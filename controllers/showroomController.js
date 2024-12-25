@@ -1,49 +1,41 @@
-const Showroom = require('../models/showroom');
+const Showroom = require("../models/showroom");
 
-
-// A controller to manage Showroom instances
-class ShowroomController {
-    constructor() {
-        this.showrooms = []; // Array to store showroom instances
+// Get all showrooms
+const getShowrooms = async (req, res) => {
+    try {
+        const showrooms = await Showroom.find({});
+        res.status(200).json({ success: true, data: showrooms });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
+};
 
-    // Add a new showroom
-    addShowroom(data) {
-        const { image, showroomName, owner, address, panCard, cinNumber } = data;
-        const showroom = new Showroom(image, showroomName, owner, address, panCard, cinNumber);
+// Add a new showroom
+const addShowroom = async (req, res) => {
+    try {
+        const showroomData = req.body;
+        const newShowroom = await Showroom.create(showroomData);
 
-        try {
-            showroom.validateDetails();
-            this.showrooms.push(showroom);
-            return "Showroom added successfully.";
-        } catch (error) {
-            throw new Error(`Failed to add showroom: ${error.message}`);
+        res.status(201).json({ success: true, message: "Showroom added successfully.", data: newShowroom });
+    } catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+};
+
+// Delete a showroom
+const deleteShowroom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedShowroom = await Showroom.findByIdAndDelete(id);
+
+        if (!deletedShowroom) {
+            return res.status(404).json({ success: false, message: "Showroom not found." });
         }
-    }
 
-    // Get all showrooms
-    getAllShowrooms() {
-        return this.showrooms.map(showroom => showroom.displayDetails());
+        res.status(200).json({ success: true, message: "Showroom deleted successfully." });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
+};
 
-    // Find a showroom by name
-    findShowroomByName(name) {
-        const showroom = this.showrooms.find(s => s.showroomName === name);
-        if (!showroom) {
-            throw new Error(`Showroom with name '${name}' not found.`);
-        }
-        return showroom.displayDetails();
-    }
-
-    // Delete a showroom by name
-    deleteShowroomByName(name) {
-        const index = this.showrooms.findIndex(s => s.showroomName === name);
-        if (index === -1) {
-            throw new Error(`Showroom with name '${name}' not found.`);
-        }
-        this.showrooms.splice(index, 1);
-        return `Showroom '${name}' deleted successfully.`;
-    }
-}
-
-module.exports = ShowroomController;
+module.exports = { getShowrooms, addShowroom, deleteShowroom };

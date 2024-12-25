@@ -1,186 +1,121 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createUser,
-  verifyOtp,
-  loginUser,
-  updateUser,
-  getUserById,
   getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
   deleteUser,
+  sendOTP,
+  verifyOTP
 } = require('../controllers/userController');
-const authenticate = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
  * tags:
- *   - name: User Management
- *     description: APIs for managing users
+ *   name: Users
+ *   description: User management
  */
-
-/**
- * @swagger
- * /users/create:
- *   post:
- *     summary: Create a new user
- *     description: Creates a new user with the provided details.
- *     tags: [User Management]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               profilePic:
- *                 type: string
- *                 format: uri
- *                 example: "https://example.com/image.jpg"
- *               type:
- *                 type: string
- *                 enum: [user, admin, showroom]
- *                 example: "user"
- *               name:
- *                 type: string
- *                 example: "John Doe"
- *               username:
- *                 type: string
- *                 example: "johndoe"
- *               phoneNumber:
- *                 type: string
- *                 example: "+1234567890"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "johndoe@example.com"
- *               password:
- *                 type: string
- *                 format: password
- *                 example: "securepassword123"
- *     responses:
- *       201:
- *         description: User created successfully.
- *       500:
- *         description: Server error.
- */
-router.post('/create', authenticate, createUser);
-
-/**
- * @swagger
- * /users/verify-otp:
- *   post:
- *     summary: Verify the OTP
- *     description: Verifies the OTP sent to the user's email.
- *     tags: [User Management] 
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "johndoe@example.com"
- *               otp:
- *                 type: string
- *                 example: "123456"
- *     responses:
- *       200:
- *         description: OTP verified successfully.
- *       400:
- *         description: Invalid or expired OTP.
- *       500:
- *         description: Server error.
- */
-router.post('/verify-otp', verifyOtp);
-
-/**
- * @swagger
- * /users/login:
- *   post:
- *     summary: Login user
- *     description: Authenticates a user and returns a JWT token.
- *     tags: [User Management]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "johndoe@example.com"
- *               password:
- *                 type: string
- *                 format: password
- *                 example: "securepassword123"
- *     responses:
- *       200:
- *         description: Login successful.
- *       401:
- *         description: Invalid credentials.
- *       500:
- *         description: Server error.
- */
-router.post('/login', loginUser);
-
-/**
- * @swagger
- * /users/{id}:
- *   get:
- *     summary: Get user by ID
- *     description: Retrieves a user by their ID.
- *     tags: [User Management]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User found.
- *       404:
- *         description: User not found.
- *       500:
- *         description: Server error.
- */
-router.get('/:id', authenticate, getUserById);
 
 /**
  * @swagger
  * /users:
  *   get:
  *     summary: Get all users
- *     description: Retrieves a list of all users.
- *     tags: [User Management]
+ *     tags: [Users]
  *     responses:
  *       200:
- *         description: List of users retrieved successfully.
- *       500:
- *         description: Server error.
+ *         description: List of users
  */
-router.get('/', authenticate, getAllUsers);
+router.get('/', getAllUsers);
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Get a user by ID
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the user to fetch
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User data
+ */
+router.get('/:id', getUserById);
+
+/**
+ * @swagger
+ * /users:
+ *   post:
+ *     summary: Create a new user
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/User'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ */
+router.post('/', createUser);
 
 /**
  * @swagger
  * /users/{id}:
  *   put:
- *     summary: Update user by ID
- *     description: Updates a user's details by their ID.
- *     tags: [User Management]
+ *     summary: Update a user
+ *     tags: [Users]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: User ID
+ *         description: ID of the user to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/User'
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ */
+router.put('/:id', updateUser);
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Soft delete a user
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the user to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ */
+router.delete('/:id', deleteUser);
+
+/**
+ * @swagger
+ * /users/send-otp:
+ *   post:
+ *     summary: Send OTP to the user's email
+ *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
@@ -188,46 +123,50 @@ router.get('/', authenticate, getAllUsers);
  *           schema:
  *             type: object
  *             properties:
- *               name:
- *                 type: string
  *               email:
  *                 type: string
- *               password:
- *                 type: string
- *               profilePic:
- *                 type: string
+ *                 description: User's email address to receive OTP
+ *                 example: user@example.com
  *     responses:
  *       200:
- *         description: User updated successfully.
+ *         description: OTP sent to the user's email
  *       404:
- *         description: User not found.
+ *         description: User not found
  *       500:
- *         description: Server error.
+ *         description: Internal server error
  */
-router.put('/:id', authenticate, updateUser);
+router.post('/send-otp', sendOTP);
 
 /**
  * @swagger
- * /users/{id}/soft-delete:
- *   put:
- *     summary: Soft delete user by ID
- *     description: Soft deletes a user without permanently removing their data.
- *     tags: [User Management]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
+ * /users/verify-otp:
+ *   post:
+ *     summary: Verify OTP sent to the user's email
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: User's email address
+ *               otp:
+ *                 type: string
+ *                 description: OTP to be verified
+ *                 example: "123456"
  *     responses:
  *       200:
- *         description: User soft deleted successfully.
+ *         description: OTP verified successfully
+ *       400:
+ *         description: Invalid OTP or expired OTP
  *       404:
- *         description: User not found.
+ *         description: User not found
  *       500:
- *         description: Server error.
+ *         description: Internal server error
  */
-router.put('/:id/soft-delete', authenticate, deleteUser);
+router.post('/verify-otp', verifyOTP);
 
 module.exports = router;

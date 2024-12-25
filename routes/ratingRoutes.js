@@ -1,22 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const ratingController = require('../controllers/ratingController');
+const ratingController = require('../controllers/ratingController'); // Path to controller
+const authMiddleware = require('../middlewares/authMiddleware'); // Path to authMiddleware
+const {rbac} = require('../middlewares/rbacMiddleware'); // Path to rbacMiddleware
 
-/**
- * @swagger
- * tags:
- *   name: Ratings
- *   description: Rating and comments management
- */
-
+// Swagger route for creating a rating
 /**
  * @swagger
  * /ratings:
  *   post:
- *     summary: Add a rating for a product
+ *     summary: Create a new rating
+ *     description: Create a new rating for a product
  *     tags: [Ratings]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -24,58 +21,44 @@ const ratingController = require('../controllers/ratingController');
  *           schema:
  *             type: object
  *             properties:
- *               productId:
+ *               user:
+ *                 type: string
+ *               product:
  *                 type: string
  *               rating:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
+ *                 type: integer
  *               review:
  *                 type: string
  *     responses:
  *       201:
- *         description: Rating added successfully
+ *         description: Rating created successfully
  *       500:
- *         description: Error adding rating
+ *         description: Internal Server Error
  */
-router.post('/', ratingController.addRating);
+router.post(
+  '/ratings',
+  authMiddleware,
+  rbac('admin'), // Only admin users can create a rating
+  ratingController.createRating
+);
 
-/**
- * @swagger
- * /ratings/product/{productId}:
- *   get:
- *     summary: Get all ratings for a product
- *     tags: [Ratings]
- *     parameters:
- *       - in: path
- *         name: productId
- *         schema:
- *           type: string
- *         required: true
- *         description: ID of the product
- *     responses:
- *       200:
- *         description: List of ratings
- *       500:
- *         description: Error fetching ratings
- */
-router.get('/product/:productId', ratingController.getRatingsByProduct);
-
+// Swagger route for adding a comment
 /**
  * @swagger
  * /ratings/{ratingId}/comments:
  *   post:
  *     summary: Add a comment to a rating
+ *     description: Add a comment to a specific rating
  *     tags: [Ratings]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
- *       - in: path
- *         name: ratingId
+ *       - name: ratingId
+ *         in: path
+ *         required: true
+ *         description: The ID of the rating to add a comment to
  *         schema:
  *           type: string
- *         required: true
- *         description: ID of the rating
  *     requestBody:
  *       required: true
  *       content:
@@ -88,30 +71,71 @@ router.get('/product/:productId', ratingController.getRatingsByProduct);
  *     responses:
  *       200:
  *         description: Comment added successfully
+ *       404:
+ *         description: Rating not found
  *       500:
- *         description: Error adding comment
+ *         description: Internal Server Error
  */
-router.post('/:ratingId/comments', ratingController.addComment);
+router.post(
+  '/ratings/:ratingId/comments',
+  authMiddleware,
+  rbac('user'), // Users can comment
+  ratingController.addComment
+);
 
+// Swagger route for getting ratings of a product
+/**
+ * @swagger
+ * /ratings/product/{productId}:
+ *   get:
+ *     summary: Get ratings for a product
+ *     description: Retrieve all ratings for a specific product
+ *     tags: [Ratings]
+ *     parameters:
+ *       - name: productId
+ *         in: path
+ *         required: true
+ *         description: The product ID to get ratings for
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: A list of ratings
+ *       500:
+ *         description: Internal Server Error
+ */
+router.get('/ratings/product/:productId', ratingController.getRatingsByProduct);
+
+// Swagger route for deleting a rating
 /**
  * @swagger
  * /ratings/{ratingId}:
- *   get:
- *     summary: Get a rating with comments
+ *   delete:
+ *     summary: Delete a rating
+ *     description: Delete a specific rating by its ID
  *     tags: [Ratings]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
- *       - in: path
- *         name: ratingId
+ *       - name: ratingId
+ *         in: path
+ *         required: true
+ *         description: The ID of the rating to delete
  *         schema:
  *           type: string
- *         required: true
- *         description: ID of the rating
  *     responses:
  *       200:
- *         description: Rating details with comments
+ *         description: Rating deleted successfully
+ *       404:
+ *         description: Rating not found
  *       500:
- *         description: Error fetching rating
+ *         description: Internal Server Error
  */
-router.get('/:ratingId', ratingController.getRatingWithComments);
+router.delete(
+  '/ratings/:ratingId',
+  authMiddleware,
+  rbac('admin'),
+  ratingController.deleteRating
+);
 
 module.exports = router;

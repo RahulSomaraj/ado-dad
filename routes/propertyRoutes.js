@@ -1,151 +1,142 @@
-// routes.js
-
 const express = require('express');
-const propertiesController = require('../controllers/propertiesController');
 const router = express.Router();
+const { createProperty, getAllProperties, getPropertyById, updateProperty, deleteProperty } = require('../controllers/propertiesController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const {rbac} = require('../middlewares/rbacMiddleware'); // Role-based access control
 
 /**
  * @swagger
  * tags:
  *   name: Properties
- *   description: Properties management
+ *   description: API for managing properties
  */
 
 /**
  * @swagger
- * /properties:
+ * /api/properties:
  *   get:
- *     summary: Retrieve all properties
+ *     summary: Get all properties
  *     tags: [Properties]
- *     description: Get a list of all properties available.
  *     responses:
  *       200:
- *         description: A list of all properties.
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
+ *         description: List of all properties
  */
-router.get('/properties', propertiesController.getAllProperties);
+router.get('/', getAllProperties);
 
 /**
  * @swagger
- * /properties/sale:
+ * /api/properties/{id}:
  *   get:
- *     summary: Retrieve all properties for sale
+ *     summary: Get property by ID
  *     tags: [Properties]
- *     description: Get a list of properties that are for sale.
- *     responses:
- *       200:
- *         description: A list of properties for sale.
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- */
-router.get('/properties/sale', propertiesController.getForSaleProperties);
-
-/**
- * @swagger
- * /properties/rent:
- *   get:
- *     summary: Retrieve all properties for rent
- *     tags: [Properties]
- *     description: Get a list of properties available for rent.
- *     responses:
- *       200:
- *         description: A list of properties for rent.
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- */
-router.get('/properties/rent', propertiesController.getForRentProperties);
-
-/**
- * @swagger
- * /properties/{category}/{type}:
- *   get:
- *     summary: Retrieve properties by category and type
- *     tags: [Properties]
- *     description: Get properties based on a specific category (e.g., forSale, forRent) and type (e.g., houses, apartments).
  *     parameters:
- *       - name: category
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The category of the properties (e.g., forSale, forRent).
- *         schema:
- *           type: string
- *       - name: type
- *         in: path
- *         required: true
- *         description: The type of the properties (e.g., houses, apartments).
+ *         description: Property ID
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: A list of properties of the specified category and type.
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
+ *         description: Property data
  *       404:
- *         description: Category or type not found.
+ *         description: Property not found
  */
-router.get('/properties/:category/:type', propertiesController.getPropertiesByType);
+router.get('/:id', getPropertyById);
 
 /**
  * @swagger
- * /properties:
+ * /api/properties:
  *   post:
- *     summary: Post a new property
+ *     summary: Create a new property
  *     tags: [Properties]
- *     description: Add a new property to a specified category and type.
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
+ *       description: Property data
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               category:
+ *               title:
  *                 type: string
- *                 description: The category of the property (e.g., forSale, forRent).
+ *               description:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               location:
+ *                 type: string
+ *               area:
+ *                 type: number
  *               type:
  *                 type: string
- *                 description: The type of the property (e.g., houses, apartments).
- *               property:
- *                 type: object
- *                 description: The property details.
- *                 properties:
- *                   title:
- *                     type: string
- *                   description:
- *                     type: string
- *                   price:
- *                     type: number
- *                   location:
- *                     type: string
- *                   postedBy:
- *                     type: string
- *                   datePosted:
- *                     type: string
+ *               category:
+ *                 type: string
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *     responses:
  *       201:
- *         description: Property posted successfully.
+ *         description: Property created
  *       400:
- *         description: Invalid category or type.
- *       500:
- *         description: Error posting property.a
+ *         description: Invalid input
  */
-router.post('/properties', propertiesController.postProperty);
+router.post('/', authMiddleware, rbac(['admin', 'seller']), createProperty);
+
+/**
+ * @swagger
+ * /api/properties/{id}:
+ *   put:
+ *     summary: Update a property
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Property ID
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       description: Updated property data
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Property updated
+ *       404:
+ *         description: Property not found
+ */
+router.put('/:id', authMiddleware, rbac(['admin', 'seller']), updateProperty);
+
+/**
+ * @swagger
+ * /api/properties/{id}:
+ *   delete:
+ *     summary: Delete a property
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Property ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Property deleted
+ *       404:
+ *         description: Property not found
+ */
+router.delete('/:id', authMiddleware, rbac(['admin', 'seller']), deleteProperty);
 
 module.exports = router;

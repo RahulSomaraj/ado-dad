@@ -1,40 +1,39 @@
-class Showroom {
-    constructor(image, showroomName, owner, address, panCard, cinNumber) {
-        this.image = image; // URL or path to the showroom's image
-        this.showroomName = showroomName; // Name of the showroom
-        this.owner = owner; // Owner's name
-        this.address = address; // Address of the showroom
-        this.panCard = panCard; // PAN Card number
-        this.cinNumber = cinNumber; // CIN (Corporate Identification Number)
+const mongoose = require("mongoose");
+
+const showroomSchema = new mongoose.Schema(
+    {
+        image: {
+            type: String,
+            required: [true, "Image URL is required"],
+        },
+        showroomName: {
+            type: String,
+            required: [true, "Showroom name is required"],
+        },
+        owner: {
+            type: String,
+            required: [true, "Owner name is required"],
+        },
+        address: {
+            type: String,
+            required: [true, "Address is required"],
+        },
+        panCard: {
+            type: String,
+            required: [true, "PAN Card number is required"],
+            match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN Card format"],
+        },
+        cinNumber: {
+            type: String,
+            required: [true, "CIN Number is required"],
+            match: [/^[A-Z]{1}[0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{1}$/, "Invalid CIN Number format"],
+        },
+    },
+    {
+        timestamps: true,
     }
+);
 
-    // Display showroom details
-    displayDetails() {
-        return `
-        Showroom Name: ${this.showroomName}
-        Owner: ${this.owner}
-        Address: ${this.address}
-        PAN Card: ${this.panCard}
-        CIN Number: ${this.cinNumber}
-        Image URL: ${this.image}
-        `;
-    }
-
-    // To validate essential details
-    validateDetails() {
-        if (!this.image || !this.showroomName || !this.owner || !this.address || !this.panCard || !this.cinNumber) {
-            throw new Error("All fields are required to create a showroom.");
-        }
-        return true;
-    }
-}
-
-
-try {
-    myShowroom.validateDetails();
-    console.log(myShowroom.displayDetails());
-} catch (error) {
-    console.error(error.message);
-}
+const Showroom = mongoose.model("Showroom", showroomSchema);
 
 module.exports = Showroom;

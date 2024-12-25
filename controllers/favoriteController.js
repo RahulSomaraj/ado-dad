@@ -1,56 +1,45 @@
 const Favorite = require('../models/favorites');
 
 // Add a favorite
-const addFavorite = async (req, res) => {
+exports.addFavorite = async (req, res) => {
   try {
-    const { userId, itemId, itemType } = req.body;
-
-
-    // Check if the favorite already exists
-    const existingFavorite = await Favorite.findOne({ userId, itemId, itemType });
-    if (existingFavorite) {
-      return res.status(400).json({ message: 'Item is already in favorites.' });
-    }
+    const { itemId, itemType } = req.body;
+    const userId = req.user.id; // AuthMiddleware should populate `req.user`
 
     const favorite = new Favorite({ userId, itemId, itemType });
     await favorite.save();
 
-    res.status(201).json(favorite);
+    return res.status(201).json({ message: 'Item added to favorites', favorite });
   } catch (error) {
-    res.status(500).json({ message: 'Error adding favorite.', error });
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Get all favorites for a user
-const getFavorites = async (req, res) => {
+// Get user's favorites
+exports.getUserFavorites = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
     const favorites = await Favorite.find({ userId }).populate('itemId');
 
-    res.status(200).json(favorites);
+    return res.status(200).json({ favorites });
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving favorites.', error });
+    return res.status(500).json({ message: error.message });
   }
 };
 
 // Remove a favorite
-const removeFavorite = async (req, res) => {
+exports.removeFavorite = async (req, res) => {
   try {
-    const { userId, itemId } = req.body;
+    const { favoriteId } = req.params;
+    const userId = req.user.id;
 
-    const favorite = await Favorite.findOneAndDelete({ userId, itemId });
+    const favorite = await Favorite.findOneAndDelete({ _id: favoriteId, userId });
     if (!favorite) {
-      return res.status(404).json({ message: 'Favorite not found.' });
+      return res.status(404).json({ message: 'Favorite not found' });
     }
 
-    res.status(200).json({ message: 'Favorite removed successfully.' });
+    return res.status(200).json({ message: 'Item removed from favorites' });
   } catch (error) {
-    res.status(500).json({ message: 'Error removing favorite.', error });
+    return res.status(500).json({ message: error.message });
   }
-};
-
-module.exports = {
-  addFavorite,
-  getFavorites,
-  removeFavorite
 };

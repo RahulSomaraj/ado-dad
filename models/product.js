@@ -23,14 +23,6 @@ const productSchema = new mongoose.Schema(
       ref: 'Vendor', // Reference to the Vendor model
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

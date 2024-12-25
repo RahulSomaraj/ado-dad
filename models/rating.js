@@ -17,7 +17,7 @@ const commentSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { _id: false } // Disabling automatic `_id` for embedded sub-document
+  { _id: false } // Ensuring the comment doesn't have an _id
 );
 
 const ratingSchema = new mongoose.Schema(

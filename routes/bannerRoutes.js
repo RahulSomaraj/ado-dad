@@ -1,7 +1,8 @@
 const express = require('express');
-const bannerController = require('../controllers/bannerController');
-
 const router = express.Router();
+const bannerController = require('../controllers/bannerController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const {rbac} = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
@@ -12,10 +13,12 @@ const router = express.Router();
 
 /**
  * @swagger
- * /banners:
+ * /api/banners:
  *   post:
  *     summary: Create a new banner
  *     tags: [Banners]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -25,71 +28,81 @@ const router = express.Router();
  *             properties:
  *               title:
  *                 type: string
- *                 description: Banner title
  *               image:
  *                 type: string
- *                 description: Banner image URL
  *               link:
  *                 type: string
- *                 description: Banner link URL
  *     responses:
  *       201:
- *         description: Banner created successfully.
+ *         description: Banner created successfully
  *       500:
- *         description: Error creating banner.
+ *         description: Server error
  */
-router.post('/', bannerController.createBanner);
+router.post(
+  '/',
+  authMiddleware,
+  rbac(['admin','vendor','user']), // Restrict access to admin
+  bannerController.createBanner
+);
 
 /**
  * @swagger
- * /banners:
+ * /api/banners:
  *   get:
  *     summary: Get all banners
  *     tags: [Banners]
  *     responses:
  *       200:
- *         description: List of all banners.
+ *         description: A list of banners
  *       500:
- *         description: Error fetching banners.
+ *         description: Server error
  */
-router.get('/', bannerController.getBanners);
+router.get(
+  '/',
+  authMiddleware,
+  bannerController.getBanners
+);
 
 /**
  * @swagger
- * /banners/{id}:
+ * /api/banners/{id}:
  *   get:
  *     summary: Get a banner by ID
  *     tags: [Banners]
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: Banner ID
  *     responses:
  *       200:
- *         description: Banner details.
+ *         description: Banner details
  *       404:
- *         description: Banner not found.
+ *         description: Banner not found
  *       500:
- *         description: Error fetching banner.
+ *         description: Server error
  */
-router.get('/:id', bannerController.getBannerById);
+router.get(
+  '/:id',
+  authMiddleware,
+  bannerController.getBannerById
+);
 
 /**
  * @swagger
- * /banners/{id}:
+ * /api/banners/{id}:
  *   put:
  *     summary: Update a banner
  *     tags: [Banners]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: Banner ID
  *     requestBody:
  *       required: true
  *       content:
@@ -99,44 +112,52 @@ router.get('/:id', bannerController.getBannerById);
  *             properties:
  *               title:
  *                 type: string
- *                 description: Banner title
  *               image:
  *                 type: string
- *                 description: Banner image URL
  *               link:
  *                 type: string
- *                 description: Banner link URL
  *     responses:
  *       200:
- *         description: Banner updated successfully.
+ *         description: Banner updated successfully
  *       404:
- *         description: Banner not found.
+ *         description: Banner not found
  *       500:
- *         description: Error updating banner.
+ *         description: Server error
  */
-router.put('/:id', bannerController.updateBanner);
+router.put(
+  '/:id',
+  authMiddleware,
+  rbac('admin'),
+  bannerController.updateBanner
+);
 
 /**
  * @swagger
- * /banners/{id}:
+ * /api/banners/{id}:
  *   delete:
  *     summary: Delete a banner
  *     tags: [Banners]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: Banner ID
  *     responses:
  *       200:
- *         description: Banner deleted successfully.
+ *         description: Banner deleted successfully
  *       404:
- *         description: Banner not found.
+ *         description: Banner not found
  *       500:
- *         description: Error deleting banner.
+ *         description: Server error
  */
-router.delete('/:id', bannerController.deleteBanner);
+router.delete(
+  '/:id',
+  authMiddleware,
+  rbac('admin'),
+  bannerController.deleteBanner
+);
 
 module.exports = router;

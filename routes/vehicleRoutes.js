@@ -1,20 +1,52 @@
 const express = require('express');
 const router = express.Router();
-const vehicleController = require('../controllers/vehicleController');
+const { getAllVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle } = require('../controllers/vehicleController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const {rbac} = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
  * tags:
- *   - name: Vehicles
- *     description: Vehicle management APIs
+ *   name: Vehicles
+ *   description: Vehicle management
  */
+
+/**
+ * @swagger
+ * /vehicles:
+ *   get:
+ *     summary: Get all vehicles (with vendor info)
+ *     tags: [Vehicles]
+ *     responses:
+ *       200:
+ *         description: List of vehicles with vendor information
+ */
+router.get('/', authMiddleware, rbac(['admin', 'showroom']), getAllVehicles);
+
+/**
+ * @swagger
+ * /vehicles/{id}:
+ *   get:
+ *     summary: Get a vehicle by ID (with vendor info)
+ *     tags: [Vehicles]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Vehicle ID
+ *     responses:
+ *       200:
+ *         description: Vehicle details with vendor information
+ */
+router.get('/:id', authMiddleware, rbac(['admin', 'showroom']), getVehicleById);
 
 /**
  * @swagger
  * /vehicles:
  *   post:
- *     summary: Create a new vehicle
- *     description: Creates a new vehicle with the provided data.
+ *     summary: Create a new vehicle with vendor association
  *     tags: [Vehicles]
  *     requestBody:
  *       required: true
@@ -23,77 +55,30 @@ const vehicleController = require('../controllers/vehicleController');
  *           schema:
  *             type: object
  *             properties:
- *               name:
- *                 type: string
- *               model:
- *                 type: string
- *               year:
- *                 type: integer
  *               vendorId:
  *                 type: string
+ *                 description: Vendor ID to associate
+ *               vehicleData:
+ *                 $ref: '#/components/schemas/Vehicle'
  *     responses:
  *       201:
  *         description: Vehicle created successfully
- *       400:
- *         description: Validation error or bad request
  */
-router.post('/', vehicleController.createVehicle);
-
-/**
- * @swagger
- * /vehicles:
- *   get:
- *     summary: Get all vehicles
- *     description: Retrieves a list of all vehicles.
- *     tags: [Vehicles]
- *     responses:
- *       200:
- *         description: List of vehicles
- *       500:
- *         description: Internal server error
- */
-router.get('/', vehicleController.getAllVehicles);
-
-/**
- * @swagger
- * /vehicles/{id}:
- *   get:
- *     summary: Get a single vehicle by ID
- *     description: Retrieves a vehicle by its ID.
- *     tags: [Vehicles]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID of the vehicle to retrieve
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Vehicle found
- *       404:
- *         description: Vehicle not found
- *       400:
- *         description: Invalid ID format
- *       500:
- *         description: Internal server error
- */
-router.get('/:id', vehicleController.getVehicleById);
+router.post('/', authMiddleware, rbac(['admin']), createVehicle);
 
 /**
  * @swagger
  * /vehicles/{id}:
  *   put:
- *     summary: Update a vehicle by ID
- *     description: Updates the vehicle with the specified ID using provided data.
+ *     summary: Update a vehicle and its vendor
  *     tags: [Vehicles]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: ID of the vehicle to update
  *         schema:
  *           type: string
+ *         description: Vehicle ID
  *     requestBody:
  *       required: true
  *       content:
@@ -101,50 +86,34 @@ router.get('/:id', vehicleController.getVehicleById);
  *           schema:
  *             type: object
  *             properties:
- *               name:
- *                 type: string
- *               model:
- *                 type: string
- *               year:
- *                 type: integer
  *               vendorId:
  *                 type: string
+ *                 description: Vendor ID to update
+ *               vehicleData:
+ *                 $ref: '#/components/schemas/Vehicle'
  *     responses:
  *       200:
  *         description: Vehicle updated successfully
- *       404:
- *         description: Vehicle not found
- *       400:
- *         description: Validation error or invalid ID format
- *       500:
- *         description: Internal server error
  */
-router.put('/:id', vehicleController.updateVehicle);
+router.put('/:id', authMiddleware, rbac(['admin', 'showroom']), updateVehicle);
 
 /**
  * @swagger
  * /vehicles/{id}:
  *   delete:
- *     summary: Delete a vehicle by ID
- *     description: Deletes a vehicle by its ID.
+ *     summary: Delete a vehicle
  *     tags: [Vehicles]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: ID of the vehicle to delete
  *         schema:
  *           type: string
+ *         description: Vehicle ID
  *     responses:
  *       200:
  *         description: Vehicle deleted successfully
- *       404:
- *         description: Vehicle not found
- *       400:
- *         description: Invalid ID format
- *       500:
- *         description: Internal server error
  */
-router.delete('/:id', vehicleController.deleteVehicle);
+router.delete('/:id', authMiddleware, rbac(['admin']), deleteVehicle);
 
 module.exports = router;

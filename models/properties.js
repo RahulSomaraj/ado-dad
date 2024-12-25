@@ -1,53 +1,60 @@
-// properties.js
-
 const mongoose = require('mongoose');
 
 // Defining the Schema
 const propertySchema = new mongoose.Schema({
     title: {
         type: String,
-        required: true
+        required: true,
+        trim: true,
     },
     description: {
         type: String,
-        required: true
+        required: true,
     },
     price: {
         type: Number,
-        required: true
+        required: true,
+        min: 0,
     },
     location: {
         type: String,
-        required: true
+        required: true,
     },
     area: {
-        type: Number, // area in square feet or meters
-        required: true
+        type: Number,
+        required: true,
+        min: 0,
     },
-    images: [String], // array of image URLs
+    images: {
+        type: [String], // array of image URLs
+        validate: [arrayLimit, '{PATH} exceeds the limit of 5 images']
+    },
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', // Assuming there's a 'User' model for property owner
-        required: true
+        required: true,
     },
     type: {
         type: String,
         enum: ['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'],
-        required: true
+        required: true,
     },
     category: {
         type: String,
         enum: ['forSale', 'forRent', 'landsAndPlots'],
-        required: true
+        required: true,
     },
     createdAt: {
         type: Date,
-        default: Date.now
+        default: Date.now,
     }
 });
 
-// Define models for each property category (For Sale, For Rent, Lands and Plots)
+// Helper function for image array limit validation
+function arrayLimit(val) {
+    return val.length <= 5;
+}
+
 const Property = mongoose.model('Property', propertySchema);
 
-// Export the Property model
 module.exports = Property;

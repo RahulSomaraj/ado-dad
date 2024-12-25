@@ -6,7 +6,7 @@ const Product = require('../models/product');
 // Create a new vendor
 exports.createVendor = async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, phoneNumber, address } = req.body;
 
     // Check if vendor already exists
     const vendorExists = await Vendor.findOne({ email });
@@ -14,7 +14,7 @@ exports.createVendor = async (req, res) => {
       return res.status(400).json({ message: 'Vendor already exists' });
     }
 
-    const vendor = new Vendor({ name, email, role });
+    const vendor = new Vendor({ name, email, phoneNumber, address });
     await vendor.save();
     res.status(201).json({ message: 'Vendor created successfully', vendor });
   } catch (error) {

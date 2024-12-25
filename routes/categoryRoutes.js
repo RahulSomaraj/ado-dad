@@ -1,36 +1,14 @@
-const express = require("express");
-const categoryController = require("../controllers/categoryController");
-
+const express = require('express');
 const router = express.Router();
+const CategoryController = require('../controllers/categoryController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const {rbac} = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
- * components:
- *   schemas:
- *     Subcategory:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           description: The name of the subcategory
- *         description:
- *           type: string
- *           description: A brief description of the subcategory
- *     Category:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           description: The name of the category
- *         description:
- *           type: string
- *           description: A brief description of the category
- *         subcategories:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/Subcategory'
- *       required:
- *         - name
+ * tags:
+ *   name: Categories
+ *   description: Category management API
  */
 
 /**
@@ -39,19 +17,33 @@ const router = express.Router();
  *   post:
  *     summary: Create a new category
  *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Category'
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Electronics
+ *               icon:
+ *                 type: string
+ *                 example: icon-url.png
  *     responses:
  *       201:
- *         description: The category was successfully created
- *       500:
- *         description: Failed to create the category
+ *         description: Category created successfully
+ *       400:
+ *         description: Validation error
  */
-router.post("/c", categoryController.createCategory);
+router.post(
+  '/categories',
+  authMiddleware,
+  rbac(['admin']), // Allow only admins to create categories
+  CategoryController.createCategory
+);
 
 /**
  * @swagger
@@ -61,17 +53,9 @@ router.post("/c", categoryController.createCategory);
  *     tags: [Categories]
  *     responses:
  *       200:
- *         description: List of all categories
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Category'
- *       500:
- *         description: Failed to fetch categories
+ *         description: Categories fetched successfully
  */
-router.get("/", categoryController.getAllCategories);
+router.get('/categories', authMiddleware, CategoryController.getAllCategories);
 
 /**
  * @swagger
@@ -82,74 +66,79 @@ router.get("/", categoryController.getAllCategories);
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
+ *         description: Category ID
  *         schema:
  *           type: string
- *         required: true
- *         description: The category ID
  *     responses:
  *       200:
- *         description: The category details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Category'
+ *         description: Category fetched successfully
  *       404:
  *         description: Category not found
- *       500:
- *         description: Failed to fetch the category
  */
-router.get("/:id", categoryController.getCategoryById);
+router.get('/categories/:id', authMiddleware, CategoryController.getCategoryById);
 
 /**
  * @swagger
  * /categories/{id}:
  *   put:
- *     summary: Update a category by ID
+ *     summary: Update a category
  *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
+ *         description: Category ID
  *         schema:
  *           type: string
- *         required: true
- *         description: The category ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Category'
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               icon:
+ *                 type: string
  *     responses:
  *       200:
- *         description: The category was updated
- *       404:
- *         description: Category not found
- *       500:
- *         description: Failed to update the category
+ *         description: Category updated successfully
  */
-router.put("/:id", categoryController.updateCategory);
+router.put(
+  '/categories/:id',
+  authMiddleware,
+  rbac(['admin']),
+  CategoryController.updateCategory
+);
 
 /**
  * @swagger
  * /categories/{id}:
  *   delete:
- *     summary: Delete a category by ID
+ *     summary: Delete a category
  *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
+ *         description: Category ID
  *         schema:
  *           type: string
- *         required: true
- *         description: The category ID
  *     responses:
  *       200:
- *         description: The category was deleted
- *       404:
- *         description: Category not found
- *       500:
- *         description: Failed to delete the category
+ *         description: Category deleted successfully
  */
-router.delete("/:id", categoryController.deleteCategory);
+router.delete(
+  '/categories/:id',
+  authMiddleware,
+  rbac(['admin']),
+  CategoryController.deleteCategory
+);
 
 module.exports = router;

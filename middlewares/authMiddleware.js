@@ -1,29 +1,58 @@
 const jwt = require('jsonwebtoken');
-const Vendor = require('../models/vendor'); // Assuming the vendor model is imported here
+const User = require('../models/User'); // Assuming the User model is imported here
+const { default: mongoose } = require('mongoose');
 
-// Middleware to authenticate the user based on JWT
+// Middleware to authenticate the user based on JWT and include role verification
 const authMiddleware = async (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', ''); // Get token from Authorization header
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
-  }
-
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Replace JWT_SECRET with your secret key
-    const vendor = await Vendor.findById(decoded.id); // Find user by decoded ID
+    // Get token from Authorization header
+    const token = req.header('Authorization')?.replace('Bearer ', '');
 
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor not found.' });
+    if (!token) {
+      return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
 
-    // Attach user information to the request
-    req.user = vendor; // Add the vendor object to the request
+    // Check for malformed token
+    const tokenRegex = /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*$/;
+    if (!tokenRegex.test(token)) {
+      return res.status(400).json({ error: 'Malformed token.' });
+    }
 
-    next(); // Continue to the next middleware or route handler
+    // Validate presence of JWT secret
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is missing in environment variables.');
+      return res.status(500).json({ error: 'Server configuration error.' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user by decoded ID
+    const user = await User.findOne({ _id: new mongoose.Types.ObjectId(decoded.userId) });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    // Attach user information and role to the request
+    req.user = user;
+    req.role = user.type; // Assuming the role is stored in the `role` field in the User model
+
+    // Optionally check role permissions
+    if (req.role !== 'admin' && req.role !== 'user') {
+      return res.status(403).json({ error: 'Access denied. Insufficient permissions.' });
+    }
+
+    next(); // Proceed to the next middleware or route handler
   } catch (error) {
-    return res.status(400).json({ error: 'Invalid or expired token.' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token has expired.' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(400).json({ error: 'Invalid token.' });
+    }
+    // General error handling
+    return res.status(500).json({ error: error.message || 'An error occurred during authentication.' });
   }
 };
 

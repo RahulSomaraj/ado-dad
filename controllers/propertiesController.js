@@ -1,108 +1,77 @@
-// Importing the properties object
-const properties = require('../models/properties');
+const Property = require('../models/properties');
 
-// Utility function to validate category and type
-const isValidCategoryAndType = (category, type) => {
-    return properties[category] && (category === 'landsAndPlots' || properties[category][type]);
-};
-
-// Controller function to get all properties
-const getAllProperties = (req, res) => {
+// Create a new property
+const createProperty = async (req, res) => {
     try {
-        res.status(200).json({
-            message: 'Successfully retrieved all properties',
-            properties: properties.viewAll
-        });
+        const propertyData = req.body;
+        propertyData.owner = req.user.id; // Assume `req.user.id` comes from auth middleware
+        const property = new Property(propertyData);
+        await property.save();
+        res.status(201).json({ success: true, data: property });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving properties', error: error.message });
+        res.status(400).json({ success: false, message: error.message });
     }
 };
 
-// Controller function to get properties for sale by type
-const getForSaleProperties = (req, res) => {
+// Get all properties
+const getAllProperties = async (req, res) => {
     try {
-        res.status(200).json({
-            message: 'Successfully retrieved properties for sale',
-            properties: properties.forSale
-        });
+        const properties = await Property.find().populate('owner', 'name email');
+        res.status(200).json({ success: true, data: properties });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving for sale properties', error: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Controller function to get properties for rent by type
-const getForRentProperties = (req, res) => {
+// Get a property by ID
+const getPropertyById = async (req, res) => {
     try {
-        res.status(200).json({
-            message: 'Successfully retrieved properties for rent',
-            properties: properties.forRent
-        });
+        const { id } = req.params;
+        const property = await Property.findById(id).populate('owner', 'name email');
+        if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+        res.status(200).json({ success: true, data: property });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving for rent properties', error: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Controller function to get properties by type (e.g., houses, apartments)
-const getPropertiesByType = (req, res) => {
-    const { category, type } = req.params;
-
+// Update a property
+const updateProperty = async (req, res) => {
     try {
-        // Validate category and type
-        if (!properties[category]) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
-        if (category !== 'landsAndPlots' && !properties[category][type]) {
-            return res.status(404).json({ message: 'Type not found in the category' });
-        }
+        const { id } = req.params;
+        const updatedData = req.body;
 
-        res.status(200).json({
-            message: `Successfully retrieved ${type} properties in the ${category} category`,
-            properties: properties[category][type]
-        });
+        const property = await Property.findOneAndUpdate(
+            { _id: id, owner: req.user.id }, // Ensure the owner matches the user
+            updatedData,
+            { new: true, runValidators: true }
+        );
+
+        if (!property) return res.status(404).json({ success: false, message: 'Property not found or unauthorized' });
+        res.status(200).json({ success: true, data: property });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving properties by type', error: error.message });
+        res.status(400).json({ success: false, message: error.message });
     }
 };
 
-// Controller function to post a new property
-const postProperty = (req, res) => {
-    const { category, type, property } = req.body;
-
+// Delete a property
+const deleteProperty = async (req, res) => {
     try {
-        // Validate category and type
-        if (!properties[category]) {
-            return res.status(400).json({ message: 'Invalid category' });
-        }
+        const { id } = req.params;
 
-        // Handle validation for types within the category
-        if (!isValidCategoryAndType(category, type)) {
-            return res.status(400).json({ message: 'Invalid type in the category' });
-        }
+        const property = await Property.findOneAndDelete({ _id: id, owner: req.user.id });
+        if (!property) return res.status(404).json({ success: false, message: 'Property not found or unauthorized' });
 
-        // Add the property to the appropriate category and type
-        if (category === 'landsAndPlots') {
-            properties.landsAndPlots.push(property);
-        } else {
-            properties[category][type].push(property);
-        }
-
-        // Add to viewAll
-        properties.viewAll.push(property);
-
-        res.status(201).json({
-            message: 'Property posted successfully',
-            property
-        });
+        res.status(200).json({ success: true, message: 'Property deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error posting property', error: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Exporting the controller functions for use in routing
 module.exports = {
+    createProperty,
     getAllProperties,
-    getForSaleProperties,
-    getForRentProperties,
-    getPropertiesByType,
-    postProperty
+    getPropertyById,
+    updateProperty,
+    deleteProperty,
 };

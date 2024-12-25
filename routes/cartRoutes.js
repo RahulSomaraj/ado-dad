@@ -1,94 +1,102 @@
 const express = require('express');
-const cartController = require('../controllers/cartController');
-const authenticate = require('../middlewares/authMiddleware');
-
 const router = express.Router();
+const cartController = require('../controllers/cartController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const {rbac} = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
  * tags:
  *   name: Cart
- *   description: Cart management APIs
+ *   description: Cart management API
  */
-
-/**
- * @swagger
- * /cart:
- *   post:
- *     summary: Add an item to the cart
- *     tags: [Cart]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               productId:
- *                 type: string
- *                 description: Product ID to add to the cart
- *               quantity:
- *                 type: integer
- *                 description: Quantity of the product
- *             required:
- *               - productId
- *               - quantity
- *     responses:
- *       200:
- *         description: Item added to cart.
- *       500:
- *         description: Error adding item to cart.
- */
-router.post('/', authenticate,cartController.addToCart);
 
 /**
  * @swagger
  * /cart:
  *   get:
- *     summary: Get the current user's cart
+ *     summary: Get cart for the logged-in user
  *     tags: [Cart]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: The current user's cart.
+ *         description: User's cart fetched successfully.
  *       404:
  *         description: Cart not found.
  *       500:
- *         description: Error fetching cart.
+ *         description: Server error.
  */
-router.get('/',authenticate, cartController.getCart);
+router.get(
+  '/', 
+  authMiddleware, 
+  rbac(['user', 'admin']), 
+  cartController.getCartByUserId
+);
 
 /**
  * @swagger
  * /cart:
- *   delete:
- *     summary: Remove an item from the cart
+ *   post:
+ *     summary: Add a product to the cart
  *     tags: [Cart]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [product, quantity]
  *             properties:
- *               productId:
+ *               product:
  *                 type: string
- *                 description: Product ID to remove from the cart
- *             required:
- *               - productId
+ *                 description: Product ID
+ *               quantity:
+ *                 type: number
+ *                 description: Quantity of product to add
  *     responses:
  *       200:
- *         description: Item removed from cart.
+ *         description: Product added to cart successfully.
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  '/', 
+  authMiddleware, 
+  rbac(['user', 'admin']), 
+  cartController.addToCart
+);
+
+/**
+ * @swagger
+ * /cart/{product}:
+ *   delete:
+ *     summary: Remove a product from the cart
+ *     tags: [Cart]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: product
+ *         required: true
+ *         description: Product ID to remove
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product removed from cart successfully.
  *       404:
  *         description: Cart not found.
  *       500:
- *         description: Error removing item from cart.
+ *         description: Server error.
  */
-router.delete('/',authenticate, cartController.removeFromCart);
+router.delete(
+  '/:product', 
+  authMiddleware, 
+  rbac(['user', 'admin']), 
+  cartController.removeFromCart
+);
 
 module.exports = router;
