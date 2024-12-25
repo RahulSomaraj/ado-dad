@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Assuming the User model is imported here
+const User = require('../models/user'); // Assuming the User model is imported here
 const { default: mongoose } = require('mongoose');
 
 // Middleware to authenticate the user based on JWT and include role verification
