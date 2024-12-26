@@ -20,11 +20,7 @@ mongoose
 		process.env.MONGO_URI.replace(`<username>`, process.env.MONGO_USER).replace(
 			`<insertYourPassword>`,
 			process.env.MONGO_PASSWORD
-		),
-		{
-			tls: true, // Enable TLS
-			tlsCAFile: "global-bundle.pem", // Path to the CA file
-		}
+		)
 	)
 	.then(() => console.log("MongoDB connected"))
 	.catch((error) => console.error("Error connecting to MongoDB:", error));
