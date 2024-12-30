@@ -82,7 +82,7 @@ const vehicleSchema = new mongoose.Schema({
     vendor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Vendor',
-      required: [true, 'Vendor is required.'],
+      required: [false, 'Vendor is required.'],
     },
   }
 });

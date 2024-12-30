@@ -15,19 +15,15 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose.set("debug", true);
-mongoose
-	.connect(
-		process.env.MONGO_URI.replace(`<username>`, process.env.MONGO_USER).replace(
-			`<insertYourPassword>`,
-			process.env.MONGO_PASSWORD
-		),
-		{
-			tls: true, // Enable TLS
-			tlsCAFile: "global-bundle.pem", // Path to the CA file
-		}
-	)
-	.then(() => console.log("MongoDB connected"))
-	.catch((error) => console.error("Error connecting to MongoDB:", error));
+mongoose.connect('mongodb://13.126.129.26:27017/yourDB', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    ssl: false, // Disable SSL if the server doesn't use it
+}).then(() => {
+    console.log('MongoDB connected successfully.');
+}).catch((err) => {
+    console.error('Error connecting to MongoDB:', err);
+});
 
 // Swagger configuration
 const swaggerDefinition = {
@@ -141,7 +137,7 @@ app.use("/cart", cartRoutes);
 app.use("/vehicles", vehicleRoutes);
 app.use("/ratings", ratingRoutes);
 app.use("/vendors", vendorRoutes);
-app.use("/", showroomRoutes);
+app.use("/showroom", showroomRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

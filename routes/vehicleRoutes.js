@@ -64,7 +64,7 @@ router.get('/:id', authMiddleware, rbac(['admin', 'showroom']), getVehicleById);
  *       201:
  *         description: Vehicle created successfully
  */
-router.post('/', authMiddleware, rbac(['admin']), createVehicle);
+router.post('/', authMiddleware, rbac(['admin','vendor']), createVehicle);
 
 /**
  * @swagger

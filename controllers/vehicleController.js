@@ -30,11 +30,12 @@ exports.createVehicle = async (req, res) => {
     const { vendorId, ...vehicleData } = req.body;
 
     // Ensure the vendor exists
-    const vendor = await Vendor.findById(vendorId);
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor not found' });
+    if(vendorId){
+      const vendor = await Vendor.findById(vendorId);
+      if (!vendor) {
+        return res.status(404).json({ error: 'Vendor not found' });
+      }
     }
-
     // Create the vehicle
     const newVehicle = new Vehicle({ ...vehicleData, vendor: vendorId });
     await newVehicle.save();
