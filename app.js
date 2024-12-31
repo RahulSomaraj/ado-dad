@@ -15,9 +15,7 @@ app.use(express.json());
 
 // Connect to MongoDB
 mongoose.set("debug", true);
-mongoose.connect('mongodb://13.126.129.26:27017/yourDB', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+mongoose.connect(process.env.MONGO_URI, {
     ssl: false, // Disable SSL if the server doesn't use it
 }).then(() => {
     console.log('MongoDB connected successfully.');
@@ -37,6 +35,10 @@ const swaggerDefinition = {
 		{
 			url: "http://localhost:3000",
 			description: "Development server",
+		},
+		{
+			url: "http://uat.ado-dad.com",
+			description: "Uat server",
 		},
 	],
 	components: {
@@ -126,8 +128,11 @@ const bannerRoutes = require("./routes/bannerRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const favoriteRoutes = require("./routes/favoriteRoutes");
 const showroomRoutes = require("./routes/showroomRoutes");
+const vehicleCompanyRoutes=require("./routes/vehicleCompanyRoutes");
+const advertisementRoutes=require("./routes/advertisementRoutes");
 // Use routes
 app.use("/auth", authRoutes);
+app.use("/advertisements", advertisementRoutes);
 app.use("/properties", propertyRoutes);
 app.use("/users", userRoutes);
 app.use("/categories", categoryRoutes);
@@ -138,6 +143,8 @@ app.use("/vehicles", vehicleRoutes);
 app.use("/ratings", ratingRoutes);
 app.use("/vendors", vendorRoutes);
 app.use("/showroom", showroomRoutes);
+app.use("/vehicle-companies", vehicleCompanyRoutes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
