@@ -4,11 +4,12 @@ const swaggerUi = require("swagger-ui-express");
 const morgan = require("morgan");
 
 const connectDB = require("./config/db");
-const swaggerDocs = require("./config/swagger");
 const routes = require("./routes/index");
 const errorHandler = require("./middlewares/error");
 
 dotenv.config();
+
+const swaggerDocs = require("./config/swagger");
 
 const app = express();
 app.use(express.json());

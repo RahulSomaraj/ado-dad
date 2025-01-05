@@ -16,9 +16,13 @@ const servers = [
 
 // Dynamically set the current server based on NODE_ENV
 const dynamicServer =
-	env === "uat"
+	env == "uat"
 		? { url: "https://uat.ado-dad.com", description: "UAT server" }
 		: { url: "http://localhost:5000", description: "Development server" };
+
+console.log(env);
+console.log(process.env.NODE_ENV);
+console.log(dynamicServer);
 
 const swaggerDefinition = {
 	openapi: "3.0.0",
