@@ -9,7 +9,7 @@ const swaggerDefinition = {
 	},
 	servers: [
 		{ url: "http://localhost:5000", description: "Development server" },
-		{ url: "http://uat.ado-dad.com", description: "UAT server" },
+		{ url: "https://uat.ado-dad.com", description: "UAT server" },
 	],
 	components: {
 		securitySchemes: {
