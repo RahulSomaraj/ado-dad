@@ -25,14 +25,18 @@ exports.getUserById = async (req, res) => {
 	}
 };
 
-// Create User
+// Create User Controller
 exports.createUser = async (req, res) => {
 	try {
 		const newUser = new User(req.body);
 		await newUser.save();
 		res.status(201).json(newUser);
 	} catch (error) {
-		res.status(400).json({ error: "Error creating user", details: error });
+		let errorMessage = "Error creating user";
+		if (error.code === 11000) {
+			errorMessage = "Duplicate key error: email or username already exists";
+		}
+		res.status(400).json({ error: errorMessage, details: error.message });
 	}
 };
 
