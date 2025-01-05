@@ -24,7 +24,7 @@ jobs:
             ll  # List project directory to verify access
 
             # Navigate to your project directory
-            cd /ado-dad
+            cd ado-dad
 
             # Pull the latest changes from the GitHub repository
             git pull origin main
