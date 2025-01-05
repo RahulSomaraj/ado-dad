@@ -19,8 +19,23 @@ jobs:
           key: ${{ secrets.ADA_DAD_AWS_SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            echo "Connected to server: $(hostname)"
+            uptime  # Check server uptime to verify connection
+            ll  # List project directory to verify access
+
+            # Navigate to your project directory
             cd /ado-dad
+
+            # Pull the latest changes from the GitHub repository
             git pull origin main
-            npm install --legacy-peer-deps # Install any new dependencies
-            pm2 delete 0
-            pm2 start app.js
+
+            # Install dependencies
+            npm install --legacy-peer-deps 
+
+            # Restart the PM2 process by deleting the existing instance and restarting
+            pm2 delete all || true  # Delete existing PM2 processes (ignore errors if none)
+            pm2 start app.js --name "ado-dad"
+
+            # Save PM2 process to restart on reboot
+            pm2 save
+            pm2 startup
