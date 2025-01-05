@@ -46,7 +46,3 @@ jobs:
             # Restart the PM2 process by deleting the existing instance and restarting
             pm2 delete all || true  # Delete existing PM2 processes (ignore errors if none)
             pm2 start app.js --name "ado-dad"
-
-            # Save PM2 process to restart on reboot
-            pm2 save
-            pm2 startup
