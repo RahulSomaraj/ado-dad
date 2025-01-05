@@ -1,0 +1,27 @@
+name: Deploy to AWS with PM2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: SSH into EC2 or Remote Server
+      - name: SSH into EC2 and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.ADA_DAD_AWS_SSH_HOST }}
+          username: ${{ secrets.ADA_DAD_AWS_SSH_USER }}
+          key: ${{ secrets.ADA_DAD_AWS_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /ado-dad
+            git pull origin main
+            npm install --legacy-peer-deps # Install any new dependencies
+            pm2 delete 0
+            pm2 start app.js
