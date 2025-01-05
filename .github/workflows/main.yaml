@@ -23,6 +23,17 @@ jobs:
             uptime  # Check server uptime to verify connection
             ll  # List project directory to verify access
 
+
+             # Load NVM explicitly
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            # Print Node and PM2 versions to verify
+            node -v
+            npm -v
+            pm2 -v
+
+
             # Navigate to your project directory
             cd ado-dad
 
