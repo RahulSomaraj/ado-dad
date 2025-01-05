@@ -1,9 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const { getShowrooms, addShowroom, deleteShowroom } = require("../controllers/showroomController");
+const {
+	getShowrooms,
+	addShowroom,
+	deleteShowroom,
+} = require("../controllers/showroomController");
 const authMiddleware = require("../middlewares/authMiddleware");
-const {rbac} = require("../middlewares/rbacMiddleware");
-const { validateShowroom } = require("../middlewares/validationMiddleware");
+const { rbac } = require("../middlewares/rbacMiddleware");
+const {
+	validateShowroom,
+} = require("../middlewares/validation/showRoomValidation");
 
 /**
  * @swagger
@@ -76,7 +82,13 @@ router.get("/", authMiddleware, rbac(["admin", "user"]), getShowrooms);
  *       403:
  *         description: Forbidden
  */
-router.post("/", authMiddleware, rbac(["admin"]), validateShowroom, addShowroom);
+router.post(
+	"/",
+	authMiddleware,
+	rbac(["admin"]),
+	validateShowroom,
+	addShowroom
+);
 
 /**
  * @swagger

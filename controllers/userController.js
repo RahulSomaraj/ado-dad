@@ -5,20 +5,44 @@ const emailService = require("../utils/emailService"); // Import the email servi
 // Get All Users
 exports.getAllUsers = async (req, res) => {
 	try {
-		const users = await User.find({ isDeleted: false });
-		res.status(200).json(users);
+		const { name, email, type, page = 1, limit = 10 } = req.query;
+
+		// Building the query object dynamically
+		const query = {};
+		if (name) query.name = { $regex: name, $options: "i" }; // Case-insensitive search
+		if (email) query.email = email;
+		if (type) query.type = type;
+
+		// Pagination
+		const users = await User.find(query)
+			.limit(limit * 1) // Convert limit to integer
+			.skip((page - 1) * limit)
+			.exec();
+
+		const count = await User.countDocuments(query);
+
+		res.json({
+			users,
+			totalPages: Math.ceil(count / limit),
+			currentPage: page,
+		});
 	} catch (error) {
-		res.status(500).json({ error: "Error fetching users", details: error });
+		console.error("Error fetching users:", error);
+		res.status(500).json({ error: "Error fetching users" });
 	}
 };
 
 // Get User by ID
 exports.getUserById = async (req, res) => {
 	try {
-		const user = await User.findById(req.params.id);
+		const userQuery = User.findById(req.params.id);
+
+		const user = await userQuery.exec();
+
 		if (!user || user.isDeleted) {
 			return res.status(404).json({ error: "User not found" });
 		}
+
 		res.status(200).json(user);
 	} catch (error) {
 		res.status(500).json({ error: "Error fetching user", details: error });
@@ -40,18 +64,49 @@ exports.createUser = async (req, res) => {
 	}
 };
 
-// Update User
 exports.updateUser = async (req, res) => {
 	try {
-		const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, {
+		const { username, email, phoneNumber } = req.body;
+		const userId = req.params.id;
+
+		// Check if the username, email, or phoneNumber already exists for other users
+		const existingUser = await User.findOne({
+			_id: { $ne: userId }, // Exclude the current user from the search
+			$or: [
+				{ username: username },
+				{ email: email },
+				{ phoneNumber: phoneNumber },
+			],
+		});
+
+		if (existingUser) {
+			let conflictField = "";
+			if (existingUser.username === username) {
+				conflictField = "username";
+			} else if (existingUser.email === email) {
+				conflictField = "email";
+			} else if (existingUser.phoneNumber === phoneNumber) {
+				conflictField = "phone number";
+			}
+
+			return res.status(400).json({
+				error: `The ${conflictField} is already in use by another user.`,
+			});
+		}
+
+		// Proceed with updating the user if no conflicts are found
+		const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
 			new: true,
 			runValidators: true,
 		});
+
 		if (!updatedUser) {
 			return res.status(404).json({ error: "User not found" });
 		}
+
 		res.status(200).json(updatedUser);
 	} catch (error) {
+		console.error("Error updating user:", error);
 		res.status(400).json({ error: "Error updating user", details: error });
 	}
 };
