@@ -27,7 +27,7 @@ const authController = require("../controllers/authController"); // Controller f
  *                 example: johndoe@example.com
  *               password:
  *                 type: string
- *                 example: johndoe@example.com
+ *                 example: strongpassword
  *     responses:
  *       200:
  *         description: Login successful, returns a JWT token
