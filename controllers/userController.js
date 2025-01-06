@@ -49,8 +49,6 @@ exports.getUserById = async (req, res) => {
 	}
 };
 
-const User = require("../models/User"); // Import User model
-
 // Create User Controller
 exports.createUser = async (req, res) => {
 	try {

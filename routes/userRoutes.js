@@ -10,6 +10,7 @@ const {
 	verifyOTP,
 } = require("../controllers/userController");
 const { body } = require("express-validator");
+const { createUserValidationRules } = require("../middlewares/validation/userValidation");
 
 /**
  * @swagger
