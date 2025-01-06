@@ -1,6 +1,6 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const authController = require('../controllers/authController'); // Controller for login
+const authController = require("../controllers/authController"); // Controller for login
 
 /**
  * @swagger
@@ -11,7 +11,7 @@ const authController = require('../controllers/authController'); // Controller f
 
 /**
  * @swagger
- * /api/auth/login:
+ * /auth/login:
  *   post:
  *     summary: Login a user and get a JWT token
  *     tags: [Auth]
@@ -34,6 +34,6 @@ const authController = require('../controllers/authController'); // Controller f
  *       500:
  *         description: Server error
  */
-router.post('/login', authController.login);
+router.post("/login", authController.login);
 
 module.exports = router;
