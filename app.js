@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const swaggerUi = require("swagger-ui-express");
 const morgan = require("morgan");
+const cors = require("cors"); // Import cors
 
 const connectDB = require("./config/db");
 const routes = require("./routes/index");
@@ -14,6 +15,18 @@ const swaggerDocs = require("./config/swagger");
 const app = express();
 app.use(express.json());
 app.use(morgan("dev"));
+
+// Enable CORS for all routes
+app.use(cors());
+
+// Custom CORS configuration (Optional)
+app.use(
+	cors({
+		origin: "*", // Allow all origins
+		methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
+		allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
+	})
+);
 
 // Connect to Database
 connectDB();
