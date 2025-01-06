@@ -176,11 +176,7 @@ router.get("/:id", getUserById);
  *         description: Bad request or validation error
  */
 
-router.post(
-	"/",
-
-	createUser
-);
+router.post("/", createUserValidationRules, createUser);
 
 /**
  * @swagger

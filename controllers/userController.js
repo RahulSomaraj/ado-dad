@@ -49,9 +49,31 @@ exports.getUserById = async (req, res) => {
 	}
 };
 
+const User = require("../models/User"); // Import User model
+
 // Create User Controller
 exports.createUser = async (req, res) => {
 	try {
+		const { email, phoneNumber } = req.body;
+
+		// Check if email or phonenumber already exists
+		const existingUser = await User.findOne({
+			$or: [{ email: email }, { phoneNumber: phoneNumber }].filter(
+				(item) => item[Object.keys(item)[0]]
+			), // Filter out null/undefined values
+		});
+
+		if (existingUser) {
+			let errorMessage = "User with this email or phone number already exists";
+			if (existingUser.email === email) {
+				errorMessage = "Email is already in use";
+			} else if (existingUser.phoneNumber === phoneNumber) {
+				errorMessage = "Phone number is already in use";
+			}
+			return res.status(400).json({ error: errorMessage });
+		}
+
+		// Create new user if no duplicate found
 		const newUser = new User(req.body);
 		await newUser.save();
 		res.status(201).json(newUser);

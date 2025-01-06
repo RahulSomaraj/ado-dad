@@ -4,16 +4,24 @@ const { body } = require("express-validator");
 const createUserValidationRules = [
 	body("type")
 		.isIn(["user", "admin", "showroom"])
+		.optional()
 		.withMessage("Type must be one of user, admin, or showroom"),
-	body("name").notEmpty().withMessage("Name is required"),
+	body("name").optional().notEmpty().withMessage("Name is required"),
 	body("phoneNumber")
+		.optional()
 		.matches(/^\d{10,15}$/)
 		.withMessage("Invalid phone number format"),
-	body("email").isEmail().withMessage("Invalid email format").normalizeEmail(),
+	body("email")
+		.optional()
+		.isEmail()
+		.withMessage("Invalid email format")
+		.normalizeEmail(),
 	body("password")
+		.optional()
 		.isLength({ min: 6 })
 		.withMessage("Password must be at least 6 characters"),
 	body("username")
+		.optional()
 		.isLength({ min: 4 })
 		.withMessage("Username must be at least 4 characters"),
 	(req, res, next) => {
