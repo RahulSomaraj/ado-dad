@@ -63,15 +63,64 @@ router.post('/', authMiddleware, rbac(['admin', 'vendor', 'user']), advertisemen
  *   get:
  *     summary: Get all advertisements
  *     tags: [Advertisements]
+ *     parameters:
+ *       - name: type
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Filter by advertisement type (e.g., "Vehicle" or "Property")
+ *       - name: createdBy
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Filter by user ID who created the advertisement
+ *       - name: heading
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Search by heading (case-insensitive)
+ *       - name: sortBy
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Field to sort by (e.g., "type", "createdBy")
+ *       - name: order
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *         description: Sorting order (ascending or descending)
+ *       - name: page
+ *         in: query
+ *         schema:
+ *           type: integer
+ *         description: Page number for pagination (default is 1)
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *         description: Number of results per page (default is 10)
  *     responses:
  *       200:
  *         description: List of advertisements
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Advertisement'
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of matching advertisements
+ *                 page:
+ *                   type: integer
+ *                   description: Current page number
+ *                 limit:
+ *                   type: integer
+ *                   description: Results per page
+ *                 advertisements:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Advertisement'
  *       500:
  *         description: Internal Server Error
  */
