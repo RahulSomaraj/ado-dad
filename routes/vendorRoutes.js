@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const authMiddleware = require('../middlewares/authMiddleware');  // Corrected path to authMiddleware
+const authMiddleware = require('../middlewares/authMiddleware'); // Corrected path to authMiddleware
 const { rbac, checkOwnership } = require('../middlewares/rbacMiddleware'); // Corrected path to rbacMiddleware
 const vendorController = require('../controllers/vendorController');
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 // Create a new Vendor
 /**
  * @swagger
- * /api/vendors:
+ * /vendors:
  *   post:
  *     summary: Create a new vendor
  *     description: This will create a new vendor.
@@ -22,14 +22,20 @@ const router = express.Router();
  *             required:
  *               - name
  *               - email
- *               - role
+ *               - address
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "John Doe"
  *               email:
  *                 type: string
- *               role:
+ *                 example: "johndoe@example.com"
+ *               phoneNumber:
  *                 type: string
+ *                 example: "1234567890"
+ *               address:
+ *                 type: string
+ *                 example: "123 Main Street, New York, NY"
  *     responses:
  *       201:
  *         description: Vendor created successfully
@@ -37,10 +43,10 @@ const router = express.Router();
  *         description: Validation error
  */
 router.post(
-  '/vendors',
+  '/',
   body('name').not().isEmpty(),
   body('email').isEmail(),
-  body('role').not().isEmpty(),
+  body('address').not().isEmpty(),
   authMiddleware, // Ensure the user is authenticated
   vendorController.createVendor
 );
@@ -53,6 +59,17 @@ router.post(
  *     summary: Get all vendors
  *     description: This will return all vendors.
  *     tags: [Vendors]
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Filter vendors by name
+ *       - in: query
+ *         name: email
+ *         schema:
+ *           type: string
+ *         description: Filter vendors by email
  *     responses:
  *       200:
  *         description: Successfully retrieved all vendors
@@ -117,10 +134,16 @@ router.get(
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Jane Doe"
  *               email:
  *                 type: string
- *               role:
+ *                 example: "janedoe@example.com"
+ *               phoneNumber:
  *                 type: string
+ *                 example: "9876543210"
+ *               address:
+ *                 type: string
+ *                 example: "456 Elm Street, Los Angeles, CA"
  *     responses:
  *       200:
  *         description: Successfully updated the vendor
@@ -165,33 +188,6 @@ router.delete(
   authMiddleware, // Ensure the user is authenticated
   rbac(['admin']), // Only admin can delete a vendor
   vendorController.deleteVendor
-);
-
-// Get all products for a specific vendor
-/**
- * @swagger
- * /api/vendors/{vendorId}/products:
- *   get:
- *     summary: Get all products for a vendor
- *     description: This will return all products for a specific vendor.
- *     tags: [Vendors]
- *     parameters:
- *       - in: path
- *         name: vendorId
- *         required: true
- *         description: The ID of the vendor
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Successfully retrieved the products for the vendor
- *       404:
- *         description: No products found for this vendor
- */
-router.get(
-  '/vendors/:vendorId/products',
-  authMiddleware, // Ensure the user is authenticated
-  vendorController.getProductsByVendor
 );
 
 module.exports = router;

@@ -45,6 +45,26 @@ exports.getRatingsByProduct = async (req, res) => {
   }
 };
 
+// Update a rating
+exports.updateRating = async (req, res) => {
+  const { ratingId } = req.params;
+  const { rating, review } = req.body;
+  try {
+    const existingRating = await Rating.findById(ratingId);
+    if (!existingRating) {
+      return res.status(404).json({ message: 'Rating not found' });
+    }
+
+    if (rating !== undefined) existingRating.rating = rating;
+    if (review !== undefined) existingRating.review = review;
+
+    await existingRating.save();
+    res.status(200).json({ message: 'Rating updated successfully', data: existingRating });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // Delete a rating
 exports.deleteRating = async (req, res) => {
   const { ratingId } = req.params;
