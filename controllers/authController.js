@@ -42,6 +42,10 @@ exports.login = async (req, res) => {
 		return res.status(200).json({
 			message: "Login successful",
 			token: `Bearer ${token}`,
+			name: user.name,
+			phoneNumber: user.phoneNumber,
+			email: user.email,
+			profilePicture: user.profilePic ?? "",
 		});
 	} catch (err) {
 		console.error("Error during login:", err.message);
