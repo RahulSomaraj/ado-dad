@@ -39,9 +39,14 @@ exports.login = async (req, res) => {
 			expiresIn: "1h",
 		});
 
+		const refreshToken = jwt.sign(payload, process.env.JWT_SECRET, {
+			expiresIn: "360d",
+		});
+
 		return res.status(200).json({
 			message: "Login successful",
 			token: `Bearer ${token}`,
+			refreshToken,
 			name: user.name,
 			phoneNumber: user.phoneNumber,
 			email: user.email,
