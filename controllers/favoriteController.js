@@ -27,6 +27,24 @@ exports.getUserFavorites = async (req, res) => {
   }
 };
 
+// Get a specific favorite by ID
+exports.getFavoriteById = async (req, res) => {
+  try {
+    const { favoriteId } = req.params;
+    const userId = req.user.id;
+
+    // Find the favorite by userId and favoriteId
+    const favorite = await Favorite.findOne({ _id: favoriteId, userId }).populate('itemId');
+    if (!favorite) {
+      return res.status(404).json({ message: 'Favorite not found' });
+    }
+
+    return res.status(200).json({ favorite });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // Remove a favorite
 exports.removeFavorite = async (req, res) => {
   try {
@@ -39,6 +57,32 @@ exports.removeFavorite = async (req, res) => {
     }
 
     return res.status(200).json({ message: 'Item removed from favorites' });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Update a favorite
+exports.updateFavorite = async (req, res) => {
+  try {
+    const { favoriteId } = req.params;
+    const { itemId, itemType } = req.body;
+    const userId = req.user.id;
+
+    // Find the favorite by userId and favoriteId
+    const favorite = await Favorite.findOne({ _id: favoriteId, userId });
+    if (!favorite) {
+      return res.status(404).json({ message: 'Favorite not found' });
+    }
+
+    // Update the favorite
+    if (itemId) favorite.itemId = itemId;
+    if (itemType) favorite.itemType = itemType;
+
+    // Save the updated favorite
+    await favorite.save();
+
+    return res.status(200).json({ message: 'Favorite updated', favorite });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

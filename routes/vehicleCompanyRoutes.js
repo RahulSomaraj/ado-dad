@@ -26,6 +26,19 @@ const router = express.Router();
  *   get:
  *     summary: Get all vehicle companies
  *     tags: [Vehicle Companies]
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter vehicle companies by name
+ *       - in: query
+ *         name: originCountry
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter vehicle companies by origin country
  *     responses:
  *       200:
  *         description: List of vehicle companies
@@ -68,10 +81,13 @@ router.get('/:id', authMiddleware, getVehicleCompanyById);
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Tesla"
  *               originCountry:
  *                 type: string
+ *                 example: "USA"
  *               logo:
  *                 type: string
+ *                 example: "https://www.tesla.com/sites/default/files/images/tesla-logo.png"
  *             required:
  *               - name
  *               - originCountry
@@ -83,7 +99,7 @@ router.get('/:id', authMiddleware, getVehicleCompanyById);
 router.post(
   '/',
   authMiddleware,
-  rbac(['admin']),
+  rbac(['admin',]),
   validateRequest([
     check('name').notEmpty().withMessage('Name is required.'),
     check('originCountry').notEmpty().withMessage('Origin country is required.'),
@@ -114,16 +130,19 @@ router.post(
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Tesla Motors"
  *               originCountry:
  *                 type: string
+ *                 example: "USA"
  *               logo:
  *                 type: string
+ *                 example: "https://www.tesla.com/sites/default/files/images/tesla-logo-updated.png"
  *     responses:
  *       200:
  *         description: Vehicle company updated successfully
  */
 router.put(
-  '/:id',
+  '/vehicle-companies/:id',
   authMiddleware,
   rbac(['admin']),
   validateRequest([
@@ -152,7 +171,7 @@ router.put(
  *         description: Vehicle company deleted successfully
  */
 router.delete(
-  '/:id',
+  '/vehicle-companies/:id',
   authMiddleware,
   rbac(['admin']),
   deleteVehicleCompany

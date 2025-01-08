@@ -1,8 +1,9 @@
+
 const express = require('express');
 const router = express.Router();
 const CategoryController = require('../controllers/categoryController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const {rbac} = require('../middlewares/rbacMiddleware');
+const { rbac } = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
@@ -17,31 +18,36 @@ const {rbac} = require('../middlewares/rbacMiddleware');
  *   post:
  *     summary: Create a new category
  *     tags: [Categories]
- *     security:
- *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - icon
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The name of the category.
  *                 example: Electronics
  *               icon:
  *                 type: string
- *                 example: icon-url.png
+ *                 description: The icon URL for the category.
+ *                 example: "https://example.com/icon-electronics.png"
  *     responses:
  *       201:
  *         description: Category created successfully
  *       400:
  *         description: Validation error
+ *       500:
+ *         description: Server error
  */
 router.post(
-  '/categories',
+  '/',
   authMiddleware,
-  rbac(['admin']), // Allow only admins to create categories
+  rbac(['admin','user']), // Allow only admins and users to create categories
   CategoryController.createCategory
 );
 
@@ -51,9 +57,25 @@ router.post(
  *   get:
  *     summary: Get all categories
  *     tags: [Categories]
+ *     description: Fetch categories with optional filtering by name.
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Filter categories by name (case-insensitive).
+ *         example: "Electronics"
  *     responses:
  *       200:
  *         description: Categories fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Category'
+ *       500:
+ *         description: Server error
  */
 router.get('/categories', authMiddleware, CategoryController.getAllCategories);
 
@@ -73,8 +95,14 @@ router.get('/categories', authMiddleware, CategoryController.getAllCategories);
  *     responses:
  *       200:
  *         description: Category fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Category'
  *       404:
  *         description: Category not found
+ *       500:
+ *         description: Server error
  */
 router.get('/categories/:id', authMiddleware, CategoryController.getCategoryById);
 
@@ -102,11 +130,21 @@ router.get('/categories/:id', authMiddleware, CategoryController.getCategoryById
  *             properties:
  *               name:
  *                 type: string
+ *                 description: Updated name of the category.
+ *                 example: "Updated Electronics"
  *               icon:
  *                 type: string
+ *                 description: Updated icon URL for the category.
+ *                 example: "https://example.com/icon-updated-electronics.png"
  *     responses:
  *       200:
  *         description: Category updated successfully
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Category not found
+ *       500:
+ *         description: Server error
  */
 router.put(
   '/categories/:id',
@@ -133,6 +171,10 @@ router.put(
  *     responses:
  *       200:
  *         description: Category deleted successfully
+ *       404:
+ *         description: Category not found
+ *       500:
+ *         description: Server error
  */
 router.delete(
   '/categories/:id',

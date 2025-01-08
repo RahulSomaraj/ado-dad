@@ -5,7 +5,7 @@ const env = process.env.NODE_ENV || "development"; // Default to 'development' i
 // Define server URLs based on environment
 const servers = [
 	{
-		url: "http://localhost:5000",
+		url: `http://localhost:${process.env.PORT}`,
 		description: "Development server",
 	},
 	{
@@ -18,11 +18,8 @@ const servers = [
 const dynamicServer =
 	env == "uat"
 		? { url: "https://uat.ado-dad.com", description: "UAT server" }
-		: { url: "http://localhost:5000", description: "Development server" };
+		: { url: `http://localhost:${process.env.PORT}`, description: "Development server" };
 
-console.log(env);
-console.log(process.env.NODE_ENV);
-console.log(dynamicServer);
 
 const swaggerDefinition = {
 	openapi: "3.0.0",
@@ -47,6 +44,7 @@ const swaggerDefinition = {
 const swaggerOptions = {
 	swaggerDefinition,
 	apis: ["./routes/*.js"],
+	persistAuthorization: true, // Ensure token persists across page reloads
 };
 
 module.exports = swaggerJsDoc(swaggerOptions);

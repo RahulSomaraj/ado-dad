@@ -28,7 +28,7 @@ router.use("/cart", cartRoutes);
 router.use("/vehicles", vehicleRoutes);
 router.use("/ratings", ratingRoutes);
 router.use("/vendors", vendorRoutes);
-router.use("/showroom", showroomRoutes);
+router.use("/showrooms", showroomRoutes);
 router.use("/vehicle-companies", vehicleCompanyRoutes);
 
 // Use routes

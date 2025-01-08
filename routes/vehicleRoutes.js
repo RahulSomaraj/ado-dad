@@ -1,8 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getAllVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle } = require('../controllers/vehicleController');
+const {
+  getAllVehicles,
+  getVehicleById,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
+} = require('../controllers/vehicleController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const {rbac} = require('../middlewares/rbacMiddleware');
+const { rbac } = require('../middlewares/rbacMiddleware');
 
 /**
  * @swagger
@@ -17,6 +23,22 @@ const {rbac} = require('../middlewares/rbacMiddleware');
  *   get:
  *     summary: Get all vehicles (with vendor info)
  *     tags: [Vehicles]
+ *     parameters:
+ *       - in: query
+ *         name: vendorId
+ *         schema:
+ *           type: string
+ *         description: Filter vehicles by vendor ID
+ *       - in: query
+ *         name: make
+ *         schema:
+ *           type: string
+ *         description: Filter vehicles by make
+ *       - in: query
+ *         name: model
+ *         schema:
+ *           type: string
+ *         description: Filter vehicles by model
  *     responses:
  *       200:
  *         description: List of vehicles with vendor information
@@ -58,13 +80,27 @@ router.get('/:id', authMiddleware, rbac(['admin', 'showroom']), getVehicleById);
  *               vendorId:
  *                 type: string
  *                 description: Vendor ID to associate
- *               vehicleData:
- *                 $ref: '#/components/schemas/Vehicle'
+ *                 example: "64f8a2f6e3b2a9f9d234abcd"
+ *               make:
+ *                 type: string
+ *                 example: "Toyota"
+ *               model:
+ *                 type: string
+ *                 example: "Camry"
+ *               year:
+ *                 type: integer
+ *                 example: 2023
+ *               price:
+ *                 type: number
+ *                 example: 30000
+ *               color:
+ *                 type: string
+ *                 example: "Red"
  *     responses:
  *       201:
  *         description: Vehicle created successfully
  */
-router.post('/', authMiddleware, rbac(['admin','vendor']), createVehicle);
+router.post('/', authMiddleware, rbac(['admin', 'vendor',]), createVehicle);
 
 /**
  * @swagger
@@ -89,8 +125,22 @@ router.post('/', authMiddleware, rbac(['admin','vendor']), createVehicle);
  *               vendorId:
  *                 type: string
  *                 description: Vendor ID to update
- *               vehicleData:
- *                 $ref: '#/components/schemas/Vehicle'
+ *                 example: "64f8a2f6e3b2a9f9d234abcd"
+ *               make:
+ *                 type: string
+ *                 example: "Toyota"
+ *               model:
+ *                 type: string
+ *                 example: "Camry Hybrid"
+ *               year:
+ *                 type: integer
+ *                 example: 2024
+ *               price:
+ *                 type: number
+ *                 example: 35000
+ *               color:
+ *                 type: string
+ *                 example: "Blue"
  *     responses:
  *       200:
  *         description: Vehicle updated successfully
