@@ -1,24 +1,35 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/user"
-);
+const User = require("../models/user");
 exports.login = async (req, res) => {
-	const { email, password } = req.body;
+	const { username, password } = req.body;
 
 	try {
 		console.log("Incoming request body:", req.body);
 
-		if (!email || !password) {
-			return res.status(400).json({ error: "Email and password are required" });
+		if (!username || !password) {
+			return res
+				.status(400)
+				.json({ error: "Username and password are required" });
 		}
 
-		const user = await User.findOne({ email });
+		const user = await User.findOne({
+			$or: [
+				{ email: username }, // Check by email
+				{ phoneNumber: username }, // Check by phonenumber
+			],
+		});
 		console.log("User found:", user);
 
 		if (!user) {
-			return res.status(404).json({ error: "User not found" });
+			return res.status(400).json({ error: "User not found" });
 		}
 
-		const isMatch = await user.comparePassword(password);
+		let isMatch = await user.comparePassword(password);
+
+		if (user.phoneNumber == username) {
+			isMatch = user.otp == password;
+		}
+
 		if (!isMatch) {
 			return res.status(400).json({ error: "Invalid credentials" });
 		}
