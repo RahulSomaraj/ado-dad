@@ -17,8 +17,6 @@ const { rbac } = require('../middlewares/rbacMiddleware');
  *   post:
  *     summary: Add an item to favorites
  *     tags: [Favorites]
- *     security:
- *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -49,7 +47,7 @@ const { rbac } = require('../middlewares/rbacMiddleware');
 router.post(
   '/',
   authMiddleware,
-  rbac(['user']), // Example: Only 'user' role can add favorites
+  rbac(['user','admin']), // Example: Only 'user' role can add favorites
   favoriteController.addFavorite
 );
 
