@@ -22,7 +22,7 @@ const authController = require("../controllers/authController"); // Controller f
  *           schema:
  *             type: object
  *             properties:
- *               email:
+ *               username:
  *                 type: string
  *                 example: johndoe@example.com
  *               password:
