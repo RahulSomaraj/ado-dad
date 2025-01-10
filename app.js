@@ -18,6 +18,7 @@ app.use(morgan("dev"));
 
 // Enable CORS for all routes
 app.use(cors());
+app.use("/static", express.static("public"));
 
 // Custom CORS configuration (Optional)
 app.use(
