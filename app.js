@@ -7,9 +7,9 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const routes = require("./routes/index");
 const errorHandler = require("./middlewares/error");
-const swaggerDocs = require("./config/swagger");
-
 dotenv.config();
+
+const swaggerDocs = require("./config/swagger");
 
 const app = express();
 
