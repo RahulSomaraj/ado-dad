@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { SecurityMiddleware } from './middleware/security-middleware'; // Corrected the path
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -21,9 +20,7 @@ async function bootstrap() {
   });
 
   // Apply security middleware globally
-  app.use(SecurityMiddleware); // This works if the middleware is an Express-style middleware
-  
-  
+
   // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Ado-dad API')

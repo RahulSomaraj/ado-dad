@@ -1,4 +1,5 @@
 import { MongooseModuleOptions } from '@nestjs/mongoose';
+import mongoose from 'mongoose';
 import 'dotenv/config';
 
 class ConfigService {
@@ -17,16 +18,16 @@ class ConfigService {
     return this;
   }
 
-  public getPort() {
-    return this.getValue('PORT', true);
+  public getPort(): number {
+    return parseInt(this.getValue('PORT', true), 10);
   }
 
-  public isProduction() {
+  public isProduction(): boolean {
     return this.getValue('NODE_ENV', false) === 'production';
   }
 
   public getMongoConfig(): MongooseModuleOptions {
-    let uri: string = this.getValue('MONGO_URI', false); // Now always a string
+    let uri: string = this.getValue('MONGO_URI', false);
 
     if (!uri) {
       const user = encodeURIComponent(this.getValue('MONGO_USER', false) || '');
@@ -44,12 +45,23 @@ class ConfigService {
       }
     }
 
-    console.log('Connecting to MongoDB:', uri);
+    console.log('Connecting to MongoDB with URI:', uri);
 
     return {
-      uri, // Guaranteed to be a string
+      uri,
       connectionFactory: (connection) => {
-        console.log('MongoDB connection established');
+        connection.on('connected', () => {
+          console.log('✅ MongoDB connection established successfully!');
+        });
+
+        connection.on('error', (err) => {
+          console.error('❌ MongoDB connection error:', err);
+        });
+
+        connection.on('disconnected', () => {
+          console.warn('⚠️ MongoDB connection lost!');
+        });
+
         return connection;
       },
     };
@@ -57,8 +69,8 @@ class ConfigService {
 }
 
 const configService = new ConfigService(process.env).ensureValues([
-  'MONGO_URI', // Ensures URI is set OR falls back to manual connection
-  'MONGO_DATABASE', // Additional required values
+  'MONGO_URI',
+  'MONGO_DATABASE',
 ]);
 
 export { configService };

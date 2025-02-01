@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { VehicleModule } from './vehicles/vehicle.module';
 import { ShowroomModule } from './showroom/showroom.module';
@@ -17,23 +18,27 @@ import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
 import { PropertyController } from './property/property.controller';
 import { PropertyModule } from './property/property.module';
-import { FavoriteModule } from './favorites/favorite.module'; // Correct import
-import { configService } from './config/mongo.config';
-import { ConfigModule } from '@nestjs/config';
-import appConfig from './config/app.config';
+import { FavoriteModule } from './favorites/favorite.module';
 import { EmailService } from './utils/email.service';
-import { SecurityMiddleware } from './middleware/security-middleware';
-
-// Removed FavoriteController from the controller array because it is handled inside FavoriteModule
+import { configService } from './config/mongo.config';
+import appConfig from './config/app.config';
+import helmet from 'helmet';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(configService.getMongoConfig().uri as string), // Ensure it's always a string
     ConfigModule.forRoot({
       load: [appConfig],
       isGlobal: true,
-      // envFilePath: join(os.homedir(), 'newshop', `.env`),
     }),
+
+    MongooseModule.forRootAsync({
+      useFactory: () => {
+        const mongoConfig = configService.getMongoConfig();
+        console.log('Applying MongoDB configuration:', mongoConfig);
+        return mongoConfig;
+      },
+    }),
+
     UsersModule,
     VehicleModule,
     ShowroomModule,
@@ -60,7 +65,7 @@ import { SecurityMiddleware } from './middleware/security-middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(SecurityMiddleware)  // Apply middleware here
-      .forRoutes('*');  // Apply to all routes or specify particular controllers
+      .apply(helmet()) // ✅ Apply Helmet & CORS
+      .forRoutes('*'); // ✅ Correct
   }
 }
