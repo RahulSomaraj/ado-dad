@@ -3,7 +3,6 @@ import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/s
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { RatingService } from './rating.service';
-import { AuthGuard } from '../auth/auth.guard'; // Assuming you have an AuthGuard
 import { Roles } from 'src/roles/roles.decorator'; // Assuming you have a Roles decorator
 import { UserRole } from 'src/roles/user-role.enum'; // Assuming you have a Role enum
 

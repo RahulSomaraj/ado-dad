@@ -1,29 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { EncryptionUtil } from '../common/encryption.util';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import * as bcrypt from 'bcrypt';
+import { User } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private jwtService: JwtService,
-    private encryptionUtil: EncryptionUtil,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
-  async login(user: any) {
-    const payload = { username: user.username, sub: user.userId };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
-  }
+  async validateUser(username: string, password: string): Promise<any> {
+    const trimmedUsername = username.trim();
 
-  async validateUser(username: string, pass: string): Promise<any> {
-    const user = { username, password: 'hashed-password' }; // Example user, replace with real user lookup
-    const isValid = await EncryptionUtil.comparePassword(pass, user.password); // Await the promise
+    // 🔹 Find user by username, email, or contact number
+    const user = await this.userModel
+      .findOne({
+        $or: [
+          { userName: trimmedUsername },
+          { contactEmail: trimmedUsername },
+          { contactNumber: trimmedUsername },
+        ],
+      })
+      .exec();
 
-    if (isValid) {
-      return user; // Return user if the password is valid
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const { password, ...result } = user.toObject(); // Convert Mongoose document to a plain object
+      return result;
     }
-
-    return null; // Return null if the password is not valid
+    return null;
   }
 }

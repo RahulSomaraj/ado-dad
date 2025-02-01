@@ -42,7 +42,7 @@ export class CategoryController {
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all categories with optional filters' })
   @ApiResponse({ status: 200, description: 'Categories fetched successfully' })

@@ -1,12 +1,28 @@
-import { Controller, Post, Get, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AdvertisementsService } from './advertisement.service';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { AuthGuard } from '../auth/auth.guard';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { UserRole } from '../roles/user-role.enum';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 
 @ApiTags('Advertisements')
 @Controller('advertisements')
@@ -16,8 +32,11 @@ export class AdvertisementsController {
   @Post()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new advertisement' })
-  @ApiResponse({ status: 201, description: 'Advertisement created successfully.' })
-  @UseGuards(AuthGuard, RolesGuard)
+  @ApiResponse({
+    status: 201,
+    description: 'Advertisement created successfully.',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Vendor, UserRole.User)
   async create(@Body() createAdvertisementDto: CreateAdvertisementDto) {
     return this.advertisementService.create(createAdvertisementDto);
@@ -26,14 +45,46 @@ export class AdvertisementsController {
   @Get()
   @ApiOperation({ summary: 'Get all advertisements with optional filters' })
   @ApiResponse({ status: 200, description: 'List of advertisements' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filter by advertisement category' })
-  @ApiQuery({ name: 'location', required: false, description: 'Filter by location' })
-  @ApiQuery({ name: 'priceMin', required: false, description: 'Minimum price filter' })
-  @ApiQuery({ name: 'priceMax', required: false, description: 'Maximum price filter' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by advertisement status (active, expired, etc.)' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
-  @ApiQuery({ name: 'sort', required: false, description: 'Sort by field (e.g., price:asc, date:desc)' })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by advertisement category',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    description: 'Filter by location',
+  })
+  @ApiQuery({
+    name: 'priceMin',
+    required: false,
+    description: 'Minimum price filter',
+  })
+  @ApiQuery({
+    name: 'priceMax',
+    required: false,
+    description: 'Maximum price filter',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by advertisement status (active, expired, etc.)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    description: 'Sort by field (e.g., price:asc, date:desc)',
+  })
   async findAll(
     @Query('category') category?: string,
     @Query('location') location?: string,
@@ -74,18 +125,27 @@ export class AdvertisementsController {
   @Put(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update advertisement by ID' })
-  @ApiResponse({ status: 200, description: 'Advertisement updated successfully.' })
-  @UseGuards(AuthGuard, RolesGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement updated successfully.',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Vendor, UserRole.User)
-  async update(@Param('id') id: string, @Body() updateAdvertisementDto: UpdateAdvertisementDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateAdvertisementDto: UpdateAdvertisementDto,
+  ) {
     return this.advertisementService.update(id, updateAdvertisementDto);
   }
 
   @Delete(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete advertisement by ID' })
-  @ApiResponse({ status: 200, description: 'Advertisement deleted successfully.' })
-  @UseGuards(AuthGuard, RolesGuard)
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement deleted successfully.',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin)
   async remove(@Param('id') id: string) {
     return this.advertisementService.remove(id);
