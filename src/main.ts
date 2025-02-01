@@ -1,14 +1,30 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { SecurityMiddleware } from './middleware/security-middleware'; // Corrected the path
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
   const PORT = configService.get('APP_CONFIG.BACKEND_PORT');
 
+  // Apply global validation pipe (optional)
+  app.useGlobalPipes(new ValidationPipe());
+
+  // Enable CORS globally (you can customize the options as needed)
+  app.enableCors({
+    origin: '*', // Allow all domains (you can specify specific domains here)
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Allowed HTTP methods
+    allowedHeaders: 'Content-Type, Accept', // Allowed headers
+  });
+
+  // Apply security middleware globally
+  app.use(SecurityMiddleware); // This works if the middleware is an Express-style middleware
+  
+  
+  // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Ado-dad API')
     .setDescription('API for managing ado-dad')

@@ -40,6 +40,9 @@ export class User extends Document {
   @Prop({ default: false })
   isDeleted?: boolean;
 
+  @Prop({ required: false }) // SSN added as an optional field
+  ssn?: string;
+
   // Method to compare password
   async comparePassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);

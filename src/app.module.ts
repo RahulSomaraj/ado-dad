@@ -1,29 +1,28 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './users/users.module';
 import { VehicleModule } from './vehicles/vehicle.module';
 import { ShowroomModule } from './showroom/showroom.module';
 import { CartModule } from './cart/cart.module';
-import { ProductModule } from './product/product.module'; // Import ProductModule
-import { EmailService } from './utils/email.service';
+import { ProductModule } from './product/product.module';
 import { AdvertisementsModule } from './advertisement/advertisement.module';
-import { BannerModule } from './banner/banner.module'; // Import BannerModule
+import { BannerModule } from './banner/banner.module';
 import { CategoryController } from './category/category.controller';
 import { CategoryModule } from './category/category.module';
 import { VehicleCompanyModule } from './vehicle-company/vehicle-company.module';
 import { VendorController } from './vendor/vendor.controller';
 import { VendorModule } from './vendor/vendor.module';
-import { ModelService } from './model/model.service';
 import { ModelController } from './model/model.controller';
 import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
-import { PropertyService } from './property/property.service';
 import { PropertyController } from './property/property.controller';
 import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module'; // Correct import
 import { configService } from './config/mongo.config';
 import { ConfigModule } from '@nestjs/config';
 import appConfig from './config/app.config';
+import { EmailService } from './utils/email.service';
+import { SecurityMiddleware } from './middleware/security-middleware';
 
 // Removed FavoriteController from the controller array because it is handled inside FavoriteModule
 
@@ -48,7 +47,7 @@ import appConfig from './config/app.config';
     ModelModule,
     RatingModule,
     PropertyModule,
-    FavoriteModule, // Ensures FavoriteController is registered via FavoriteModule
+    FavoriteModule,
   ],
   providers: [EmailService],
   controllers: [
@@ -58,4 +57,10 @@ import appConfig from './config/app.config';
     PropertyController,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(SecurityMiddleware)  // Apply middleware here
+      .forRoutes('*');  // Apply to all routes or specify particular controllers
+  }
+}

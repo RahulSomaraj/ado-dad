@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User } from './schemas/user.schema';  // Import the User schema
+import { User } from './schemas/user.schema';  
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
+import { EncryptionUtil } from '../common/encryption.util'; // Import Encryption Utility
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectModel('User') private userModel: Model<User>,  // Inject the model by name 'User'
+    @InjectModel('User') private userModel: Model<User>,
     private emailService: EmailService,
   ) {}
 
@@ -30,6 +31,16 @@ export class UsersService {
   }
 
   async createUser(userData: any): Promise<User> {
+    // Hash the password before storing it
+    if (userData.password) {
+      userData.password = await EncryptionUtil.hashPassword(userData.password);
+    }
+    
+    // Encrypt sensitive data (if any)
+    if (userData.ssn) {
+      userData.ssn = EncryptionUtil.encrypt(userData.ssn);
+    }
+
     const newUser = new this.userModel(userData);
     return newUser.save();
   }
@@ -37,12 +48,21 @@ export class UsersService {
   async updateUser(id: string, updateData: any): Promise<User> {
     const user = await this.userModel.findById(id).exec();
     if (!user || user.isDeleted) throw new Error('User not found or deleted');
-    // Cast user as User type to satisfy TypeScript
+
+    // Hash password if it's being updated
+    if (updateData.password) {
+      updateData.password = await EncryptionUtil.hashPassword(updateData.password);
+    }
+
+    // Encrypt sensitive data if it's being updated
+    if (updateData.ssn) {
+      updateData.ssn = EncryptionUtil.encrypt(updateData.ssn);
+    }
+
     const updatedUser = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
     return updatedUser!;
   }
   
-
   async deleteUser(id: string): Promise<User> {
     const user = await this.userModel.findById(id).exec();
     if (!user) throw new Error('User not found');
@@ -56,7 +76,6 @@ export class UsersService {
     const user = await this.userModel.findOne({ email }).exec();
     if (!user) throw new Error('User not found');
     
-    // Call the generateAndSendOTP method from the schema to generate OTP and send email
     await user.generateAndSendOTP(this.emailService, generateOTP);
   }
 
@@ -65,19 +84,26 @@ export class UsersService {
     const user = await this.userModel.findOne({ email }).exec();
     if (!user) throw new Error('User not found');
     
-    // Check if OTP matches
     if (user.otp !== otp) throw new Error('Invalid OTP');
     
-    // Check if OTP expired (making sure otpExpires is defined)
     if (!user.otpExpires || user.otpExpires < new Date()) {
       throw new Error('OTP expired');
     }
     
-    // Clear OTP and expiration date after verification
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
     return 'OTP verified successfully';
   }
-  
+
+  // Decrypt sensitive user data (e.g., SSN)
+  async getDecryptedUser(id: string): Promise<any> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user || user.isDeleted) throw new Error('User not found or deleted');
+
+    return {
+      ...user.toObject(),
+      ssn: user.ssn ? EncryptionUtil.decrypt(user.ssn) : null,
+    };
+  }
 }
