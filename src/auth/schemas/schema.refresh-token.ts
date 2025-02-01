@@ -16,7 +16,7 @@ export class AuthTokens extends Document {
   @Prop({ required: false, default: false })
   isDeleted: boolean;
 
-  @Prop({ required: false, default: null })
+  @Prop({ type: Date, required: false, default: null }) // ✅ Explicitly define type
   deletedAt: Date | null;
 
   // Hash token before saving to the database

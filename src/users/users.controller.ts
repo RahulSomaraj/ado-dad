@@ -1,12 +1,24 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  Query,
+  UseFilters,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { EmailService } from '../utils/email.service';
 import { ApiTags, ApiQuery, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/create-user.dto';  // Import CreateUserDto
-import { UpdateUserDto } from './dto/update-user.dto';  // Import UpdateUserDto
+import { CreateUserDto } from './dto/create-user.dto'; // Import CreateUserDto
+import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('users')
 @Controller('users')
+@UseFilters(new HttpExceptionFilter('Users'))
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -14,9 +26,24 @@ export class UsersController {
   ) {}
 
   @Get()
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of users per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query to filter users' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of users per page',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search query to filter users',
+  })
   @ApiResponse({ status: 200, description: 'List of users' })
   async getAllUsers(@Query() query): Promise<any> {
     return this.usersService.getAllUsers(query.page, query.limit, query);
@@ -32,7 +59,7 @@ export class UsersController {
   @Post()
   @ApiBody({
     description: 'Create a new user',
-    type: CreateUserDto,  // Use CreateUserDto for creating user
+    type: CreateUserDto, // Use CreateUserDto for creating user
   })
   @ApiResponse({ status: 201, description: 'User created' })
   async createUser(@Body() userData: CreateUserDto) {
@@ -42,7 +69,7 @@ export class UsersController {
   @Put(':id')
   @ApiBody({
     description: 'Update user details',
-    type: UpdateUserDto,  // Use UpdateUserDto for updating user
+    type: UpdateUserDto, // Use UpdateUserDto for updating user
   })
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })

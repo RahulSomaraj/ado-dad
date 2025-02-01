@@ -23,6 +23,16 @@ import { EmailService } from './utils/email.service';
 import { configService } from './config/mongo.config';
 import appConfig from './config/app.config';
 import helmet from 'helmet';
+import {
+  AuthTokens,
+  AuthTokensSchema,
+} from './auth/schemas/schema.refresh-token';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { JwtModule } from '@nestjs/jwt';
+import { RefreshTokenService } from './auth/auth.refresh.service';
+import { User, UserSchema } from './users/schemas/user.schema';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -37,6 +47,14 @@ import helmet from 'helmet';
         console.log('Applying MongoDB configuration:', mongoConfig);
         return mongoConfig;
       },
+    }),
+    MongooseModule.forFeature([
+      { name: AuthTokens.name, schema: AuthTokensSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
+    JwtModule.register({
+      secret: process.env.TOKEN_KEY || 'default-secret',
+      signOptions: { expiresIn: '1h' },
     }),
 
     UsersModule,
@@ -53,14 +71,10 @@ import helmet from 'helmet';
     RatingModule,
     PropertyModule,
     FavoriteModule,
+    AuthModule,
   ],
-  providers: [EmailService],
-  controllers: [
-    CategoryController,
-    VendorController,
-    ModelController,
-    PropertyController,
-  ],
+  providers: [EmailService, AppService, RefreshTokenService],
+  controllers: [AppController],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
