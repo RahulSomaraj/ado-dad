@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseFilters } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Cart')
 @ApiBearerAuth()
 @Controller('cart')
+@UseFilters(new HttpExceptionFilter('Cart'))
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 

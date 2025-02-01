@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsNotEmpty,
 } from 'class-validator';
+import { UserType } from '../enums/user.types';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'John Doe' })
@@ -27,10 +28,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ example: 'user', enum: ['user'] })
-  @IsEnum(['user'])
+  @ApiProperty({ example: 'user', enum: UserType })
+  @IsEnum(UserType)
   @IsNotEmpty()
-  type: 'user';
+  type: UserType;
 
   @ApiProperty({ example: 'admin' })
   @IsString()

@@ -1,11 +1,13 @@
-import { Controller, Post, Put, Get, Param, Body, Query, Delete } from '@nestjs/common';
+import { Controller, Post, Put, Get, Param, Body, Query, Delete, UseFilters } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { CreateModelDto } from './dto/create-model.dto';
 import { UpdateModelDto } from './dto/update-model.dto';
 import { ModelService } from './model.service';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Model')
 @Controller('models')
+@UseFilters(new HttpExceptionFilter('Models'))
 export class ModelController {
   constructor(private readonly modelService: ModelService) {}
 

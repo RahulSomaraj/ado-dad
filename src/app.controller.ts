@@ -17,7 +17,7 @@ import { LoginUserDto } from './common/dtos/userLoginDto';
 import { HttpExceptionFilter } from './shared/exception-service';
 
 @Controller()
-@UseFilters(new HttpExceptionFilter('Users'))
+@UseFilters(new HttpExceptionFilter('App'))
 export class AppController {
   constructor(private readonly appService: AppService) {}
 

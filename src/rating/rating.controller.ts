@@ -1,13 +1,15 @@
-import { Controller, Post, Put, Get, Param, Body, Query, Delete } from '@nestjs/common';
+import { Controller, Post, Put, Get, Param, Body, Query, Delete, UseFilters } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { RatingService } from './rating.service';
 import { Roles } from 'src/roles/roles.decorator'; // Assuming you have a Roles decorator
 import { UserRole } from 'src/roles/user-role.enum'; // Assuming you have a Role enum
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Ratings')
 @Controller('ratings')
+@UseFilters(new HttpExceptionFilter('Ratings'))
 export class RatingController {
   constructor(private readonly ratingService: RatingService) {}
 

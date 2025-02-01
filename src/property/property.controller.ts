@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, UseFilters } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -6,9 +6,11 @@ import { UpdatePropertyDto } from './dto/update-property.dto';
 import { RolesGuard } from 'src/roles/roles.guard';
 import { Roles } from 'src/roles/roles.decorator';
 import { UserRole } from 'src/roles/user-role.enum'; // Import UserRole enum
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Properties')
 @Controller('properties')
+@UseFilters(new HttpExceptionFilter('Properties'))
 export class PropertyController {
   constructor(private readonly propertyService: PropertyService) {}
 

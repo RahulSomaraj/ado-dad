@@ -1,5 +1,6 @@
 import { 
-  Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req 
+  Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req, 
+  UseFilters
 } from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
@@ -10,10 +11,12 @@ import { UserRole } from 'src/roles/user-role.enum';
 import { 
   ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiBody 
 } from '@nestjs/swagger';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Favorites')
 @ApiBearerAuth()
 @Controller('favorites')
+@UseFilters(new HttpExceptionFilter('Favorites'))
 @UseGuards(RolesGuard)
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}

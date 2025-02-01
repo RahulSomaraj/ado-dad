@@ -2,11 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional } from 'class-validator';
 
 export class LoginUserDto {
-  @ApiProperty()
+  @ApiProperty({ default: 'defaultUsername' }) // Set your default value here
   @IsOptional()
-  username: string;
+  username: string = 'defaultUsername'; // Default value in code
 
-  @ApiProperty()
+  @ApiProperty({ default: 'defaultPassword' }) // Set your default value here
   @IsOptional()
-  password: string;
+  password: string = 'defaultPassword'; // Default value in code
 }

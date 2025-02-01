@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Query, UseFilters } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { Product } from './schemas/product.schema';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Products')
 @Controller('products')
+@UseFilters(new HttpExceptionFilter('Products'))
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 

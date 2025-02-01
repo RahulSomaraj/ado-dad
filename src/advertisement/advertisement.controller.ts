@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
+  UseFilters,
 } from '@nestjs/common';
 import { AdvertisementsService } from './advertisement.service';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
@@ -23,9 +24,11 @@ import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { UserRole } from '../roles/user-role.enum';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Advertisements')
 @Controller('advertisements')
+@UseFilters(new HttpExceptionFilter('Advertisements'))
 export class AdvertisementsController {
   constructor(private readonly advertisementService: AdvertisementsService) {}
 

@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Query, UseFilters } from '@nestjs/common';
 import { BannerService } from './banner.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Banner } from './schemas/schema.banner';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Banners')
 @Controller('banners')
+@UseFilters(new HttpExceptionFilter('Banners'))
 export class BannerController {
   constructor(private readonly bannerService: BannerService) {}
 

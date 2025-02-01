@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UseFilters } from '@nestjs/common';
 import { VehicleCompanyService } from './vehicle-company.service';
 import { CreateVehicleCompanyDto } from './dto/create-vehicle-company.dto';
 import { UpdateVehicleCompanyDto } from './dto/update-vehicle-company.dto';
@@ -7,14 +7,17 @@ import { RolesGuard } from 'src/roles/roles.guard';
 import { Roles } from 'src/roles/roles.decorator';
 import { UserRole } from 'src/roles/user-role.enum'; // ✅ Import the UserRole enum
 import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 
 @ApiTags('Vehicle Companies')
 @Controller('vehicle-companies')
+@UseFilters(new HttpExceptionFilter('Vehicle-Companies'))
 export class VehicleCompanyController {
   constructor(private readonly companyService: VehicleCompanyService) {}
 
   @Post()
-//   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin) // ✅ Use enum instead of string
   @ApiOperation({ summary: 'Create a new vehicle company' })
   async create(@Body() dto: CreateVehicleCompanyDto) {

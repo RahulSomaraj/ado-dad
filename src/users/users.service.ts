@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User } from './schemas/user.schema';  
+import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
-import { EncryptionUtil } from '../common/encryption.util'; // Import Encryption Utility
+import { EncryptionUtil } from '../common/encryption.util';
 
 @Injectable()
 export class UsersService {
@@ -13,8 +13,9 @@ export class UsersService {
     private emailService: EmailService,
   ) {}
 
+  // Get all users with pagination and filters
   async getAllUsers(page: number, limit: number, filters: any) {
-    const query = { ...filters, isDeleted: false };
+    const query = { ...filters, isDeleted: false };  // Make sure to filter by isDeleted
     const users = await this.userModel
       .find(query)
       .skip((page - 1) * limit)
@@ -24,37 +25,34 @@ export class UsersService {
     return { users, totalPages: Math.ceil(count / limit), currentPage: page };
   }
 
+  // Get user by ID
   async getUserById(id: string): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
+    if (!user || user.isDeleted) throw new NotFoundException('User not found or deleted');
     return user;
   }
 
+  // Create a new user
   async createUser(userData: any): Promise<User> {
-    // Hash the password before storing it
     if (userData.password) {
       userData.password = await EncryptionUtil.hashPassword(userData.password);
     }
-    
-    // Encrypt sensitive data (if any)
     if (userData.ssn) {
       userData.ssn = EncryptionUtil.encrypt(userData.ssn);
     }
-
     const newUser = new this.userModel(userData);
     return newUser.save();
   }
 
+  // Update user details
   async updateUser(id: string, updateData: any): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
+    if (!user || user.isDeleted) throw new NotFoundException('User not found or deleted');
 
-    // Hash password if it's being updated
     if (updateData.password) {
       updateData.password = await EncryptionUtil.hashPassword(updateData.password);
     }
 
-    // Encrypt sensitive data if it's being updated
     if (updateData.ssn) {
       updateData.ssn = EncryptionUtil.encrypt(updateData.ssn);
     }
@@ -62,32 +60,38 @@ export class UsersService {
     const updatedUser = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
     return updatedUser!;
   }
-  
+
+  // Soft delete user
   async deleteUser(id: string): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     user.isDeleted = true;
     await user.save();
     return user;
   }
 
-  // Send OTP to a user via email
+  // Send OTP via email
   async sendOTP(email: string): Promise<void> {
     const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     
-    await user.generateAndSendOTP(this.emailService, generateOTP);
+    const otp = generateOTP();
+    user.otp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60000); // OTP expires in 10 minutes
+    await user.save();
+
+    await this.emailService.sendOtp(user.email, otp);
   }
 
-  // Verify the OTP
+  // Verify OTP
   async verifyOTP(email: string, otp: string): Promise<string> {
     const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     
-    if (user.otp !== otp) throw new Error('Invalid OTP');
+    if (user.otp !== otp) throw new BadRequestException('Invalid OTP');
     
     if (!user.otpExpires || user.otpExpires < new Date()) {
-      throw new Error('OTP expired');
+      throw new BadRequestException('OTP expired');
     }
     
     user.otp = undefined;
@@ -99,7 +103,7 @@ export class UsersService {
   // Decrypt sensitive user data (e.g., SSN)
   async getDecryptedUser(id: string): Promise<any> {
     const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
+    if (!user || user.isDeleted) throw new NotFoundException('User not found or deleted');
 
     return {
       ...user.toObject(),

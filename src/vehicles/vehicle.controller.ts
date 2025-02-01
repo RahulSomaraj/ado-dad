@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Query, UseFilters } from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Vehicles')
 @Controller('vehicles')
+@UseFilters(new HttpExceptionFilter('Vehicles'))
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 

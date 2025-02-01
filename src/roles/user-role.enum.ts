@@ -3,6 +3,6 @@ export enum UserRole {
     Vendor = 'Vendor',
     Seller = 'seller',
     User = 'User',
-    
+    user = "user",    
   }
   

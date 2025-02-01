@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  UseFilters,
 } from '@nestjs/common';
 import { UserRole } from 'src/roles/user-role.enum'; // ✅ Corrected path
 import {
@@ -23,15 +24,19 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './schemas/category.schema';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from 'src/roles/roles.decorator'; // ✅ Corrected path
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../auth/guard/roles.guards';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Categories')
 @Controller('categories')
+@UseFilters(new HttpExceptionFilter('Categories'))
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
-  //@UseGuards(AuthGuard('jwt'), RbacGuard)
-  //@Roles(UserRole.Admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
@@ -70,7 +75,7 @@ export class CategoryController {
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a category by ID' })
   @ApiResponse({ status: 200, description: 'Category fetched successfully' })
@@ -79,7 +84,7 @@ export class CategoryController {
   }
 
   @Put(':id')
-  //@UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   //@Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a category' })
@@ -92,7 +97,7 @@ export class CategoryController {
   }
 
   @Delete(':id')
-  //@UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   //@Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a category' })

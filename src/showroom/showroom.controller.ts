@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
+  UseFilters,
 } from '@nestjs/common';
 import { ShowroomService } from './showroom.service';
 import { Showroom } from './schemas/showroom.schema';
@@ -15,9 +16,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CreateShowroomDto } from './dto/create-showroom.dto';
 import { UpdateShowroomDto } from './dto/update-showroom.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Showrooms')
 @Controller('showrooms')
+@UseFilters(new HttpExceptionFilter('Showrooms'))
 export class ShowroomController {
   constructor(private readonly showroomService: ShowroomService) {}
 
