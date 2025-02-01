@@ -21,11 +21,20 @@ import { PropertyService } from './property/property.service';
 import { PropertyController } from './property/property.controller';
 import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module'; // Correct import
+import { configService } from './config/mongo.config';
+import { ConfigModule } from '@nestjs/config';
+import appConfig from './config/app.config';
+
 // Removed FavoriteController from the controller array because it is handled inside FavoriteModule
 
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/nestjs'), // MongoDB connection
+    MongooseModule.forRoot(configService.getMongoConfig().uri as string), // Ensure it's always a string
+    ConfigModule.forRoot({
+      load: [appConfig],
+      isGlobal: true,
+      // envFilePath: join(os.homedir(), 'newshop', `.env`),
+    }),
     UsersModule,
     VehicleModule,
     ShowroomModule,
@@ -41,10 +50,10 @@ import { FavoriteModule } from './favorites/favorite.module'; // Correct import
     PropertyModule,
     FavoriteModule, // Ensures FavoriteController is registered via FavoriteModule
   ],
-  providers: [EmailService],  
+  providers: [EmailService],
   controllers: [
-    CategoryController, 
-    VendorController, 
+    CategoryController,
+    VendorController,
     ModelController,
     PropertyController,
   ],
