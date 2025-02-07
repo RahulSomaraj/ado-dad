@@ -17,8 +17,9 @@ export class User extends Document {
   @Prop({ required: true })
   password: string;
 
-  @Prop({ unique: true })
+  @Prop({ unique: true, sparse: true }) 
   username?: string;
+  
 
   @Prop({ enum: UserType, required: true })
   type: UserType;
