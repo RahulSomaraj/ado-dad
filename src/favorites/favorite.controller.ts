@@ -22,12 +22,10 @@ export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
   @Post()
-  @Roles(UserRole.User)
-  @ApiOperation({ summary: 'Add an item to favorites' })
-  @ApiBody({ type: CreateFavoriteDto })
-  async addFavorite(@Req() req, @Body() createFavoriteDto: CreateFavoriteDto) {
-    return await this.favoriteService.addFavorite(req.user.id, createFavoriteDto);
+  async addToCart(@Query('userId') userId: string, @Body() createFavoriteDto: CreateFavoriteDto) {
+    return this.favoriteService.addFavorite(userId, createFavoriteDto);
   }
+  
 
   @Get()
   @Roles(UserRole.User, UserRole.Admin)

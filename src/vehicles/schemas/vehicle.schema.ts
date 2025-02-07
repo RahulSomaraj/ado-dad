@@ -5,6 +5,12 @@ import { Vendor } from '../schemas/vendor.schema';
 @Schema({ timestamps: true })
 export class Vehicle extends Document {
   @Prop({ required: true })
+  vehicleCompany: string;
+
+  @Prop({ required: true, type: [String] })
+  variants: string[];
+
+  @Prop({ required: true })
   image: string;
 
   @Prop({ required: true })
@@ -73,6 +79,9 @@ export class Vehicle extends Document {
     usbCompatibility?: boolean;
     vendor?: Vendor;
   };
+
+  @Prop({ required: true })
+  createdBy: string;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

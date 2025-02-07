@@ -80,7 +80,7 @@ export class ShowroomController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add a new showroom' })
   @ApiResponse({
     status: 201,

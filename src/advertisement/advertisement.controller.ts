@@ -23,7 +23,6 @@ import {
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { UserRole } from '../roles/user-role.enum';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Advertisements')
@@ -33,14 +32,13 @@ export class AdvertisementsController {
   constructor(private readonly advertisementService: AdvertisementsService) {}
 
   @Post()
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new advertisement' })
   @ApiResponse({
     status: 201,
     description: 'Advertisement created successfully.',
   })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin, UserRole.Vendor, UserRole.User)
+  // @UseGuards(RolesGuard)
+  // @Roles(UserRole.Admin, UserRole.Vendor, UserRole.User)
   async create(@Body() createAdvertisementDto: CreateAdvertisementDto) {
     return this.advertisementService.create(createAdvertisementDto);
   }
@@ -126,13 +124,12 @@ export class AdvertisementsController {
   }
 
   @Put(':id')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update advertisement by ID' })
   @ApiResponse({
     status: 200,
     description: 'Advertisement updated successfully.',
   })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.Admin, UserRole.Vendor, UserRole.User)
   async update(
     @Param('id') id: string,
@@ -142,13 +139,12 @@ export class AdvertisementsController {
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete advertisement by ID' })
   @ApiResponse({
     status: 200,
     description: 'Advertisement deleted successfully.',
   })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.Admin)
   async remove(@Param('id') id: string) {
     return this.advertisementService.remove(id);

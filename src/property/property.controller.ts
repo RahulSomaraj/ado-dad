@@ -62,9 +62,9 @@ export class PropertyController {
   }
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.Seller)
-  @ApiBearerAuth()
+  // @UseGuards(RolesGuard)
+  // @Roles(UserRole.Seller)
+  // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new property' })
   @ApiResponse({ status: 201, description: 'Property created successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden: Only sellers can create properties' })

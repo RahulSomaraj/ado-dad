@@ -18,7 +18,7 @@ export class VehicleCompanyController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin) // ✅ Use enum instead of string
+  @Roles(UserRole.Admin) // 
   @ApiOperation({ summary: 'Create a new vehicle company' })
   async create(@Body() dto: CreateVehicleCompanyDto) {
     return this.companyService.create(dto);
