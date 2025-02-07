@@ -27,7 +27,7 @@ export class AppController {
   }
 
   @UseGuards(LocalAuthGuard)
-  @Post('/login')
+  @Post('auth/login')
   login(
     @Body() userLoginDto: LoginUserDto,
     @Request() req,

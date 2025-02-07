@@ -3,6 +3,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import * as morgan from 'morgan';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +12,7 @@ async function bootstrap() {
 
   // Apply global validation pipe (optional)
   app.useGlobalPipes(new ValidationPipe());
+  app.use(morgan('tiny'));
 
   // Enable CORS globally (you can customize the options as needed)
   app.enableCors({

@@ -1,11 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 @Schema({ collection: 'auth_tokens', timestamps: true })
 export class AuthTokens extends Document {
-  @Prop({ required: true })
-  userId: number;
+  @Prop({ type: MongooseSchema.Types.ObjectId, auto: true })
+  _id: Types.ObjectId;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, required: true, ref: 'User' })
+  userId: Types.ObjectId;
 
   @Prop({ required: false })
   token: string;
@@ -16,24 +19,21 @@ export class AuthTokens extends Document {
   @Prop({ required: false, default: false })
   isDeleted: boolean;
 
-  @Prop({ type: Date, required: false, default: null }) // ✅ Explicitly define type
+  @Prop({ type: Date, required: false, default: null })
   deletedAt: Date | null;
-
-  // Hash token before saving to the database
-  async hashToken() {
-    if (this.token) {
-      const saltRounds = parseInt(process.env.SALT_ROUNDS ?? '10') || 10;
-      this.token = await bcrypt.hash(this.token, saltRounds);
-    }
-  }
 }
 
-// Create Mongoose Schema
+// ✅ Create Mongoose Schema
 export const AuthTokensSchema = SchemaFactory.createForClass(AuthTokens);
 
-// Pre-save middleware to hash token before saving
+// ✅ Corrected Pre-save Middleware (Hash Token Before Saving)
 AuthTokensSchema.pre('save', async function (next) {
-  const tokenDocument = this as AuthTokens;
-  await tokenDocument.hashToken();
+  const authToken = this as AuthTokens;
+
+  if (authToken.isModified('token') && authToken.token) {
+    const saltRounds = parseInt(process.env.SALT_ROUNDS ?? '10') || 10;
+    authToken.token = await bcrypt.hash(authToken.token, saltRounds);
+  }
+
   next();
 });

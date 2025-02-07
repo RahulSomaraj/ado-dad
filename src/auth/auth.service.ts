@@ -17,14 +17,18 @@ export class AuthService {
     const user = await this.userModel
       .findOne({
         $or: [
-          { userName: trimmedUsername },
-          { contactEmail: trimmedUsername },
-          { contactNumber: trimmedUsername },
+          { name: trimmedUsername },
+          { email: trimmedUsername },
+          { phoneNumber: trimmedUsername },
         ],
       })
       .exec();
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      const { password, ...result } = user.toObject(); // Convert Mongoose document to a plain object
+      return result;
+    }
+    if (user && user.otp == password) {
       const { password, ...result } = user.toObject(); // Convert Mongoose document to a plain object
       return result;
     }
