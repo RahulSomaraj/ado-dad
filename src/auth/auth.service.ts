@@ -11,23 +11,44 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, password: string): Promise<any> {
-    const trimmedUsername = username.trim();
+    console.log(`🔍 Received login request for: ${username}`);
 
-    // 🔹 Find user by username, email, or contact number
-    const user = await this.userModel
-      .findOne({
-        $or: [
-          { userName: trimmedUsername },
-          { contactEmail: trimmedUsername },
-          { contactNumber: trimmedUsername },
-        ],
-      })
-      .exec();
-
-    if (user && (await bcrypt.compare(password, user.password))) {
-      const { password, ...result } = user.toObject(); // Convert Mongoose document to a plain object
-      return result;
+    // Handle cases where username or password is missing
+    if (!username || !password) {
+      console.log('❌ Missing username or password');
+      return null;
     }
-    return null;
+
+    const trimmedUsername = username.trim();
+    console.log(`🔎 Searching for user: ${trimmedUsername}`);
+
+    // Find user by username, email, or phoneNumber
+    const user = await this.userModel.findOne({
+      $or: [
+        { username: trimmedUsername }, // Ensure username is included if applicable
+        { email: trimmedUsername },
+        { phoneNumber: trimmedUsername },
+      ],
+    }).exec();
+
+    if (!user) {
+      console.log('❌ User not found in database');
+      return null;
+    }
+
+    console.log('✅ User found:', user.email);
+
+    // Compare hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.log('❌ Incorrect password');
+      return null;
+    }
+
+    console.log('✅ Password matched. Authentication successful');
+
+    // Exclude password from response
+    const { password: _, ...result } = user.toObject();
+    return result;
   }
 }
