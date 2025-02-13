@@ -15,6 +15,7 @@ import { ApiTags, ApiQuery, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto'; // Import CreateUserDto
 import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { GetUsersDto } from './dto/get-user.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -26,27 +27,9 @@ export class UsersController {
   ) {}
 
   @Get()
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of users per page',
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Search query to filter users',
-  })
   @ApiResponse({ status: 200, description: 'List of users' })
-  async getAllUsers(@Query() query): Promise<any> {
-    return this.usersService.getAllUsers(query.page, query.limit, query);
+  async getAllUsers(@Query() query: GetUsersDto): Promise<any> {
+    return this.usersService.getAllUsers(query);
   }
 
   @Get(':id')
