@@ -8,15 +8,11 @@ import { CartModule } from './cart/cart.module';
 import { ProductModule } from './product/product.module';
 import { AdvertisementsModule } from './advertisement/advertisement.module';
 import { BannerModule } from './banner/banner.module';
-import { CategoryController } from './category/category.controller';
 import { CategoryModule } from './category/category.module';
 import { VehicleCompanyModule } from './vehicle-company/vehicle-company.module';
-import { VendorController } from './vendor/vendor.controller';
 import { VendorModule } from './vendor/vendor.module';
-import { ModelController } from './model/model.controller';
 import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
-import { PropertyController } from './property/property.controller';
 import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module';
 import { EmailService } from './utils/email.service';
@@ -73,7 +69,7 @@ import { AuthModule } from './auth/auth.module';
     PropertyModule,
     FavoriteModule,
     AuthModule,
-    UploadModule
+  
   ],
   providers: [EmailService, AppService, RefreshTokenService],
   controllers: [AppController],
