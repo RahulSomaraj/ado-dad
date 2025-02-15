@@ -17,7 +17,7 @@ import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module';
 import { EmailService } from './utils/email.service';
 import { configService } from './config/mongo.config';
-import { UploadModule } from './shared/upload.module'; 
+import { UploadModule } from './shared/upload.module';
 import appConfig from './config/app.config';
 import helmet from 'helmet';
 import {
@@ -69,7 +69,7 @@ import { AuthModule } from './auth/auth.module';
     PropertyModule,
     FavoriteModule,
     AuthModule,
-  
+    UploadModule,
   ],
   providers: [EmailService, AppService, RefreshTokenService],
   controllers: [AppController],
