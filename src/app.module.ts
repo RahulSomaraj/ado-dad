@@ -10,7 +10,6 @@ import { AdvertisementsModule } from './advertisement/advertisement.module';
 import { BannerModule } from './banner/banner.module';
 import { CategoryModule } from './category/category.module';
 import { VehicleCompanyModule } from './vehicle-company/vehicle-company.module';
-import { VendorModule } from './vendor/vendor.module';
 import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
 import { PropertyModule } from './property/property.module';
@@ -63,7 +62,6 @@ import { AuthModule } from './auth/auth.module';
     BannerModule,
     CategoryModule,
     VehicleCompanyModule,
-    VendorModule,
     ModelModule,
     RatingModule,
     PropertyModule,

@@ -62,10 +62,10 @@ export class VehicleCompanyService {
     // Example pseudo-code: build filter based on provided query properties
     const filter: any = {};
     if (query.name) {
-      filter.name = query.name;
+      filter.name = { $regex: new RegExp(query.name, 'i') };
     }
     if (query.originCountry) {
-      filter.originCountry = query.originCountry;
+      filter.originCountry = { $regex: new RegExp(query.originCountry, 'i') };
     }
     // Replace with actual database logic (e.g., using Mongoose or TypeORM)
     return await this.vehicleCompanyModel.find(filter);

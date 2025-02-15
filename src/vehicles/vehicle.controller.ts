@@ -1,8 +1,19 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query, UseFilters } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  Query,
+  UseFilters,
+} from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiQuery, ApiOperation } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { FindVehicleDto } from './dto/get-vehicle.dto';
 
 @ApiTags('Vehicles')
 @Controller('vehicles')
@@ -11,12 +22,9 @@ export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
   @Get()
-  @ApiQuery({ name: 'vendorId', required: false })
-  @ApiQuery({ name: 'make', required: false })
-  @ApiQuery({ name: 'model', required: false })
-  @ApiResponse({ status: 200, description: 'List of vehicles' })
-  async getAllVehicles(@Query() query): Promise<any> {
-    return this.vehicleService.getAllVehicles(query);
+  @ApiOperation({ summary: 'Search vehicles with filters and pagination' })
+  async findVehicles(@Query() query: FindVehicleDto) {
+    return this.vehicleService.findVehicles(query);
   }
 
   @Get(':id')
@@ -35,7 +43,10 @@ export class VehicleController {
   @Put(':id')
   @ApiResponse({ status: 200, description: 'Vehicle updated successfully' })
   @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async updateVehicle(@Param('id') id: string, @Body() createVehicleDto: CreateVehicleDto) {
+  async updateVehicle(
+    @Param('id') id: string,
+    @Body() createVehicleDto: CreateVehicleDto,
+  ) {
     return this.vehicleService.updateVehicle(id, createVehicleDto);
   }
 
