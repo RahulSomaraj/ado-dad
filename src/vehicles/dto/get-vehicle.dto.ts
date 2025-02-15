@@ -173,14 +173,6 @@ export class FindAdditionalInfoDto {
   })
   @IsOptional()
   usbCompatibility?: boolean;
-
-  @ApiPropertyOptional({
-    example: '60f6a4c1234567890abcdef1',
-    description: 'Vendor ID for AdditionalInfo',
-  })
-  @IsOptional()
-  @IsMongoId()
-  vendor?: string;
 }
 
 /**
@@ -248,6 +240,14 @@ export class FindVehicleModelDto {
  * Main DTO for searching vehicles.
  */
 export class FindVehicleDto extends PaginationDto {
+  @ApiPropertyOptional({
+    example: '60f6a4c1234567890abcdef1',
+    description: 'Vendor ID for AdditionalInfo',
+  })
+  @IsOptional()
+  @IsMongoId()
+  vendor?: string;
+
   @ApiPropertyOptional({ example: 'Toyota', description: 'Vehicle brand name' })
   @IsOptional()
   @IsString()

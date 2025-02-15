@@ -32,6 +32,11 @@ export class VehicleService {
       filter['details.month'] = { $regex: findDto.month, $options: 'i' };
     }
 
+    // Vendor filter
+    if (findDto.vendor) {
+      filter.vendor = findDto.vendor;
+    }
+
     // Nested filter for vehicleModels using $elemMatch if provided
     if (findDto.vehicleModel) {
       const vmQuery: any = {};
@@ -62,7 +67,7 @@ export class VehicleService {
         if (findDto.vehicleModel.additionalInfo.abs !== undefined) {
           additionalInfoQuery.abs = findDto.vehicleModel.additionalInfo.abs;
         }
-        // Add more filters for additionalInfo fields as needed...
+        // Add more additional info filters as needed...
         if (Object.keys(additionalInfoQuery).length > 0) {
           vmQuery.additionalInfo = additionalInfoQuery;
         }
