@@ -1,144 +1,145 @@
-import { Schema, Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { User } from '../../users/schemas/user.schema';
 
 // Helper function for image array limit validation
-function arrayLimit(val) {
+function arrayLimit(val: string[]): boolean {
   return val.length <= 5;
 }
 
-export const PropertySchema = new Schema({
-  title: {
-    type: String,
-    required: [true, 'Title is required'],
-    trim: true,
-  },
-  description: {
-    type: String,
-    required: [true, 'Description is required'],
-  },
-  price: {
-    type: Number,
-    required: [true, 'Price is required'],
-    min: [0, 'Price cannot be negative'],
-  },
-  location: {
-    type: String,
-    required: [true, 'Location is required'],
-  },
-  area: {
-    type: Number, // Area in square feet
-    required: [true, 'Area is required'],
-    min: [0, 'Area cannot be negative'],
-  },
-  images: {
-    type: [String], // Array of image URLs
-    validate: [arrayLimit, '{PATH} exceeds the limit of 5 images'],
-  },
-  owner: {
-    type: Schema.Types.ObjectId,
-    ref: 'User', // Reference to the User model
-    required: [true, 'Owner is required'],
-  },
-  type: {
-    type: String,
+@Schema({ timestamps: true })
+export class Property extends Document {
+  @Prop({ required: true, trim: true })
+  title: string;
+
+  @Prop({ required: true })
+  description: string;
+
+  @Prop({ required: true, min: 0 })
+  price: number;
+
+  @Prop({ required: true })
+  location: string;
+
+  @Prop({ required: true, min: 0 })
+  area: number;
+
+  @Prop({
+    type: [String],
+    validate: {
+      validator: arrayLimit,
+      message: '{PATH} exceeds the limit of 5 images',
+    },
+  })
+  images: string[];
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  owner: Types.ObjectId;
+
+  @Prop({
+    required: true,
     enum: ['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'],
-    required: [true, 'Type is required'],
-  },
-  category: {
-    type: String,
+  })
+  type: 'house' | 'apartment' | 'shopAndOffice' | 'pgAndGuestHouse' | 'land';
+
+  @Prop({
+    required: true,
     enum: ['forSale', 'forRent', 'landsAndPlots'],
-    required: [true, 'Category is required'],
-  },
-  bhk: {
+  })
+  category: 'forSale' | 'forRent' | 'landsAndPlots';
+
+  @Prop({
     type: Number,
-    required: function () {
+    required: function (this: PropertyDocument) {
       return ['house', 'apartment', 'pgAndGuestHouse'].includes(this.type);
     },
     min: [1, 'BHK must be at least 1'],
-  },
-  bathrooms: {
+  })
+  bhk?: number;
+
+  @Prop({
     type: Number,
-    required: function () {
+    required: function (this: PropertyDocument) {
       return ['house', 'apartment', 'pgAndGuestHouse'].includes(this.type);
     },
     min: [1, 'Bathrooms must be at least 1'],
-  },
-  furnished: {
-    type: String,
-    enum: ['Furnished', 'Semi-Furnished', 'Unfurnished'],
-    required: function () {
+  })
+  bathrooms?: number;
+
+  @Prop({
+    required: function (this: PropertyDocument) {
       return ['house', 'apartment', 'pgAndGuestHouse'].includes(this.type);
     },
-  },
-  projectStatus: {
-    type: String,
-    enum: ['Under Construction', 'Ready to Move', 'Resale'],
-    required: function () {
+    enum: ['Furnished', 'Semi-Furnished', 'Unfurnished'],
+  })
+  furnished?: 'Furnished' | 'Semi-Furnished' | 'Unfurnished';
+
+  @Prop({
+    required: function (this: PropertyDocument) {
       return this.type !== 'land';
     },
-  },
-  maintenanceCost: {
+    enum: ['Under Construction', 'Ready to Move', 'Resale'],
+  })
+  projectStatus?: 'Under Construction' | 'Ready to Move' | 'Resale';
+
+  @Prop({ default: 0 })
+  maintenanceCost: number;
+
+  @Prop({
     type: Number,
-    default: 0,
-  },
-  totalFloors: {
-    type: Number,
-    required: function () {
+    required: function (this: PropertyDocument) {
       return ['house', 'apartment', 'pgAndGuestHouse'].includes(this.type);
     },
     min: [1, 'Total floors must be at least 1'],
-  },
-  floorNo: {
+  })
+  totalFloors?: number;
+
+  @Prop({
     type: Number,
-    required: function () {
+    required: function (this: PropertyDocument) {
       return ['house', 'apartment', 'pgAndGuestHouse'].includes(this.type);
     },
     min: [0, 'Floor number cannot be negative'],
-  },
-  carParking: {
-    type: Number,
-    default: 0,
-    min: [0, 'Car parking must be at least 0'],
-  },
-  facing: {
-    type: String,
-    enum: ['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'],
-  },
-  listedBy: {
-    type: String,
-    enum: ['Owner', 'Dealer', 'Builder'],
-    required: [true, 'Listed by is required'],
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  })
+  floorNo?: number;
 
-// Interface for Property document
-export interface Property extends Document {
-  title: string;
-  description: string;
-  price: number;
-  location: string;
-  area: number;
-  images: string[];
-  owner: string;
-  type: string;
-  category: string;
-  bhk: number;
-  bathrooms: number;
-  furnished: string;
-  projectStatus: string;
-  maintenanceCost: number;
-  totalFloors: number;
-  floorNo: number;
+  @Prop({ default: 0, min: [0, 'Car parking must be at least 0'] })
   carParking: number;
-  facing: string;
-  listedBy: string;
-  createdAt: Date;
+
+  @Prop({
+    enum: [
+      'North',
+      'South',
+      'East',
+      'West',
+      'North-East',
+      'North-West',
+      'South-East',
+      'South-West',
+    ],
+  })
+  facing?:
+    | 'North'
+    | 'South'
+    | 'East'
+    | 'West'
+    | 'North-East'
+    | 'North-West'
+    | 'South-East'
+    | 'South-West';
+
+  @Prop({
+    required: true,
+    enum: ['Owner', 'Dealer', 'Builder'],
+  })
+  listedBy: 'Owner' | 'Dealer' | 'Builder';
+
+  // createdAt is automatically added by the timestamps option
 }
 
-// PropertyDocument is the type of the Mongoose document, combining the interface and Mongoose's Document
-export type PropertyDocument = Property & Document;
+export const PropertySchema = SchemaFactory.createForClass(Property);
 
-
+// Define a type for "this" context in conditional validators.
+interface PropertyDocument extends Document {
+  type: 'house' | 'apartment' | 'shopAndOffice' | 'pgAndGuestHouse' | 'land';
+}

@@ -1,162 +1,237 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsEnum, IsArray, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsEnum,
+  IsMongoId,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  Min,
+  ValidateIf,
+  ArrayNotEmpty,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export enum PropertyTypeEnum {
+  house = 'house',
+  apartment = 'apartment',
+  shopAndOffice = 'shopAndOffice',
+  pgAndGuestHouse = 'pgAndGuestHouse',
+  land = 'land',
+}
+
+export enum PropertyCategoryEnum {
+  forSale = 'forSale',
+  forRent = 'forRent',
+  landsAndPlots = 'landsAndPlots',
+}
+
+export enum FurnishedEnum {
+  Furnished = 'Furnished',
+  SemiFurnished = 'Semi-Furnished',
+  Unfurnished = 'Unfurnished',
+}
+
+export enum ProjectStatusEnum {
+  UnderConstruction = 'Under Construction',
+  ReadyToMove = 'Ready to Move',
+  Resale = 'Resale',
+}
+
+export enum FacingEnum {
+  North = 'North',
+  South = 'South',
+  East = 'East',
+  West = 'West',
+  NorthEast = 'North-East',
+  NorthWest = 'North-West',
+  SouthEast = 'South-East',
+  SouthWest = 'South-West',
+}
+
+export enum ListedByEnum {
+  Owner = 'Owner',
+  Dealer = 'Dealer',
+  Builder = 'Builder',
+}
 
 export class CreatePropertyDto {
-  @ApiProperty({
-    description: 'Title of the property',
-    example: 'Beautiful House for Sale',
-  })
+  @ApiProperty({ description: 'Title of the property' })
   @IsString()
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({
-    description: 'Description of the property',
-    example: 'A 3-bedroom house in a prime location.',
-  })
+  @ApiProperty({ description: 'Description of the property' })
   @IsString()
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({
-    description: 'Price of the property',
-    example: 500000,
-  })
+  @ApiProperty({ description: 'Price of the property', minimum: 0 })
   @IsNumber()
+  @Type(() => Number)
   @Min(0)
   price: number;
 
-  @ApiProperty({
-    description: 'Location of the property',
-    example: 'New York, NY',
-  })
+  @ApiProperty({ description: 'Location of the property' })
   @IsString()
   @IsNotEmpty()
   location: string;
 
-  @ApiProperty({
-    description: 'Area of the property in square feet',
-    example: 1200,
-  })
+  @ApiProperty({ description: 'Area (in square feet)', minimum: 0 })
   @IsNumber()
+  @Type(() => Number)
   @Min(0)
   area: number;
 
   @ApiProperty({
-    description: 'List of image URLs of the property',
-    example: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'],
+    description: 'Image URLs (maximum 5 images)',
+    isArray: true,
     type: [String],
-    required: false,
   })
   @IsArray()
-  @IsOptional()
-  images?: string[];
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  images: string[];
+
+  @ApiProperty({ description: 'Owner ID', example: '609c1d1f4f1a2561d8e6b123' })
+  @IsMongoId()
+  @IsNotEmpty()
+  owner: string;
+
+  @ApiProperty({ description: 'Type of property', enum: PropertyTypeEnum })
+  @IsEnum(PropertyTypeEnum)
+  @IsNotEmpty()
+  type: PropertyTypeEnum;
 
   @ApiProperty({
-    description: 'Type of the property',
-    enum: ['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'],
-    example: 'house',
+    description: 'Category of property',
+    enum: PropertyCategoryEnum,
   })
-  @IsEnum(['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'])
-  type: string;
+  @IsEnum(PropertyCategoryEnum)
+  @IsNotEmpty()
+  category: PropertyCategoryEnum;
 
-  @ApiProperty({
-    description: 'Category of the property',
-    enum: ['forSale', 'forRent', 'landsAndPlots'],
-    example: 'forSale',
+  // Conditional: For house, apartment, pgAndGuestHouse, require bhk.
+  @ApiPropertyOptional({
+    description:
+      'BHK count (required for house, apartment, and pgAndGuestHouse types)',
+    minimum: 1,
   })
-  @IsEnum(['forSale', 'forRent', 'landsAndPlots'])
-  category: string;
-
-  @ApiProperty({
-    description: 'Number of BHK (for house, apartment, PG)',
-    example: 3,
-    required: false,
-  })
+  @ValidateIf((o) =>
+    [
+      PropertyTypeEnum.house,
+      PropertyTypeEnum.apartment,
+      PropertyTypeEnum.pgAndGuestHouse,
+    ].includes(o.type),
+  )
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
+  @Min(1)
   bhk?: number;
 
-  @ApiProperty({
-    description: 'Number of bathrooms',
-    example: 2,
-    required: false,
+  // Conditional: For house, apartment, pgAndGuestHouse, require bathrooms.
+  @ApiPropertyOptional({
+    description:
+      'Number of bathrooms (required for house, apartment, and pgAndGuestHouse types)',
+    minimum: 1,
   })
+  @ValidateIf((o) =>
+    [
+      PropertyTypeEnum.house,
+      PropertyTypeEnum.apartment,
+      PropertyTypeEnum.pgAndGuestHouse,
+    ].includes(o.type),
+  )
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
+  @Min(1)
   bathrooms?: number;
 
-  @ApiProperty({
-    description: 'Furnishing status',
-    enum: ['Furnished', 'Semi-Furnished', 'Unfurnished'],
-    example: 'Furnished',
-    required: false,
+  // Conditional: For house, apartment, pgAndGuestHouse, require furnished status.
+  @ApiPropertyOptional({
+    description:
+      'Furnished status (required for house, apartment, and pgAndGuestHouse types)',
+    enum: FurnishedEnum,
   })
-  @IsEnum(['Furnished', 'Semi-Furnished', 'Unfurnished'])
-  @IsOptional()
-  furnished?: string;
+  @ValidateIf((o) =>
+    [
+      PropertyTypeEnum.house,
+      PropertyTypeEnum.apartment,
+      PropertyTypeEnum.pgAndGuestHouse,
+    ].includes(o.type),
+  )
+  @IsEnum(FurnishedEnum)
+  furnished?: FurnishedEnum;
 
-  @ApiProperty({
-    description: 'Project status (if applicable)',
-    enum: ['Under Construction', 'Ready to Move', 'Resale'],
-    example: 'Ready to Move',
-    required: false,
+  // Conditional: For non-land properties, require project status.
+  @ApiPropertyOptional({
+    description: 'Project status (required if property type is not land)',
+    enum: ProjectStatusEnum,
   })
-  @IsEnum(['Under Construction', 'Ready to Move', 'Resale'])
-  @IsOptional()
-  projectStatus?: string;
+  @ValidateIf((o) => o.type !== PropertyTypeEnum.land)
+  @IsEnum(ProjectStatusEnum)
+  projectStatus?: ProjectStatusEnum;
 
-  @ApiProperty({
-    description: 'Maintenance cost of the property',
-    example: 5000,
-    required: false,
-  })
+  @ApiPropertyOptional({ description: 'Maintenance cost', default: 0 })
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
   maintenanceCost?: number;
 
-  @ApiProperty({
-    description: 'Total number of floors (if applicable)',
-    example: 5,
-    required: false,
+  // Conditional: For house, apartment, pgAndGuestHouse, require total floors.
+  @ApiPropertyOptional({
+    description:
+      'Total number of floors (required for house, apartment, and pgAndGuestHouse types)',
+    minimum: 1,
   })
+  @ValidateIf((o) =>
+    [
+      PropertyTypeEnum.house,
+      PropertyTypeEnum.apartment,
+      PropertyTypeEnum.pgAndGuestHouse,
+    ].includes(o.type),
+  )
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
+  @Min(1)
   totalFloors?: number;
 
-  @ApiProperty({
-    description: 'Floor number (if applicable)',
-    example: 2,
-    required: false,
+  // Conditional: For house, apartment, pgAndGuestHouse, require floor number.
+  @ApiPropertyOptional({
+    description:
+      'Floor number (required for house, apartment, and pgAndGuestHouse types)',
+    minimum: 0,
   })
+  @ValidateIf((o) =>
+    [
+      PropertyTypeEnum.house,
+      PropertyTypeEnum.apartment,
+      PropertyTypeEnum.pgAndGuestHouse,
+    ].includes(o.type),
+  )
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
   floorNo?: number;
 
-  @ApiProperty({
-    description: 'Number of car parking spaces',
-    example: 2,
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Car parking count',
+    default: 0,
+    minimum: 0,
   })
   @IsNumber()
-  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
   carParking?: number;
 
-  @ApiProperty({
-    description: 'Facing direction of the property',
-    enum: ['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'],
-    example: 'North',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Facing direction',
+    enum: FacingEnum,
   })
-  @IsEnum(['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'])
-  @IsOptional()
-  facing?: string;
+  @IsEnum(FacingEnum)
+  facing?: FacingEnum;
 
-  @ApiProperty({
-    description: 'Who is listing the property',
-    enum: ['Owner', 'Dealer', 'Builder'],
-    example: 'Owner',
-  })
-  @IsEnum(['Owner', 'Dealer', 'Builder'])
-  listedBy: string;
+  @ApiProperty({ description: 'Listed by', enum: ListedByEnum })
+  @IsEnum(ListedByEnum)
+  @IsNotEmpty()
+  listedBy: ListedByEnum;
 }

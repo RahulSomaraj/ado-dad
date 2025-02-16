@@ -1,136 +1,109 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsArray, IsOptional, IsEnum } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsEnum,
+  IsMongoId,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ArrayNotEmpty,
+  ValidateIf,
+} from 'class-validator';
+import { AdvertisementType, FuelType } from './create-advertisement.dto';
+import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 
 export class UpdateAdvertisementDto {
-  @ApiProperty({ description: 'Title of the advertisement', example: 'Affordable Family Car for Sale' })
-  @IsString()
-  @IsNotEmpty()
-  adTitle: string;
-
-  @ApiProperty({ description: 'Description of the advertisement', example: 'A well-maintained family car, single owner, excellent mileage, and recently serviced.' })
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-
-  @ApiProperty({ description: 'Price of the advertisement', example: 15000 })
-  @IsNumber()
-  @Min(0)
-  price: number;
-
-  @ApiProperty({
-    description: 'Array of image URLs',
-    example: ['https://example.com/car1.jpg', 'https://example.com/car2.jpg'],
+  @ApiPropertyOptional({
+    enum: AdvertisementType,
+    description: 'Type of advertisement. Allowed values: Vehicle, Property.',
   })
+  @IsOptional()
+  @IsEnum(AdvertisementType)
+  type?: AdvertisementType;
+
+  @ApiPropertyOptional({
+    enum: VehicleTypes,
+    description: 'Type of vehicls. Allowed values: Car',
+  })
+  @IsEnum(VehicleTypes)
+  modelType: VehicleTypes;
+
+  @ApiPropertyOptional({ description: 'Title of the advertisement' })
+  @IsOptional()
+  @IsString()
+  adTitle?: string;
+
+  @ApiPropertyOptional({ description: 'Description of the advertisement' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Price of the advertised item',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Image URLs for the advertisement',
+    isArray: true,
+    type: String,
+  })
+  @IsOptional()
   @IsArray()
+  @ArrayNotEmpty()
   @IsString({ each: true })
-  @IsNotEmpty()
-  imageUrls: string[];
+  imageUrls?: string[];
 
-  @ApiProperty({ description: 'Full name of the person', example: 'John Doe' })
+  @ApiPropertyOptional({ description: 'Full name of the advertiser' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  fullName: string;
+  fullName?: string;
 
-  @ApiProperty({ description: 'Phone number of the person', example: '1234567890' })
+  @ApiPropertyOptional({ description: 'Phone number of the advertiser' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  phoneNumber: string;
+  phoneNumber?: string;
 
-  @ApiProperty({ description: 'State where the advertisement is located', example: 'California' })
+  @ApiPropertyOptional({
+    description: 'State where the advertisement is posted',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  state: string;
+  state?: string;
 
-  @ApiProperty({ description: 'City where the advertisement is located', example: 'Los Angeles' })
+  @ApiPropertyOptional({
+    description: 'City where the advertisement is posted',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  city: string;
+  city?: string;
 
-  // ------------------------ Property-Specific Fields ------------------------
-
-  @ApiProperty({
-    description: 'Type of the property',
-    enum: ['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'],
-    example: 'house',
+  @ApiPropertyOptional({
+    description: 'User ID of the creator',
+    example: '609c1d1f4f1a2561d8e6b123',
   })
-  @IsEnum(['house', 'apartment', 'shopAndOffice', 'pgAndGuestHouse', 'land'])
   @IsOptional()
-  type?: string;
+  @IsMongoId()
+  createdBy?: string;
 
-  @ApiProperty({ description: 'Number of BHK', example: 3, required: false })
-  @IsNumber()
-  @Min(1)
-  @IsOptional()
-  bhk?: number;
-
-  @ApiProperty({ description: 'Number of bathrooms', example: 2, required: false })
-  @IsNumber()
-  @Min(1)
-  @IsOptional()
-  bathrooms?: number;
-
-  @ApiProperty({
-    description: 'Furnishing status',
-    enum: ['Furnished', 'Semi-Furnished', 'Unfurnished'],
-    example: 'Furnished',
+  @ApiPropertyOptional({
+    description: 'Category ID for the advertisement',
+    example: '609c1d1f4f1a2561d8e6b789',
   })
-  @IsEnum(['Furnished', 'Semi-Furnished', 'Unfurnished'])
   @IsOptional()
-  furnished?: string;
+  @IsMongoId()
+  category?: string;
 
-  @ApiProperty({
-    description: 'Project status',
-    enum: ['Under Construction', 'Ready to Move', 'Resale'],
-    example: 'Ready to Move',
+  @ApiPropertyOptional({
+    description:
+      'Fuel type for the vehicle advertisement. Allowed values: Petrol, Diesel, Electric, Hybrid.',
+    enum: FuelType,
   })
-  @IsEnum(['Under Construction', 'Ready to Move', 'Resale'])
+  @ValidateIf((o) => o.type === AdvertisementType.Vehicle)
   @IsOptional()
-  projectStatus?: string;
-
-  @ApiProperty({ description: 'Area of the property in square feet', example: 1200 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  area?: number;
-
-  @ApiProperty({ description: 'Maintenance cost of the property', example: 5000 })
-  @IsNumber()
-  @IsOptional()
-  maintenanceCost?: number;
-
-  @ApiProperty({ description: 'Total number of floors', example: 5 })
-  @IsNumber()
-  @Min(1)
-  @IsOptional()
-  totalFloors?: number;
-
-  @ApiProperty({ description: 'Floor number', example: 2 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  floorNo?: number;
-
-  @ApiProperty({ description: 'Number of car parking spaces', example: 2 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  carParking?: number;
-
-  @ApiProperty({
-    description: 'Facing direction of the property',
-    enum: ['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'],
-    example: 'North',
-  })
-  @IsEnum(['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'])
-  @IsOptional()
-  facing?: string;
-
-  @ApiProperty({
-    description: 'Who is listing the property',
-    enum: ['Owner', 'Dealer', 'Builder'],
-    example: 'Owner',
-  })
-  @IsEnum(['Owner', 'Dealer', 'Builder'])
-  @IsOptional()
-  listedBy?: string;
+  @IsEnum(FuelType)
+  fuelType?: FuelType;
 }

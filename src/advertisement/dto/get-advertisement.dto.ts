@@ -1,6 +1,7 @@
-import { IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 
 export class FindAdvertisementsDto {
   @ApiPropertyOptional({ description: 'Advertisement type', example: 'sale' })
@@ -48,15 +49,12 @@ export class FindAdvertisementsDto {
   @IsString()
   order: string = 'desc';
 
-  @ApiPropertyOptional({ description: 'Page number', default: 1 })
+  @ApiPropertyOptional({
+    description: 'Vehicle type filter',
+    enum: VehicleTypes,
+    example: VehicleTypes.SUV,
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  page: number = 1;
-
-  @ApiPropertyOptional({ description: 'Number of items per page', default: 10 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  limit: number = 10;
+  @IsEnum(VehicleTypes)
+  vehicleType?: VehicleTypes;
 }

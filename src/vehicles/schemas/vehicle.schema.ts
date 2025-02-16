@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { VehicleTypes } from '../enum/vehicle.type';
 
 @Schema({ timestamps: true })
 export class Vehicle extends Document {
@@ -8,6 +9,10 @@ export class Vehicle extends Document {
 
   @Prop({ required: true })
   modelName: string;
+
+  // Updated modelType property now uses the ModelType enum.
+  @Prop({ required: true, enum: VehicleTypes, default: VehicleTypes.SEDAN })
+  modelType: VehicleTypes;
 
   @Prop({
     required: true,

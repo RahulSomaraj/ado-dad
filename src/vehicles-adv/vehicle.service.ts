@@ -6,9 +6,10 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleAdvDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
+import { Vehicle } from 'src/vehicles/schemas/vehicle.schema';
 
 @Injectable()
-export class VehicleAdvService {
+export class VehicleService {
   constructor(
     @InjectModel(VehicleAdv.name) private vehicleModel: Model<VehicleAdv>,
     @InjectModel(VehicleCompany.name)
