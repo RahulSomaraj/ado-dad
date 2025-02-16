@@ -8,6 +8,11 @@ import {
 } from './schemas/advertisement.schema';
 import { User, UserSchema } from '../users/schemas/user.schema'; // Import User schema for reference
 import { Property, PropertySchema } from 'src/property/schemas/schema.property';
+import { Category, CategorySchema } from 'src/category/schemas/category.schema';
+import {
+  VehicleAdv,
+  VehicleAdvSchema,
+} from 'src/vehicles-adv/schemas/vehicle.schema';
 
 @Module({
   imports: [
@@ -15,6 +20,8 @@ import { Property, PropertySchema } from 'src/property/schemas/schema.property';
       { name: Advertisement.name, schema: AdvertisementSchema },
       { name: User.name, schema: UserSchema }, // Reference to User schema
       { name: Property.name, schema: PropertySchema },
+      { name: Category.name, schema: CategorySchema },
+      { name: VehicleAdv.name, schema: VehicleAdvSchema },
     ]),
   ],
   controllers: [AdvertisementsController],

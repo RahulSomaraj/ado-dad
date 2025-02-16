@@ -9,7 +9,7 @@ import { FindVehicleDto } from './dto/get-vehicle.dto';
 import { Vehicle } from 'src/vehicles/schemas/vehicle.schema';
 
 @Injectable()
-export class VehicleService {
+export class VehicleAdvService {
   constructor(
     @InjectModel(VehicleAdv.name) private vehicleModel: Model<VehicleAdv>,
     @InjectModel(VehicleCompany.name)
