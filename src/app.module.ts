@@ -29,6 +29,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { RefreshTokenService } from './auth/auth.refresh.service';
 import { User, UserSchema } from './users/schemas/user.schema';
 import { AuthModule } from './auth/auth.module';
+import { VehicleAdvModule } from './vehicles-adv/vehicle.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { AuthModule } from './auth/auth.module';
     FavoriteModule,
     AuthModule,
     UploadModule,
+    VehicleAdvModule,
   ],
   providers: [EmailService, AppService, RefreshTokenService],
   controllers: [AppController],

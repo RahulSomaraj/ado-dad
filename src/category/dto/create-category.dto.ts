@@ -15,4 +15,13 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   icon?: string;
+
+  @ApiProperty({
+    example: '60c72b2f9b1e8c1a8a0c4b2d',
+    description: 'Parent category ID (optional)',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  parent?: string;
 }

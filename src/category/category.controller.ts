@@ -27,6 +27,7 @@ import { Roles } from 'src/roles/roles.decorator'; // ✅ Corrected path
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { FindAllCategoriesDto } from './dto/get-category.dto';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -51,27 +52,8 @@ export class CategoryController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all categories with optional filters' })
   @ApiResponse({ status: 200, description: 'Categories fetched successfully' })
-  @ApiQuery({
-    name: 'name',
-    required: false,
-    description: 'Filter by category name',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Limit the number of results',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Pagination - Page number',
-  })
-  async findAll(
-    @Query('name') name?: string,
-    @Query('limit') limit?: number,
-    @Query('page') page?: number,
-  ): Promise<Category[]> {
-    return this.categoryService.findAll({ name, limit, page });
+  async findAll(@Query() query: FindAllCategoriesDto): Promise<Category[]> {
+    return this.categoryService.findAll(query);
   }
 
   @Get(':id')
@@ -84,7 +66,7 @@ export class CategoryController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
   //@Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a category' })
