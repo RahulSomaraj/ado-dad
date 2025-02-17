@@ -6,6 +6,7 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
+import { VehicleTypes } from './enum/vehicle.type';
 
 @Injectable()
 export class VehicleService {
@@ -16,7 +17,9 @@ export class VehicleService {
   ) {}
 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-    const filter: any = {};
+    const filter: any = {
+      isDeleted: false, // Exclude soft-deleted vehicles.
+    };
 
     // Top-level filters
     if (findDto.name) {
@@ -61,13 +64,13 @@ export class VehicleService {
           $options: 'i',
         };
       }
-      // Additional info nested filter
+      // Additional nested filter for additionalInfo
       if (findDto.vehicleModel.additionalInfo) {
         const additionalInfoQuery: any = {};
         if (findDto.vehicleModel.additionalInfo.abs !== undefined) {
           additionalInfoQuery.abs = findDto.vehicleModel.additionalInfo.abs;
         }
-        // Add more additional info filters as needed...
+        // Add additional additionalInfo filters as needed.
         if (Object.keys(additionalInfoQuery).length > 0) {
           vmQuery.additionalInfo = additionalInfoQuery;
         }
@@ -75,7 +78,7 @@ export class VehicleService {
       filter.vehicleModels = { $elemMatch: vmQuery };
     }
 
-    // Pagination: Default values are provided by PaginationDto if not present.
+    // Pagination
     const page = findDto.page || 1;
     const limit = findDto.limit || 10;
     const skip = (page - 1) * limit;
@@ -128,14 +131,16 @@ export class VehicleService {
       );
     }
 
-    // Build the vehicle object manually (adding other required fields from the DTO).
+    // Build the vehicle object manually using the DTO data.
     const vehicleData = {
       name: createVehicleDto.name,
       modelName: createVehicleDto.modelName,
+      modelType: createVehicleDto.modelType || VehicleTypes.SEDAN,
       details: createVehicleDto.details,
       createdBy: createVehicleDto.createdBy,
-      vendor: createVehicleDto.vendor, // Relation to a VehicleCompany document.
+      vendor: createVehicleDto.vendor,
       vehicleModels: createVehicleDto.vehicleModels,
+      color: createVehicleDto.color,
     };
 
     const newVehicle = new this.vehicleModel(vehicleData);
@@ -143,36 +148,10 @@ export class VehicleService {
   }
 
   async updateVehicle(
-    id: string,
-    updateVehicleDto: UpdateVehicleDto, // Assume UpdateVehicleDto is defined with optional fields
+    vehicleId: string,
+    updateVehicleDto: UpdateVehicleDto,
   ): Promise<Vehicle> {
-    // Retrieve the existing vehicle by its ID
-    const vehicle = await this.vehicleModel.findById(id);
-    if (!vehicle) {
-      throw new HttpException(
-        { status: HttpStatus.NOT_FOUND, error: 'Vehicle not found.' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    // Validate uniqueness of the vehicle name if a new name is provided.
-    // Ensure that any found vehicle with the same name is not the one being updated.
-    if (updateVehicleDto.name) {
-      const existingVehicle: any = await this.vehicleModel.findOne({
-        name: updateVehicleDto.name,
-      });
-      if (existingVehicle && existingVehicle._id.toString() !== id) {
-        throw new HttpException(
-          {
-            status: HttpStatus.BAD_REQUEST,
-            error: 'Vehicle with this name already exists.',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    }
-
-    // Validate vendor if provided: ensure the referenced VehicleCompany exists.
+    // Check if the provided vendor (VehicleCompany) exists if vendor is provided.
     if (updateVehicleDto.vendor) {
       const vehicleCompany = await this.vehicleCompanyModel.findById(
         updateVehicleDto.vendor,
@@ -188,26 +167,45 @@ export class VehicleService {
       }
     }
 
-    // Validate vehicleModels if provided: ensure at least one model is present.
-    if (
-      updateVehicleDto.vehicleModels &&
-      updateVehicleDto.vehicleModels.length === 0
-    ) {
+    // Find the existing vehicle document.
+    const vehicle = await this.vehicleModel.findById(vehicleId);
+    if (!vehicle) {
       throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'At least one vehicle model is required.',
-        },
-        HttpStatus.BAD_REQUEST,
+        { status: HttpStatus.NOT_FOUND, error: 'Vehicle not found.' },
+        HttpStatus.NOT_FOUND,
       );
     }
 
-    // Merge update fields into the existing vehicle document.
+    // If new vehicle models are provided, map them to plain objects and append.
+    if (
+      updateVehicleDto.vehicleModels &&
+      updateVehicleDto.vehicleModels.length > 0
+    ) {
+      // Map DTO models to plain objects; this conversion ensures type compatibility.
+      const newModels = updateVehicleDto.vehicleModels.map((modelDto) => ({
+        ...modelDto,
+        // Explicitly ensure fuelType and transmissionType are strings.
+        fuelType: String(modelDto.fuelType),
+        transmissionType: String(modelDto.transmissionType),
+      }));
+
+      // Append new models to the existing array.
+      vehicle.vehicleModels = (vehicle.vehicleModels || []).concat(newModels);
+
+      // Remove vehicleModels from update DTO so it does not overwrite the array.
+      delete updateVehicleDto.vehicleModels;
+    }
+
+    // Merge other updated fields into the existing document.
     Object.assign(vehicle, updateVehicleDto);
     return vehicle.save();
   }
 
   async deleteVehicle(id: string): Promise<void> {
-    await this.vehicleModel.findByIdAndDelete(id);
+    await this.vehicleModel.findByIdAndUpdate(
+      id,
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true },
+    );
   }
 }

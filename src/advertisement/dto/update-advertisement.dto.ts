@@ -9,8 +9,8 @@ import {
   ArrayNotEmpty,
   ValidateIf,
 } from 'class-validator';
-import { AdvertisementType, FuelType } from './create-advertisement.dto';
-import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
+import { AdvertisementType } from './create-advertisement.dto';
+import { FuelType, VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 
 export class UpdateAdvertisementDto {
   @ApiPropertyOptional({

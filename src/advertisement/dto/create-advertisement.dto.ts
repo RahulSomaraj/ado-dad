@@ -11,18 +11,11 @@ import {
   ValidateIf,
   ArrayNotEmpty,
 } from 'class-validator';
-import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
+import { FuelType, VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 
 export enum AdvertisementType {
   Vehicle = 'Vehicle',
   Property = 'Property',
-}
-
-export enum FuelType {
-  Petrol = 'Petrol',
-  Diesel = 'Diesel',
-  Electric = 'Electric',
-  Hybrid = 'Hybrid',
 }
 
 export class CreateAdvertisementDto {
