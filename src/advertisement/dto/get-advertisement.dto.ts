@@ -1,10 +1,58 @@
-import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsEnum,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
+import { PaginationDto } from 'src/shared/dto/pagination.dto';
 
-export class FindAdvertisementsDto {
-  @ApiPropertyOptional({ description: 'Advertisement type', example: 'sale' })
+export class VehicleFilterDto {
+  @ApiPropertyOptional({ description: 'Vehicle name', example: 'Toyota' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Vehicle model name', example: 'Camry' })
+  @IsOptional()
+  @IsString()
+  modelName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Fuel type',
+    example: 'Petrol',
+    enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
+  })
+  @IsOptional()
+  @IsString()
+  fuelType?: string;
+
+  @ApiPropertyOptional({
+    description: 'Transmission type',
+    example: 'Automatic',
+    enum: ['Automatic', 'Manual', 'Semi-Automatic', 'CVT', 'Dual-Clutch'],
+  })
+  @IsOptional()
+  @IsString()
+  transmissionType?: string;
+
+  @ApiPropertyOptional({
+    description: 'Mileage (e.g., 15km/l)',
+    example: '15km/l',
+  })
+  @IsOptional()
+  @IsString()
+  mileage?: string;
+}
+
+export class FindAdvertisementsDto extends PaginationDto {
+  @ApiPropertyOptional({
+    description: 'Advertisement type (Vehicle or Property)',
+    example: 'Vehicle',
+  })
   @IsOptional()
   @IsString()
   type?: string;
@@ -57,4 +105,18 @@ export class FindAdvertisementsDto {
   @IsOptional()
   @IsEnum(VehicleTypes)
   vehicleType?: VehicleTypes;
+
+  @ApiPropertyOptional({
+    description: 'Vendor name filter',
+    example: 'Toyota Motors',
+  })
+  @IsOptional()
+  @IsString()
+  vendorName?: string;
+
+  @ApiPropertyOptional({ description: 'Nested vehicle filters' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => VehicleFilterDto)
+  vehicle?: VehicleFilterDto;
 }

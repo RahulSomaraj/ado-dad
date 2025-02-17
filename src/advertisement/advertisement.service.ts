@@ -17,6 +17,7 @@ import { User } from '../users/schemas/user.schema';
 import { Category } from 'src/category/schemas/category.schema';
 import { VehicleAdv } from 'src/vehicles-adv/schemas/vehicle.schema';
 import { Property } from 'src/property/schemas/schema.property';
+import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
 
 @Injectable()
 export class AdvertisementsService {
@@ -123,51 +124,100 @@ export class AdvertisementsService {
     return createdAdvertisement.save();
   }
 
+  async findAdvertisements(
+    findDto: FindAdvertisementsDto,
+  ): Promise<Advertisement[]> {
+    const page = findDto.page || 1;
+    const limit = findDto.limit || 10;
+    const skip = (page - 1) * limit;
 
-  
+    const pipeline: any[] = [
+      // Only consider Vehicle ads.
+      { $match: { type: 'Vehicle', isDeleted: { $ne: true } } },
+    ];
 
-  // ✅ Get all advertisements with filters (Supports Vehicle & Property)
-  async findAll(query: any) {
-    const {
-      type,
-      createdBy,
-      adTitle,
-      minPrice,
-      maxPrice,
-      propertyType,
-      brandName,
-      sortBy = 'createdAt',
-      order = 'desc',
-      page = 1,
-      limit = 10,
-    } = query;
+    // Filter by category if provided.
+    if (findDto.category) {
+      pipeline.push({
+        $match: { category: findDto.category },
+      });
+    }
 
-    const filter: any = {};
+    // Lookup the associated vehicle document.
+    pipeline.push({
+      $lookup: {
+        from: 'vehicleadvs', // Adjust this if your vehicle collection name is different.
+        localField: 'vehicle',
+        foreignField: '_id',
+        as: 'vehicle',
+      },
+    });
 
-    if (type) filter['type'] = type; // Filter by type: Vehicle or Property
-    if (createdBy) filter['createdBy'] = createdBy;
-    if (adTitle) filter['adTitle'] = { $regex: adTitle, $options: 'i' }; // Case-insensitive search
-    if (minPrice || maxPrice)
-      filter['price'] = {
-        ...(minPrice && { $gte: minPrice }),
-        ...(maxPrice && { $lte: maxPrice }),
-      };
+    // Unwind the vehicle array (each ad should have one vehicle).
+    pipeline.push({ $unwind: '$vehicle' });
 
-    if (type === 'Vehicle' && brandName)
-      filter['brandName'] = { $regex: brandName, $options: 'i' };
-    if (type === 'Property' && propertyType)
-      filter['propertyType'] = propertyType;
+    // Lookup the vendor inside the vehicle.
+    pipeline.push({
+      $lookup: {
+        from: 'vehiclecompanies', // Adjust this if your vendor collection name is different.
+        localField: 'vehicle.vendor',
+        foreignField: '_id',
+        as: 'vehicle.vendor',
+      },
+    });
+
+    // Unwind the vendor array.
+    pipeline.push({ $unwind: '$vehicle.vendor' });
+
+    // Filter by vendor name if provided.
+    if (findDto.vendorName) {
+      pipeline.push({
+        $match: {
+          'vehicle.vendor.name': { $regex: findDto.vendorName, $options: 'i' },
+        },
+      });
+    }
+
+    // If vehicle DTO filters are provided, add matching criteria.
+    if (findDto.vehicle) {
+      // For example: filter by vehicle name.
+      if (findDto.vehicle.name) {
+        pipeline.push({
+          $match: {
+            'vehicle.name': { $regex: findDto.vehicle.name, $options: 'i' },
+          },
+        });
+      }
+      // Filter by vehicle modelName.
+      if (findDto.vehicle.modelName) {
+        pipeline.push({
+          $match: {
+            'vehicle.modelName': {
+              $regex: findDto.vehicle.modelName,
+              $options: 'i',
+            },
+          },
+        });
+      }
+      // If needed, filter by other vehicle fields (such as fuelType, transmissionType, etc.).
+      // For example, filtering vehicleModels nested within vehicle:
+      if (findDto.vehicle.fuelType) {
+        pipeline.push({
+          $match: {
+            'vehicle.vehicleModels.fuelType': findDto.vehicle.fuelType,
+          },
+        });
+      }
+    }
+
+    // Apply pagination.
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limit });
 
     const advertisements = await this.advertisementModel
-      .find(filter)
-      .sort({ [sortBy]: order }) // Sort by any field (e.g., price, createdAt)
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate('createdBy', 'name email'); // Populate User data
-
-    const total = await this.advertisementModel.countDocuments(filter);
-
-    return { total, page, limit, advertisements };
+      .aggregate(pipeline)
+      .exec();
+    return advertisements;
   }
 
   // ✅ Get a single advertisement by ID
