@@ -40,7 +40,7 @@ export class AdvertisementsController {
   @Get()
   @ApiOperation({ summary: 'Retrieve advertisements based on query filters' })
   findAll(@Query() query: FindAdvertisementsDto) {
-    return this.advertisementService.findAll(query);
+    return this.advertisementService.findAdvertisements(query);
   }
 
   // ✅ Get advertisement by ID
