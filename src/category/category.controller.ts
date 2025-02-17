@@ -10,20 +10,16 @@ import {
   UseGuards,
   UseFilters,
 } from '@nestjs/common';
-import { UserRole } from 'src/roles/user-role.enum'; // ✅ Corrected path
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './schemas/category.schema';
-import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/roles/roles.decorator'; // ✅ Corrected path
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
@@ -52,7 +48,13 @@ export class CategoryController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all categories with optional filters' })
   @ApiResponse({ status: 200, description: 'Categories fetched successfully' })
-  async findAll(@Query() query: FindAllCategoriesDto): Promise<Category[]> {
+  async findAll(@Query() query: FindAllCategoriesDto): Promise<{
+    data: Category[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     return this.categoryService.findAll(query);
   }
 

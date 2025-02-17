@@ -53,24 +53,33 @@ export class CategoryService {
     return newCategory.save();
   }
 
-  async findAll(query: FindAllCategoriesDto): Promise<Category[]> {
+  async findAll(query: FindAllCategoriesDto): Promise<{
+    data: Category[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const { name, parent, limit = 10, page = 1 } = query;
 
     // Build filter: only include categories that have not been soft-deleted.
     const filter: any = { deletedAt: null };
 
     if (name) {
-      // Use a case-insensitive regex search for name
       filter.name = { $regex: name, $options: 'i' };
     }
 
     if (parent) {
-      // Filter by parent category ID if provided
       filter.parent = parent;
     }
 
-    // Calculate pagination: number of documents to skip
+    // Calculate pagination: number of documents to skip.
     const skip = (page - 1) * limit;
+
+    // Get the total count for pagination.
+    const total = await this.categoryModel.countDocuments(filter);
+
+    // Retrieve the categories using the filter, pagination, and skip.
     const categories = await this.categoryModel
       .find(filter)
       .limit(limit)
@@ -87,7 +96,15 @@ export class CategoryService {
       );
     }
 
-    return categories;
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: categories,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findById(id: string): Promise<Category> {
