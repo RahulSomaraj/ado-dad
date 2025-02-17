@@ -1,22 +1,44 @@
-import { IsOptional, IsString, IsUrl } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { VehicleCompanyTypes } from 'src/vehicles/enum/vehicle.type';
 
 export class UpdateVehicleCompanyDto {
+  @ApiPropertyOptional({
+    example: 'Tesla Motors',
+    description: 'Updated name of the vehicle company',
+  })
   @IsOptional()
   @IsString()
-  @ApiPropertyOptional({ example: 'Tesla Motors', description: 'Updated name of the vehicle company' })
   name?: string;
 
+  @ApiPropertyOptional({
+    example: 'USA',
+    description: 'Updated country of origin',
+  })
   @IsOptional()
   @IsString()
-  @ApiPropertyOptional({ example: 'USA', description: 'Updated country of origin' })
   originCountry?: string;
+
+  @ApiPropertyOptional({
+    example: 'two-wheeler',
+    description: 'two-wheeler, four-wheeler',
+  })
+  @IsEnum(VehicleCompanyTypes)
+  @IsNotEmpty()
+  @IsOptional()
+  vehicleType: VehicleCompanyTypes;
 
   @IsOptional()
   @IsUrl()
-  @ApiPropertyOptional({ 
-    example: 'https://www.tesla.com/logo-updated.png', 
-    description: 'Updated URL of the company logo (must be a valid image URL)' 
+  @ApiPropertyOptional({
+    example: 'https://www.tesla.com/logo-updated.png',
+    description: 'Updated URL of the company logo (must be a valid image URL)',
   })
   logo?: string;
 }

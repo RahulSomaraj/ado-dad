@@ -24,6 +24,7 @@ import { VehicleCompany } from './schemas/schema.vehicle-company';
 import { CreateVehicleCompanyDto } from './dto/create-vehicle-company.dto';
 import { UpdateVehicleCompanyDto } from './dto/update-vehicle-company.dto';
 import { FindVehicleCompaniesDto } from './dto/get-vehicle-company.dto';
+import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 
 @Injectable()
 export class VehicleCompanyService {
@@ -35,8 +36,10 @@ export class VehicleCompanyService {
   async create(createVCDto: CreateVehicleCompanyDto): Promise<VehicleCompany> {
     // Check if a vehicle company with the same name already exists in the database
     const existingCompany = await this.vehicleCompanyModel.findOne({
-      name: createVCDto.name,
+      name: { $regex: new RegExp(`^${createVCDto.name}$`, 'i') },
+      vehicleType: createVCDto.vehicleType,
     });
+
     if (existingCompany) {
       throw new HttpException(
         {
@@ -47,11 +50,12 @@ export class VehicleCompanyService {
       );
     }
 
-    // If not, create a new vehicle company
+    // If not, create a new vehicle company using consistent field names
     const vehicleCompany = {
       name: createVCDto.name,
       originCountry: createVCDto.originCountry,
       logo: createVCDto.logo,
+      vehicleType: createVCDto.vehicleType, // Use 'vehicleType' consistently
     };
 
     const newCompany = new this.vehicleCompanyModel(vehicleCompany);
@@ -59,7 +63,7 @@ export class VehicleCompanyService {
   }
 
   async findAll(query: FindVehicleCompaniesDto) {
-    // Example pseudo-code: build filter based on provided query properties
+    // Build filter based on provided query properties
     const filter: any = {};
     if (query.name) {
       filter.name = { $regex: new RegExp(query.name, 'i') };
@@ -67,8 +71,26 @@ export class VehicleCompanyService {
     if (query.originCountry) {
       filter.originCountry = { $regex: new RegExp(query.originCountry, 'i') };
     }
-    // Replace with actual database logic (e.g., using Mongoose or TypeORM)
-    return await this.vehicleCompanyModel.find(filter);
+
+    // Set pagination defaults if not provided
+    const page = query.page ? Number(query.page) : 1;
+    const limit = query.limit ? Number(query.limit) : 10;
+    const skip = (page - 1) * limit;
+
+    // Execute both the query and count in parallel
+    const [results, total] = await Promise.all([
+      this.vehicleCompanyModel.find(filter).skip(skip).limit(limit).exec(),
+      this.vehicleCompanyModel.countDocuments(filter),
+    ]);
+
+    // Return paginated result with metadata
+    return {
+      data: results,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: string): Promise<VehicleCompany | null> {
@@ -96,6 +118,7 @@ export class VehicleCompanyService {
     if (updateVCDto.name && updateVCDto.name !== vehicleCompany.name) {
       const existingCompany = await this.vehicleCompanyModel.findOne({
         name: updateVCDto.name,
+        vehicleType: updateVCDto.vehicleType ?? vehicleCompany.vehicleType,
       });
       if (existingCompany) {
         throw new HttpException(
@@ -116,6 +139,12 @@ export class VehicleCompanyService {
   }
 
   async remove(id: string): Promise<VehicleCompany | null> {
-    return this.vehicleCompanyModel.findByIdAndDelete(id).exec();
+    return this.vehicleCompanyModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: true, deletedAt: new Date() },
+        { new: true },
+      )
+      .exec();
   }
 }
