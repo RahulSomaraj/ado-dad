@@ -2,10 +2,10 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { VehicleAdv } from './schemas/vehicleadv.schema';
-import { CreateVehicleAdvDto } from './dto/create-vehicle.dto';
+import { CreateVehicleAdvDto } from './dto/create-vehicle-adv.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleAdvDto } from './dto/update-vehicle.dto';
-import { FindVehicleDto } from './dto/get-vehicle.dto';
+import { FindVehicleDto } from './dto/get-vehicle-adv.dto';
 import { Vehicle } from 'src/vehicles/schemas/vehicle.schema';
 
 @Injectable()
@@ -136,7 +136,6 @@ export class VehicleAdvService {
       name: createVehicleDto.name,
       modelName: createVehicleDto.modelName,
       details: createVehicleDto.details,
-      createdBy: createVehicleDto.createdBy,
       vendor: createVehicleDto.vendor, // Relation to a VehicleCompany document.
       vehicleModels: createVehicleDto.vehicleModels,
     };

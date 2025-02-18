@@ -9,10 +9,10 @@ import {
   Query,
   UseFilters,
 } from '@nestjs/common';
-import { CreateVehicleAdvDto } from './dto/create-vehicle.dto';
+import { CreateVehicleAdvDto } from './dto/create-vehicle-adv.dto';
 import { ApiTags, ApiResponse, ApiQuery, ApiOperation } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
-import { FindVehicleDto } from './dto/get-vehicle.dto';
+import { FindVehicleDto } from './dto/get-vehicle-adv.dto';
 import { VehicleAdvService } from './vehicleadv.service';
 
 @ApiTags('Vehicles-Adv')

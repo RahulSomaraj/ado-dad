@@ -10,8 +10,14 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  FuelType,
+  TransmissionType,
+  VehicleTypes,
+  WheelerType,
+} from 'src/vehicles/enum/vehicle.type';
 
-export class VehicleDetailsDto {
+export class AdvVehicleDetailsDto {
   @ApiProperty({ example: 2023 })
   @IsNumber()
   @IsNotEmpty()
@@ -23,10 +29,14 @@ export class VehicleDetailsDto {
   month: string;
 }
 
-export class AdditionalInfoDto {
+export class AdvAdditionalInfoDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   abs?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  accidental?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -35,6 +45,10 @@ export class AdditionalInfoDto {
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   adjustableSteering?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  adjustableSeats?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -65,10 +79,12 @@ export class AdditionalInfoDto {
   @IsOptional()
   vehicleCertified?: boolean;
 
-  @ApiPropertyOptional({ example: 'Red' })
+  // Updated: color as an array of strings.
+  @ApiPropertyOptional({ example: ['Red'] })
   @IsOptional()
-  @IsString()
-  color?: string;
+  @IsArray()
+  @IsString({ each: true })
+  color?: string[];
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -142,10 +158,9 @@ export class AdditionalInfoDto {
   @IsOptional()
   usbCompatibility?: boolean;
 
-  @ApiPropertyOptional({ example: '60f6a4c1234567890abcdef1' })
+  @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @IsMongoId()
-  vendor?: string;
+  seatWarmer?: boolean;
 }
 
 export class VehicleModelDto {
@@ -179,30 +194,45 @@ export class VehicleModelDto {
 
   @ApiProperty({
     example: 'Petrol',
-    enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
+    enum: FuelType,
   })
-  @IsEnum(['Petrol', 'Diesel', 'Electric', 'Hybrid'])
+  @IsEnum(FuelType)
   @IsNotEmpty()
-  fuelType: string;
+  fuelType: FuelType;
 
   @ApiProperty({
     example: 'Automatic',
-    enum: ['Automatic', 'Manual', 'Semi-Automatic', 'CVT', 'Dual-Clutch'],
+    enum: TransmissionType,
   })
-  @IsEnum(['Automatic', 'Manual', 'Semi-Automatic', 'CVT', 'Dual-Clutch'])
+  @IsEnum(TransmissionType)
   @IsNotEmpty()
-  transmissionType: string;
+  transmissionType: TransmissionType;
 
-  @ApiProperty({ example: '15km/l' })
-  @IsString()
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
   @IsNotEmpty()
-  mileage: string;
+  mileage: number;
 
-  @ApiPropertyOptional({ type: AdditionalInfoDto })
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  engineCapacity: number;
+
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  fuelCapacity: number;
+
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  maxPower: number;
+
+  @ApiPropertyOptional({ type: AdvAdditionalInfoDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => AdditionalInfoDto)
-  additionalInfo?: AdditionalInfoDto;
+  @Type(() => AdvAdditionalInfoDto)
+  additionalInfo?: AdvAdditionalInfoDto;
 }
 
 export class CreateVehicleAdvDto {
@@ -216,16 +246,21 @@ export class CreateVehicleAdvDto {
   @IsNotEmpty()
   modelName: string;
 
-  @ApiProperty({ type: VehicleDetailsDto })
-  @ValidateNested()
-  @Type(() => VehicleDetailsDto)
-  @IsNotEmpty()
-  details: VehicleDetailsDto;
+  @ApiPropertyOptional({ example: VehicleTypes.SEDAN, enum: VehicleTypes })
+  @IsOptional()
+  @IsEnum(VehicleTypes)
+  modelType?: VehicleTypes;
 
-  @ApiProperty({ example: '60f6a4c1234567890abcdef2' })
-  @IsString()
+  @ApiPropertyOptional({ example: WheelerType.TWO_WHEELER, enum: WheelerType })
+  @IsOptional()
+  @IsEnum(WheelerType)
+  wheelerType?: WheelerType;
+
+  @ApiProperty({ type: AdvVehicleDetailsDto })
+  @ValidateNested()
+  @Type(() => AdvVehicleDetailsDto)
   @IsNotEmpty()
-  createdBy: string;
+  details: AdvVehicleDetailsDto;
 
   @ApiProperty({ example: '60f6a4c1234567890abcdef3' })
   @IsMongoId()
@@ -241,4 +276,14 @@ export class CreateVehicleAdvDto {
   @ValidateNested({ each: true })
   @Type(() => VehicleModelDto)
   vehicleModels?: VehicleModelDto[];
+
+  @ApiPropertyOptional({
+    isArray: true,
+    type: String,
+    example: ['Red', 'Blue'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  color?: string[];
 }

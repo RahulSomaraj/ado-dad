@@ -91,8 +91,8 @@ export class VehicleService {
       .exec();
   }
 
-  async getVehicleById(id: string): Promise<Vehicle | null> {
-    return this.vehicleModel
+  async getVehicleById(id: string): Promise<Vehicle> {
+    const vehicle = await this.vehicleModel
       .findById(id)
       .populate('vendor') // populate the top-level vendor (VehicleCompany)
       .populate({
@@ -100,6 +100,30 @@ export class VehicleService {
         model: 'VehicleCompany', // adjust this if the nested vendor references a different model
       })
       .exec();
+
+    // Throw an exception if no vehicle is found
+    if (!vehicle) {
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error: 'Vehicle not found.',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Throw an exception if the top-level vendor is missing
+    if (!vehicle.vendor) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Vehicle company (vendor) not found.',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return vehicle;
   }
 
   async createVehicle(createVehicleDto: CreateVehicleDto): Promise<Vehicle> {
