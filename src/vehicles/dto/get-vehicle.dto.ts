@@ -259,11 +259,10 @@ export class FindVehicleDto extends PaginationDto {
   modelName?: string;
 
   // Filtering by details fields (which are stored in the "details" sub-document)
-  @ApiPropertyOptional({
-    example: 2023,
-    description: 'Model year from vehicle details',
-  })
+
+  @ApiPropertyOptional({ example: 1, description: 'Page number' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   modelYear?: number;
 

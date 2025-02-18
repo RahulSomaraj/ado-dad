@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { User } from 'src/users/schemas/user.schema';
 
 @Schema({ _id: false })
 export class VehicleAdvDetails {
@@ -48,17 +49,15 @@ export const AdditionalInfoSchema =
   SchemaFactory.createForClass(AdditionalInfo);
 
 @Schema({ _id: false })
-export class VehicleModel {
+export class VehicleAdvModel {
   @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })
   modelName: string;
 
-  @Prop() modelDetails?: string;
-
-  @Prop([String])
-  images?: string[];
+  @Prop()
+  modelDetails?: string;
 
   @Prop({
     required: true,
@@ -73,12 +72,22 @@ export class VehicleModel {
   transmissionType: string;
 
   @Prop({ required: true })
-  mileage: string;
+  mileage: number;
 
-  @Prop()
+  @Prop({ required: true })
+  engineCapacity: number;
+
+  @Prop({ required: true })
+  fuelCapacity: number;
+
+  @Prop({ required: true })
+  maxPower: number;
+
+  @Prop({ type: AdditionalInfoSchema })
   additionalInfo?: AdditionalInfo;
 }
-export const VehicleModelSchema = SchemaFactory.createForClass(VehicleModel);
+export const ADVVehicleModelSchema =
+  SchemaFactory.createForClass(VehicleAdvModel);
 
 @Schema({ timestamps: true })
 export class VehicleAdv extends Document {
@@ -88,17 +97,20 @@ export class VehicleAdv extends Document {
   @Prop({ required: true })
   modelName: string;
 
+  @Prop({ required: true })
+  color: string;
+
   @Prop({ required: true, type: VehicleAdvDetailsSchema })
   details: VehicleAdvDetails;
 
-  @Prop({ required: true })
-  createdBy: string;
+  @Prop({ type: String, ref: 'User' })
+  createdBy: User;
 
-  // Reference to the VehicleCompany schema as a vendor.
   @Prop({ required: true, ref: 'VehicleCompany', type: Types.ObjectId })
   vendor: Types.ObjectId;
 
-  @Prop({ type: [VehicleModelSchema], default: [] })
-  vehicleModels?: VehicleModel[];
+  // Note: Removed the default value so that if no vehicle model is provided, this field remains undefined.
+  @Prop({ type: ADVVehicleModelSchema })
+  vehicleModel?: VehicleAdvModel;
 }
 export const VehicleAdvSchema = SchemaFactory.createForClass(VehicleAdv);

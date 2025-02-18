@@ -20,24 +20,18 @@ export class Advertisement extends Document {
   imageUrls: string[];
 
   @Prop({ required: true })
-  fullName: string;
-
-  @Prop({ required: true })
-  phoneNumber: string;
-
-  @Prop({ required: true })
   state: string;
 
   @Prop({ required: true })
   city: string;
 
-  @Prop({ type: String, ref: 'User', required: true })
+  @Prop({ type: String, ref: 'User', required: false })
   createdBy: User;
 
   @Prop({ required: false, default: false })
   isApproved: boolean;
 
-  @Prop({ type: String, ref: 'User', required: true })
+  @Prop({ type: String, ref: 'User', required: false })
   approvedBy: User;
 
   @Prop({ type: String, ref: 'Category', required: true })

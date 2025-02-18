@@ -57,16 +57,6 @@ export class UpdateAdvertisementDto {
   @IsString({ each: true })
   imageUrls?: string[];
 
-  @ApiPropertyOptional({ description: 'Full name of the advertiser' })
-  @IsOptional()
-  @IsString()
-  fullName?: string;
-
-  @ApiPropertyOptional({ description: 'Phone number of the advertiser' })
-  @IsOptional()
-  @IsString()
-  phoneNumber?: string;
-
   @ApiPropertyOptional({
     description: 'State where the advertisement is posted',
   })

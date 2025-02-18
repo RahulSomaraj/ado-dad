@@ -29,11 +29,8 @@ export class AdvertisementsController {
     status: 201,
     description: 'Advertisement created successfully.',
   })
-  async create(
-    @Body() createAdvertisementDto: CreateAdvertisementDto,
-    @Query('userId') userId: string,
-  ) {
-    return this.advertisementService.create(createAdvertisementDto, userId);
+  async create(@Body() createAdvertisementDto: CreateAdvertisementDto) {
+    return this.advertisementService.create(createAdvertisementDto);
   }
 
   // ✅ Get all advertisements with filters & pagination

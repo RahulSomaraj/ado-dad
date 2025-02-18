@@ -8,23 +8,23 @@ import * as morgan from 'morgan';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
-  const PORT = configService.get('APP_CONFIG.BACKEND_PORT');
+  const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 3000;
 
-  // Apply global validation pipe (optional)
-  app.useGlobalPipes(new ValidationPipe());
+  // Apply global validation pipe with transformation enabled
+  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+
+  // Apply morgan logging middleware
   app.use(morgan('tiny'));
 
-  // Enable CORS globally (you can customize the options as needed)
+  // Enable CORS globally (customize options as needed)
   app.enableCors({
-    origin: '*', // Allow all domains (you can specify specific domains here)
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Allowed HTTP methods
-    allowedHeaders: 'Content-Type, Accept', // Allowed headers
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type, Accept',
   });
 
-  // Apply security middleware globally
-
   // Swagger setup
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('Ado-dad API')
     .setDescription('API for managing ado-dad')
     .setVersion('1.0')
@@ -32,32 +32,32 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api-docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true, // Keep token after reload
     },
     customJs: `
-    window.onload = function() {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-        if (bearerInput) {
-          bearerInput.value = storedToken;
+      window.onload = function() {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
+          if (bearerInput) {
+            bearerInput.value = storedToken;
+          }
         }
-      }
-      
-      document.querySelector('button[class*="authorize"]').onclick = function() {
-        const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-        if (bearerInput) {
-          localStorage.setItem('token', bearerInput.value);
-        }
+        document.querySelector('button[class*="authorize"]').onclick = function() {
+          const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
+          if (bearerInput) {
+            localStorage.setItem('token', bearerInput.value);
+          }
+        };
       };
-    };
     `,
   });
+
   await app.listen(PORT, () => {
-    Logger.log(`Server Started at ${PORT}`);
+    Logger.log(`Server started at port ${PORT}`);
   });
 }
 

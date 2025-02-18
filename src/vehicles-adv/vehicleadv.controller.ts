@@ -37,18 +37,18 @@ export class VehicleAdvController {
   @Post()
   @ApiResponse({ status: 201, description: 'Vehicle created successfully' })
   async createVehicle(@Body() createVehicleDto: CreateVehicleAdvDto) {
-    return this.vehicleService.createVehicle(createVehicleDto);
+    return this.vehicleService.createVehicleAdv(createVehicleDto);
   }
 
-  @Put(':id')
-  @ApiResponse({ status: 200, description: 'Vehicle updated successfully' })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async updateVehicle(
-    @Param('id') id: string,
-    @Body() createVehicleDto: CreateVehicleAdvDto,
-  ) {
-    return this.vehicleService.updateVehicle(id, createVehicleDto);
-  }
+  // @Put(':id')
+  // @ApiResponse({ status: 200, description: 'Vehicle updated successfully' })
+  // @ApiResponse({ status: 404, description: 'Vehicle not found' })
+  // async updateVehicle(
+  //   @Param('id') id: string,
+  //   @Body() createVehicleDto: CreateVehicleAdvDto,
+  // ) {
+  //   return this.vehicleService.updateVehicleAdv(id, createVehicleDto);
+  // }
 
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'Vehicle deleted successfully' })

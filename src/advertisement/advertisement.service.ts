@@ -30,35 +30,7 @@ export class AdvertisementsService {
     @InjectModel(Property.name) private propertiesModel: Model<Property>,
   ) {}
 
-  async create(createAdvertisementDto: CreateAdvertisementDto, userId: string) {
-    // Validate that the creator exists.
-    const creator = await this.userModel.findById(userId);
-    if (!creator) {
-      throw new HttpException(
-        'Creator user not found.',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Validate that the approver exists.
-    const approver = await this.userModel.findById(
-      createAdvertisementDto.approvedBy,
-    );
-    if (!approver) {
-      throw new HttpException(
-        'Approver user not found.',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Validate that the category exists.
-    const category = await this.categoryModel.findById(
-      createAdvertisementDto.category,
-    );
-    if (!category) {
-      throw new HttpException('Category not found.', HttpStatus.BAD_REQUEST);
-    }
-
+  async create(createAdvertisementDto: CreateAdvertisementDto) {
     // Conditional validations based on the advertisement type.
     if (createAdvertisementDto.type === AdvertisementType.Vehicle) {
       // Vehicle ads must have a vehicle reference and fuel type.
@@ -115,13 +87,39 @@ export class AdvertisementsService {
       );
     }
 
-    // If all validations pass, create and save the advertisement.
+    // Create and save the advertisement.
     const createdAdvertisement = new this.advertisementModel({
       ...createAdvertisementDto,
-      createdBy: userId,
     });
+    const savedAdvertisement = await createdAdvertisement.save();
 
-    return createdAdvertisement.save();
+    // Build populate options conditionally ("if available")
+    const populateOptions: any = [];
+
+    if (savedAdvertisement.vehicle) {
+      populateOptions.push({ path: 'vehicle' });
+    }
+    if (savedAdvertisement.property) {
+      populateOptions.push({ path: 'property' });
+    }
+    if (savedAdvertisement.approvedBy) {
+      populateOptions.push({ path: 'approvedBy' });
+    }
+    if (savedAdvertisement.createdBy) {
+      populateOptions.push({ path: 'createdBy' });
+    }
+    if (savedAdvertisement.category) {
+      populateOptions.push({ path: 'category' });
+    }
+
+    const populatedAdvertisement = populateOptions.length
+      ? await this.advertisementModel.populate(
+          savedAdvertisement,
+          populateOptions,
+        )
+      : savedAdvertisement;
+
+    return populatedAdvertisement;
   }
 
   async findAdvertisements(
@@ -132,87 +130,23 @@ export class AdvertisementsService {
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [
-      // Only consider Vehicle ads.
+      // Only consider vehicle ads that are not deleted.
       { $match: { type: 'Vehicle', isDeleted: { $ne: true } } },
-    ];
-
-    // Filter by category if provided.
-    if (findDto.category) {
-      pipeline.push({
-        $match: { category: findDto.category },
-      });
-    }
-
-    // Lookup the associated vehicle document.
-    pipeline.push({
-      $lookup: {
-        from: 'vehicleadvs', // Adjust this if your vehicle collection name is different.
-        localField: 'vehicle',
-        foreignField: '_id',
-        as: 'vehicle',
-      },
-    });
-
-    // Unwind the vehicle array (each ad should have one vehicle).
-    pipeline.push({ $unwind: '$vehicle' });
-
-    // Lookup the vendor inside the vehicle.
-    pipeline.push({
-      $lookup: {
-        from: 'vehiclecompanies', // Adjust this if your vendor collection name is different.
-        localField: 'vehicle.vendor',
-        foreignField: '_id',
-        as: 'vehicle.vendor',
-      },
-    });
-
-    // Unwind the vendor array.
-    pipeline.push({ $unwind: '$vehicle.vendor' });
-
-    // Filter by vendor name if provided.
-    if (findDto.vendorName) {
-      pipeline.push({
-        $match: {
-          'vehicle.vendor.name': { $regex: findDto.vendorName, $options: 'i' },
+      // Lookup the associated vehicle document from the vehicleAdv collection.
+      {
+        $lookup: {
+          from: 'vehicleadvs', // Adjust this if your vehicle adv collection name is different.
+          localField: 'vehicle',
+          foreignField: '_id',
+          as: 'vehicle',
         },
-      });
-    }
-
-    // If vehicle DTO filters are provided, add matching criteria.
-    if (findDto.vehicle) {
-      // For example: filter by vehicle name.
-      if (findDto.vehicle.name) {
-        pipeline.push({
-          $match: {
-            'vehicle.name': { $regex: findDto.vehicle.name, $options: 'i' },
-          },
-        });
-      }
-      // Filter by vehicle modelName.
-      if (findDto.vehicle.modelName) {
-        pipeline.push({
-          $match: {
-            'vehicle.modelName': {
-              $regex: findDto.vehicle.modelName,
-              $options: 'i',
-            },
-          },
-        });
-      }
-      // If needed, filter by other vehicle fields (such as fuelType, transmissionType, etc.).
-      // For example, filtering vehicleModels nested within vehicle:
-      if (findDto.vehicle.fuelType) {
-        pipeline.push({
-          $match: {
-            'vehicle.vehicleModels.fuelType': findDto.vehicle.fuelType,
-          },
-        });
-      }
-    }
-
-    // Apply pagination.
-    pipeline.push({ $skip: skip });
-    pipeline.push({ $limit: limit });
+      },
+      // Unwind the vehicle array (each ad should have one vehicle).
+      { $unwind: '$vehicle' },
+      // Apply pagination.
+      { $skip: skip },
+      { $limit: limit },
+    ];
 
     const advertisements = await this.advertisementModel
       .aggregate(pipeline)

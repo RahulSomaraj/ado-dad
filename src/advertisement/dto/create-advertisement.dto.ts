@@ -57,16 +57,6 @@ export class CreateAdvertisementDto {
   @IsString({ each: true })
   imageUrls: string[];
 
-  @ApiProperty({ description: 'Full name of the advertiser' })
-  @IsString()
-  @IsNotEmpty()
-  fullName: string;
-
-  @ApiProperty({ description: 'Phone number of the advertiser' })
-  @IsString()
-  @IsNotEmpty()
-  phoneNumber: string;
-
   @ApiProperty({ description: 'State where the advertisement is posted' })
   @IsString()
   @IsNotEmpty()
@@ -77,13 +67,13 @@ export class CreateAdvertisementDto {
   @IsNotEmpty()
   city: string;
 
-  @ApiProperty({
-    description: 'User ID of the creator',
-    example: '609c1d1f4f1a2561d8e6b123',
-  })
-  @IsMongoId()
-  @IsNotEmpty()
-  createdBy: string;
+  // @ApiProperty({
+  //   description: 'User ID of the creator',
+  //   example: '609c1d1f4f1a2561d8e6b123',
+  // })
+  // @IsMongoId()
+  // @IsNotEmpty()
+  // createdBy: string;
 
   @ApiPropertyOptional({
     description: 'Approval status of the advertisement',
@@ -93,13 +83,13 @@ export class CreateAdvertisementDto {
   @IsBoolean()
   isApproved?: boolean;
 
-  @ApiProperty({
-    description: 'User ID of the approver',
-    example: '609c1d1f4f1a2561d8e6b456',
-  })
-  @IsMongoId()
-  @IsNotEmpty()
-  approvedBy: string;
+  // @ApiProperty({
+  //   description: 'User ID of the approver',
+  //   example: '609c1d1f4f1a2561d8e6b456',
+  // })
+  // @IsMongoId()
+  // @IsNotEmpty()
+  // approvedBy: string;
 
   @ApiProperty({
     description: 'Category ID for the advertisement',

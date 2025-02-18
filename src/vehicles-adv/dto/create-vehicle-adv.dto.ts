@@ -17,19 +17,7 @@ import {
   WheelerType,
 } from 'src/vehicles/enum/vehicle.type';
 
-export class AdvVehicleDetailsDto {
-  @ApiProperty({ example: 2023 })
-  @IsNumber()
-  @IsNotEmpty()
-  modelYear: number;
-
-  @ApiProperty({ example: 'March' })
-  @IsString()
-  @IsNotEmpty()
-  month: string;
-}
-
-export class AdvAdditionalInfoDto {
+export class AdditionalAdvInfoDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   abs?: boolean;
@@ -78,13 +66,6 @@ export class AdvAdditionalInfoDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   vehicleCertified?: boolean;
-
-  // Updated: color as an array of strings.
-  @ApiPropertyOptional({ example: ['Red'] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  color?: string[];
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -163,7 +144,7 @@ export class AdvAdditionalInfoDto {
   seatWarmer?: boolean;
 }
 
-export class VehicleModelDto {
+export class VehicleModelAdvDto {
   @ApiProperty({ example: 'Model X' })
   @IsString()
   @IsNotEmpty()
@@ -178,19 +159,6 @@ export class VehicleModelDto {
   @IsOptional()
   @IsString()
   modelDetails?: string;
-
-  @ApiPropertyOptional({
-    isArray: true,
-    type: String,
-    example: [
-      'https://example.com/model1.jpg',
-      'https://example.com/model2.jpg',
-    ],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  images?: string[];
 
   @ApiProperty({
     example: 'Petrol',
@@ -208,31 +176,43 @@ export class VehicleModelDto {
   @IsNotEmpty()
   transmissionType: TransmissionType;
 
-  @ApiPropertyOptional({ example: '15' })
+  @ApiProperty({ example: 15 })
   @IsNumber()
   @IsNotEmpty()
   mileage: number;
 
-  @ApiPropertyOptional({ example: '15' })
+  @ApiProperty({ example: 15 })
   @IsNumber()
   @IsNotEmpty()
   engineCapacity: number;
 
-  @ApiPropertyOptional({ example: '15' })
+  @ApiProperty({ example: 15 })
   @IsNumber()
   @IsNotEmpty()
   fuelCapacity: number;
 
-  @ApiPropertyOptional({ example: '15' })
+  @ApiProperty({ example: 15 })
   @IsNumber()
   @IsNotEmpty()
   maxPower: number;
 
-  @ApiPropertyOptional({ type: AdvAdditionalInfoDto })
+  @ApiPropertyOptional({ type: AdditionalAdvInfoDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => AdvAdditionalInfoDto)
-  additionalInfo?: AdvAdditionalInfoDto;
+  @Type(() => AdditionalAdvInfoDto)
+  additionalInfo?: AdditionalAdvInfoDto;
+}
+
+export class VehicleDetailsAdvDto {
+  @ApiProperty({ example: 2023 })
+  @IsNumber()
+  @IsNotEmpty()
+  modelYear: number;
+
+  @ApiProperty({ example: 'March' })
+  @IsString()
+  @IsNotEmpty()
+  month: string;
 }
 
 export class CreateVehicleAdvDto {
@@ -241,7 +221,7 @@ export class CreateVehicleAdvDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'Toyota Camry' })
+  @ApiProperty({ example: 'Camry' })
   @IsString()
   @IsNotEmpty()
   modelName: string;
@@ -256,34 +236,29 @@ export class CreateVehicleAdvDto {
   @IsEnum(WheelerType)
   wheelerType?: WheelerType;
 
-  @ApiProperty({ type: AdvVehicleDetailsDto })
-  @ValidateNested()
-  @Type(() => AdvVehicleDetailsDto)
-  @IsNotEmpty()
-  details: AdvVehicleDetailsDto;
+  @ApiPropertyOptional({
+    example: 'Red',
+  })
+  @IsOptional()
+  @IsString()
+  color?: string;
 
-  @ApiProperty({ example: '60f6a4c1234567890abcdef3' })
+  @ApiProperty({ type: VehicleDetailsAdvDto })
+  @ValidateNested()
+  @Type(() => VehicleDetailsAdvDto)
+  @IsNotEmpty()
+  details: VehicleDetailsAdvDto;
+
+  @ApiProperty({ example: '67b349d2c0ec145884f86926' })
   @IsMongoId()
   @IsNotEmpty()
   vendor: string;
 
   @ApiPropertyOptional({
-    isArray: true,
-    type: VehicleModelDto,
+    type: VehicleModelAdvDto,
   })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => VehicleModelDto)
-  vehicleModels?: VehicleModelDto[];
-
-  @ApiPropertyOptional({
-    isArray: true,
-    type: String,
-    example: ['Red', 'Blue'],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  color?: string[];
+  @ValidateNested()
+  @Type(() => VehicleModelAdvDto)
+  vehicleModel?: VehicleModelAdvDto;
 }
