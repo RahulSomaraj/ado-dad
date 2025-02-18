@@ -241,7 +241,7 @@ export class CreateVehicleAdvDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'Camry' })
+  @ApiProperty({ example: 'Toyota Camry' })
   @IsString()
   @IsNotEmpty()
   modelName: string;
