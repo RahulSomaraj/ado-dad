@@ -9,11 +9,11 @@ import {
   Query,
   UseFilters,
 } from '@nestjs/common';
-import { CreateVehicleDto } from './dto/create-vehicle.dto';
+import { CreateVehicleAdvDto } from './dto/create-vehicle.dto';
 import { ApiTags, ApiResponse, ApiQuery, ApiOperation } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
-import { VehicleAdvService } from './vehicle.service';
+import { VehicleAdvService } from './vehicleadv.service';
 
 @ApiTags('Vehicles-Adv')
 @Controller('vehiclesadv')
@@ -36,7 +36,7 @@ export class VehicleAdvController {
 
   @Post()
   @ApiResponse({ status: 201, description: 'Vehicle created successfully' })
-  async createVehicle(@Body() createVehicleDto: CreateVehicleDto) {
+  async createVehicle(@Body() createVehicleDto: CreateVehicleAdvDto) {
     return this.vehicleService.createVehicle(createVehicleDto);
   }
 
@@ -45,7 +45,7 @@ export class VehicleAdvController {
   @ApiResponse({ status: 404, description: 'Vehicle not found' })
   async updateVehicle(
     @Param('id') id: string,
-    @Body() createVehicleDto: CreateVehicleDto,
+    @Body() createVehicleDto: CreateVehicleAdvDto,
   ) {
     return this.vehicleService.updateVehicle(id, createVehicleDto);
   }

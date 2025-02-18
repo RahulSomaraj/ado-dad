@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { VehicleCompanyTypes } from 'src/vehicles/enum/vehicle.type';
+import { WheelerType } from 'src/vehicles/enum/vehicle.type';
 
 @Schema({ timestamps: true })
 export class VehicleCompany extends Document {
@@ -10,8 +10,8 @@ export class VehicleCompany extends Document {
   @Prop({ required: true })
   originCountry: string;
 
-  @Prop({ required: true, default: VehicleCompanyTypes.FOURWHEELER })
-  vehicleType: VehicleCompanyTypes;
+  @Prop({ required: true, default: WheelerType.FOUR_WHEELER })
+  vehicleType: WheelerType;
 
   @Prop({
     required: true,

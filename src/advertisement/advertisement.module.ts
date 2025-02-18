@@ -12,7 +12,7 @@ import { Category, CategorySchema } from 'src/category/schemas/category.schema';
 import {
   VehicleAdv,
   VehicleAdvSchema,
-} from 'src/vehicles-adv/schemas/vehicle.schema';
+} from 'src/vehicles-adv/schemas/vehicleadv.schema';
 
 @Module({
   imports: [

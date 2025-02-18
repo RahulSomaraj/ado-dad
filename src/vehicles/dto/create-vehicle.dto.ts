@@ -10,7 +10,12 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { FuelType, TransmissionType, VehicleTypes } from '../enum/vehicle.type';
+import {
+  FuelType,
+  TransmissionType,
+  VehicleTypes,
+  WheelerType,
+} from '../enum/vehicle.type';
 
 export class VehicleDetailsDto {
   @ApiProperty({ example: 2023 })
@@ -193,7 +198,7 @@ export class VehicleModelDto {
   })
   @IsEnum(FuelType)
   @IsNotEmpty()
-  fuelType: FuelType.PETROL;
+  fuelType: FuelType;
 
   @ApiProperty({
     example: 'Automatic',
@@ -201,12 +206,27 @@ export class VehicleModelDto {
   })
   @IsEnum(TransmissionType)
   @IsNotEmpty()
-  transmissionType: TransmissionType.MANUAL;
+  transmissionType: TransmissionType;
 
-  @ApiProperty({ example: '15km/l' })
-  @IsString()
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
   @IsNotEmpty()
-  mileage: string;
+  mileage: number;
+
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  engineCapacity: number;
+
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  fuelCapacity: number;
+
+  @ApiPropertyOptional({ example: '15' })
+  @IsNumber()
+  @IsNotEmpty()
+  maxPower: number;
 
   @ApiPropertyOptional({ type: AdditionalInfoDto })
   @IsOptional()
@@ -231,16 +251,16 @@ export class CreateVehicleDto {
   @IsEnum(VehicleTypes)
   modelType?: VehicleTypes;
 
+  @ApiPropertyOptional({ example: WheelerType.TWO_WHEELER, enum: WheelerType })
+  @IsOptional()
+  @IsEnum(WheelerType)
+  wheelerType?: WheelerType;
+
   @ApiProperty({ type: VehicleDetailsDto })
   @ValidateNested()
   @Type(() => VehicleDetailsDto)
   @IsNotEmpty()
   details: VehicleDetailsDto;
-
-  @ApiProperty({ example: '60f6a4c1234567890abcdef2' })
-  @IsString()
-  @IsNotEmpty()
-  createdBy: string;
 
   @ApiProperty({ example: '60f6a4c1234567890abcdef3' })
   @IsMongoId()

@@ -205,7 +205,7 @@ export class VehicleModelDto {
   additionalInfo?: AdditionalInfoDto;
 }
 
-export class CreateVehicleDto {
+export class CreateVehicleAdvDto {
   @ApiProperty({ example: 'Toyota' })
   @IsString()
   @IsNotEmpty()

@@ -15,7 +15,7 @@ import { Model } from 'mongoose';
 import { Advertisement } from './schemas/advertisement.schema';
 import { User } from '../users/schemas/user.schema';
 import { Category } from 'src/category/schemas/category.schema';
-import { VehicleAdv } from 'src/vehicles-adv/schemas/vehicle.schema';
+import { VehicleAdv } from 'src/vehicles-adv/schemas/vehicleadv.schema';
 import { Property } from 'src/property/schemas/schema.property';
 import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
 

@@ -29,7 +29,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { RefreshTokenService } from './auth/auth.refresh.service';
 import { User, UserSchema } from './users/schemas/user.schema';
 import { AuthModule } from './auth/auth.module';
-import { VehicleAdvModule } from './vehicles-adv/vehicle.module';
+import { VehicleAdvModule } from './vehicles-adv/vehicleadv.module';
 
 @Module({
   imports: [

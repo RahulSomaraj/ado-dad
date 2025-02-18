@@ -23,7 +23,7 @@ export enum FuelType {
   HYBRID = 'Hybrid',
 }
 
-export enum VehicleCompanyTypes {
-  BIKES = 'two-wheeler',
-  FOURWHEELER = 'four-wheeler',
+export enum WheelerType {
+  TWO_WHEELER = 'TWO_WHEELER',
+  FOUR_WHEELER = 'FOUR_WHEELER',
 }

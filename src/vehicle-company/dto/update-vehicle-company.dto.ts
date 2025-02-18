@@ -6,7 +6,7 @@ import {
   IsUrl,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { VehicleCompanyTypes } from 'src/vehicles/enum/vehicle.type';
+import { WheelerType } from 'src/vehicles/enum/vehicle.type';
 
 export class UpdateVehicleCompanyDto {
   @ApiPropertyOptional({
@@ -29,10 +29,10 @@ export class UpdateVehicleCompanyDto {
     example: 'two-wheeler',
     description: 'two-wheeler, four-wheeler',
   })
-  @IsEnum(VehicleCompanyTypes)
+  @IsEnum(WheelerType)
   @IsNotEmpty()
   @IsOptional()
-  vehicleType: VehicleCompanyTypes;
+  vehicleType: WheelerType;
 
   @IsOptional()
   @IsUrl()

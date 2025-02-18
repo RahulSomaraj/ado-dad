@@ -1,8 +1,8 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { VehicleAdv } from './schemas/vehicle.schema';
-import { CreateVehicleDto } from './dto/create-vehicle.dto';
+import { VehicleAdv } from './schemas/vehicleadv.schema';
+import { CreateVehicleAdvDto } from './dto/create-vehicle.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleAdvDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
@@ -100,7 +100,9 @@ export class VehicleAdvService {
       .exec();
   }
 
-  async createVehicle(createVehicleDto: CreateVehicleDto): Promise<VehicleAdv> {
+  async createVehicle(
+    createVehicleDto: CreateVehicleAdvDto,
+  ): Promise<VehicleAdv> {
     // Check if the provided vendor (VehicleCompany) exists.
     const vehicleCompany = await this.vehicleCompanyModel.findById(
       createVehicleDto.vendor,

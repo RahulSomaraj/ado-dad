@@ -17,9 +17,7 @@ export class VehicleService {
   ) {}
 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-    const filter: any = {
-      isDeleted: false, // Exclude soft-deleted vehicles.
-    };
+    const filter: any = {};
 
     // Top-level filters
     if (findDto.name) {
@@ -83,6 +81,8 @@ export class VehicleService {
     const limit = findDto.limit || 10;
     const skip = (page - 1) * limit;
 
+    console.log(filter);
+
     return this.vehicleModel
       .find(filter)
       .skip(skip)
@@ -131,13 +131,47 @@ export class VehicleService {
       );
     }
 
-    // Build the vehicle object manually using the DTO data.
+    // Check if a vehicle with the same combination of name, modelName, and modelType already exists.
+    const duplicateVehicle = await this.vehicleModel.findOne({
+      name: createVehicleDto.name,
+      modelName: createVehicleDto.modelName,
+      modelType: createVehicleDto.modelType || VehicleTypes.SEDAN,
+    });
+
+    if (duplicateVehicle) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error:
+            'A vehicle with the same name, model name, and model type already exists.',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check for duplicate vehicle models in the provided array.
+    const modelKeys = new Set<string>();
+    for (const model of createVehicleDto.vehicleModels) {
+      const key = `${model.name}-${model.modelName}-${model.transmissionType}-${model.fuelType}`;
+      if (modelKeys.has(key)) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error:
+              'Duplicate vehicle model found with the same combination of name, model name, transmission type and fuel type.',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      modelKeys.add(key);
+    }
+
+    // Build the vehicle object using the DTO data.
     const vehicleData = {
       name: createVehicleDto.name,
       modelName: createVehicleDto.modelName,
       modelType: createVehicleDto.modelType || VehicleTypes.SEDAN,
       details: createVehicleDto.details,
-      createdBy: createVehicleDto.createdBy,
       vendor: createVehicleDto.vendor,
       vehicleModels: createVehicleDto.vehicleModels,
       color: createVehicleDto.color,
@@ -148,10 +182,35 @@ export class VehicleService {
   }
 
   async updateVehicle(
-    vehicleId: string,
-    updateVehicleDto: UpdateVehicleDto,
+    id: string,
+    updateVehicleDto: UpdateVehicleDto, // Assume UpdateVehicleAdvDto has optional fields
   ): Promise<Vehicle> {
-    // Check if the provided vendor (VehicleCompany) exists if vendor is provided.
+    // Retrieve the existing vehicle by its ID
+    const vehicle = await this.vehicleModel.findById(id);
+    if (!vehicle) {
+      throw new HttpException(
+        { status: HttpStatus.NOT_FOUND, error: 'Vehicle not found.' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Validate uniqueness of the vehicle name if a new name is provided.
+    if (updateVehicleDto.name) {
+      const existingVehicle: any = await this.vehicleModel.findOne({
+        name: updateVehicleDto.name,
+      });
+      if (existingVehicle && existingVehicle._id.toString() !== id) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'Vehicle with this name already exists.',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    // Validate vendor if provided: ensure the referenced VehicleCompany exists.
     if (updateVehicleDto.vendor) {
       const vehicleCompany = await this.vehicleCompanyModel.findById(
         updateVehicleDto.vendor,
@@ -167,45 +226,57 @@ export class VehicleService {
       }
     }
 
-    // Find the existing vehicle document.
-    const vehicle = await this.vehicleModel.findById(vehicleId);
+    // Validate and merge vehicleModels if provided.
+    if (updateVehicleDto.vehicleModels) {
+      // If an empty array is provided, throw an error.
+      if (updateVehicleDto.vehicleModels.length === 0) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'At least one vehicle model is required.',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate that new vehicle models do not contain duplicates.
+      const newModelKeys = new Set<string>();
+      for (const newModel of updateVehicleDto.vehicleModels) {
+        const key = `${newModel.name}-${newModel.modelName}-${newModel.transmissionType}-${newModel.fuelType}`;
+        if (newModelKeys.has(key)) {
+          throw new HttpException(
+            {
+              status: HttpStatus.BAD_REQUEST,
+              error:
+                'Duplicate vehicle model found with the same combination of name, model name, transmission type, and fuel type.',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        newModelKeys.add(key);
+      }
+
+      // Delete all existing vehicle models and replace with the new ones.
+      vehicle.vehicleModels = updateVehicleDto.vehicleModels;
+    }
+
+    // Overwrite the vehicleModels field with the merged array.
+
+    // Merge update fields into the existing vehicle document.
+    Object.assign(vehicle, updateVehicleDto);
+    return vehicle.save();
+  }
+
+  async softDeleteVehicle(id: string): Promise<Vehicle> {
+    const vehicle = await this.vehicleModel.findById(id);
     if (!vehicle) {
       throw new HttpException(
         { status: HttpStatus.NOT_FOUND, error: 'Vehicle not found.' },
         HttpStatus.NOT_FOUND,
       );
     }
-
-    // If new vehicle models are provided, map them to plain objects and append.
-    if (
-      updateVehicleDto.vehicleModels &&
-      updateVehicleDto.vehicleModels.length > 0
-    ) {
-      // Map DTO models to plain objects; this conversion ensures type compatibility.
-      const newModels = updateVehicleDto.vehicleModels.map((modelDto) => ({
-        ...modelDto,
-        // Explicitly ensure fuelType and transmissionType are strings.
-        fuelType: String(modelDto.fuelType),
-        transmissionType: String(modelDto.transmissionType),
-      }));
-
-      // Append new models to the existing array.
-      vehicle.vehicleModels = (vehicle.vehicleModels || []).concat(newModels);
-
-      // Remove vehicleModels from update DTO so it does not overwrite the array.
-      delete updateVehicleDto.vehicleModels;
-    }
-
-    // Merge other updated fields into the existing document.
-    Object.assign(vehicle, updateVehicleDto);
+    // Mark the vehicle as deleted by setting the deletedAt field to the current date.
+    vehicle.deletedAt = new Date();
     return vehicle.save();
-  }
-
-  async deleteVehicle(id: string): Promise<void> {
-    await this.vehicleModel.findByIdAndUpdate(
-      id,
-      { isDeleted: true, deletedAt: new Date() },
-      { new: true },
-    );
   }
 }

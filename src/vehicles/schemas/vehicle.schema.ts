@@ -1,6 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { FuelType, TransmissionType, VehicleTypes } from '../enum/vehicle.type';
+import {
+  FuelType,
+  TransmissionType,
+  VehicleTypes,
+  WheelerType,
+} from '../enum/vehicle.type';
 
 @Schema({ _id: false })
 export class VehicleDetails {
@@ -62,26 +67,37 @@ export class VehicleModel {
 
   @Prop([String])
   images?: string[];
+
   @Prop({
     required: true,
     enum: FuelType,
     default: FuelType.PETROL,
   })
-  fuelType: string;
+  fuelType: FuelType;
 
   @Prop({
     required: true,
     enum: TransmissionType,
     default: TransmissionType.MANUAL,
   })
-  transmissionType: string;
+  transmissionType: TransmissionType;
 
   @Prop({ required: true })
-  mileage: string;
+  mileage: number;
+
+  @Prop({ required: true })
+  engineCapacity: number;
+
+  @Prop({ required: true })
+  fuelCapacity: number;
+
+  @Prop({ required: true })
+  maxPower: number;
 
   @Prop()
   additionalInfo?: AdditionalInfo;
 }
+
 export const VehicleModelSchema = SchemaFactory.createForClass(VehicleModel);
 
 @Schema({ timestamps: true })
@@ -94,6 +110,14 @@ export class Vehicle extends Document {
 
   @Prop({ required: true, enum: VehicleTypes, default: VehicleTypes.SEDAN })
   modelType: VehicleTypes;
+
+  // New property to differentiate wheeler type.
+  @Prop({
+    required: true,
+    enum: WheelerType,
+    default: WheelerType.FOUR_WHEELER,
+  })
+  wheelerType: WheelerType;
 
   // Reference to the VehicleCompany schema as a vendor.
   @Prop({ required: true, ref: 'VehicleCompany', type: Types.ObjectId })
@@ -111,4 +135,5 @@ export class Vehicle extends Document {
   @Prop()
   deletedAt?: Date;
 }
+
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { VehicleAdvController } from './vehicle.controller';
-import { VehicleAdvService } from './vehicle.service';
-import { VehicleAdv, VehicleAdvSchema } from './schemas/vehicle.schema';
+import { VehicleAdvController } from './vehicleadv.controller';
+import { VehicleAdvService } from './vehicleadv.service';
+import { VehicleAdv, VehicleAdvSchema } from './schemas/vehicleadv.schema';
 import {
   VehicleCompany,
   VehicleCompanySchema,

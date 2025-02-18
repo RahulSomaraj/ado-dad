@@ -1,6 +1,6 @@
 import { IsEnum, IsNotEmpty, IsString, IsUrl } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { VehicleCompanyTypes } from 'src/vehicles/enum/vehicle.type';
+import { WheelerType } from 'src/vehicles/enum/vehicle.type';
 
 export class CreateVehicleCompanyDto {
   @IsNotEmpty()
@@ -20,13 +20,13 @@ export class CreateVehicleCompanyDto {
   originCountry: string;
 
   @IsNotEmpty()
-  @IsEnum(VehicleCompanyTypes)
+  @IsEnum(WheelerType)
   @ApiProperty({
-    enum: VehicleCompanyTypes,
-    example: VehicleCompanyTypes.BIKES,
+    enum: WheelerType,
+    example: WheelerType.TWO_WHEELER,
     description: 'Type of vehicle company (e.g., two-wheeler, four-wheeler)',
   })
-  vehicleType: VehicleCompanyTypes;
+  vehicleType: WheelerType;
 
   @IsNotEmpty()
   @IsUrl()
