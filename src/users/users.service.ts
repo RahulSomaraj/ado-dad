@@ -12,6 +12,7 @@ import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
 import { EncryptionUtil } from '../common/encryption.util';
 import { GetUsersDto } from './dto/get-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -96,7 +97,7 @@ export class UsersService {
   }
 
   // Update user details
-  async updateUser(id: string, updateData: any): Promise<User> {
+  async updateUser(id: string, updateData: UpdateUserDto): Promise<User> {
     const user = await this.userModel.findById(id).exec();
     if (!user || user.isDeleted)
       throw new NotFoundException('User not found or deleted');
@@ -106,11 +107,6 @@ export class UsersService {
         updateData.password,
       );
     }
-
-    if (updateData.ssn) {
-      updateData.ssn = EncryptionUtil.encrypt(updateData.ssn);
-    }
-
     const updatedUser = await this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();

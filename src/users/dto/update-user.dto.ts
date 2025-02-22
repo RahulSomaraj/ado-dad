@@ -35,7 +35,7 @@ export class UpdateUserDto {
   @IsOptional()
   password: string;
 
-  @ApiPropertyOptional({ example: 'user', enum: UserType })
+  @ApiPropertyOptional({ example: 'SA', enum: UserType })
   @IsEnum(UserType)
   @IsNotEmpty()
   @IsOptional()
