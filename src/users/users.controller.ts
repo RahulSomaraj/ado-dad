@@ -8,30 +8,44 @@ import {
   Delete,
   Query,
   UseFilters,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { EmailService } from '../utils/email.service';
-import { ApiTags, ApiQuery, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiQuery,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto'; // Import CreateUserDto
 import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { GetUsersDto } from './dto/get-user.dto';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { Roles } from 'src/roles/roles.decorator';
+import { UserType } from './enums/user.types';
 
 @ApiTags('users')
 @Controller('users')
 @UseFilters(new HttpExceptionFilter('Users'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
   ) {}
 
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Get()
   @ApiResponse({ status: 200, description: 'List of users' })
   async getAllUsers(@Query() query: GetUsersDto): Promise<any> {
     return this.usersService.getAllUsers(query);
   }
 
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
   @Get(':id')
   @ApiResponse({ status: 200, description: 'User found' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -39,6 +53,7 @@ export class UsersController {
     return this.usersService.getUserById(id);
   }
 
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Post()
   @ApiBody({
     description: 'Create a new user',
@@ -49,6 +64,7 @@ export class UsersController {
     return this.usersService.createUser(userData);
   }
 
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Put(':id')
   @ApiBody({
     description: 'Update user details',
@@ -60,6 +76,7 @@ export class UsersController {
     return this.usersService.updateUser(id, updateData);
   }
 
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -67,6 +84,7 @@ export class UsersController {
     return this.usersService.deleteUser(id);
   }
 
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('send-otp')
   @ApiResponse({ status: 200, description: 'OTP sent' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -74,6 +92,7 @@ export class UsersController {
     return this.usersService.sendOTP(email);
   }
 
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('verify-otp')
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })

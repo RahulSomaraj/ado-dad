@@ -1,12 +1,29 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, UseFilters } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  UseFilters,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { RolesGuard } from 'src/roles/roles.guard';
 import { Roles } from 'src/roles/roles.decorator';
-import { UserRole } from 'src/roles/user-role.enum'; // Import UserRole enum
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { UserType } from 'src/users/enums/user.types';
 
 @ApiTags('Properties')
 @Controller('properties')
@@ -18,13 +35,41 @@ export class PropertyController {
   @ApiOperation({ summary: 'Get all properties with optional query filters' })
   @ApiResponse({ status: 200, description: 'Properties fetched successfully' })
   @ApiResponse({ status: 500, description: 'Server error' })
-  @ApiQuery({ name: 'location', required: false, description: 'Filter by location' })
-  @ApiQuery({ name: 'priceMin', required: false, description: 'Minimum price filter' })
-  @ApiQuery({ name: 'priceMax', required: false, description: 'Maximum price filter' })
-  @ApiQuery({ name: 'propertyType', required: false, description: 'Filter by property type' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
-  @ApiQuery({ name: 'sort', required: false, description: 'Sort by field (e.g., price:asc, date:desc)' })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    description: 'Filter by location',
+  })
+  @ApiQuery({
+    name: 'priceMin',
+    required: false,
+    description: 'Minimum price filter',
+  })
+  @ApiQuery({
+    name: 'priceMax',
+    required: false,
+    description: 'Maximum price filter',
+  })
+  @ApiQuery({
+    name: 'propertyType',
+    required: false,
+    description: 'Filter by property type',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    description: 'Sort by field (e.g., price:asc, date:desc)',
+  })
   async getAllProperties(
     @Query('location') location?: string,
     @Query('priceMin') priceMin?: string,
@@ -32,7 +77,7 @@ export class PropertyController {
     @Query('propertyType') propertyType?: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Query('sort') sort?: string
+    @Query('sort') sort?: string,
   ) {
     const pagination = {
       page: parseInt(page.toString(), 10),
@@ -67,29 +112,41 @@ export class PropertyController {
   // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new property' })
   @ApiResponse({ status: 201, description: 'Property created successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Only sellers can create properties' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden: Only sellers can create properties',
+  })
   async createProperty(@Body() createPropertyDto: CreatePropertyDto) {
     return await this.propertyService.createProperty(createPropertyDto);
   }
 
   @Put(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin, UserRole.Seller)
+  @Roles(UserType.ADMIN, UserType.SHOWROOM)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing property' })
   @ApiResponse({ status: 200, description: 'Property updated successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Only admins or sellers can update properties' })
-  async updateProperty(@Param('id') id: string, @Body() updatePropertyDto: UpdatePropertyDto) {
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden: Only admins or sellers can update properties',
+  })
+  async updateProperty(
+    @Param('id') id: string,
+    @Body() updatePropertyDto: UpdatePropertyDto,
+  ) {
     return await this.propertyService.updateProperty(id, updatePropertyDto);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin, UserRole.Seller)
+  @Roles(UserType.ADMIN, UserType.SHOWROOM)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a property' })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Only admins or sellers can delete properties' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden: Only admins or sellers can delete properties',
+  })
   async deleteProperty(@Param('id') id: string) {
     return await this.propertyService.deleteProperty(id);
   }

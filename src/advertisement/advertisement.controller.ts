@@ -17,14 +17,14 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
 import { Roles } from 'src/roles/roles.decorator';
-import { UserRole } from 'src/roles/user-role.enum';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { UserType } from 'src/users/enums/user.types';
 
 @ApiTags('Advertisements')
 @Controller('advertisements')
 @UseFilters(new HttpExceptionFilter('Advertisements'))
 @UseGuards(JwtAuthGuard)
-@Roles(UserRole.User, UserRole.Admin, UserRole.Vendor) // Assuming you have a roles mechanism
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SHOWROOM) // Assuming you have a roles mechanism
 export class AdvertisementsController {
   constructor(private readonly advertisementService: AdvertisementsService) {}
 

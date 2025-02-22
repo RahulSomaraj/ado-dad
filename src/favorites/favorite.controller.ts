@@ -1,35 +1,52 @@
-import { 
-  Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req, 
-  UseFilters
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  UseFilters,
 } from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { RolesGuard } from 'src/roles/roles.guard';
 import { Roles } from 'src/roles/roles.decorator';
-import { UserRole } from 'src/roles/user-role.enum';
-import { 
-  ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiBody 
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { UserType } from 'src/users/enums/user.types';
 
 @ApiTags('Favorites')
 @ApiBearerAuth()
 @Controller('favorites')
 @UseFilters(new HttpExceptionFilter('Favorites'))
 @UseGuards(RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SHOWROOM) // Assuming you have a roles mechanism
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
   @Post()
-  async addToCart(@Query('userId') userId: string, @Body() createFavoriteDto: CreateFavoriteDto) {
+  async addToCart(
+    @Query('userId') userId: string,
+    @Body() createFavoriteDto: CreateFavoriteDto,
+  ) {
     return this.favoriteService.addFavorite(userId, createFavoriteDto);
   }
-  
 
   @Get()
-  @Roles(UserRole.User, UserRole.Admin)
-  @ApiOperation({ summary: 'Get user\'s favorites' })
+  @Roles(UserType.USER, UserType.ADMIN)
+  @ApiOperation({ summary: "Get user's favorites" })
   @ApiQuery({ name: 'itemId', required: false, type: String })
   @ApiQuery({ name: 'itemType', required: false, enum: ['product', 'service'] })
   async getUserFavorites(@Req() req, @Query() query) {
@@ -37,7 +54,7 @@ export class FavoriteController {
   }
 
   @Get(':favoriteId')
-  @Roles(UserRole.User, UserRole.Admin)
+  @Roles(UserType.USER, UserType.ADMIN)
   @ApiOperation({ summary: 'Get a specific favorite by ID' })
   @ApiParam({ name: 'favoriteId', type: String })
   async getFavoriteById(@Req() req, @Param('favoriteId') favoriteId: string) {
@@ -45,7 +62,7 @@ export class FavoriteController {
   }
 
   @Put(':favoriteId')
-  @Roles(UserRole.User)
+  @Roles(UserType.USER)
   @ApiOperation({ summary: 'Update a favorite' })
   @ApiParam({ name: 'favoriteId', type: String })
   @ApiBody({ type: UpdateFavoriteDto })
@@ -54,11 +71,15 @@ export class FavoriteController {
     @Param('favoriteId') favoriteId: string,
     @Body() updateFavoriteDto: UpdateFavoriteDto,
   ) {
-    return await this.favoriteService.updateFavorite(req.user.id, favoriteId, updateFavoriteDto);
+    return await this.favoriteService.updateFavorite(
+      req.user.id,
+      favoriteId,
+      updateFavoriteDto,
+    );
   }
 
   @Delete(':favoriteId')
-  @Roles(UserRole.User)
+  @Roles(UserType.USER)
   @ApiOperation({ summary: 'Remove an item from favorites' })
   @ApiParam({ name: 'favoriteId', type: String })
   async removeFavorite(@Req() req, @Param('favoriteId') favoriteId: string) {

@@ -1,11 +1,27 @@
-import { Controller, Post, Put, Get, Param, Body, Query, Delete, UseFilters } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Put,
+  Get,
+  Param,
+  Body,
+  Query,
+  Delete,
+  UseFilters,
+} from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { RatingService } from './rating.service';
 import { Roles } from 'src/roles/roles.decorator'; // Assuming you have a Roles decorator
-import { UserRole } from 'src/roles/user-role.enum'; // Assuming you have a Role enum
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { UserType } from 'src/users/enums/user.types';
 
 @ApiTags('Ratings')
 @Controller('ratings')
@@ -37,7 +53,7 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserRole.User, UserRole.Admin) // Assuming you have a roles mechanism
+  @Roles(UserType.USER, UserType.ADMIN) // Assuming you have a roles mechanism
   async createRating(@Body() createRatingDto: CreateRatingDto) {
     return this.ratingService.create(createRatingDto);
   }
@@ -68,8 +84,11 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserRole.Admin) // Only admin can update
-  async updateRating(@Param('ratingId') ratingId: string, @Body() updateRatingDto: UpdateRatingDto) {
+  @Roles(UserType.ADMIN) // Only admin can update
+  async updateRating(
+    @Param('ratingId') ratingId: string,
+    @Body() updateRatingDto: UpdateRatingDto,
+  ) {
     return this.ratingService.update(ratingId, updateRatingDto);
   }
 
@@ -130,7 +149,7 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserRole.Admin) // Only admin can delete
+  @Roles(UserType.ADMIN) // Only admin can delete
   async deleteRating(@Param('ratingId') ratingId: string) {
     return this.ratingService.delete(ratingId);
   }

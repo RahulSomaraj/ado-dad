@@ -7,19 +7,13 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   UseFilters,
 } from '@nestjs/common';
 import { VehicleCompanyService } from './vehicle-company.service';
 import { CreateVehicleCompanyDto } from './dto/create-vehicle-company.dto';
 import { UpdateVehicleCompanyDto } from './dto/update-vehicle-company.dto';
-import { AuthGuard } from 'src/roles/auth.guard';
-import { RolesGuard } from 'src/roles/roles.guard';
-import { Roles } from 'src/roles/roles.decorator';
-import { UserRole } from 'src/roles/user-role.enum'; // ✅ Import the UserRole enum
-import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { FindVehicleCompaniesDto } from './dto/get-vehicle-company.dto';
 
 @ApiTags('Vehicle Companies')

@@ -40,7 +40,7 @@ export class AppService {
         { id: user._id, email: user.email },
         {
           secret: process.env.TOKEN_KEY,
-          expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+          expiresIn: process.env.REFRESH_TOKEN_EXPIRY, // e.g., '60d'
         },
       ),
     ]);
@@ -50,15 +50,22 @@ export class AppService {
       secret: process.env.TOKEN_KEY,
     });
 
-    // 🔹 Store refresh token in MongoDB
+    // Remove any existing refresh token for this user that has the same token and iat
+    await this.authTokenModel.deleteMany({
+      userId: user._id,
+      token: refreshToken,
+      iat: iat,
+    });
+
+    // Save the new refresh token document
     await new this.authTokenModel({
-      userId: user._id, // MongoDB uses '_id' instead of 'id'
+      userId: user._id,
       token: refreshToken,
       iat,
     }).save();
 
     return {
-      id: user._id, // Convert ObjectId to string
+      id: user._id,
       token: `Bearer ${accessToken}`,
       refreshToken,
       userName: user.name,
@@ -79,9 +86,23 @@ export class AppService {
       ),
     ]);
 
+    // Extract 'iat' (Issued At) from the refresh token
+    const { iat } = await this.jwtService.verify(refreshToken, {
+      secret: process.env.TOKEN_KEY,
+    });
+
+    // Remove any existing refresh token for this user that has the same token and iat
+    await this.authTokenModel.deleteMany({
+      userId: user._id,
+      token: refreshToken,
+      iat: iat,
+    });
+
+    // Save the new refresh token document
     await new this.authTokenModel({
       userId: user._id,
       token: refreshToken,
+      iat,
     }).save();
 
     return {
@@ -94,15 +115,13 @@ export class AppService {
     };
   }
 
-  async logoutAllSessions(user: User) {
-    const deletedStatus = await this.authTokenModel
-      .deleteMany({
-        userId: user._id,
-      })
-      .exec();
+  async logoutAllSessions(user: User): Promise<{ message: string }> {
+    const { deletedCount } = await this.authTokenModel.deleteMany({
+      userId: user._id,
+    });
 
-    if (deletedStatus.deletedCount > 0) {
-      return { message: 'Logged out from all instances' };
+    if (deletedCount && deletedCount > 0) {
+      return { message: 'Logged out from all sessions' };
     }
 
     throw new HttpException(
@@ -118,6 +137,8 @@ export class AppService {
         secret: process.env.TOKEN_KEY,
       },
     );
+
+    console.log(jwtTokenDecode);
 
     const userSessions = await this.authTokenModel
       .find({

@@ -1,15 +1,24 @@
 // roles.guard.ts
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
-import { UserRole } from './user-role.enum';
+import { UserType } from 'src/users/enums/user.types';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const roles = this.reflector.get<UserRole[]>(ROLES_KEY, context.getHandler());
+    const roles = this.reflector.get<UserType[]>(
+      ROLES_KEY,
+      context.getHandler(),
+    );
     if (!roles) {
       return true; // No roles set, access is granted
     }
@@ -21,7 +30,7 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('User not authenticated');
     }
 
-    const hasRole = roles.some(role => user.roles?.includes(role));
+    const hasRole = roles.some((role) => user.roles?.includes(role));
     if (!hasRole) {
       throw new ForbiddenException('User does not have the required role');
     }
