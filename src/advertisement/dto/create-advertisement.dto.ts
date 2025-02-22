@@ -67,6 +67,11 @@ export class CreateAdvertisementDto {
   @IsNotEmpty()
   city: string;
 
+  @ApiProperty({ description: 'City where the advertisement is posted' })
+  @IsString()
+  @IsNotEmpty()
+  district: string;
+
   // @ApiProperty({
   //   description: 'User ID of the creator',
   //   example: '609c1d1f4f1a2561d8e6b123',
@@ -120,14 +125,4 @@ export class CreateAdvertisementDto {
   })
   @IsMongoId()
   property?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Fuel type for the vehicle advertisement. Allowed values: Petrol, Diesel, Electric, Hybrid.',
-    enum: FuelType,
-  })
-  @ValidateIf((o) => o.type === AdvertisementType.Vehicle)
-  @IsNotEmpty({ message: 'Fuel type is required for Vehicle advertisements.' })
-  @IsEnum(FuelType)
-  fuelType?: FuelType;
 }

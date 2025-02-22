@@ -17,7 +17,7 @@ export class CreateUserDto {
   @ApiProperty({ example: '+123456789' })
   @IsString()
   @IsNotEmpty()
-  phone: string;
+  phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
   @IsEmail()
@@ -29,15 +29,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ example: 'user', enum: UserType })
+  @ApiProperty({ example: 'SA', enum: UserType })
   @IsEnum(UserType)
   @IsNotEmpty()
   type: UserType;
-
-  @ApiProperty({ example: 'admin' })
-  @IsString()
-  @IsNotEmpty()
-  createdBy: string;
 
   @ApiProperty({ example: 'john_doe', required: false })
   @IsOptional()

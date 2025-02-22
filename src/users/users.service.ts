@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -62,12 +64,33 @@ export class UsersService {
 
   // Create a new user
   async createUser(userData: any): Promise<User> {
+    const existingUser = await this.userModel.findOne({
+      $or: [{ phoneNumber: userData.phoneNumber }, { email: userData.email }],
+    });
+
+    if (existingUser) {
+      if (existingUser.phoneNumber == userData.phoneNumber) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User Already Exist for same Phone Number ',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User Already Exist for same Email',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (userData.password) {
       userData.password = await EncryptionUtil.hashPassword(userData.password);
     }
-    if (userData.ssn) {
-      userData.ssn = EncryptionUtil.encrypt(userData.ssn);
-    }
+
     const newUser = new this.userModel(userData);
     return newUser.save();
   }
@@ -131,17 +154,5 @@ export class UsersService {
     user.otpExpires = undefined;
     await user.save();
     return 'OTP verified successfully';
-  }
-
-  // Decrypt sensitive user data (e.g., SSN)
-  async getDecryptedUser(id: string): Promise<any> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted)
-      throw new NotFoundException('User not found or deleted');
-
-    return {
-      ...user.toObject(),
-      ssn: user.ssn ? EncryptionUtil.decrypt(user.ssn) : null,
-    };
   }
 }
