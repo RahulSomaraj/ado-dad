@@ -40,9 +40,4 @@ export class UpdateUserDto {
   @IsNotEmpty()
   @IsOptional()
   type: UserType;
-
-  @ApiPropertyOptional({ example: 'john_doe', required: false })
-  @IsOptional()
-  @IsString()
-  username?: string;
 }

@@ -33,9 +33,4 @@ export class CreateUserDto {
   @IsEnum(UserType)
   @IsNotEmpty()
   type: UserType;
-
-  @ApiProperty({ example: 'john_doe', required: false })
-  @IsOptional()
-  @IsString()
-  username?: string;
 }
