@@ -88,10 +88,6 @@ export class UsersService {
       );
     }
 
-    if (userData.password) {
-      userData.password = await EncryptionUtil.hashPassword(userData.password);
-    }
-
     const newUser = new this.userModel(userData);
     return newUser.save();
   }
@@ -99,14 +95,17 @@ export class UsersService {
   // Update user details
   async updateUser(id: string, updateData: UpdateUserDto): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted)
-      throw new NotFoundException('User not found or deleted');
-
-    if (updateData.password) {
-      updateData.password = await EncryptionUtil.hashPassword(
-        updateData.password,
+    if (!user || user.isDeleted) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User not found or deleted',
+        },
+        HttpStatus.BAD_REQUEST,
       );
     }
+    // throw new NotFoundException('User not found or deleted');
+
     const updatedUser = await this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
