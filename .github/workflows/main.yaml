@@ -43,6 +43,9 @@ jobs:
             # Install dependencies
             npm install --legacy-peer-deps 
 
+            # Build Node 
+            npm run build
+
             # Restart the PM2 process by deleting the existing instance and restarting
-            pm2 delete all || true  # Delete existing PM2 processes (ignore errors if none)
+            pm2 delete 0 || true  # Delete existing PM2 processes (ignore errors if none)
             pm2 start dist/main.js --name "ado-dad"
