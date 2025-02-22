@@ -104,8 +104,33 @@ export class UsersService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    // throw new NotFoundException('User not found or deleted');
 
+    const existingUser = await this.userModel.findOne({
+      _id: { $ne: id },
+      $or: [
+        { phoneNumber: updateData.phoneNumber },
+        { email: updateData.email },
+      ],
+    });
+
+    if (existingUser) {
+      if (existingUser.phoneNumber == updateData.phoneNumber) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User Already Exist for same Phone Number ',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User Already Exist for same Email',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const updatedUser = await this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
