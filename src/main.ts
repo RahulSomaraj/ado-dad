@@ -16,11 +16,11 @@ async function bootstrap() {
   // Apply morgan logging middleware
   app.use(morgan('tiny'));
 
-  // Enable CORS globally (customize options as needed)
+  // Enable CORS globally
   app.enableCors({
-    origin: '*',
+    origin: '*', // Allows requests from all origins. Adjust this for production.
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type, Accept',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   // Swagger setup

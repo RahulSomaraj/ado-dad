@@ -13,6 +13,7 @@ import { generateOTP } from '../utils/otp-generator';
 import { EncryptionUtil } from '../common/encryption.util';
 import { GetUsersDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserType } from './enums/user.types';
 
 @Injectable()
 export class UsersService {
@@ -21,28 +22,36 @@ export class UsersService {
     private emailService: EmailService,
   ) {}
 
-  // Get all users with pagination and filters
-  async getAllUsers(getUsersDto: GetUsersDto) {
+  async getAllUsers(getUsersDto: GetUsersDto, currentUser: User) {
     const { page = 1, limit = 10, search } = getUsersDto;
 
     // Build query with filters and ensure `isDeleted: false`
     const query: any = { isDeleted: false };
 
-    // If a search term is provided, add it to the query
+    // If a search term is provided, add it to the query (searches name or email)
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } }, // Case-insensitive search
-        { email: { $regex: search, $options: 'i' } }, // Extendable to more fields
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
       ];
+    }
+
+    // If the current user is an admin (user.type === 'AD'), only return users
+    // whose userType is one of the following: 'aDmin', 'NU', 'SR'
+    if (currentUser.type == UserType.ADMIN) {
+      query.type = {
+        $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
+      };
     }
 
     console.log('Query:', query);
 
-    // Fetch paginated users
+    // Fetch paginated users with selected fields (you can adjust the projection as needed)
     const users = await this.userModel
       .find(query)
-      .skip((page - 1) * limit) // ✅ Ensure correct pagination logic
+      .skip((page - 1) * limit)
       .limit(limit)
+      .select('_id name email type phoneNumber profilePic') // Only send required fields, adjust as necessary
       .exec();
 
     // Count total documents that match the query
@@ -57,9 +66,18 @@ export class UsersService {
 
   // Get user by ID
   async getUserById(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).exec();
+    const user = await this.userModel
+      .findById(id)
+      .select('_id name email type phoneNumber profilePic') // Only send required fields, adjust as necessary
+      .exec();
     if (!user || user.isDeleted)
-      throw new NotFoundException('User not found or deleted');
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User not found or deleted',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     return user;
   }
 

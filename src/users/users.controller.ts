@@ -9,6 +9,7 @@ import {
   Query,
   UseFilters,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { EmailService } from '../utils/email.service';
@@ -42,8 +43,9 @@ export class UsersController {
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Get()
   @ApiResponse({ status: 200, description: 'List of users' })
-  async getAllUsers(@Query() query: GetUsersDto): Promise<any> {
-    return this.usersService.getAllUsers(query);
+  async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
+    const { user } = req;
+    return this.usersService.getAllUsers(query, user);
   }
 
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
