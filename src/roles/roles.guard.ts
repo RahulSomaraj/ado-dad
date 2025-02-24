@@ -1,39 +1,26 @@
-// roles.guard.ts
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from './roles.decorator';
 import { UserType } from 'src/users/enums/user.types';
+import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const roles = this.reflector.get<UserType[]>(
+    const requiredRoles = this.reflector.getAllAndOverride<UserType[]>(
       ROLES_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     );
-    if (!roles) {
-      return true; // No roles set, access is granted
+
+    if (!requiredRoles) {
+      return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user; // Assuming user is added to the request by the AuthGuard
+    const { user } = context.switchToHttp().getRequest();
+    console.log(user);
 
-    if (!user) {
-      throw new UnauthorizedException('User not authenticated');
-    }
-
-    const hasRole = roles.some((role) => user.roles?.includes(role));
-    if (!hasRole) {
-      throw new ForbiddenException('User does not have the required role');
-    }
-    return true;
+    // If user.userType is a single value, check if it exists in requiredRoles
+    return requiredRoles.includes(user.type);
   }
 }
