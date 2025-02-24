@@ -12,7 +12,7 @@ import {
 import { CreateVehicleAdvDto } from './dto/create-vehicle-adv.dto';
 import { ApiTags, ApiResponse, ApiQuery, ApiOperation } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
-import { FindVehicleDto } from './dto/get-vehicle-adv.dto';
+import { FindVehicleAdvDto } from './dto/get-vehicle-adv.dto';
 import { VehicleAdvService } from './vehicleadv.service';
 
 @ApiTags('Vehicles-Adv')
@@ -23,7 +23,7 @@ export class VehicleAdvController {
 
   @Get()
   @ApiOperation({ summary: 'Search vehicles with filters and pagination' })
-  async findVehicles(@Query() query: FindVehicleDto) {
+  async findVehicles(@Query() query: FindVehicleAdvDto) {
     return this.vehicleService.findVehicles(query);
   }
 

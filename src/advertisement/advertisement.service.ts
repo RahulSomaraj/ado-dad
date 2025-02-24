@@ -30,84 +30,120 @@ export class AdvertisementsService {
     @InjectModel(Property.name) private propertiesModel: Model<Property>,
   ) {}
 
-  async create(createAdvertisementDto: CreateAdvertisementDto) {}
+  async create(createAdvertisementDto: CreateAdvertisementDto, user: User) {
+    if (createAdvertisementDto.type === AdvertisementType.Property) {
+    } else if (createAdvertisementDto.type == AdvertisementType.Vehicle) {
+    }
+  }
 
-  async findAdvertisements(
-    findDto: FindAdvertisementsDto,
-  ): Promise<Advertisement[]> {
-    const page = findDto.page || 1;
-    const limit = findDto.limit || 10;
+  async findVehicleAdv(findDto: FindAdvertisementsDto) {
+    const query: any = {};
+
+    // Top-level filters
+    if (findDto.vehicleAdv?.vendor) {
+      query.vendor = findDto.vehicleAdv?.vendor;
+    }
+
+    if (findDto.vehicleAdv?.name) {
+      // Case-insensitive regex search for brand name
+      query.name = { $regex: findDto.vehicleAdv?.name, $options: 'i' };
+    }
+
+    if (findDto.vehicleAdv?.modelName) {
+      // Case-insensitive regex search for top-level modelName
+      query.modelName = {
+        $regex: findDto.vehicleAdv?.modelName,
+        $options: 'i',
+      };
+    }
+
+    // Filter by modelYear stored in the nested "details" sub-document
+    if (
+      findDto.vehicleAdv?.modelYear &&
+      findDto.vehicleAdv?.modelYear !== undefined
+    ) {
+      query['details.modelYear'] = findDto.vehicleAdv?.modelYear;
+    }
+
+    // Nested vehicle model filters
+    if (findDto.vehicleAdv?.vehicleModel) {
+      const vm = findDto.vehicleAdv?.vehicleModel;
+      if (vm.name) {
+        query['vehicleModel.name'] = { $regex: vm.name, $options: 'i' };
+      }
+      if (vm.modelName) {
+        query['vehicleModel.modelName'] = {
+          $regex: vm.modelName,
+          $options: 'i',
+        };
+      }
+      if (vm.modelDetails) {
+        query['vehicleModel.modelDetails'] = {
+          $regex: vm.modelDetails,
+          $options: 'i',
+        };
+      }
+      if (vm.fuelType) {
+        query['vehicleModel.fuelType'] = vm.fuelType;
+      }
+      if (vm.transmissionType) {
+        query['vehicleModel.transmissionType'] = vm.transmissionType;
+      }
+      // Additional info filter inside the vehicle model
+      if (vm.additionalInfo) {
+        const addInfo = vm.additionalInfo;
+        if (addInfo.color) {
+          query['vehicleModel.additionalInfo.color'] = {
+            $regex: addInfo.color,
+            $options: 'i',
+          };
+        }
+      }
+    }
+
+    // Optional: Add a generic search that spans multiple fields (if needed)
+    // For example, to search across the top-level name, modelName, and vehicleModel.name:
+    if (findDto.search) {
+      query.$or = [
+        { name: { $regex: findDto.search, $options: 'i' } },
+        { modelName: { $regex: findDto.search, $options: 'i' } },
+        { 'vehicleModel.name': { $regex: findDto.search, $options: 'i' } },
+      ];
+    }
+
+    // Apply pagination if provided
+    const page = findDto?.page || 1;
+    const limit = findDto?.limit || 10;
     const skip = (page - 1) * limit;
 
-    const pipeline: any[] = [
-      // Only consider vehicle ads that are not deleted.
-      { $match: { type: 'Vehicle', isDeleted: { $ne: true } } },
-      // Lookup the associated vehicle document from the vehicleAdv collection.
-      {
-        $lookup: {
-          from: 'vehicleadvs', // Adjust this if your vehicle adv collection name is different.
-          localField: 'vehicle',
-          foreignField: '_id',
-          as: 'vehicle',
-        },
-      },
-      // Unwind the vehicle array (each ad should have one vehicle).
-      { $unwind: '$vehicle' },
-      // Apply pagination.
-      { $skip: skip },
-      { $limit: limit },
-    ];
+    // You can also limit the fields returned.
+    // For example, to return only vendor, name, modelName, details, and select vehicleModel fields:
+    const projection = {
+      vendor: 1,
+      name: 1,
+      modelName: 1,
+      'details.modelYear': 1,
+      'details.month': 1,
+      'vehicleModel.name': 1,
+      'vehicleModel.modelName': 1,
+      'vehicleModel.fuelType': 1,
+      'vehicleModel.transmissionType': 1,
+      'vehicleModel.additionalInfo.color': 1,
+    };
 
     const advertisements = await this.advertisementModel
-      .aggregate(pipeline)
+      .find(query)
+      .select(projection)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
     return advertisements;
   }
 
   // ✅ Get a single advertisement by ID
-  async findOne(id: string) {
-    const advertisement = await this.advertisementModel
-      .findById(id)
-      .populate('createdBy', 'name email');
-    if (!advertisement) throw new NotFoundException('Advertisement not found');
-    return advertisement;
-  }
+  async findOne(id: string) {}
 
   // ✅ Update an advertisement (Only allows modification by the creator)
-  async update(
-    id: string,
-    updateAdvertisementDto: UpdateAdvertisementDto,
-    userId: string,
-  ) {
-    const advertisement = await this.advertisementModel.findById(id);
-    if (!advertisement) throw new NotFoundException('Advertisement not found');
-
-    // Check if the user owns the ad
-    if (advertisement.createdBy.toString() !== userId) {
-      throw new UnauthorizedException(
-        'Unauthorized to edit this advertisement',
-      );
-    }
-
-    return this.advertisementModel.findByIdAndUpdate(
-      id,
-      updateAdvertisementDto,
-      { new: true },
-    );
-  }
-
-  // ✅ Delete an advertisement (Only allows deletion by the creator)
-  async remove(id: string, userId: string) {
-    const advertisement = await this.advertisementModel.findById(id);
-    if (!advertisement) throw new NotFoundException('Advertisement not found');
-
-    // Check if the user owns the ad
-    if (advertisement.createdBy.toString() !== userId) {
-      throw new UnauthorizedException(
-        'Unauthorized to delete this advertisement',
-      );
-    }
-
-    return this.advertisementModel.findByIdAndDelete(id);
-  }
+  async update() {}
 }

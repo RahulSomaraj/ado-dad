@@ -5,7 +5,7 @@ import { VehicleAdv } from './schemas/vehicleadv.schema';
 import { CreateVehicleAdvDto } from './dto/create-vehicle-adv.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleAdvDto } from './dto/update-vehicle-adv.dto';
-import { FindVehicleDto } from './dto/get-vehicle-adv.dto';
+import { FindVehicleAdvDto } from './dto/get-vehicle-adv.dto';
 import { Vehicle } from 'src/vehicles/schemas/vehicle.schema';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class VehicleAdvService {
     private vehicleCompanyModel: Model<VehicleCompany>,
   ) {}
 
-  async findVehicles(findDto: FindVehicleDto): Promise<VehicleAdv[]> {
+  async findVehicles(findDto: FindVehicleAdvDto): Promise<VehicleAdv[]> {
     const filter: any = {};
 
     // Top-level filters
@@ -28,9 +28,6 @@ export class VehicleAdvService {
     }
     if (findDto.modelYear) {
       filter['details.modelYear'] = findDto.modelYear;
-    }
-    if (findDto.month) {
-      filter['details.month'] = { $regex: findDto.month, $options: 'i' };
     }
 
     // Vendor filter
@@ -56,37 +53,16 @@ export class VehicleAdvService {
       if (findDto.vehicleModel.transmissionType) {
         vmQuery.transmissionType = findDto.vehicleModel.transmissionType;
       }
-      if (findDto.vehicleModel.mileage) {
-        vmQuery.mileage = {
-          $regex: findDto.vehicleModel.mileage,
-          $options: 'i',
-        };
-      }
-      // Additional info nested filter
-      if (findDto.vehicleModel.additionalInfo) {
-        const additionalInfoQuery: any = {};
-        if (findDto.vehicleModel.additionalInfo.abs !== undefined) {
-          additionalInfoQuery.abs = findDto.vehicleModel.additionalInfo.abs;
-        }
-        // Add more additional info filters as needed...
-        if (Object.keys(additionalInfoQuery).length > 0) {
-          vmQuery.additionalInfo = additionalInfoQuery;
-        }
-      }
+
       filter.vehicleModels = { $elemMatch: vmQuery };
     }
 
     // Pagination: Default values are provided by PaginationDto if not present.
-    const page = findDto.page || 1;
-    const limit = findDto.limit || 10;
-    const skip = (page - 1) * limit;
+    // const page = findDto.page || 1;
+    // const limit = findDto.limit || 10;
+    // const skip = (page - 1) * limit;
 
-    return this.vehicleModel
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
-      .populate('vendor')
-      .exec();
+    return this.vehicleModel.find(filter).populate('vendor').exec();
   }
 
   async getVehicleById(id: string): Promise<VehicleAdv> {

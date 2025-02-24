@@ -26,12 +26,13 @@ import { GetUsersDto } from './dto/get-user.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { Roles } from 'src/roles/roles.decorator';
 import { UserType } from './enums/user.types';
+import { RolesGuard } from 'src/roles/roles.guard';
 
 @ApiTags('users')
 @Controller('users')
 @UseFilters(new HttpExceptionFilter('Users'))
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

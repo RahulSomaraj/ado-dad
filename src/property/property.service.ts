@@ -49,62 +49,12 @@ export class PropertyService {
 
   async createProperty(
     createPropertyDto: CreatePropertyDto,
+    user: User,
   ): Promise<Property> {
     // Validate that the owner exists.
-    const owner = await this.userModel.findById(createPropertyDto.owner);
-    if (!owner) {
-      throw new HttpException('Owner not found', HttpStatus.BAD_REQUEST);
-    }
 
     // Additional conditional validations:
-    const propertyType = createPropertyDto.type;
-    if (['house', 'apartment', 'pgAndGuestHouse'].includes(propertyType)) {
-      if (!createPropertyDto.bhk) {
-        throw new HttpException(
-          'BHK is required for this property type',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      if (!createPropertyDto.bathrooms) {
-        throw new HttpException(
-          {
-            status: HttpStatus.BAD_REQUEST,
-            error: 'Bathrooms are required for this property type',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      if (!createPropertyDto.totalFloors) {
-        throw new HttpException(
-          {
-            status: HttpStatus.BAD_REQUEST,
-            error: 'Total floors are required for this property type',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      if (
-        createPropertyDto.floorNo === undefined ||
-        createPropertyDto.floorNo === null
-      ) {
-        throw new HttpException(
-          {
-            status: HttpStatus.BAD_REQUEST,
-            error: 'Floor number is required for this property type',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    }
-    if (propertyType !== 'land' && !createPropertyDto.projectStatus) {
-      throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Project status is required for non-land properties',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // const propertyType = createPropertyDto.type;
 
     try {
       const newProperty = new this.propertyModel(createPropertyDto);
@@ -204,7 +154,7 @@ export class PropertyService {
         updatePropertyDto,
         { new: true, runValidators: true },
       );
-      return updatedProperty ?? { };
+      return updatedProperty ?? {};
     } catch (error) {
       throw new HttpException(
         {

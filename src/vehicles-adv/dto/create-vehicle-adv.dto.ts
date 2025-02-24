@@ -145,12 +145,14 @@ export class AdditionalAdvInfoDto {
 }
 
 export class VehicleModelAdvDto {
-  @ApiProperty({ example: 'Model X' })
+  @ApiPropertyOptional({ example: 'Model X' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'X1' })
+  @ApiPropertyOptional({ example: 'X1' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   modelName: string;
@@ -160,38 +162,44 @@ export class VehicleModelAdvDto {
   @IsString()
   modelDetails?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Petrol',
     enum: FuelType,
   })
+  @IsOptional()
   @IsEnum(FuelType)
   @IsNotEmpty()
   fuelType: FuelType;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Automatic',
     enum: TransmissionType,
   })
+  @IsOptional()
   @IsEnum(TransmissionType)
   @IsNotEmpty()
   transmissionType: TransmissionType;
 
-  @ApiProperty({ example: 15 })
+  @ApiPropertyOptional({ example: 15 })
+  @IsOptional()
   @IsNumber()
   @IsNotEmpty()
   mileage: number;
 
-  @ApiProperty({ example: 15 })
+  @ApiPropertyOptional({ example: 15 })
+  @IsOptional()
   @IsNumber()
   @IsNotEmpty()
   engineCapacity: number;
 
-  @ApiProperty({ example: 15 })
+  @ApiPropertyOptional({ example: 15 })
+  @IsOptional()
   @IsNumber()
   @IsNotEmpty()
   fuelCapacity: number;
 
-  @ApiProperty({ example: 15 })
+  @ApiPropertyOptional({ example: 15 })
+  @IsOptional()
   @IsNumber()
   @IsNotEmpty()
   maxPower: number;
@@ -204,24 +212,28 @@ export class VehicleModelAdvDto {
 }
 
 export class VehicleDetailsAdvDto {
-  @ApiProperty({ example: 2023 })
+  @ApiPropertyOptional({ example: 2023 })
+  @IsOptional()
   @IsNumber()
   @IsNotEmpty()
   modelYear: number;
 
-  @ApiProperty({ example: 'March' })
+  @ApiPropertyOptional({ example: 'March' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   month: string;
 }
 
 export class CreateVehicleAdvDto {
-  @ApiProperty({ example: 'Toyota' })
+  @ApiPropertyOptional({ example: 'Toyota' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'Camry' })
+  @ApiPropertyOptional({ example: 'Camry' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   modelName: string;
@@ -243,13 +255,15 @@ export class CreateVehicleAdvDto {
   @IsString()
   color?: string;
 
-  @ApiProperty({ type: VehicleDetailsAdvDto })
+  @ApiPropertyOptional({ type: VehicleDetailsAdvDto })
+  @IsOptional()
   @ValidateNested()
   @Type(() => VehicleDetailsAdvDto)
   @IsNotEmpty()
   details: VehicleDetailsAdvDto;
 
-  @ApiProperty({ example: '67b349d2c0ec145884f86926' })
+  @ApiPropertyOptional({ example: '67b349d2c0ec145884f86926' })
+  @IsOptional()
   @IsMongoId()
   @IsNotEmpty()
   vendor: string;

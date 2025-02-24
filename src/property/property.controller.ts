@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   UseFilters,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +25,7 @@ import { RolesGuard } from 'src/roles/roles.guard';
 import { Roles } from 'src/roles/roles.decorator';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { UserType } from 'src/users/enums/user.types';
+import { User } from 'src/users/schemas/user.schema';
 
 @ApiTags('Properties')
 @Controller('properties')
@@ -107,17 +109,18 @@ export class PropertyController {
   }
 
   @Post()
-  // @UseGuards(RolesGuard)
-  // @Roles(UserRole.Seller)
-  // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new property' })
   @ApiResponse({ status: 201, description: 'Property created successfully' })
   @ApiResponse({
     status: 403,
     description: 'Forbidden: Only sellers can create properties',
   })
-  async createProperty(@Body() createPropertyDto: CreatePropertyDto) {
-    return await this.propertyService.createProperty(createPropertyDto);
+  async createProperty(
+    @Body() createPropertyDto: CreatePropertyDto,
+    @Request() req,
+  ) {
+    const { user } = req;
+    return await this.propertyService.createProperty(createPropertyDto, user);
   }
 
   @Put(':id')

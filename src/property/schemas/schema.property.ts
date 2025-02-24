@@ -9,32 +9,8 @@ function arrayLimit(val: string[]): boolean {
 
 @Schema({ timestamps: true })
 export class Property extends Document {
-  @Prop({ required: true, trim: true })
-  title: string;
-
-  @Prop({ required: true })
-  description: string;
-
-  @Prop({ required: true, min: 0 })
-  price: number;
-
-  @Prop({ required: true })
-  location: string;
-
-  @Prop({ required: true, min: 0 })
-  area: number;
-
-  @Prop({
-    type: [String],
-    validate: {
-      validator: arrayLimit,
-      message: '{PATH} exceeds the limit of 5 images',
-    },
-  })
-  images: string[];
-
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  owner: Types.ObjectId;
+  createdBy: Types.ObjectId;
 
   @Prop({
     required: true,
@@ -84,6 +60,18 @@ export class Property extends Document {
 
   @Prop({ default: 0 })
   maintenanceCost: number;
+
+  @Prop({ default: 0 })
+  carpetArea: number;
+
+  @Prop({ default: 0 })
+  buildArea: number;
+
+  @Prop({ default: 0 })
+  floorArea: number;
+
+  @Prop({ default: 'Project Name' })
+  projectName: string;
 
   @Prop({
     type: Number,

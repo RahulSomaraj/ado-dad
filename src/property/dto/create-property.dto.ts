@@ -56,52 +56,10 @@ export enum ListedByEnum {
 }
 
 export class CreatePropertyDto {
-  @ApiProperty({ description: 'Title of the property' })
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @ApiProperty({ description: 'Description of the property' })
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-
-  @ApiProperty({ description: 'Price of the property', minimum: 0 })
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  price: number;
-
-  @ApiProperty({ description: 'Location of the property' })
-  @IsString()
-  @IsNotEmpty()
-  location: string;
-
-  @ApiProperty({ description: 'Area (in square feet)', minimum: 0 })
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  area: number;
-
-  @ApiProperty({
-    description: 'Image URLs (maximum 5 images)',
-    isArray: true,
-    type: [String],
-  })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  images: string[];
-
-  @ApiProperty({ description: 'Owner ID', example: '609c1d1f4f1a2561d8e6b123' })
-  @IsMongoId()
-  @IsNotEmpty()
-  owner: string;
-
   @ApiProperty({ description: 'Type of property', enum: PropertyTypeEnum })
   @IsEnum(PropertyTypeEnum)
   @IsNotEmpty()
-  type: PropertyTypeEnum;
+  propertyType: PropertyTypeEnum;
 
   @ApiProperty({
     description: 'Category of property',
@@ -109,7 +67,7 @@ export class CreatePropertyDto {
   })
   @IsEnum(PropertyCategoryEnum)
   @IsNotEmpty()
-  category: PropertyCategoryEnum;
+  adType: PropertyCategoryEnum;
 
   // Conditional: For house, apartment, pgAndGuestHouse, require bhk.
   @ApiPropertyOptional({

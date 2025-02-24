@@ -31,6 +31,9 @@ export class Advertisement extends Document {
   @Prop({ required: true })
   city: string;
 
+  @Prop({ required: true })
+  district: string;
+
   @Prop({ type: String, ref: 'User', required: false })
   createdBy: User;
 

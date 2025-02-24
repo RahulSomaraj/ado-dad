@@ -4,119 +4,63 @@ import {
   IsNumber,
   IsEnum,
   ValidateNested,
+  IsNotEmpty,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 import { PaginationDto } from 'src/shared/dto/pagination.dto';
-
-export class VehicleFilterDto {
-  @ApiPropertyOptional({ description: 'Vehicle name', example: 'Toyota' })
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @ApiPropertyOptional({ description: 'Vehicle model name', example: 'Camry' })
-  @IsOptional()
-  @IsString()
-  modelName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Fuel type',
-    example: 'Petrol',
-    enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
-  })
-  @IsOptional()
-  @IsString()
-  fuelType?: string;
-
-  @ApiPropertyOptional({
-    description: 'Transmission type',
-    example: 'Automatic',
-    enum: ['Automatic', 'Manual', 'Semi-Automatic', 'CVT', 'Dual-Clutch'],
-  })
-  @IsOptional()
-  @IsString()
-  transmissionType?: string;
-
-  @ApiPropertyOptional({
-    description: 'Mileage (e.g., 15km/l)',
-    example: '15km/l',
-  })
-  @IsOptional()
-  @IsString()
-  mileage?: string;
-}
+import { FindVehicleAdvDto } from 'src/vehicles-adv/dto/get-vehicle-adv.dto';
 
 export class FindAdvertisementsDto extends PaginationDto {
+  @ApiProperty({
+    description: 'Advertisement type (Vehicle or Property)',
+    example: 'Vehicle',
+  })
+  @IsNotEmpty()
+  @IsString()
+  type?: string;
+
   @ApiPropertyOptional({
     description: 'Advertisement type (Vehicle or Property)',
     example: 'Vehicle',
   })
   @IsOptional()
   @IsString()
-  type?: string;
+  search?: string;
 
   @ApiPropertyOptional({
-    description: 'Advertisement category',
-    example: 'electronics',
+    description:
+      'Price in rupees. This value can be very large, so it is transformed to a number.',
+    example: 1000000000, // example in rupees
   })
   @IsOptional()
-  @IsString()
-  category?: string;
-
-  @ApiPropertyOptional({ description: 'Property type', example: 'apartment' })
-  @IsOptional()
-  @IsString()
-  propertyType?: string;
-
-  @ApiPropertyOptional({ description: 'Brand name', example: 'Samsung' })
-  @IsOptional()
-  @IsString()
-  brandName?: string;
-
-  @ApiPropertyOptional({ description: 'Minimum price', example: 100 })
-  @IsOptional()
+  @IsNotEmpty({ message: 'MinPrice is required.' })
   @Type(() => Number)
-  @IsNumber()
-  minPrice?: number;
+  @IsNumber({}, { message: 'Price must be a valid number.' })
+  @Min(0, { message: 'Price must be at least 0.' })
+  minPrice: number;
 
-  @ApiPropertyOptional({ description: 'Maximum price', example: 1000 })
+  @ApiPropertyOptional({
+    description:
+      'Price in rupees. This value can be very large, so it is transformed to a number.',
+    example: 1000000000, // example in rupees
+  })
   @IsOptional()
+  @IsNotEmpty({ message: 'MAA rice is required.' })
   @Type(() => Number)
-  @IsNumber()
-  maxPrice?: number;
-
-  @ApiPropertyOptional({ description: 'Sort by field', default: 'createdAt' })
-  @IsOptional()
-  @IsString()
-  sortBy: string = 'createdAt';
-
-  @ApiPropertyOptional({ description: 'Sorting order', default: 'desc' })
-  @IsOptional()
-  @IsString()
-  order: string = 'desc';
+  @IsNumber({}, { message: 'Max Price must be a valid number.' })
+  @Min(0, { message: 'Price must be at least 0.' })
+  maxPrice: number;
 
   @ApiPropertyOptional({
-    description: 'Vehicle type filter',
-    enum: VehicleTypes,
-    example: VehicleTypes.SUV,
+    description:
+      'Price in rupees. This value can be very large, so it is transformed to a number.',
+    example: 1000000000, // example in rupees
   })
-  @IsOptional()
-  @IsEnum(VehicleTypes)
-  vehicleType?: VehicleTypes;
-
-  @ApiPropertyOptional({
-    description: 'Vendor name filter',
-    example: 'Toyota Motors',
-  })
-  @IsOptional()
-  @IsString()
-  vendorName?: string;
-
-  @ApiPropertyOptional({ description: 'Nested vehicle filters' })
   @IsOptional()
   @ValidateNested()
-  @Type(() => VehicleFilterDto)
-  vehicle?: VehicleFilterDto;
+  @Type(() => FindVehicleAdvDto)
+  vehicleAdv?: FindVehicleAdvDto;
 }
