@@ -30,6 +30,7 @@ import { RefreshTokenService } from './auth/auth.refresh.service';
 import { User, UserSchema } from './users/schemas/user.schema';
 import { AuthModule } from './auth/auth.module';
 import { VehicleAdvModule } from './vehicles-adv/vehicleadv.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { VehicleAdvModule } from './vehicles-adv/vehicleadv.module';
     AuthModule,
     UploadModule,
     VehicleAdvModule,
+    GatewayModule,
   ],
   providers: [EmailService, AppService, RefreshTokenService],
   controllers: [AppController],
