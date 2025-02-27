@@ -23,7 +23,7 @@ export class UsersService {
   ) {}
 
   async getAllUsers(getUsersDto: GetUsersDto, currentUser: User) {
-    const { page = 1, limit = 10, search } = getUsersDto;
+    const { page = 1, limit = 10, search, type } = getUsersDto;
 
     // Build query with filters and ensure `isDeleted: false`
     const query: any = { isDeleted: false };
@@ -38,10 +38,15 @@ export class UsersService {
 
     // If the current user is an admin (user.type === 'AD'), only return users
     // whose userType is one of the following: 'aDmin', 'NU', 'SR'
-    if (currentUser.type == UserType.ADMIN) {
+    if (currentUser.type == UserType.SUPER_ADMIN) {
       query.type = {
         $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
       };
+    }
+
+    if (type) {
+      // If a type filter is provided in the DTO, add it to the query
+      query.type = type;
     }
 
     console.log('Query:', query);
