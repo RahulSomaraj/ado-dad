@@ -72,14 +72,26 @@ export class VehicleCompanyService {
       filter.originCountry = { $regex: new RegExp(query.originCountry, 'i') };
     }
 
+    // Exclude soft-deleted documents:
+    // Option 1: Explicit filter condition if soft-deletion sets deletedAt
+    filter.deletedAt = null;
+
+    // Option 2: Use mongoose-delete option if configured:
+    // (Uncomment the third argument below and remove filter.deletedAt if you prefer)
+    // { withDeleted: false }
+
     // Set pagination defaults if not provided
     const page = query.page ? Number(query.page) : 1;
     const limit = query.limit ? Number(query.limit) : 10;
     const skip = (page - 1) * limit;
 
-    // Execute both the query and count in parallel
+    // Execute the query and count in parallel
     const [results, total] = await Promise.all([
-      this.vehicleCompanyModel.find(filter).skip(skip).limit(limit).exec(),
+      this.vehicleCompanyModel
+        .find(filter, null, { withDeleted: false })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
       this.vehicleCompanyModel.countDocuments(filter),
     ]);
 

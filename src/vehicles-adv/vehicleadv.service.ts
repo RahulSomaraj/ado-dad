@@ -17,7 +17,7 @@ export class VehicleAdvService {
   ) {}
 
   async findVehicles(findDto: FindVehicleAdvDto): Promise<VehicleAdv[]> {
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
 
     // Top-level filters
     if (findDto.name) {
@@ -53,16 +53,19 @@ export class VehicleAdvService {
       if (findDto.vehicleModel.transmissionType) {
         vmQuery.transmissionType = findDto.vehicleModel.transmissionType;
       }
-
       filter.vehicleModels = { $elemMatch: vmQuery };
     }
 
-    // Pagination: Default values are provided by PaginationDto if not present.
-    // const page = findDto.page || 1;
-    // const limit = findDto.limit || 10;
-    // const skip = (page - 1) * limit;
+    const page = findDto.page || 1;
+    const limit = findDto.limit || 10;
+    const skip = (page - 1) * limit;
 
-    return this.vehicleModel.find(filter).populate('vendor').exec();
+    return this.vehicleModel
+      .find(filter, null, { withDeleted: false })
+      .skip(skip)
+      .limit(limit)
+      .populate('vendor')
+      .exec();
   }
 
   async getVehicleById(id: string): Promise<VehicleAdv> {

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
+import * as mongooseDelete from 'mongoose-delete'; // Import the plugin
 import { User } from 'src/users/schemas/user.schema';
 
 @Schema({ _id: false })
@@ -44,7 +45,6 @@ export class AdditionalInfo {
   @Prop() tyreCondition?: string;
   @Prop() usbCompatibility?: boolean;
 }
-
 export const AdditionalInfoSchema =
   SchemaFactory.createForClass(AdditionalInfo);
 
@@ -109,8 +109,13 @@ export class VehicleAdv extends Document {
   @Prop({ required: true, ref: 'VehicleCompany', type: Types.ObjectId })
   vendor: Types.ObjectId;
 
-  // Note: Removed the default value so that if no vehicle model is provided, this field remains undefined.
   @Prop({ type: ADVVehicleModelSchema })
   vehicleModel?: VehicleAdvModel;
 }
 export const VehicleAdvSchema = SchemaFactory.createForClass(VehicleAdv);
+
+// Apply mongoose-delete plugin to VehicleAdvSchema
+VehicleAdvSchema.plugin(mongooseDelete, {
+  deletedAt: true,
+  overrideMethods: 'all',
+});
