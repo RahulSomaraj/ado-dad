@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { ChatService } from 'src/chat/chat.service';
 
 @WebSocketGateway({
   cors: {
@@ -19,6 +20,8 @@ import { Server, Socket } from 'socket.io';
 export class MyGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
+  constructor(private readonly chatService: ChatService) {}
+
   @WebSocketServer()
   server: Server;
 
@@ -39,10 +42,24 @@ export class MyGateway
     // Additional actions on client disconnect can be performed here.
   }
 
+  // @SubscribeMessage('message')
+  // handleMessage(@MessageBody() payload: any): void {
+  //   this.logger.log(`Message received: ${payload}`);
+  //   // Broadcast the message to all connected clients
+  //   this.server.emit('message', payload);
+  // }
+
   @SubscribeMessage('message')
-  handleMessage(@MessageBody() payload: any): void {
-    this.logger.log(`Message received: ${payload}`);
-    // Broadcast the message to all connected clients
-    this.server.emit('message', payload);
+  async handleMessage(@MessageBody() payload: any): Promise<void> {
+    this.logger.log(`Message received: ${JSON.stringify(payload)}`);
+    try {
+      // Save the message in the database
+      const savedMessage = await this.chatService.createMessage(payload);
+      // Broadcast the saved message to all connected clients
+      this.server.emit('message', savedMessage);
+    } catch (error) {
+      this.logger.error('Error saving chat message', error);
+      // Optionally, you can emit an error event back to the client here
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { ChatModule } from './chat/chat.module';
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
@@ -34,6 +35,7 @@ import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
+    ChatModule,
     ConfigModule.forRoot({
       load: [appConfig],
       isGlobal: true,
