@@ -61,7 +61,6 @@ export class VehicleCompanyService {
     const newCompany = new this.vehicleCompanyModel(vehicleCompany);
     return newCompany.save();
   }
-
   async findAll(query: FindVehicleCompaniesDto) {
     // Build filter based on provided query properties
     const filter: any = {};
@@ -71,30 +70,29 @@ export class VehicleCompanyService {
     if (query.originCountry) {
       filter.originCountry = { $regex: new RegExp(query.originCountry, 'i') };
     }
-
+  
     // Exclude soft-deleted documents:
-    // Option 1: Explicit filter condition if soft-deletion sets deletedAt
     filter.deletedAt = null;
-
-    // Option 2: Use mongoose-delete option if configured:
-    // (Uncomment the third argument below and remove filter.deletedAt if you prefer)
-    // { withDeleted: false }
-
+  
     // Set pagination defaults if not provided
     const page = query.page ? Number(query.page) : 1;
     const limit = query.limit ? Number(query.limit) : 10;
     const skip = (page - 1) * limit;
-
+  
+    // Determine sorting order (default to newest first)
+    const sortOrder = query.sort === 'asc' ? 1 : -1;
+  
     // Execute the query and count in parallel
     const [results, total] = await Promise.all([
       this.vehicleCompanyModel
         .find(filter, null, { withDeleted: false })
+        .sort({ createdAt: sortOrder }) // Sorting by createdAt
         .skip(skip)
         .limit(limit)
         .exec(),
       this.vehicleCompanyModel.countDocuments(filter),
     ]);
-
+  
     // Return paginated result with metadata
     return {
       data: results,
@@ -104,6 +102,7 @@ export class VehicleCompanyService {
       totalPages: Math.ceil(total / limit),
     };
   }
+  
 
   async findOne(id: string): Promise<VehicleCompany | null> {
     return this.vehicleCompanyModel.findById(id).exec();

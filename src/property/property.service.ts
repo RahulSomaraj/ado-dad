@@ -36,10 +36,30 @@ export class PropertyService {
       filter['price'] = { $lte: query.maxPrice };
     }
 
-    return await this.propertyModel
+    // Pagination
+    const page = parseInt(query.page) || 1;
+    const limit = parseInt(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // total count of properties
+    const totalProperties = await this.propertyModel.countDocuments(filter);
+    const totalPages = Math.ceil(totalProperties / limit);
+
+    const properties = await this.propertyModel
       .find(filter)
-      .populate('owner', 'name email');
-  }
+      .populate('owner', 'name email')
+      .skip(skip)
+      .limit(limit);
+
+    return {
+      data: properties, 
+      pagination: {
+        totalProperties: totalProperties,
+        currentPage: page,
+        totalPages: totalPages
+      }
+    };
+}
 
   async getPropertyById(id: string) {
     return await this.propertyModel

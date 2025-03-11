@@ -59,7 +59,7 @@ export class CreatePropertyDto {
   @ApiProperty({ description: 'Type of property', enum: PropertyTypeEnum })
   @IsEnum(PropertyTypeEnum)
   @IsNotEmpty()
-  propertyType: PropertyTypeEnum;
+  type: PropertyTypeEnum;
 
   @ApiProperty({
     description: 'Category of property',
@@ -105,6 +105,13 @@ export class CreatePropertyDto {
   @Min(1)
   bathrooms?: number;
 
+
+  @ApiProperty({ description: 'Owner ID' })
+  @IsMongoId()
+  @IsNotEmpty()
+  owner: string;
+
+
   // Conditional: For house, apartment, pgAndGuestHouse, require furnished status.
   @ApiPropertyOptional({
     description:
@@ -126,7 +133,8 @@ export class CreatePropertyDto {
     description: 'Project status (required if property type is not land)',
     enum: ProjectStatusEnum,
   })
-  @ValidateIf((o) => o.type !== PropertyTypeEnum.land)
+  @ValidateIf((o) => o.propertyType !== PropertyTypeEnum.land)
+
   @IsEnum(ProjectStatusEnum)
   projectStatus?: ProjectStatusEnum;
 
@@ -187,6 +195,16 @@ export class CreatePropertyDto {
   })
   @IsEnum(FacingEnum)
   facing?: FacingEnum;
+
+  @ApiProperty({ description: 'Category of property' })
+  @IsString()
+  @IsNotEmpty()
+  category: string;
+
+  @ApiProperty({ description: 'Created by (User ID)' })
+  @IsMongoId()
+  @IsNotEmpty()
+  createdBy: string;
 
   @ApiProperty({ description: 'Listed by', enum: ListedByEnum })
   @IsEnum(ListedByEnum)

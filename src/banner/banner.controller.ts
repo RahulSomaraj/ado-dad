@@ -21,11 +21,19 @@ export class BannerController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Retrieve all banners' })
-  @ApiQuery({ name: 'title', required: false, description: 'Filter by title' })
-  async findAll(@Query('title') title?: string): Promise<Banner[]> {
-    return this.bannerService.findAll(title);
-  }
+@ApiOperation({ summary: 'Retrieve all banners with pagination' })
+@ApiQuery({ name: 'title', required: false, description: 'Filter by title' })
+@ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
+@ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
+async findAll(
+  @Query('title') title?: string,
+  @Query('page') page: number = 1,
+  @Query('limit') limit: number = 10
+): Promise<{ banners: Banner[]; totalPages: number; currentPage: number }> {
+  return this.bannerService.findAll(title, page, limit);
+}
+
+
 
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a banner by ID' })

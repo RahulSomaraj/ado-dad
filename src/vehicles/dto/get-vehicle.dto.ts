@@ -260,7 +260,7 @@ export class FindVehicleDto extends PaginationDto {
 
   // Filtering by details fields (which are stored in the "details" sub-document)
 
-  @ApiPropertyOptional({ example: 1, description: 'Page number' })
+  @ApiPropertyOptional({ example: 2023, description: 'Model year' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -283,4 +283,12 @@ export class FindVehicleDto extends PaginationDto {
   @ValidateNested()
   @Type(() => FindVehicleModelDto)
   vehicleModel?: FindVehicleModelDto;
+
+  @ApiPropertyOptional({
+    example: 'createdAt:desc',
+    description: 'Sorting field with order (e.g., createdAt:desc, price:asc)',
+  })
+  @IsOptional()
+  @IsString()
+  sort?: string;
 }

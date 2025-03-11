@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsNumber, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UserType } from '../enums/user.types';
@@ -33,11 +33,18 @@ export class GetUsersDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Search query to filter users',
-    example: 'john',
-    default: UserType.USER,
+    description: 'User type filter',
+    example: UserType.USER,
   })
   @IsOptional()
   @IsString()
   type?: UserType;
+
+  @ApiPropertyOptional({
+    description: 'Sorting field and order (e.g., "name:asc" or "createdAt:desc")',
+    example: 'name:asc',
+  })
+  @IsOptional()
+  @IsString()
+  sort?: string;
 }

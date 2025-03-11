@@ -23,11 +23,11 @@ export class UsersService {
   ) {}
 
   async getAllUsers(getUsersDto: GetUsersDto, currentUser: User) {
-    const { page = 1, limit = 10, search, type } = getUsersDto;
-
+    const { page = 1, limit = 10, search, type, sort } = getUsersDto;
+  
     // Build query with filters and ensure `isDeleted: false`
     const query: any = { isDeleted: false };
-
+  
     // If a search term is provided, add it to the query (searches name or email)
     if (search) {
       query.$or = [
@@ -35,40 +35,47 @@ export class UsersService {
         { email: { $regex: search, $options: 'i' } },
       ];
     }
-
-    // If the current user is an admin (user.type === 'AD'), only return users
-    // whose userType is one of the following: 'aDmin', 'NU', 'SR'
+  
+    // If the current user is a SUPER_ADMIN, restrict user types
     if (currentUser.type == UserType.SUPER_ADMIN) {
       query.type = {
         $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
       };
     }
-
+  
     if (type) {
       // If a type filter is provided in the DTO, add it to the query
       query.type = type;
     }
-
+  
     console.log('Query:', query);
-
-    // Fetch paginated users with selected fields (you can adjust the projection as needed)
+  
+    // Sorting logic (default: createdAt descending)
+    let sortOptions: any = { createdAt: -1 };
+    if (sort) {
+      const [field, order] = sort.split(':');
+      sortOptions = { [field]: order === 'asc' ? 1 : -1 };
+    }
+  
+    // Fetch paginated users with selected fields
     const users = await this.userModel
       .find(query)
+      .sort(sortOptions) // Added sorting
       .skip((page - 1) * limit)
       .limit(limit)
-      .select('_id name email type phoneNumber profilePic') // Only send required fields, adjust as necessary
+      .select('_id name email type phoneNumber profilePic') // Only send required fields
       .exec();
-
+  
     // Count total documents that match the query
     const count = await this.userModel.countDocuments(query);
-
+  
     return {
       users,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
     };
   }
-
+  
   // Get user by ID
   async getUserById(id: string): Promise<User> {
     const user = await this.userModel
