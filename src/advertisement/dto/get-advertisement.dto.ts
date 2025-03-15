@@ -61,6 +61,7 @@ export class FindAdvertisementsDto extends PaginationDto {
   })
   @IsOptional()
   @ValidateNested()
+  
   @Type(() => FindVehicleAdvDto)
   vehicleAdv?: FindVehicleAdvDto;
 }

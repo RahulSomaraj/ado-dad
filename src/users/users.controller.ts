@@ -56,7 +56,6 @@ export class UsersController {
     return this.usersService.getUserById(id);
   }
 
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Post()
   @ApiBody({
     description: 'Create a new user',
