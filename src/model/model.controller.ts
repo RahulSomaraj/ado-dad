@@ -4,11 +4,13 @@ import { CreateModelDto } from './dto/create-model.dto';
 import { UpdateModelDto } from './dto/update-model.dto';
 import { ModelService } from './model.service';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { VehicleModelDocument } from './schemas/schema.model';
 
 @ApiTags('Model')
 @Controller('models')
 @UseFilters(new HttpExceptionFilter('Models'))
 export class ModelController {
+  vehicleModelService: any;
   constructor(private readonly modelService: ModelService) {}
 
   @Post()
@@ -22,38 +24,34 @@ export class ModelController {
   async createModel(@Body() createModelDto: CreateModelDto) {
     return this.modelService.create(createModelDto);
   }
-
   @Get()
-  @ApiOperation({ summary: 'Get all models with optional query filters' })
-  @ApiResponse({ status: 200, description: 'Models fetched successfully' })
-  @ApiResponse({ status: 500, description: 'Server error' })
-  @ApiQuery({ name: 'brandName', required: false, description: 'Filter by brand name' })
-  @ApiQuery({ name: 'fuelType', required: false, description: 'Filter by fuel type' })
-  @ApiQuery({ name: 'modelYear', required: false, description: 'Filter by model year' })
-  @ApiQuery({ name: 'page', required: false, description: 'Pagination - Page number' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Limit the number of results' })
-  @ApiQuery({ name: 'sort', required: false, description: 'Sort by field (e.g., name:asc)' })
-  async getAllModels(
-    @Query('brandName') brandName?: string,
-    @Query('fuelType') fuelType?: string,
-    @Query('modelYear') modelYear?: string,
+  @ApiOperation({ summary: 'Get all vehicle models with pagination and sorting' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
+  @ApiQuery({ name: 'sort', required: false, description: 'Sorting field (e.g., name:asc, createdAt:desc)' })
+  async findAll(
+    @Query() query: any,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('sort') sort?: string
-  ): Promise<any> {
-    // Convert pagination parameters to numbers
+  ): Promise<{ models: VehicleModelDocument[]; totalPages: number; currentPage: number }> {
+    
     const pagination = {
       page: parseInt(page.toString(), 10),
       limit: parseInt(limit.toString(), 10),
     };
-
-    // Convert sort parameter into object (e.g., { name: 'asc' })
+  
+    // Convert sort query from "field:asc,field2:desc" to { field: 1, field2: -1 }
     const sortOptions = sort
-      ? Object.fromEntries(sort.split(',').map((s) => s.split(':')))
+      ? Object.fromEntries(sort.split(',').map(s => {
+          const [key, value] = s.split(':');
+          return [key, value === 'desc' ? -1 : 1];
+        }))
       : {};
-
-    return this.modelService.findAll({ brandName, fuelType, modelYear, pagination, sortOptions });
+  
+    return this.modelService.findAll(query, pagination.page, pagination.limit, sortOptions);
   }
+  
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a model by ID' })

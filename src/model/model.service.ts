@@ -17,10 +17,35 @@ export class ModelService {
     return newModel.save(); // Save to the database
   }
 
-  // Find all models matching the query
-  async findAll(query): Promise<VehicleModelDocument[]> {
-    return this.modelModel.find(query).exec(); // Execute the query
+  async findAll(
+    query: any,
+    page: number,
+    limit: number,
+    sortOptions: Record<string, any>
+  ): Promise<{ models: VehicleModelDocument[]; totalPages: number; currentPage: number }> {
+    
+    // Convert page and limit values
+    const skip = (page - 1) * limit;
+
+    // Count total documents for pagination
+    const totalDocuments = await this.modelModel.countDocuments(query);
+
+    // Fetch paginated and sorted data
+    const models = await this.modelModel
+      .find(query)
+      .sort(sortOptions) // Apply sorting
+      .skip(skip) // Apply pagination
+      .limit(limit) // Limit results
+      .exec();
+
+    return {
+      models,
+      totalPages: Math.ceil(totalDocuments / limit),
+      currentPage: page,
+    };
   }
+
+  
 
   // Find a single model by its ID
   async findOne(id: string): Promise<VehicleModelDocument> {

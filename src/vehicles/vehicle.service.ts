@@ -18,7 +18,7 @@ export class VehicleService {
 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
     const filter: any = {};
-
+  
     // Top-level filters
     if (findDto.name) {
       filter.name = { $regex: findDto.name, $options: 'i' };
@@ -32,12 +32,12 @@ export class VehicleService {
     if (findDto.month) {
       filter['details.month'] = { $regex: findDto.month, $options: 'i' };
     }
-
+  
     // Vendor filter
     if (findDto.vendor) {
       filter.vendor = findDto.vendor;
     }
-
+  
     // Nested filter for vehicleModels using $elemMatch if provided
     if (findDto.vehicleModel) {
       const vmQuery: any = {};
@@ -75,22 +75,25 @@ export class VehicleService {
       }
       filter.vehicleModels = { $elemMatch: vmQuery };
     }
-
+  
     // Pagination
     const page = findDto.page || 1;
     const limit = findDto.limit || 10;
     const skip = (page - 1) * limit;
-
+  
+    // Sorting
+    const sortOrder = findDto.sort === 'asc' ? 1 : -1; // Default: Descending
     console.log(filter);
-
+  
     return this.vehicleModel
       .find(filter)
       .skip(skip)
       .limit(limit)
+      .sort({ createdAt: sortOrder }) // <-- Sorting added here
       .populate('vendor')
       .exec();
   }
-
+  
   async getVehicleById(id: string): Promise<Vehicle> {
     const vehicle = await this.vehicleModel
       .findById(id)

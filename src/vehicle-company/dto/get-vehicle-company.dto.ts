@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { WheelerType } from 'src/vehicles/enum/vehicle.type';
 import { PaginationDto } from 'src/shared/dto/pagination.dto';
 
@@ -16,7 +16,7 @@ export class FindVehicleCompaniesDto extends PaginationDto {
   @IsOptional()
   @IsNotEmpty()
   @IsEnum(WheelerType)
-  vehicleType: WheelerType;
+  vehicleType?: WheelerType;
 
   @ApiPropertyOptional({
     description: 'Origin country of the vehicle company',
@@ -25,4 +25,12 @@ export class FindVehicleCompaniesDto extends PaginationDto {
   @IsOptional()
   @IsString()
   originCountry?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sort order based on createdAt (asc for oldest, desc for newest)',
+    example: 'desc',
+  })
+  @IsOptional()
+  @IsString()
+  sort?: 'asc' | 'desc';
 }

@@ -51,19 +51,23 @@ export class ProductController {
     @Query('brand') brand?: string,
     @Query('minPrice') minPrice?: number,
     @Query('maxPrice') maxPrice?: number,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
     @Query('sort') sort?: string
-  ): Promise<Product[]> {
+  ): Promise<{ products: Product[]; totalPages: number; currentPage: number }> {
+    
     const pagination = {
       page: parseInt(page.toString(), 10),
       limit: parseInt(limit.toString(), 10),
     };
-
+  
     const sortOptions = sort
-      ? Object.fromEntries(sort.split(',').map((s) => s.split(':')))
+      ? Object.fromEntries(sort.split(',').map((s) => {
+          const [key, value] = s.split(':');
+          return [key, value === 'desc' ? -1 : 1];
+        }))
       : {};
-
+  
     return this.productService.getAllProducts({
       category,
       brand,
@@ -73,6 +77,7 @@ export class ProductController {
       sortOptions,
     });
   }
+  
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })

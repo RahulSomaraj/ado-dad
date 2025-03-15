@@ -18,10 +18,33 @@ export class BannerService {
   }
 
   // Get all banners with optional title filtering
-  async findAll(title?: string): Promise<Banner[]> {
+  async findAll(
+    title?: string, 
+    page: number = 1, 
+    limit: number = 10
+  ): Promise<{ banners: Banner[]; totalPages: number; currentPage: number }> {
+    
     const filter = title ? { title: { $regex: title, $options: 'i' } } : {};
-    return this.bannerModel.find(filter).exec();
+  
+    // Count total matching documents for pagination
+    const count = await this.bannerModel.countDocuments(filter);
+  
+    // Fetch banners with pagination and sorting
+    const banners = await this.bannerModel
+      .find(filter)
+      .sort({ createdAt: -1 }) // Sorting by newest first
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+  
+    return {
+      banners,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+    };
   }
+  
+  
 
   // Get a banner by its ID
   async findOne(id: string): Promise<Banner> {

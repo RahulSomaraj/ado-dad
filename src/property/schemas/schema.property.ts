@@ -94,6 +94,10 @@ export class Property extends Document {
   @Prop({ default: 0, min: [0, 'Car parking must be at least 0'] })
   carParking: number;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+ owner: Types.ObjectId;
+
+
   @Prop({
     enum: [
       'North',
