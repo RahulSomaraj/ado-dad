@@ -32,29 +32,11 @@ import { RolesGuard } from 'src/roles/roles.guard';
 @ApiTags('users')
 @Controller('users')
 @UseFilters(new HttpExceptionFilter('Users'))
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
   ) {}
-
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
-  @Get()
-  @ApiResponse({ status: 200, description: 'List of users' })
-  async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
-    const { user } = req;
-    return this.usersService.getAllUsers(query, user);
-  }
-
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
-  @Get(':id')
-  @ApiResponse({ status: 200, description: 'User found' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserById(@Param('id') id: string) {
-    return this.usersService.getUserById(id);
-  }
 
   @Post()
   @ApiBody({
@@ -66,7 +48,29 @@ export class UsersController {
     return this.usersService.createUser(userData);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @Get()
+  @ApiResponse({ status: 200, description: 'List of users' })
+  async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
+    const { user } = req;
+    return this.usersService.getAllUsers(query, user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
+  @Get(':id')
+  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getUserById(@Param('id') id: string) {
+    return this.usersService.getUserById(id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
   @Put(':id')
   @ApiBody({
     description: 'Update user details',
@@ -78,6 +82,8 @@ export class UsersController {
     return this.usersService.updateUser(id, updateData);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
@@ -86,6 +92,8 @@ export class UsersController {
     return this.usersService.deleteUser(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('send-otp')
   @ApiResponse({ status: 200, description: 'OTP sent' })
@@ -94,6 +102,8 @@ export class UsersController {
     return this.usersService.sendOTP(email);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('verify-otp')
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
