@@ -1,43 +1,14 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import {
-  AdvertisementType,
-  CreateAdvertisementDto,
-} from './dto/create-advertisement.dto';
-import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import {
-  AnyObject,
-  ClientSession,
-  Document,
-  DocumentSetOptions,
-  Error,
-  FlattenMaps,
-  MergeType,
-  Model,
-  ModifiedPathsSnapshot,
-  pathsToSkip,
-  PopulateOptions,
-  Query,
-  QueryOptions,
-  SaveOptions,
-  ToObjectOptions,
-  Types,
-  UpdateQuery,
-  UpdateWithAggregationPipeline,
-} from 'mongoose';
+import { Model } from 'mongoose';
 import { Advertisement } from './schemas/advertisement.schema';
 import { User } from '../users/schemas/user.schema';
 import { Category } from 'src/category/schemas/category.schema';
 import { VehicleAdv } from 'src/vehicles-adv/schemas/vehicleadv.schema';
 import { Property } from 'src/property/schemas/schema.property';
 import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
-import { months } from 'moment';
+import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
+import { ADSTATUS } from './enums/advertisement.enum';
 
 @Injectable()
 export class AdvertisementsService {
@@ -50,22 +21,42 @@ export class AdvertisementsService {
     @InjectModel(Property.name) private propertiesModel: Model<Property>,
   ) {}
 
-  async create(createAdvertisementDto: CreateAdvertisementDto, user: User) {
-    if (createAdvertisementDto.type === AdvertisementType.Property) {
-    } else if (createAdvertisementDto.type == AdvertisementType.Vehicle) {
-      const vehiclAdv = {
-        name: createAdvertisementDto.vehicle?.name,
-        modelName: createAdvertisementDto.vehicle?.modelName,
-        color: createAdvertisementDto.vehicle?.color,
-        details: {
-          modelYear: createAdvertisementDto.vehicle?.details?.modelYear,
-          month: createAdvertisementDto.vehicle?.details?.month,
+  async createAdvertisement(
+    createAdvertisementDto: CreateAdvertisementDto,
+    user: User,
+  ): Promise<Advertisement> {
+    const category = await this.categoryModel.findOne({
+      _id: createAdvertisementDto.category,
+    });
+    if (!category) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Category instance not found',
         },
-        createdBy: user,
-        vendor: createAdvertisementDto.vehicle?.vendor,
-      };
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    const advertisements = {};
+    const advertisement = new this.advertisementModel({
+      adTitle: 'Dummy',
+      type: createAdvertisementDto.type,
+      description: createAdvertisementDto.description,
+      price: createAdvertisementDto.price,
+      state: createAdvertisementDto.state,
+      city: createAdvertisementDto.city,
+      district: createAdvertisementDto.district,
+      // Set default value for isApproved if not provided
+      isApproved: false,
+      category: category,
+      createdBy: user,
+      adStatus: ADSTATUS.AD_CREATED,
+    });
+
+    // Save the advertisement document to the database.
+    const savedAd = await advertisement.save();
+
+    // Return the saved advertisement.
+    return savedAd;
   }
 
   async findVehicleAdv(findDto: FindAdvertisementsDto) {

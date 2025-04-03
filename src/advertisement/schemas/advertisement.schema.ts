@@ -65,11 +65,6 @@ AdvertisementSchema.pre('validate', function (next) {
   const ad = this as Advertisement;
 
   if (ad.type === 'Vehicle') {
-    if (!ad.vehicle) {
-      return next(
-        new Error('For Vehicle advertisements, a vehicle object is required.'),
-      );
-    }
     if (ad.property) {
       return next(
         new Error(
@@ -78,13 +73,6 @@ AdvertisementSchema.pre('validate', function (next) {
       );
     }
   } else if (ad.type === 'Property') {
-    if (!ad.property) {
-      return next(
-        new Error(
-          'For Property advertisements, a property object is required.',
-        ),
-      );
-    }
     if (ad.vehicle) {
       return next(
         new Error(

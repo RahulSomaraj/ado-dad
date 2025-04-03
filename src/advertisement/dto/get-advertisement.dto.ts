@@ -14,11 +14,12 @@ import { PaginationDto } from 'src/shared/dto/pagination.dto';
 import { FindVehicleAdvDto } from 'src/vehicles-adv/dto/get-vehicle-adv.dto';
 
 export class FindAdvertisementsDto extends PaginationDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Advertisement type (Vehicle or Property)',
     example: 'Vehicle',
   })
   @IsNotEmpty()
+  @IsOptional()
   @IsString()
   type?: string;
 
@@ -61,7 +62,6 @@ export class FindAdvertisementsDto extends PaginationDto {
   })
   @IsOptional()
   @ValidateNested()
-  
   @Type(() => FindVehicleAdvDto)
   vehicleAdv?: FindVehicleAdvDto;
 }

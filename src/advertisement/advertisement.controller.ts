@@ -12,7 +12,6 @@ import {
   Request,
 } from '@nestjs/common';
 import { AdvertisementsService } from './advertisement.service';
-import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 import {
   ApiTags,
@@ -27,6 +26,7 @@ import { Roles } from 'src/roles/roles.decorator';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { UserType } from 'src/users/enums/user.types';
 import { RolesGuard } from 'src/roles/roles.guard';
+import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 
 @ApiTags('Advertisements')
 @Controller('advertisements')
@@ -49,7 +49,10 @@ export class AdvertisementsController {
     @Request() req,
   ) {
     const { user } = req;
-    return this.advertisementService.create(createAdvertisementDto, user);
+    return this.advertisementService.createAdvertisement(
+      createAdvertisementDto,
+      user,
+    );
   }
 
   // ✅ Get all advertisements with filters & pagination

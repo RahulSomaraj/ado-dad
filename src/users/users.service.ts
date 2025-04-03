@@ -24,39 +24,48 @@ export class UsersService {
 
   async getAllUsers(getUsersDto: GetUsersDto, currentUser: User) {
     const { page = 1, limit = 10, search, type, sort } = getUsersDto;
-  
+
     // Build query with filters and ensure `isDeleted: false`
     const query: any = { isDeleted: false };
-  
-    // If a search term is provided, add it to the query (searches name or email)
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-      ];
+
+    /**
+     * Escapes special characters in the search string so that it can be used safely in a regex.
+     * @param text The raw search string input.
+     * @returns The escaped search string.
+     */
+    function escapeRegex(text: string): string {
+      return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
     }
-  
+
+    const escapedSearch = escapeRegex(search ?? '');
+    const regexPattern = `.*${escapedSearch}.*`;
+
+    query.$or = [
+      { name: { $regex: regexPattern, $options: 'i' } },
+      { email: { $regex: regexPattern, $options: 'i' } },
+      { phoneNumber: { $regex: regexPattern, $options: 'i' } },
+    ];
+
     // If the current user is a SUPER_ADMIN, restrict user types
     if (currentUser.type == UserType.SUPER_ADMIN) {
       query.type = {
         $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
       };
     }
-  
+
     if (type) {
       // If a type filter is provided in the DTO, add it to the query
       query.type = type;
     }
-  
-    console.log('Query:', query);
-  
+
+
     // Sorting logic (default: createdAt descending)
     let sortOptions: any = { createdAt: -1 };
     if (sort) {
       const [field, order] = sort.split(':');
       sortOptions = { [field]: order === 'asc' ? 1 : -1 };
     }
-  
+
     // Fetch paginated users with selected fields
     const users = await this.userModel
       .find(query)
@@ -65,17 +74,17 @@ export class UsersService {
       .limit(limit)
       .select('_id name email type phoneNumber profilePic') // Only send required fields
       .exec();
-  
+
     // Count total documents that match the query
     const count = await this.userModel.countDocuments(query);
-  
+
     return {
       users,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
     };
   }
-  
+
   // Get user by ID
   async getUserById(id: string): Promise<User> {
     const user = await this.userModel
