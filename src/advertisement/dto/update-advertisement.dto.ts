@@ -20,12 +20,9 @@ export class UpdateAdvertisementDto {
   @IsEnum(AdvertisementType)
   type?: AdvertisementType;
 
-  @ApiPropertyOptional({
-    enum: VehicleTypes,
-    description: 'Type of vehicls. Allowed values: Car',
-  })
+  @IsOptional()
   @IsEnum(VehicleTypes)
-  modelType: VehicleTypes;
+  modelType?: VehicleTypes;
 
   @ApiPropertyOptional({ description: 'Title of the advertisement' })
   @IsOptional()
@@ -52,7 +49,7 @@ export class UpdateAdvertisementDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayNotEmpty()
+  @ArrayNotEmpty()  
   @IsString({ each: true })
   imageUrls?: string[];
 

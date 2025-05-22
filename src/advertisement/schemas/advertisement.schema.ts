@@ -34,17 +34,19 @@ export class Advertisement extends Document {
   @Prop({ required: true })
   district: string;
 
-  @Prop({ type: String, ref: 'User', required: false })
-  createdBy: User;
 
   @Prop({ required: false, default: false })
   isApproved: boolean;
 
-  @Prop({ type: String, ref: 'User', required: false })
-  approvedBy: User;
+ @Prop({ type: Types.ObjectId, ref: 'Category', required: true })
+category: Types.ObjectId;
 
-  @Prop({ type: CategorySchema, required: true })
-  category: Category;
+@Prop({ type: Types.ObjectId, ref: 'User', required: false })
+createdBy: Types.ObjectId;
+
+@Prop({ type: Types.ObjectId, ref: 'User', required: false })
+approvedBy: Types.ObjectId;
+
 
   // The vehicle reference is no longer marked as required here.
   // It will be conditionally validated in the custom pre-validation hook.

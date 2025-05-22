@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Advertisement } from './schemas/advertisement.schema';
 import { User } from '../users/schemas/user.schema';
 import { Category } from 'src/category/schemas/category.schema';
@@ -9,6 +9,8 @@ import { Property } from 'src/property/schemas/schema.property';
 import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { ADSTATUS } from './enums/advertisement.enum';
+import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
+import { NotFoundException } from '@nestjs/common/exceptions';
 
 @Injectable()
 export class AdvertisementsService {
@@ -164,9 +166,35 @@ export class AdvertisementsService {
     return advertisements;
   }
 
-  // ✅ Get a single advertisement by ID
-  async findOne(id: string) {}
+   async findOne(id: string): Promise<Advertisement> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Invalid Advertisement ID');
+    }
+
+    const advertisement = await this.advertisementModel.findById(id).exec();
+    if (!advertisement) {
+      throw new NotFoundException('Advertisement not found');
+    }
+    return advertisement;
+  }
+
 
   // ✅ Update an advertisement (Only allows modification by the creator)
-  async update() {}
+   async update(
+  id: string,
+  updateAdvertisementDto: UpdateAdvertisementDto,
+  userId: string,
+): Promise<Advertisement> {
+  const updated = await this.advertisementModel.findOneAndUpdate(
+    { _id: id, createdBy: userId },
+    { $set: updateAdvertisementDto },
+    { new: true, runValidators: true },
+  );
+
+  if (!updated) {
+    throw new NotFoundException('Advertisement not found or not authorized to update');
+  }
+
+  return updated;
+}
 }

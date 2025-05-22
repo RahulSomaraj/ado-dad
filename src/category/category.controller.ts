@@ -34,7 +34,7 @@ export class CategoryController {
   @Post()
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(UserRole.Admin)
-  @ApiBearerAuth()
+  // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
   async create(

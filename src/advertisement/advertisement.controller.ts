@@ -19,6 +19,7 @@ import {
   ApiResponse,
   ApiQuery,
   ApiBearerAuth,
+  ApiParam,
 } from '@nestjs/swagger';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { FindAdvertisementsDto } from './dto/get-advertisement.dto';
@@ -27,6 +28,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { UserType } from 'src/users/enums/user.types';
 import { RolesGuard } from 'src/roles/roles.guard';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
+import { Advertisement } from './schemas/advertisement.schema';
 
 @ApiTags('Advertisements')
 @Controller('advertisements')
@@ -70,20 +72,19 @@ export class AdvertisementsController {
     return this.advertisementService.findOne(id);
   }
 
-  // ✅ Update advertisement by ID
-  // @Put(':id')
-  // @ApiOperation({ summary: 'Update advertisement by ID' })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Advertisement updated successfully.',
-  // })
-  // async update(
-  //   @Param('id') id: string,
-  //   @Body() updateAdvertisementDto: UpdateAdvertisementDto,
-  //   @Query('userId') userId: string,
-  // ) {
-  //   return this.advertisementService.update(id, updateAdvertisementDto, userId);
-  // }
+@Put(':id')
+@ApiBearerAuth()
+@ApiOperation({ summary: 'Update advertisement (only by owner)' })
+@ApiResponse({ status: 200, description: 'Advertisement updated successfully.' })
+@ApiResponse({ status: 404, description: 'Not found or unauthorized' })
+async update(
+  @Param('id') id: string,
+  @Body() updateAdvertisementDto: UpdateAdvertisementDto,
+  @Request() req,
+) {
+  const { user } = req;
+  return this.advertisementService.update(id, updateAdvertisementDto, user._id);
+}
 
   // ✅ Delete advertisement by ID
   // @Delete(':id')
@@ -95,4 +96,5 @@ export class AdvertisementsController {
   // async remove(@Param('id') id: string, @Query('userId') userId: string) {
   //   return this.advertisementService.remove(id, userId);
   // }
+
 }
