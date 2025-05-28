@@ -105,13 +105,13 @@ export class UpdateAdvertisementDto {
     description: 'Name of user who posted the ad ',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @ApiPropertyOptional({
     description: 'Phonenumber of user who posted the ad ',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   phoneNumber: string;
 }
