@@ -19,6 +19,12 @@ export class Advertisement extends Document {
   @Prop({ required: true })
   description: string;
 
+  @Prop({ required: false })
+  name: string;
+
+  @Prop({ required: false })
+  phoneNumber: string;
+
   @Prop({ required: true, min: 0 })
   price: number;
 

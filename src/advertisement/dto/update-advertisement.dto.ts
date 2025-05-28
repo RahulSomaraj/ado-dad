@@ -98,6 +98,20 @@ export class UpdateAdvertisementDto {
     description: 'District where the advertisement is posted',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   district: string;
+
+  @ApiPropertyOptional({
+    description: 'Name of user who posted the ad ',
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'Phonenumber of user who posted the ad ',
+  })
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
 }
