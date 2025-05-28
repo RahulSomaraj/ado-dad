@@ -8,6 +8,7 @@ import {
   IsString,
   ArrayNotEmpty,
   ValidateIf,
+  IsNotEmpty,
 } from 'class-validator';
 import { FuelType, VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 import { AdvertisementType } from './create-advertisement.dto';
@@ -49,7 +50,7 @@ export class UpdateAdvertisementDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayNotEmpty()  
+  @ArrayNotEmpty()
   @IsString({ each: true })
   imageUrls?: string[];
 
@@ -92,4 +93,11 @@ export class UpdateAdvertisementDto {
   @IsOptional()
   @IsEnum(FuelType)
   fuelType?: FuelType;
+
+  @ApiPropertyOptional({
+    description: 'District where the advertisement is posted',
+  })
+  @IsString()
+  @IsNotEmpty()
+  district: string;
 }

@@ -61,7 +61,7 @@ export class AdvertisementsController {
   @Get()
   @ApiOperation({ summary: 'Retrieve advertisements based on query filters' })
   findAll(@Query() query: FindAdvertisementsDto) {
-    return this.advertisementService.findVehicleAdv(query);
+    return this.advertisementService.findVehicleAdvertisements(query);
   }
 
   // ✅ Get advertisement by ID
@@ -72,19 +72,26 @@ export class AdvertisementsController {
     return this.advertisementService.findOne(id);
   }
 
-@Put(':id')
-@ApiBearerAuth()
-@ApiOperation({ summary: 'Update advertisement (only by owner)' })
-@ApiResponse({ status: 200, description: 'Advertisement updated successfully.' })
-@ApiResponse({ status: 404, description: 'Not found or unauthorized' })
-async update(
-  @Param('id') id: string,
-  @Body() updateAdvertisementDto: UpdateAdvertisementDto,
-  @Request() req,
-) {
-  const { user } = req;
-  return this.advertisementService.update(id, updateAdvertisementDto, user._id);
-}
+  @Put(':id')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update advertisement (only by owner)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement updated successfully.',
+  })
+  @ApiResponse({ status: 404, description: 'Not found or unauthorized' })
+  async update(
+    @Param('id') id: string,
+    @Body() updateAdvertisementDto: UpdateAdvertisementDto,
+    @Request() req,
+  ) {
+    const { user } = req;
+    return this.advertisementService.update(
+      id,
+      updateAdvertisementDto,
+      user._id,
+    );
+  }
 
   // ✅ Delete advertisement by ID
   // @Delete(':id')
@@ -96,5 +103,4 @@ async update(
   // async remove(@Param('id') id: string, @Query('userId') userId: string) {
   //   return this.advertisementService.remove(id, userId);
   // }
-
 }

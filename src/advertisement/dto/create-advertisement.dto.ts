@@ -52,21 +52,6 @@ export class CreateAdvertisementDto {
   @Min(0, { message: 'Price must be at least 0.' })
   price: number;
 
-  @ApiProperty({ description: 'State where the advertisement is posted' })
-  @IsString()
-  @IsNotEmpty()
-  state: string;
-
-  @ApiProperty({ description: 'City where the advertisement is posted' })
-  @IsString()
-  @IsNotEmpty()
-  city: string;
-
-  @ApiProperty({ description: 'City where the advertisement is posted' })
-  @IsString()
-  @IsNotEmpty()
-  district: string;
-
   @ApiProperty({
     description: 'Category ID for the advertisement',
     example: '609c1d1f4f1a2561d8e6b789',

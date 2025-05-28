@@ -27,72 +27,73 @@ export class AdvertisementsService {
     createAdvertisementDto: CreateAdvertisementDto,
     user: User,
   ): Promise<Advertisement> {
-    const category = await this.categoryModel.findOne({
-      _id: createAdvertisementDto.category,
-    });
-    if (!category) {
+    try {
+      const category = await this.categoryModel
+        .findById(createAdvertisementDto.category)
+        .exec();
+
+      if (!category) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'Category not found',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const advertisement = new this.advertisementModel({
+        adTitle: 'Dummy', // You can update this to dynamic title if needed
+        type: createAdvertisementDto.type,
+        description: createAdvertisementDto.description,
+        price: createAdvertisementDto.price,
+        isApproved: false,
+        category,
+        createdBy: user,
+        adStatus: ADSTATUS.AD_CREATED,
+      });
+
+      return await advertisement.save();
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       throw new HttpException(
         {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Category instance not found',
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to create advertisement',
+          message: error?.message || 'Unknown error occurred',
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    const advertisement = new this.advertisementModel({
-      adTitle: 'Dummy',
-      type: createAdvertisementDto.type,
-      description: createAdvertisementDto.description,
-      price: createAdvertisementDto.price,
-      state: createAdvertisementDto.state,
-      city: createAdvertisementDto.city,
-      district: createAdvertisementDto.district,
-      // Set default value for isApproved if not provided
-      isApproved: false,
-      category: category,
-      createdBy: user,
-      adStatus: ADSTATUS.AD_CREATED,
-    });
-
-    // Save the advertisement document to the database.
-    const savedAd = await advertisement.save();
-
-    // Return the saved advertisement.
-    return savedAd;
   }
 
-  async findVehicleAdv(findDto: FindAdvertisementsDto) {
+  async findVehicleAdvertisements(findDto: FindAdvertisementsDto) {
     const query: any = {};
+    const vehicleAdv = findDto.vehicleAdv;
 
-    // Top-level filters
-    if (findDto.vehicleAdv?.vendor) {
-      query.vendor = findDto.vehicleAdv?.vendor;
+    // 1. Top-Level Filters
+    if (vehicleAdv?.vendor) {
+      query.vendor = vehicleAdv.vendor;
     }
 
-    if (findDto.vehicleAdv?.name) {
-      // Case-insensitive regex search for brand name
-      query.name = { $regex: findDto.vehicleAdv?.name, $options: 'i' };
+    if (vehicleAdv?.name) {
+      query.name = { $regex: vehicleAdv.name, $options: 'i' };
     }
 
-    if (findDto.vehicleAdv?.modelName) {
-      // Case-insensitive regex search for top-level modelName
-      query.modelName = {
-        $regex: findDto.vehicleAdv?.modelName,
-        $options: 'i',
-      };
+    if (vehicleAdv?.modelName) {
+      query.modelName = { $regex: vehicleAdv.modelName, $options: 'i' };
     }
 
-    // Filter by modelYear stored in the nested "details" sub-document
-    if (
-      findDto.vehicleAdv?.modelYear &&
-      findDto.vehicleAdv?.modelYear !== undefined
-    ) {
-      query['details.modelYear'] = findDto.vehicleAdv?.modelYear;
+    if (vehicleAdv?.modelYear) {
+      query['details.modelYear'] = vehicleAdv.modelYear;
     }
 
-    // Nested vehicle model filters
-    if (findDto.vehicleAdv?.vehicleModel) {
-      const vm = findDto.vehicleAdv?.vehicleModel;
+    // 2. Nested vehicleModel Filters
+    const vm = vehicleAdv?.vehicleModel;
+    if (vm) {
       if (vm.name) {
         query['vehicleModel.name'] = { $regex: vm.name, $options: 'i' };
       }
@@ -114,20 +115,15 @@ export class AdvertisementsService {
       if (vm.transmissionType) {
         query['vehicleModel.transmissionType'] = vm.transmissionType;
       }
-      // Additional info filter inside the vehicle model
-      if (vm.additionalInfo) {
-        const addInfo = vm.additionalInfo;
-        if (addInfo.color) {
-          query['vehicleModel.additionalInfo.color'] = {
-            $regex: addInfo.color,
-            $options: 'i',
-          };
-        }
+      if (vm.additionalInfo?.color) {
+        query['vehicleModel.additionalInfo.color'] = {
+          $regex: vm.additionalInfo.color,
+          $options: 'i',
+        };
       }
     }
 
-    // Optional: Add a generic search that spans multiple fields (if needed)
-    // For example, to search across the top-level name, modelName, and vehicleModel.name:
+    // 3. Generic Search
     if (findDto.search) {
       query.$or = [
         { name: { $regex: findDto.search, $options: 'i' } },
@@ -136,37 +132,48 @@ export class AdvertisementsService {
       ];
     }
 
-    // Apply pagination if provided
-    const page = findDto?.page || 1;
-    const limit = findDto?.limit || 10;
+    // 4. Price Range
+    if (findDto.minPrice !== undefined || findDto.maxPrice !== undefined) {
+      query.price = {};
+      if (findDto.minPrice !== undefined) {
+        query.price.$gte = findDto.minPrice;
+      }
+      if (findDto.maxPrice !== undefined) {
+        query.price.$lte = findDto.maxPrice;
+      }
+    }
+
+    // 5. Pagination
+    const page = Math.max(1, findDto.page || 1);
+    const limit = Math.max(1, findDto.limit || 10);
     const skip = (page - 1) * limit;
 
-    // You can also limit the fields returned.
-    // For example, to return only vendor, name, modelName, details, and select vehicleModel fields:
+    // 6. Projection
     const projection = {
-      vendor: 1,
-      name: 1,
-      modelName: 1,
-      'details.modelYear': 1,
-      'details.month': 1,
-      'vehicleModel.name': 1,
-      'vehicleModel.modelName': 1,
-      'vehicleModel.fuelType': 1,
-      'vehicleModel.transmissionType': 1,
-      'vehicleModel.additionalInfo.color': 1,
+      adTitle: 1,
+      description: 1,
+      price: 1,
+      imageUrls: 1,
+      type: 1,
+      city: 1,
+      district: 1,
+      state: 1,
+      isApproved: 1,
+      createdAt: 1,
+      vehicle: 1, // Include entire embedded vehicle object
+      property: 1, // Include entire embedded property object
     };
 
-    const advertisements = await this.advertisementModel
+    // 7. Execute and return results
+    return this.advertisementModel
       .find(query)
       .select(projection)
       .skip(skip)
       .limit(limit)
       .exec();
-
-    return advertisements;
   }
 
-   async findOne(id: string): Promise<Advertisement> {
+  async findOne(id: string): Promise<Advertisement> {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Invalid Advertisement ID');
     }
@@ -178,23 +185,80 @@ export class AdvertisementsService {
     return advertisement;
   }
 
+  async update(
+    id: string,
+    updateDto: UpdateAdvertisementDto,
+    userId: string,
+  ): Promise<Advertisement> {
+    try {
+      // Validate advertisement ID
+      if (!Types.ObjectId.isValid(id)) {
+        throw new HttpException(
+          { status: HttpStatus.BAD_REQUEST, error: 'Invalid Advertisement ID' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
-  // ✅ Update an advertisement (Only allows modification by the creator)
-   async update(
-  id: string,
-  updateAdvertisementDto: UpdateAdvertisementDto,
-  userId: string,
-): Promise<Advertisement> {
-  const updated = await this.advertisementModel.findOneAndUpdate(
-    { _id: id, createdBy: userId },
-    { $set: updateAdvertisementDto },
-    { new: true, runValidators: true },
-  );
+      // Find the advertisement created by this user
+      const advertisement = await this.advertisementModel.findOne({
+        _id: id,
+        createdBy: userId,
+      });
 
-  if (!updated) {
-    throw new NotFoundException('Advertisement not found or not authorized to update');
+      if (!advertisement) {
+        throw new HttpException(
+          {
+            status: HttpStatus.NOT_FOUND,
+            error: 'Advertisement not found or not authorized to update',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Scalar and directly assignable fields
+      const fieldsToUpdate: (keyof UpdateAdvertisementDto)[] = [
+        'type',
+        'modelType',
+        'adTitle',
+        'description',
+        'price',
+        'imageUrls',
+        'state',
+        'city',
+        'district',
+        'fuelType',
+      ];
+
+      for (const field of fieldsToUpdate) {
+        if (updateDto[field] !== undefined) {
+          (advertisement[field] as any) = updateDto[field];
+        }
+      }
+
+      // Validate and update category if provided
+      if (updateDto.category !== undefined) {
+        const category = await this.categoryModel.findById(updateDto.category);
+        if (!category) {
+          throw new HttpException(
+            { status: HttpStatus.BAD_REQUEST, error: 'Category not found' },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        advertisement.category = category._id as Types.ObjectId;
+      }
+
+      const updatedAd = await advertisement.save();
+      return updatedAd;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to update advertisement',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
-
-  return updated;
-}
 }
