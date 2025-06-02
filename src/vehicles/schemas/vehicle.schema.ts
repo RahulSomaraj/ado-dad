@@ -132,8 +132,12 @@ export class Vehicle extends Document {
   @Prop({ type: [VehicleModelSchema], default: [] })
   vehicleModels?: VehicleModel[];
 
-  @Prop()
-  deletedAt?: Date;
+  @Prop({ type: Date, default: null })
+  deletedAt: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  isDeleted: boolean;
+
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

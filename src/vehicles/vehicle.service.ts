@@ -17,7 +17,9 @@ export class VehicleService {
   ) {}
 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-    const filter: any = {};
+    const filter: any = {
+       deletedAt: null,
+    };
   
     // Top-level filters
     if (findDto.name) {
