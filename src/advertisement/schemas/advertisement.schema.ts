@@ -19,34 +19,38 @@ export class Advertisement extends Document {
   @Prop({ required: true })
   description: string;
 
+  @Prop({ required: false })
+  name: string;
+
+  @Prop({ required: false })
+  phoneNumber: string;
+
   @Prop({ required: true, min: 0 })
   price: number;
 
   @Prop({ type: [String], required: true })
   imageUrls: string[];
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 'Pending' })
   state: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 'Pending' })
   city: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 'Pending' })
   district: string;
-
 
   @Prop({ required: false, default: false })
   isApproved: boolean;
 
- @Prop({ type: Types.ObjectId, ref: 'Category', required: true })
-category: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Category', required: true })
+  category: Types.ObjectId;
 
-@Prop({ type: Types.ObjectId, ref: 'User', required: false })
-createdBy: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  createdBy: Types.ObjectId;
 
-@Prop({ type: Types.ObjectId, ref: 'User', required: false })
-approvedBy: Types.ObjectId;
-
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  approvedBy: Types.ObjectId;
 
   // The vehicle reference is no longer marked as required here.
   // It will be conditionally validated in the custom pre-validation hook.

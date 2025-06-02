@@ -95,8 +95,7 @@ export class Property extends Document {
   carParking: number;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
- owner: Types.ObjectId;
-
+  owner: Types.ObjectId;
 
   @Prop({
     enum: [
