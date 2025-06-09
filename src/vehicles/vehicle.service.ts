@@ -6,7 +6,7 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
-import { VehicleTypes } from './enum/vehicle.type';
+import { VehicleTypes, WheelerType } from './enum/vehicle.type';
 
 @Injectable()
 export class VehicleService {
@@ -200,6 +200,7 @@ export class VehicleService {
       name: createVehicleDto.name,
       modelName: createVehicleDto.modelName,
       modelType: createVehicleDto.modelType || VehicleTypes.SEDAN,
+      wheelerType: createVehicleDto.wheelerType || WheelerType.FOUR_WHEELER,
       details: createVehicleDto.details,
       vendor: createVehicleDto.vendor,
       vehicleModels: createVehicleDto.vehicleModels,
