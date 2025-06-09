@@ -1,9 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Vehicle } from './schemas/vehicle.schema';
+import { Vehicle, VehicleDocument } from './schemas/vehicle.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { VehicleCompany } from 'src/vehicle-company/schemas/schema.vehicle-company';
+import { VehicleCompany, VehicleCompanyDocument } from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
 import { VehicleTypes, WheelerType } from './enum/vehicle.type';
@@ -11,112 +11,113 @@ import { VehicleTypes, WheelerType } from './enum/vehicle.type';
 @Injectable()
 export class VehicleService {
   constructor(
-    @InjectModel(Vehicle.name) private vehicleModel: Model<Vehicle>,
+    @InjectModel(Vehicle.name) private vehicleModel: Model<VehicleDocument>,
     @InjectModel(VehicleCompany.name)
-    private vehicleCompanyModel: Model<VehicleCompany>,
+    private vehicleCompanyModel: Model<VehicleCompanyDocument>,
   ) {}
 
+
+ 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-  const filter: any = {
-    deletedAt: null,
-  };
+    const filter: any = {
+      deletedAt: null,
+    };
 
-  // Top-level filters
-  if (findDto.name?.trim()) {
-    filter.name = { $regex: findDto.name.trim(), $options: 'i' };
-  }
+    // Top-level brand name
+    if (findDto.name?.trim()) {
+      filter.name = { $regex: findDto.name.trim(), $options: 'i' };
+    }
 
-  if (findDto.modelYear) {
-    filter['details.modelYear'] = findDto.modelYear;
-  }
+    // Year and month from 'details'
+    if (findDto.modelYear) {
+      filter['details.modelYear'] = findDto.modelYear;
+    }
 
-  if (findDto.month?.trim()) {
-    filter['details.month'] = { $regex: findDto.month.trim(), $options: 'i' };
-  }
+    if (findDto.month?.trim()) {
+      filter['details.month'] = { $regex: findDto.month.trim(), $options: 'i' };
+    }
 
-  if (findDto.vendor) {
-    filter.vendor = findDto.vendor;
-  }
-
-  // Consolidated $elemMatch filter for vehicleModels
-  if (findDto.vehicleModel) {
-    const vmQuery: any = {};
-
-    if (findDto.vehicleModel.modelName?.trim()) {
-      vmQuery.modelName = {
-        $regex: findDto.vehicleModel.modelName.trim(),
-        $options: 'i',
+    // modelName at top level
+    if (findDto.modelName?.trim()) {
+      filter.vehicleModels = {
+        $elemMatch: {
+          modelName: {
+            $regex: `^${escapeRegex(findDto.modelName.trim())}$`,
+            $options: 'i',
+          },
+        },
       };
     }
 
-    if (findDto.vehicleModel.name?.trim()) {
-      vmQuery.name = {
-        $regex: findDto.vehicleModel.name.trim(),
-        $options: 'i',
-      };
-    }
+    // Nested vehicleModel filters
+    if (findDto.vehicleModel) {
+      const vmFilter: any = {};
 
-    if (findDto.vehicleModel.fuelType) {
-      vmQuery.fuelType = findDto.vehicleModel.fuelType;
-    }
+      if (findDto.vehicleModel.modelName?.trim()) {
+        vmFilter.modelName = {
+          $regex: `^${escapeRegex(findDto.vehicleModel.modelName.trim())}$`,
+          $options: 'i',
+        };
+      }
 
-    if (findDto.vehicleModel.transmissionType) {
-      vmQuery.transmissionType = findDto.vehicleModel.transmissionType;
-    }
+      if (findDto.vehicleModel.name?.trim()) {
+        vmFilter.name = { $regex: findDto.vehicleModel.name.trim(), $options: 'i' };
+      }
 
-    if (findDto.vehicleModel.mileage?.trim()) {
-      vmQuery.mileage = {
-        $regex: findDto.vehicleModel.mileage.trim(),
-        $options: 'i',
-      };
-    }
+      if (findDto.vehicleModel.fuelType) {
+        vmFilter.fuelType = findDto.vehicleModel.fuelType;
+      }
 
-    // Additional Info
-    if (findDto.vehicleModel.additionalInfo) {
-      const additionalInfoQuery: any = {};
-      const info = findDto.vehicleModel.additionalInfo;
+      if (findDto.vehicleModel.transmissionType) {
+        vmFilter.transmissionType = findDto.vehicleModel.transmissionType;
+      }
 
-      if (info.abs !== undefined) additionalInfoQuery.abs = info.abs;
-      if (info.airConditioning !== undefined)
-        additionalInfoQuery.airConditioning = info.airConditioning;
-      if (info.bluetooth !== undefined)
-        additionalInfoQuery.bluetooth = info.bluetooth;
-      // Add other fields as needed...
+      if (findDto.vehicleModel.mileage?.trim()) {
+        vmFilter.mileage = { $regex: findDto.vehicleModel.mileage.trim(), $options: 'i' };
+      }
 
-      if (Object.keys(additionalInfoQuery).length > 0) {
-        vmQuery.additionalInfo = additionalInfoQuery;
+      if (findDto.vehicleModel.additionalInfo) {
+        for (const [key, value] of Object.entries(findDto.vehicleModel.additionalInfo)) {
+          if (value !== undefined && value !== null) {
+            vmFilter[`additionalInfo.${key}`] = value;
+          }
+        }
+      }
+
+      if (Object.keys(vmFilter).length > 0) {
+        if (filter.vehicleModels) {
+          filter.$and = [
+            { vehicleModels: filter.vehicleModels },
+            { vehicleModels: { $elemMatch: vmFilter } },
+          ];
+          delete filter.vehicleModels;
+        } else {
+          filter.vehicleModels = { $elemMatch: vmFilter };
+        }
       }
     }
 
-    if (Object.keys(vmQuery).length > 0) {
-      filter.vehicleModels = { $elemMatch: vmQuery };
+    // Optional vendor filter
+    if (findDto.vendor) {
+      filter.vendor = findDto.vendor;
     }
+
+    // Pagination
+    const page = findDto.page && findDto.page > 0 ? findDto.page : 1;
+    const limit = findDto.limit && findDto.limit > 0 ? findDto.limit : 10;
+    const skip = (page - 1) * limit;
+
+    // Sorting
+    const sortObj: any = {};
+    if (findDto.sort) {
+      const [field, order] = findDto.sort.split(':');
+      sortObj[field] = order === 'desc' ? -1 : 1;
+    }
+
+    console.log('Final filter:', JSON.stringify(filter, null, 2));
+
+    return this.vehicleModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec();
   }
-
-  // Pagination
-  const page = findDto.page || 1;
-  const limit = findDto.limit || 10;
-  const skip = (page - 1) * limit;
-
-  // Sorting
-  const sort: any = {};
-  if (findDto.sort) {
-    const [field, direction] = findDto.sort.split(':');
-    sort[field] = direction === 'asc' ? 1 : -1;
-  } else {
-    sort.createdAt = -1; // Default: latest first
-  }
-
-  console.log('Final Filter:', JSON.stringify(filter, null, 2));
-
-  return this.vehicleModel
-    .find(filter)
-    .skip(skip)
-    .limit(limit)
-    .sort(sort)
-    .populate('vendor')
-    .exec();
-}
 
   
   async getVehicleById(id: string): Promise<Vehicle> {
@@ -333,3 +334,11 @@ export class VehicleService {
     return vehicle.save();
   }
 }
+
+
+// Utility to escape special regex characters
+function escapeRegex(text: string): string {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
+  

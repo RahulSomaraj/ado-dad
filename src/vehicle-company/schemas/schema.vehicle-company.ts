@@ -2,6 +2,8 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { WheelerType } from 'src/vehicles/enum/vehicle.type';
 
+export type VehicleCompanyDocument = VehicleCompany & Document;
+
 @Schema({ timestamps: true })
 export class VehicleCompany extends Document {
   @Prop({ required: true })

@@ -10,12 +10,12 @@ import {
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Vehicle.name, schema: VehicleSchema }]),
     MongooseModule.forFeature([
+      { name: Vehicle.name, schema: VehicleSchema },
       { name: VehicleCompany.name, schema: VehicleCompanySchema },
     ]),
   ],
-  controllers: [VehicleController],
   providers: [VehicleService],
+  controllers: [VehicleController],
 })
 export class VehicleModule {}

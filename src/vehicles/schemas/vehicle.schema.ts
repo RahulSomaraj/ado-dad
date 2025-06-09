@@ -7,6 +7,11 @@ import {
   WheelerType,
 } from '../enum/vehicle.type';
 
+
+
+export type VehicleDocument = Vehicle & Document;
+
+
 @Schema({ _id: false })
 export class VehicleDetails {
   @Prop({ required: true })
