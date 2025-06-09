@@ -17,84 +17,107 @@ export class VehicleService {
   ) {}
 
   async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-    const filter: any = {
-       deletedAt: null,
-    };
-  
-    // Top-level filters
-    if (findDto.name) {
-      filter.name = { $regex: findDto.name, $options: 'i' };
+  const filter: any = {
+    deletedAt: null,
+  };
+
+  // Top-level filters
+  if (findDto.name?.trim()) {
+    filter.name = { $regex: findDto.name.trim(), $options: 'i' };
+  }
+
+  if (findDto.modelYear) {
+    filter['details.modelYear'] = findDto.modelYear;
+  }
+
+  if (findDto.month?.trim()) {
+    filter['details.month'] = { $regex: findDto.month.trim(), $options: 'i' };
+  }
+
+  if (findDto.vendor) {
+    filter.vendor = findDto.vendor;
+  }
+
+  // Consolidated $elemMatch filter for vehicleModels
+  if (findDto.vehicleModel) {
+    const vmQuery: any = {};
+
+    if (findDto.vehicleModel.modelName?.trim()) {
+      vmQuery.modelName = {
+        $regex: findDto.vehicleModel.modelName.trim(),
+        $options: 'i',
+      };
     }
-    if (findDto.modelName) {
-      filter.modelName = { $regex: findDto.modelName, $options: 'i' };
+
+    if (findDto.vehicleModel.name?.trim()) {
+      vmQuery.name = {
+        $regex: findDto.vehicleModel.name.trim(),
+        $options: 'i',
+      };
     }
-    if (findDto.modelYear) {
-      filter['details.modelYear'] = findDto.modelYear;
+
+    if (findDto.vehicleModel.fuelType) {
+      vmQuery.fuelType = findDto.vehicleModel.fuelType;
     }
-    if (findDto.month) {
-      filter['details.month'] = { $regex: findDto.month, $options: 'i' };
+
+    if (findDto.vehicleModel.transmissionType) {
+      vmQuery.transmissionType = findDto.vehicleModel.transmissionType;
     }
-  
-    // Vendor filter
-    if (findDto.vendor) {
-      filter.vendor = findDto.vendor;
+
+    if (findDto.vehicleModel.mileage?.trim()) {
+      vmQuery.mileage = {
+        $regex: findDto.vehicleModel.mileage.trim(),
+        $options: 'i',
+      };
     }
-  
-    // Nested filter for vehicleModels using $elemMatch if provided
-    if (findDto.vehicleModel) {
-      const vmQuery: any = {};
-      if (findDto.vehicleModel.name) {
-        vmQuery.name = { $regex: findDto.vehicleModel.name, $options: 'i' };
+
+    // Additional Info
+    if (findDto.vehicleModel.additionalInfo) {
+      const additionalInfoQuery: any = {};
+      const info = findDto.vehicleModel.additionalInfo;
+
+      if (info.abs !== undefined) additionalInfoQuery.abs = info.abs;
+      if (info.airConditioning !== undefined)
+        additionalInfoQuery.airConditioning = info.airConditioning;
+      if (info.bluetooth !== undefined)
+        additionalInfoQuery.bluetooth = info.bluetooth;
+      // Add other fields as needed...
+
+      if (Object.keys(additionalInfoQuery).length > 0) {
+        vmQuery.additionalInfo = additionalInfoQuery;
       }
-      if (findDto.vehicleModel.modelName) {
-        vmQuery.modelName = {
-          $regex: findDto.vehicleModel.modelName,
-          $options: 'i',
-        };
-      }
-      if (findDto.vehicleModel.fuelType) {
-        vmQuery.fuelType = findDto.vehicleModel.fuelType;
-      }
-      if (findDto.vehicleModel.transmissionType) {
-        vmQuery.transmissionType = findDto.vehicleModel.transmissionType;
-      }
-      if (findDto.vehicleModel.mileage) {
-        vmQuery.mileage = {
-          $regex: findDto.vehicleModel.mileage,
-          $options: 'i',
-        };
-      }
-      // Additional nested filter for additionalInfo
-      if (findDto.vehicleModel.additionalInfo) {
-        const additionalInfoQuery: any = {};
-        if (findDto.vehicleModel.additionalInfo.abs !== undefined) {
-          additionalInfoQuery.abs = findDto.vehicleModel.additionalInfo.abs;
-        }
-        // Add additional additionalInfo filters as needed.
-        if (Object.keys(additionalInfoQuery).length > 0) {
-          vmQuery.additionalInfo = additionalInfoQuery;
-        }
-      }
+    }
+
+    if (Object.keys(vmQuery).length > 0) {
       filter.vehicleModels = { $elemMatch: vmQuery };
     }
-  
-    // Pagination
-    const page = findDto.page || 1;
-    const limit = findDto.limit || 10;
-    const skip = (page - 1) * limit;
-  
-    // Sorting
-    const sortOrder = findDto.sort === 'asc' ? 1 : -1; // Default: Descending
-    console.log(filter);
-  
-    return this.vehicleModel
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
-      .sort({ createdAt: sortOrder }) // <-- Sorting added here
-      .populate('vendor')
-      .exec();
   }
+
+  // Pagination
+  const page = findDto.page || 1;
+  const limit = findDto.limit || 10;
+  const skip = (page - 1) * limit;
+
+  // Sorting
+  const sort: any = {};
+  if (findDto.sort) {
+    const [field, direction] = findDto.sort.split(':');
+    sort[field] = direction === 'asc' ? 1 : -1;
+  } else {
+    sort.createdAt = -1; // Default: latest first
+  }
+
+  console.log('Final Filter:', JSON.stringify(filter, null, 2));
+
+  return this.vehicleModel
+    .find(filter)
+    .skip(skip)
+    .limit(limit)
+    .sort(sort)
+    .populate('vendor')
+    .exec();
+}
+
   
   async getVehicleById(id: string): Promise<Vehicle> {
     const vehicle = await this.vehicleModel
