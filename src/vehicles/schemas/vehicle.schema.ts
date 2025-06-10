@@ -61,10 +61,10 @@ export const AdditionalInfoSchema =
 
 @Schema({ _id: false })
 export class VehicleModel {
-  @Prop({ required: true })
+  @Prop({ required: false })
   name: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   modelName: string;
 
   @Prop()

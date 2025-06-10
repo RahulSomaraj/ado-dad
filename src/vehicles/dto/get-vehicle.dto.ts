@@ -179,21 +179,21 @@ export class FindAdditionalInfoDto {
  * Filters for properties inside a vehicle model.
  */
 export class FindVehicleModelDto {
-  @ApiPropertyOptional({
-    example: 'Model X',
-    description: 'Vehicle model variant name',
-  })
-  @IsOptional()
-  @IsString()
-  name?: string;
+  // @ApiPropertyOptional({
+  //   example: 'Model X',
+  //   description: 'Vehicle model variant name',
+  // })
+  // @IsOptional()
+  // @IsString()
+  // name?: string;
 
-  @ApiPropertyOptional({
-    example: 'X1',
-    description: 'Vehicle model code/name',
-  })
-  @IsOptional()
-  @IsString()
-  modelName?: string;
+  // @ApiPropertyOptional({
+  //   example: 'X1',
+  //   description: 'Vehicle model code/name',
+  // })
+  // @IsOptional()
+  // @IsString()
+  // modelName?: string;
 
   @ApiPropertyOptional({
     example: 'Latest model details',

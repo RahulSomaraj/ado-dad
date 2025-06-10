@@ -53,16 +53,16 @@ export class VehicleService {
     if (findDto.vehicleModel) {
       const vmFilter: any = {};
 
-      if (findDto.vehicleModel.modelName?.trim()) {
-        vmFilter.modelName = {
-          $regex: `^${escapeRegex(findDto.vehicleModel.modelName.trim())}$`,
-          $options: 'i',
-        };
-      }
+      // if (findDto.vehicleModel.modelName?.trim()) {
+      //   vmFilter.modelName = {
+      //     $regex: `^${escapeRegex(findDto.vehicleModel.modelName.trim())}$`,
+      //     $options: 'i',
+      //   };
+      // }
 
-      if (findDto.vehicleModel.name?.trim()) {
-        vmFilter.name = { $regex: findDto.vehicleModel.name.trim(), $options: 'i' };
-      }
+      // if (findDto.vehicleModel.name?.trim()) {
+      //   vmFilter.name = { $regex: findDto.vehicleModel.name.trim(), $options: 'i' };
+      // }
 
       if (findDto.vehicleModel.fuelType) {
         vmFilter.fuelType = findDto.vehicleModel.fuelType;
