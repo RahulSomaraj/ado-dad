@@ -24,8 +24,15 @@ export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Search vehicles with filters and pagination' })
-  async findVehicles(@Query() query: FindVehicleDto) {
+  @ApiQuery({ name: 'name', required: false, description: 'Vehicle company name' })
+  @ApiQuery({ name: 'modelYear', required: false, description: 'Model year', type: Number })
+  @ApiQuery({ name: 'month', required: false, description: 'Month of manufacture' })
+  @ApiQuery({ name: 'modelName', required: false, description: 'Model name inside vehicleModels' })
+  @ApiQuery({ name: 'vendor', required: false, description: 'Vendor ID or name' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number', type: Number })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: Number })
+  @ApiQuery({ name: 'sort', required: false, description: 'Sort format: field:asc|desc' })
+  async findAll(@Query() query: any) {
     return this.vehicleService.findVehicles(query);
   }
 
@@ -33,7 +40,8 @@ export class VehicleController {
   @ApiResponse({ status: 200, description: 'Vehicle found' })
   @ApiResponse({ status: 404, description: 'Vehicle not found' })
   async getVehicleById(@Param('id') id: string) {
-    return this.vehicleService.getVehicleById(id);
+    return this
+    .vehicleService.getVehicleById(id);
   }
   @Post()
   @ApiOperation({ summary: 'Create a vehicle' })

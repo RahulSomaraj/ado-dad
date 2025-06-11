@@ -18,106 +18,63 @@ export class VehicleService {
 
 
  
-  async findVehicles(findDto: FindVehicleDto): Promise<Vehicle[]> {
-    const filter: any = {
-      deletedAt: null,
-    };
+  async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
+  const filter: any = {
+    deletedAt: null,
+  };
 
-    // Top-level brand name
-    if (findDto.name?.trim()) {
-      filter.name = { $regex: findDto.name.trim(), $options: 'i' };
-    }
-
-    // Year and month from 'details'
-    if (findDto.modelYear) {
-      filter['details.modelYear'] = findDto.modelYear;
-    }
-
-    if (findDto.month?.trim()) {
-      filter['details.month'] = { $regex: findDto.month.trim(), $options: 'i' };
-    }
-
-    // modelName at top level
-    if (findDto.modelName?.trim()) {
-      filter.vehicleModels = {
-        $elemMatch: {
-          modelName: {
-            $regex: `^${escapeRegex(findDto.modelName.trim())}$`,
-            $options: 'i',
-          },
-        },
-      };
-    }
-
-    // Nested vehicleModel filters
-    if (findDto.vehicleModel) {
-      const vmFilter: any = {};
-
-      // if (findDto.vehicleModel.modelName?.trim()) {
-      //   vmFilter.modelName = {
-      //     $regex: `^${escapeRegex(findDto.vehicleModel.modelName.trim())}$`,
-      //     $options: 'i',
-      //   };
-      // }
-
-      // if (findDto.vehicleModel.name?.trim()) {
-      //   vmFilter.name = { $regex: findDto.vehicleModel.name.trim(), $options: 'i' };
-      // }
-
-      if (findDto.vehicleModel.fuelType) {
-        vmFilter.fuelType = findDto.vehicleModel.fuelType;
-      }
-
-      if (findDto.vehicleModel.transmissionType) {
-        vmFilter.transmissionType = findDto.vehicleModel.transmissionType;
-      }
-
-      if (findDto.vehicleModel.mileage?.trim()) {
-        vmFilter.mileage = { $regex: findDto.vehicleModel.mileage.trim(), $options: 'i' };
-      }
-
-      if (findDto.vehicleModel.additionalInfo) {
-        for (const [key, value] of Object.entries(findDto.vehicleModel.additionalInfo)) {
-          if (value !== undefined && value !== null) {
-            vmFilter[`additionalInfo.${key}`] = value;
-          }
-        }
-      }
-
-      if (Object.keys(vmFilter).length > 0) {
-        if (filter.vehicleModels) {
-          filter.$and = [
-            { vehicleModels: filter.vehicleModels },
-            { vehicleModels: { $elemMatch: vmFilter } },
-          ];
-          delete filter.vehicleModels;
-        } else {
-          filter.vehicleModels = { $elemMatch: vmFilter };
-        }
-      }
-    }
-
-    // Optional vendor filter
-    if (findDto.vendor) {
-      filter.vendor = findDto.vendor;
-    }
-
-    // Pagination
-    const page = findDto.page && findDto.page > 0 ? findDto.page : 1;
-    const limit = findDto.limit && findDto.limit > 0 ? findDto.limit : 10;
-    const skip = (page - 1) * limit;
-
-    // Sorting
-    const sortObj: any = {};
-    if (findDto.sort) {
-      const [field, order] = findDto.sort.split(':');
-      sortObj[field] = order === 'desc' ? -1 : 1;
-    }
-
-    console.log('Final filter:', JSON.stringify(filter, null, 2));
-
-    return this.vehicleModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec();
+  // --- Direct access from query ---
+  if (query.name?.trim()) {
+    filter.name = { $regex: query.name.trim(), $options: 'i' };
   }
+
+  if (query.modelYear) {
+    filter['details.modelYear'] = +query.modelYear;
+  }
+
+  if (query.month?.trim()) {
+    filter['details.month'] = { $regex: query.month.trim(), $options: 'i' };
+  }
+
+  if (query.modelName?.trim()) {
+    filter.vehicleModels = {
+      $elemMatch: {
+        modelName: {
+          $regex: `^${escapeRegex(query.modelName.trim())}$`,
+          $options: 'i',
+        },
+      },
+    };
+  }
+
+  if (query.vendor) {
+    filter.vendor = query.vendor;
+  }
+
+  // Pagination
+  const page = query.page && query.page > 0 ? +query.page : 1;
+  const limit = query.limit && query.limit > 0 ? +query.limit : 10;
+  const skip = (page - 1) * limit;
+
+  // Sorting
+  const sortObj: any = {};
+  if (query.sort) {
+    const [field, order] = query.sort.split(':');
+    sortObj[field] = order === 'desc' ? -1 : 1;
+  }
+
+  // Fetch data
+  const [vehicles, vehicleCompanies] = await Promise.all([
+    this.vehicleModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec(),
+    this.vehicleCompanyModel.find({ deletedAt: null }).exec(),
+  ]);
+
+  return {
+    vehicleCompanies,
+    vehicles,
+  };
+}
+
 
   
   async getVehicleById(id: string): Promise<Vehicle> {
