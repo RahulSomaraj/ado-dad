@@ -17,17 +17,17 @@ export class VehicleService {
   ) {}
 
 
- 
-  async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
+ async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
   const filter: any = {
     deletedAt: null,
   };
 
-  // --- Direct access from query ---
+  // Top-level Vehicle.name
   if (query.name?.trim()) {
     filter.name = { $regex: query.name.trim(), $options: 'i' };
   }
 
+  // Vehicle.details filters
   if (query.modelYear) {
     filter['details.modelYear'] = +query.modelYear;
   }
@@ -36,17 +36,28 @@ export class VehicleService {
     filter['details.month'] = { $regex: query.month.trim(), $options: 'i' };
   }
 
-  if (query.modelName?.trim()) {
-    filter.vehicleModels = {
-      $elemMatch: {
-        modelName: {
-          $regex: `^${escapeRegex(query.modelName.trim())}$`,
-          $options: 'i',
-        },
-      },
-    };
+  // Nested vehicleModels filters
+  if (query.modelVehicleName?.trim() || query.modelName?.trim()) {
+    const subFilter: any = {};
+
+    if (query.modelVehicleName?.trim()) {
+      subFilter.name = {
+        $regex: escapeRegex(query.modelVehicleName.trim()),
+        $options: 'i',
+      };
+    }
+
+    if (query.modelName?.trim()) {
+      subFilter.modelName = {
+        $regex: escapeRegex(query.modelName.trim()),
+        $options: 'i',
+      };
+    }
+
+    filter.vehicleModels = { $elemMatch: subFilter };
   }
 
+  // Vendor filter
   if (query.vendor) {
     filter.vendor = query.vendor;
   }
@@ -63,7 +74,7 @@ export class VehicleService {
     sortObj[field] = order === 'desc' ? -1 : 1;
   }
 
-  // Fetch data
+  // Fetch vehicles and vehicle companies in parallel
   const [vehicles, vehicleCompanies] = await Promise.all([
     this.vehicleModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec(),
     this.vehicleCompanyModel.find({ deletedAt: null }).exec(),
@@ -74,7 +85,6 @@ export class VehicleService {
     vehicles,
   };
 }
-
 
   
   async getVehicleById(id: string): Promise<Vehicle> {
