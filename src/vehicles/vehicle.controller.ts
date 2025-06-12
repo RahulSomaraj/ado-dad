@@ -27,7 +27,7 @@ export class VehicleController {
   @ApiQuery({ name: 'name', required: false, description: 'Vehicle company name' })
   @ApiQuery({ name: 'modelYear', required: false, description: 'Model year', type: Number })
   @ApiQuery({ name: 'month', required: false, description: 'Month of manufacture' })
-  @ApiQuery({ name: 'Name', required: false, description: 'Name inside vehicleModels' })
+  @ApiQuery({ name: 'modelVehicleName', required: false, description: 'Name inside vehicleModels' })
   @ApiQuery({ name: 'modelName', required: false, description: 'Model name inside vehicleModels' })
   @ApiQuery({ name: 'vendor', required: false, description: 'Vendor ID or name' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number', type: Number })
