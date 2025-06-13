@@ -22,20 +22,15 @@ import { Vehicle } from './schemas/vehicle.schema';
 @UseFilters(new HttpExceptionFilter('Vehicles'))
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
+@Get()
+@ApiQuery({ name: 'modelVehicleName', required: false, description: 'Name inside vehicleModels' })
+@ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+@ApiQuery({ name: 'sort', required: false, description: 'Sort format: field:asc|desc' })
+async findAll(@Query() query: any) {
+  return this.vehicleService.findVehicles(query);
+}
 
-  @Get()
-  @ApiQuery({ name: 'name', required: false, description: 'Vehicle company name' })
-  @ApiQuery({ name: 'modelYear', required: false, description: 'Model year', type: Number })
-  @ApiQuery({ name: 'month', required: false, description: 'Month of manufacture' })
-  @ApiQuery({ name: 'modelVehicleName', required: false, description: 'Name inside vehicleModels' })
-  @ApiQuery({ name: 'modelName', required: false, description: 'Model name inside vehicleModels' })
-  @ApiQuery({ name: 'vendor', required: false, description: 'Vendor ID or name' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number', type: Number })
-  @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: Number })
-  @ApiQuery({ name: 'sort', required: false, description: 'Sort format: field:asc|desc' })
-  async findAll(@Query() query: any) {
-    return this.vehicleService.findVehicles(query);
-  }
 
   @Get(':id')
   @ApiResponse({ status: 200, description: 'Vehicle found' })

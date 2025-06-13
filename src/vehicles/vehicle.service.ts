@@ -22,44 +22,16 @@ export class VehicleService {
     deletedAt: null,
   };
 
-  // Top-level Vehicle.name
-  if (query.name?.trim()) {
-    filter.name = { $regex: query.name.trim(), $options: 'i' };
-  }
-
-  // Vehicle.details filters
-  if (query.modelYear) {
-    filter['details.modelYear'] = +query.modelYear;
-  }
-
-  if (query.month?.trim()) {
-    filter['details.month'] = { $regex: query.month.trim(), $options: 'i' };
-  }
-
-  // Nested vehicleModels filters
-  if (query.modelVehicleName?.trim() || query.modelName?.trim()) {
-    const subFilter: any = {};
-
-    if (query.modelVehicleName?.trim()) {
-      subFilter.name = {
-        $regex: escapeRegex(query.modelVehicleName.trim()),
-        $options: 'i',
-      };
-    }
-
-    if (query.modelName?.trim()) {
-      subFilter.modelName = {
-        $regex: escapeRegex(query.modelName.trim()),
-        $options: 'i',
-      };
-    }
-
-    filter.vehicleModels = { $elemMatch: subFilter };
-  }
-
-  // Vendor filter
-  if (query.vendor) {
-    filter.vendor = query.vendor;
+  // Filter only by vehicleModels.name
+  if (query.modelVehicleName?.trim()) {
+    filter.vehicleModels = {
+      $elemMatch: {
+        name: {
+          $regex: escapeRegex(query.modelVehicleName.trim()),
+          $options: 'i',
+        },
+      },
+    };
   }
 
   // Pagination
@@ -85,6 +57,7 @@ export class VehicleService {
     vehicles,
   };
 }
+
 
   
   async getVehicleById(id: string): Promise<Vehicle> {
