@@ -16,14 +16,12 @@ export class VehicleService {
     private vehicleCompanyModel: Model<VehicleCompanyDocument>,
   ) {}
 
+async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
+  const filter: any = { deletedAt: null };
 
- async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
-  const filter: any = {
-    deletedAt: null,
-  };
+  const isFiltered = !!query.modelVehicleName?.trim(); // Add more flags if needed
 
-  // Filter only by vehicleModels.name
-  if (query.modelVehicleName?.trim()) {
+  if (isFiltered) {
     filter.vehicleModels = {
       $elemMatch: {
         name: {
@@ -34,29 +32,43 @@ export class VehicleService {
     };
   }
 
-  // Pagination
   const page = query.page && query.page > 0 ? +query.page : 1;
   const limit = query.limit && query.limit > 0 ? +query.limit : 10;
   const skip = (page - 1) * limit;
 
-  // Sorting
   const sortObj: any = {};
   if (query.sort) {
     const [field, order] = query.sort.split(':');
     sortObj[field] = order === 'desc' ? -1 : 1;
   }
 
-  // Fetch vehicles and vehicle companies in parallel
-  const [vehicles, vehicleCompanies] = await Promise.all([
-    this.vehicleModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec(),
-    this.vehicleCompanyModel.find({ deletedAt: null }).exec(),
-  ]);
+  const vehicles = await this.vehicleModel
+    .find(filter)
+    .sort(sortObj)
+    .skip(skip)
+    .limit(limit)
+    .exec();
+
+  let vehicleCompanies;
+
+  if (isFiltered) {
+    const vendorIds = vehicles.map(v => v.vendor?.toString()).filter(Boolean);
+    const uniqueVendorIds = [...new Set(vendorIds)];
+
+    vehicleCompanies = await this.vehicleCompanyModel.find({
+      _id: { $in: uniqueVendorIds },
+      deletedAt: null,
+    });
+  } else {
+    vehicleCompanies = await this.vehicleCompanyModel.find({ deletedAt: null });
+  }
 
   return {
     vehicleCompanies,
     vehicles,
   };
 }
+
 
 
   
