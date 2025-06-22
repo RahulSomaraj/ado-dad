@@ -12,7 +12,10 @@ export class ModelService {
   ) {}
 
   // Create a new model entry
-  async create(createModelDto: CreateModelDto): Promise<VehicleModelDocument> {
+  async create(
+    createModelDto: CreateModelDto,
+    user: any,
+  ): Promise<VehicleModelDocument> {
     const newModel = new this.modelModel(createModelDto); // Create a new instance
     return newModel.save(); // Save to the database
   }
@@ -21,9 +24,12 @@ export class ModelService {
     query: any,
     page: number,
     limit: number,
-    sortOptions: Record<string, any>
-  ): Promise<{ models: VehicleModelDocument[]; totalPages: number; currentPage: number }> {
-    
+    sortOptions: Record<string, any>,
+  ): Promise<{
+    models: VehicleModelDocument[];
+    totalPages: number;
+    currentPage: number;
+  }> {
     // Convert page and limit values
     const skip = (page - 1) * limit;
 
@@ -45,8 +51,6 @@ export class ModelService {
     };
   }
 
-  
-
   // Find a single model by its ID
   async findOne(id: string): Promise<VehicleModelDocument> {
     const model = await this.modelModel.findById(id).exec(); // Find model by ID
@@ -57,8 +61,14 @@ export class ModelService {
   }
 
   // Update an existing model by ID
-  async update(id: string, updateModelDto: UpdateModelDto): Promise<VehicleModelDocument> {
-    const updatedModel = await this.modelModel.findByIdAndUpdate(id, updateModelDto, { new: true }).exec();
+  async update(
+    id: string,
+    updateModelDto: UpdateModelDto,
+    user: any,
+  ): Promise<VehicleModelDocument> {
+    const updatedModel = await this.modelModel
+      .findByIdAndUpdate(id, updateModelDto, { new: true })
+      .exec();
     if (!updatedModel) {
       throw new NotFoundException(`Model with id ${id} not found`); // Handle not found
     }
@@ -66,7 +76,7 @@ export class ModelService {
   }
 
   // Remove a model by ID
-  async remove(id: string): Promise<void> {
+  async remove(id: string, user: any): Promise<void> {
     const result = await this.modelModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Model with id ${id} not found`); // Handle not found

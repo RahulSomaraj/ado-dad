@@ -93,6 +93,7 @@ export class VehicleAdvService {
 
   async createVehicleAdv(
     createVehicleDto: CreateVehicleAdvDto,
+    user: any,
   ): Promise<VehicleAdv> {
     // Check if the provided vendor (VehicleCompany) exists.
     const vehicleCompany = await this.vehicleCompanyModel.findById(
@@ -201,7 +202,7 @@ export class VehicleAdvService {
   //   return vehicle.save();
   // }
 
-  async deleteVehicle(id: string): Promise<void> {
+  async deleteVehicle(id: string, user: any): Promise<void> {
     await this.vehicleModel.findByIdAndDelete(id);
   }
 }

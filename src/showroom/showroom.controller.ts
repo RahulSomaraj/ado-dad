@@ -9,18 +9,31 @@ import {
   Query,
   UseGuards,
   UseFilters,
+  Request,
 } from '@nestjs/common';
 import { ShowroomService } from './showroom.service';
 import { Showroom } from './schemas/showroom.schema';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreateShowroomDto } from './dto/create-showroom.dto';
 import { UpdateShowroomDto } from './dto/update-showroom.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { RolesGuard } from 'src/roles/roles.guard';
+import { Roles } from 'src/roles/roles.decorator';
+import { UserType } from 'src/users/enums/user.types';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 
 @ApiTags('Showrooms')
 @Controller('showrooms')
 @UseFilters(new HttpExceptionFilter('Showrooms'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
 export class ShowroomController {
   constructor(private readonly showroomService: ShowroomService) {}
 
@@ -80,7 +93,6 @@ export class ShowroomController {
   }
 
   @Post()
-  // @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add a new showroom' })
   @ApiResponse({
     status: 201,
@@ -89,12 +101,13 @@ export class ShowroomController {
   })
   async addShowroom(
     @Body() createShowroomDto: CreateShowroomDto,
+    @Request() req,
   ): Promise<Showroom> {
-    return this.showroomService.addShowroom(createShowroomDto);
+    const { user } = req;
+    return this.showroomService.addShowroom(createShowroomDto, user);
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update a showroom' })
   @ApiResponse({
     status: 200,
@@ -104,15 +117,17 @@ export class ShowroomController {
   async updateShowroom(
     @Param('id') id: string,
     @Body() updateShowroomDto: UpdateShowroomDto,
+    @Request() req,
   ): Promise<Showroom> {
-    return this.showroomService.updateShowroom(id, updateShowroomDto);
+    const { user } = req;
+    return this.showroomService.updateShowroom(id, updateShowroomDto, user);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete a showroom' })
   @ApiResponse({ status: 200, description: 'Showroom deleted successfully' })
-  async deleteShowroom(@Param('id') id: string): Promise<void> {
-    return this.showroomService.deleteShowroom(id);
+  async deleteShowroom(@Param('id') id: string, @Request() req): Promise<void> {
+    const { user } = req;
+    return this.showroomService.deleteShowroom(id, user);
   }
 }

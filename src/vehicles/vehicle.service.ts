@@ -3,7 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Vehicle, VehicleDocument } from './schemas/vehicle.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { VehicleCompany, VehicleCompanyDocument } from 'src/vehicle-company/schemas/schema.vehicle-company';
+import {
+  VehicleCompany,
+  VehicleCompanyDocument,
+} from 'src/vehicle-company/schemas/schema.vehicle-company';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { FindVehicleDto } from './dto/get-vehicle.dto';
 import { VehicleTypes, WheelerType } from './enum/vehicle.type';
@@ -16,62 +19,65 @@ export class VehicleService {
     private vehicleCompanyModel: Model<VehicleCompanyDocument>,
   ) {}
 
-async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
-  const filter: any = { deletedAt: null };
+  async findVehicles(
+    query: any,
+  ): Promise<{ vehicleCompanies: any[]; vehicles: any[] }> {
+    const filter: any = { deletedAt: null };
 
-  const isFiltered = !!query.modelVehicleName?.trim(); // Add more flags if needed
+    const isFiltered = !!query.modelVehicleName?.trim(); // Add more flags if needed
 
-  if (isFiltered) {
-    filter.vehicleModels = {
-      $elemMatch: {
-        name: {
-          $regex: escapeRegex(query.modelVehicleName.trim()),
-          $options: 'i',
+    if (isFiltered) {
+      filter.vehicleModels = {
+        $elemMatch: {
+          name: {
+            $regex: escapeRegex(query.modelVehicleName.trim()),
+            $options: 'i',
+          },
         },
-      },
+      };
+    }
+
+    const page = query.page && query.page > 0 ? +query.page : 1;
+    const limit = query.limit && query.limit > 0 ? +query.limit : 10;
+    const skip = (page - 1) * limit;
+
+    const sortObj: any = {};
+    if (query.sort) {
+      const [field, order] = query.sort.split(':');
+      sortObj[field] = order === 'desc' ? -1 : 1;
+    }
+
+    const vehicles = await this.vehicleModel
+      .find(filter)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    let vehicleCompanies;
+
+    if (isFiltered) {
+      const vendorIds = vehicles
+        .map((v) => v.vendor?.toString())
+        .filter(Boolean);
+      const uniqueVendorIds = [...new Set(vendorIds)];
+
+      vehicleCompanies = await this.vehicleCompanyModel.find({
+        _id: { $in: uniqueVendorIds },
+        deletedAt: null,
+      });
+    } else {
+      vehicleCompanies = await this.vehicleCompanyModel.find({
+        deletedAt: null,
+      });
+    }
+
+    return {
+      vehicleCompanies,
+      vehicles,
     };
   }
 
-  const page = query.page && query.page > 0 ? +query.page : 1;
-  const limit = query.limit && query.limit > 0 ? +query.limit : 10;
-  const skip = (page - 1) * limit;
-
-  const sortObj: any = {};
-  if (query.sort) {
-    const [field, order] = query.sort.split(':');
-    sortObj[field] = order === 'desc' ? -1 : 1;
-  }
-
-  const vehicles = await this.vehicleModel
-    .find(filter)
-    .sort(sortObj)
-    .skip(skip)
-    .limit(limit)
-    .exec();
-
-  let vehicleCompanies;
-
-  if (isFiltered) {
-    const vendorIds = vehicles.map(v => v.vendor?.toString()).filter(Boolean);
-    const uniqueVendorIds = [...new Set(vendorIds)];
-
-    vehicleCompanies = await this.vehicleCompanyModel.find({
-      _id: { $in: uniqueVendorIds },
-      deletedAt: null,
-    });
-  } else {
-    vehicleCompanies = await this.vehicleCompanyModel.find({ deletedAt: null });
-  }
-
-  return {
-    vehicleCompanies,
-    vehicles,
-  };
-}
-
-
-
-  
   async getVehicleById(id: string): Promise<Vehicle> {
     const vehicle = await this.vehicleModel
       .findById(id)
@@ -107,7 +113,10 @@ async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any
     return vehicle;
   }
 
-  async createVehicle(createVehicleDto: CreateVehicleDto): Promise<Vehicle> {
+  async createVehicle(
+    createVehicleDto: CreateVehicleDto,
+    user: any,
+  ): Promise<Vehicle> {
     // Check if the provided vendor (VehicleCompany) exists.
     const vehicleCompany = await this.vehicleCompanyModel.findById(
       createVehicleDto.vendor,
@@ -190,6 +199,7 @@ async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any
   async updateVehicle(
     id: string,
     updateVehicleDto: UpdateVehicleDto, // Assume UpdateVehicleAdvDto has optional fields
+    user: any,
   ): Promise<Vehicle> {
     // Retrieve the existing vehicle by its ID
     const vehicle = await this.vehicleModel.findById(id);
@@ -273,7 +283,7 @@ async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any
     return vehicle.save();
   }
 
-  async softDeleteVehicle(id: string): Promise<Vehicle> {
+  async softDeleteVehicle(id: string, user: any): Promise<Vehicle> {
     const vehicle = await this.vehicleModel.findById(id);
     if (!vehicle) {
       throw new HttpException(
@@ -287,10 +297,7 @@ async findVehicles(query: any): Promise<{ vehicleCompanies: any[]; vehicles: any
   }
 }
 
-
 // Utility to escape special regex characters
 function escapeRegex(text: string): string {
   return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
-
-  

@@ -52,14 +52,14 @@ export class PropertyService {
       .limit(limit);
 
     return {
-      data: properties, 
+      data: properties,
       pagination: {
         totalProperties: totalProperties,
         currentPage: page,
-        totalPages: totalPages
-      }
+        totalPages: totalPages,
+      },
     };
-}
+  }
 
   async getPropertyById(id: string) {
     return await this.propertyModel
@@ -87,6 +87,7 @@ export class PropertyService {
   async updateProperty(
     propertyId: string,
     updatePropertyDto: UpdatePropertyDto,
+    user: any,
   ): Promise<Property | {}> {
     // Retrieve the existing property
     const property = await this.propertyModel.findById(propertyId);
@@ -186,7 +187,7 @@ export class PropertyService {
     }
   }
 
-  async deleteProperty(id: string) {
+  async deleteProperty(id: string, user: any) {
     return await this.propertyModel.findByIdAndDelete(id);
   }
 }

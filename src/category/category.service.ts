@@ -16,7 +16,10 @@ export class CategoryService {
     @InjectModel(Category.name) private categoryModel: Model<Category>,
   ) {}
 
-  async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
+  async create(
+    createCategoryDto: CreateCategoryDto,
+    user: any,
+  ): Promise<Category> {
     const { name, parent } = createCategoryDto;
 
     // Query for an existing category with the same name and parent (default to null if parent isn't provided)
@@ -123,6 +126,7 @@ export class CategoryService {
   async update(
     id: string,
     updateCategoryDto: UpdateCategoryDto,
+    user: any,
   ): Promise<Category> {
     // Fetch the current category by id.
     const currentCategory = await this.categoryModel.findById(id);
@@ -192,7 +196,7 @@ export class CategoryService {
     return updatedCategory;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, user: any): Promise<void> {
     const updatedCategory = await this.categoryModel.findByIdAndUpdate(
       id,
       { deletedAt: new Date() },

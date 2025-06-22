@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -9,9 +10,14 @@ import {
   ArrayNotEmpty,
   ValidateIf,
   IsNotEmpty,
+  ValidateNested,
+  IsBoolean,
 } from 'class-validator';
 import { FuelType, VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 import { AdvertisementType } from './create-advertisement.dto';
+import { CreatePropertyDto } from 'src/property/dto/create-property.dto';
+import { CreateVehicleAdvDto } from 'src/vehicles-adv/dto/create-vehicle-adv.dto';
+
 export class UpdateAdvertisementDto {
   @ApiPropertyOptional({
     enum: AdvertisementType,
@@ -40,6 +46,7 @@ export class UpdateAdvertisementDto {
     minimum: 0,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   price?: number;
 
@@ -69,12 +76,32 @@ export class UpdateAdvertisementDto {
   city?: string;
 
   @ApiPropertyOptional({
-    description: 'User ID of the creator',
-    example: '609c1d1f4f1a2561d8e6b123',
+    description: 'District where the advertisement is posted',
   })
   @IsOptional()
-  @IsMongoId()
-  createdBy?: string;
+  @IsString()
+  district?: string;
+
+  @ApiPropertyOptional({
+    description: 'Name of user who posted the ad',
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Phone number of user who posted the ad',
+  })
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Approval status of the advertisement',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isApproved?: boolean;
 
   @ApiPropertyOptional({
     description: 'Category ID for the advertisement',
@@ -95,23 +122,22 @@ export class UpdateAdvertisementDto {
   fuelType?: FuelType;
 
   @ApiPropertyOptional({
-    description: 'District where the advertisement is posted',
+    description: 'Vehicle details. Optional for updates',
+    type: CreateVehicleAdvDto,
   })
-  @IsString()
+  @ValidateIf((o) => o.type === AdvertisementType.Vehicle)
   @IsOptional()
-  district: string;
+  @ValidateNested()
+  @Type(() => CreateVehicleAdvDto)
+  vehicle?: CreateVehicleAdvDto;
 
   @ApiPropertyOptional({
-    description: 'Name of user who posted the ad ',
+    description: 'Property details. Optional for updates',
+    type: CreatePropertyDto,
   })
-  @IsString()
+  @ValidateIf((o) => o.type === AdvertisementType.Property)
   @IsOptional()
-  name: string;
-
-  @ApiPropertyOptional({
-    description: 'Phonenumber of user who posted the ad ',
-  })
-  @IsString()
-  @IsOptional()
-  phoneNumber: string;
+  @ValidateNested()
+  @Type(() => CreatePropertyDto)
+  property?: CreatePropertyDto;
 }

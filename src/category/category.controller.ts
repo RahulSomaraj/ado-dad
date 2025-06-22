@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   UseFilters,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,27 +25,30 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { FindAllCategoriesDto } from './dto/get-category.dto';
+import { Roles } from 'src/roles/roles.decorator';
+import { UserType } from 'src/users/enums/user.types';
 
 @ApiTags('Categories')
 @Controller('categories')
 @UseFilters(new HttpExceptionFilter('Categories'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.SHOWROOM)
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserRole.Admin)
-  // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
+    @Request() req,
   ): Promise<Category> {
-    return this.categoryService.create(createCategoryDto);
+    const { user } = req;
+    return this.categoryService.create(createCategoryDto, user);
   }
 
   @Get()
-  // @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all categories with optional filters' })
   @ApiResponse({ status: 200, description: 'Categories fetched successfully' })
@@ -59,7 +63,6 @@ export class CategoryController {
   }
 
   @Get(':id')
-  // @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a category by ID' })
   @ApiResponse({ status: 200, description: 'Category fetched successfully' })
@@ -68,25 +71,25 @@ export class CategoryController {
   }
 
   @Put(':id')
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  //@Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({ status: 200, description: 'Category updated successfully' })
   async update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @Request() req,
   ): Promise<Category> {
-    return this.categoryService.update(id, updateCategoryDto);
+    const { user } = req;
+    return this.categoryService.update(id, updateCategoryDto, user);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  //@Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a category' })
   @ApiResponse({ status: 200, description: 'Category deleted successfully' })
-  async delete(@Param('id') id: string): Promise<void> {
-    return this.categoryService.delete(id);
+  async delete(@Param('id') id: string, @Request() req): Promise<void> {
+    const { user } = req;
+    return this.categoryService.delete(id, user);
   }
 }

@@ -26,10 +26,14 @@ import { Roles } from 'src/roles/roles.decorator';
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { UserType } from 'src/users/enums/user.types';
 import { User } from 'src/users/schemas/user.schema';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
 
 @ApiTags('Properties')
 @Controller('properties')
 @UseFilters(new HttpExceptionFilter('Properties'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
 export class PropertyController {
   constructor(private readonly propertyService: PropertyService) {}
 
@@ -124,9 +128,6 @@ export class PropertyController {
   }
 
   @Put(':id')
-  @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SHOWROOM)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing property' })
   @ApiResponse({ status: 200, description: 'Property updated successfully' })
   @ApiResponse({
@@ -136,21 +137,25 @@ export class PropertyController {
   async updateProperty(
     @Param('id') id: string,
     @Body() updatePropertyDto: UpdatePropertyDto,
+    @Request() req,
   ) {
-    return await this.propertyService.updateProperty(id, updatePropertyDto);
+    const { user } = req;
+    return await this.propertyService.updateProperty(
+      id,
+      updatePropertyDto,
+      user,
+    );
   }
 
   @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SHOWROOM)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a property' })
   @ApiResponse({ status: 200, description: 'Property deleted successfully' })
   @ApiResponse({
     status: 403,
     description: 'Forbidden: Only admins or sellers can delete properties',
   })
-  async deleteProperty(@Param('id') id: string) {
-    return await this.propertyService.deleteProperty(id);
+  async deleteProperty(@Param('id') id: string, @Request() req) {
+    const { user } = req;
+    return await this.propertyService.deleteProperty(id, user);
   }
 }

@@ -8,6 +8,8 @@ import {
   Query,
   Delete,
   UseFilters,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiOperation,
@@ -15,21 +17,27 @@ import {
   ApiTags,
   ApiBody,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { RatingService } from './rating.service';
-import { Roles } from 'src/roles/roles.decorator'; // Assuming you have a Roles decorator
 import { HttpExceptionFilter } from 'src/shared/exception-service';
 import { UserType } from 'src/users/enums/user.types';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { RolesGuard } from 'src/roles/roles.guard';
+import { Roles } from 'src/roles/roles.decorator';
 
 @ApiTags('Ratings')
 @Controller('ratings')
 @UseFilters(new HttpExceptionFilter('Ratings'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class RatingController {
   constructor(private readonly ratingService: RatingService) {}
 
   @Post()
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SHOWROOM)
   @ApiOperation({ summary: 'Create a new rating' })
   @ApiBody({
     description: 'Create a new rating for a product',
@@ -53,12 +61,13 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserType.USER, UserType.ADMIN) // Assuming you have a roles mechanism
-  async createRating(@Body() createRatingDto: CreateRatingDto) {
-    return this.ratingService.create(createRatingDto);
+  async createRating(@Body() createRatingDto: CreateRatingDto, @Request() req) {
+    const { user } = req;
+    return this.ratingService.create(createRatingDto, user);
   }
 
   @Put(':ratingId')
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update a specific rating' })
   @ApiBody({
     description: 'Update a specific rating',
@@ -84,12 +93,13 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserType.ADMIN) // Only admin can update
   async updateRating(
     @Param('ratingId') ratingId: string,
     @Body() updateRatingDto: UpdateRatingDto,
+    @Request() req,
   ) {
-    return this.ratingService.update(ratingId, updateRatingDto);
+    const { user } = req;
+    return this.ratingService.update(ratingId, updateRatingDto, user);
   }
 
   @Get('product/:productId')
@@ -136,6 +146,7 @@ export class RatingController {
   }
 
   @Delete(':ratingId')
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete a specific rating' })
   @ApiResponse({
     status: 200,
@@ -149,8 +160,8 @@ export class RatingController {
     status: 500,
     description: 'Internal Server Error',
   })
-  @Roles(UserType.ADMIN) // Only admin can delete
-  async deleteRating(@Param('ratingId') ratingId: string) {
-    return this.ratingService.delete(ratingId);
+  async deleteRating(@Param('ratingId') ratingId: string, @Request() req) {
+    const { user } = req;
+    return this.ratingService.delete(ratingId, user);
   }
 }

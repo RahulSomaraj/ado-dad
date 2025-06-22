@@ -52,20 +52,18 @@ export class Advertisement extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   approvedBy: Types.ObjectId;
 
-  // The vehicle reference is no longer marked as required here.
-  // It will be conditionally validated in the custom pre-validation hook.
-
+  // Embedded vehicle document - no dot notation in projection to preserve structure
   @Prop({ type: VehicleAdvSchema, required: false })
   vehicle: VehicleAdv;
 
-  // Embed the complete property object
+  // Embedded property document - no dot notation in projection to preserve structure
   @Prop({ type: PropertySchema, required: false })
   property: Property;
 }
 
 export const AdvertisementSchema = SchemaFactory.createForClass(Advertisement);
 
-// Custom validation: Ensure that for 'Car' ads, vehicle is provided and property is not,
+// Custom validation: Ensure that for 'Vehicle' ads, vehicle is provided and property is not,
 // and for 'Property' ads, property is provided and vehicle is not.
 AdvertisementSchema.pre('validate', function (next) {
   const ad = this as Advertisement;
@@ -78,6 +76,13 @@ AdvertisementSchema.pre('validate', function (next) {
         ),
       );
     }
+    if (!ad.vehicle) {
+      return next(
+        new Error(
+          'For Vehicle advertisements, a vehicle object must be provided.',
+        ),
+      );
+    }
   } else if (ad.type === 'Property') {
     if (ad.vehicle) {
       return next(
@@ -86,6 +91,20 @@ AdvertisementSchema.pre('validate', function (next) {
         ),
       );
     }
+    if (!ad.property) {
+      return next(
+        new Error(
+          'For Property advertisements, a property object must be provided.',
+        ),
+      );
+    }
   }
   next();
 });
+
+// Index for better query performance
+AdvertisementSchema.index({ type: 1, category: 1 });
+AdvertisementSchema.index({ price: 1 });
+AdvertisementSchema.index({ state: 1, city: 1, district: 1 });
+AdvertisementSchema.index({ isApproved: 1 });
+AdvertisementSchema.index({ createdAt: -1 });
