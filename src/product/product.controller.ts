@@ -174,4 +174,5 @@ export class ProductController {
     const { user } = req;
     return this.productService.deleteProduct(id, user);
   }
+  
 }

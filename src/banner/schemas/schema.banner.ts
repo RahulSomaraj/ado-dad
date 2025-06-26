@@ -9,7 +9,13 @@ export class Banner {
   title: string;
 
   @Prop({ required: true })
-  image: string;
+  desktopImage: string;
+
+  @Prop({ required: true })
+  phoneImage: string;
+
+  @Prop({ required: true })
+  tabletImage: string;
 
   @Prop({ required: false })
   link?: string;
