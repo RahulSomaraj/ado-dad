@@ -10,11 +10,11 @@ import { ProductModule } from './product/product.module';
 import { AdvertisementsModule } from './advertisement/advertisement.module';
 import { BannerModule } from './banner/banner.module';
 import { CategoryModule } from './category/category.module';
-import { VehicleCompanyModule } from './vehicle-company/vehicle-company.module';
 import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
 import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module';
+import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.module';
 import { EmailService } from './utils/email.service';
 import { configService } from './config/mongo.config';
 import { UploadModule } from './shared/upload.module';
@@ -30,7 +30,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { RefreshTokenService } from './auth/auth.refresh.service';
 import { User, UserSchema } from './users/schemas/user.schema';
 import { AuthModule } from './auth/auth.module';
-import { VehicleAdvModule } from './vehicles-adv/vehicleadv.module';
 import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
@@ -65,14 +64,13 @@ import { GatewayModule } from './gateway/gateway.module';
     AdvertisementsModule,
     BannerModule,
     CategoryModule,
-    VehicleCompanyModule,
     ModelModule,
     RatingModule,
     PropertyModule,
     FavoriteModule,
+    VehicleInventoryModule,
     AuthModule,
     UploadModule,
-    VehicleAdvModule,
     GatewayModule,
   ],
   providers: [EmailService, AppService, RefreshTokenService],

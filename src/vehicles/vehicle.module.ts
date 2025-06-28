@@ -3,17 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { VehicleController } from './vehicle.controller';
 import { VehicleService } from './vehicle.service';
 import { Vehicle, VehicleSchema } from './schemas/vehicle.schema';
-import {
-  VehicleCompany,
-  VehicleCompanySchema,
-} from 'src/vehicle-company/schemas/schema.vehicle-company';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Vehicle.name, schema: VehicleSchema },
-      { name: VehicleCompany.name, schema: VehicleCompanySchema },
-    ]),
+    MongooseModule.forFeature([{ name: Vehicle.name, schema: VehicleSchema }]),
   ],
   providers: [VehicleService],
   controllers: [VehicleController],

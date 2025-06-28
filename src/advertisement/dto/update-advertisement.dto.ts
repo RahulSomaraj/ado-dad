@@ -16,7 +16,7 @@ import {
 import { FuelType, VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 import { AdvertisementType } from './create-advertisement.dto';
 import { CreatePropertyDto } from 'src/property/dto/create-property.dto';
-import { CreateVehicleAdvDto } from 'src/vehicles-adv/dto/create-vehicle-adv.dto';
+import { CreateVehicleDto } from './create-vehicle.dto';
 
 export class UpdateAdvertisementDto {
   @ApiPropertyOptional({
@@ -123,13 +123,13 @@ export class UpdateAdvertisementDto {
 
   @ApiPropertyOptional({
     description: 'Vehicle details. Optional for updates',
-    type: CreateVehicleAdvDto,
+    type: CreateVehicleDto,
   })
   @ValidateIf((o) => o.type === AdvertisementType.Vehicle)
   @IsOptional()
   @ValidateNested()
-  @Type(() => CreateVehicleAdvDto)
-  vehicle?: CreateVehicleAdvDto;
+  @Type(() => CreateVehicleDto)
+  vehicle?: CreateVehicleDto;
 
   @ApiPropertyOptional({
     description: 'Property details. Optional for updates',

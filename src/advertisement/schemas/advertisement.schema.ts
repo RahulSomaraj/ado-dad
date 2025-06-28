@@ -2,10 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { User } from '../../users/schemas/user.schema';
 import { Category, CategorySchema } from 'src/category/schemas/category.schema';
-import {
-  VehicleAdv,
-  VehicleAdvSchema,
-} from 'src/vehicles-adv/schemas/vehicleadv.schema';
+import { Vehicle, VehicleSchema } from './vehicle.schema';
 import { Property, PropertySchema } from 'src/property/schemas/schema.property';
 
 @Schema({ timestamps: true }) // Automatically adds createdAt & updatedAt fields
@@ -53,8 +50,8 @@ export class Advertisement extends Document {
   approvedBy: Types.ObjectId;
 
   // Embedded vehicle document - no dot notation in projection to preserve structure
-  @Prop({ type: VehicleAdvSchema, required: false })
-  vehicle: VehicleAdv;
+  @Prop({ type: VehicleSchema, required: false })
+  vehicle: Vehicle;
 
   // Embedded property document - no dot notation in projection to preserve structure
   @Prop({ type: PropertySchema, required: false })

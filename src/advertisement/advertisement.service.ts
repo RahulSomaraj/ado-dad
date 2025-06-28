@@ -9,7 +9,6 @@ import { Model, Types } from 'mongoose';
 import { Advertisement } from './schemas/advertisement.schema';
 import { User } from '../users/schemas/user.schema';
 import { Category } from 'src/category/schemas/category.schema';
-import { VehicleAdv } from 'src/vehicles-adv/schemas/vehicleadv.schema';
 import { Property } from 'src/property/schemas/schema.property';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
@@ -22,7 +21,6 @@ export class AdvertisementsService {
     private advertisementModel: Model<Advertisement>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Category.name) private categoryModel: Model<Category>,
-    @InjectModel(VehicleAdv.name) private vehicleAdvsModel: Model<VehicleAdv>,
     @InjectModel(Property.name) private propertiesModel: Model<Property>,
   ) {}
 

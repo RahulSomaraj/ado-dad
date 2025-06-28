@@ -11,7 +11,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
 import { PaginationDto } from 'src/shared/dto/pagination.dto';
-import { FindVehicleAdvDto } from 'src/vehicles-adv/dto/get-vehicle-adv.dto';
+import { FindVehicleDto } from './find-vehicle.dto';
 
 export class FindAdvertisementsDto extends PaginationDto {
   @ApiPropertyOptional({
@@ -62,6 +62,6 @@ export class FindAdvertisementsDto extends PaginationDto {
   })
   @IsOptional()
   @ValidateNested()
-  @Type(() => FindVehicleAdvDto)
-  vehicleAdv?: FindVehicleAdvDto;
+  @Type(() => FindVehicleDto)
+  vehicleAdv?: FindVehicleDto;
 }

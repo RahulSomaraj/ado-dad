@@ -1,7 +1,7 @@
 // chat.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { MyGateway } from 'src/gateway/websocket.gateway';
+import { MyGateway } from '../gateway/websocket.gateway';
 import { ChatService } from './chat.service';
 import { ChatMessage, ChatMessageSchema } from './schemas/chat.schema';
 

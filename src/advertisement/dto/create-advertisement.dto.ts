@@ -17,7 +17,7 @@ import {
   IsIn,
 } from 'class-validator';
 import { CreatePropertyDto } from 'src/property/dto/create-property.dto';
-import { CreateVehicleAdvDto } from 'src/vehicles-adv/dto/create-vehicle-adv.dto';
+import { CreateVehicleDto } from './create-vehicle.dto';
 import {
   FuelType,
   TransmissionType,
@@ -136,13 +136,13 @@ export class CreateAdvertisementDto {
 
   @ApiPropertyOptional({
     description: 'Vehicle details. Required if type is Vehicle',
-    type: CreateVehicleAdvDto,
+    type: CreateVehicleDto,
   })
   @ValidateIf((o) => o.type === AdvertisementType.Vehicle)
   @IsNotEmpty({ message: 'Vehicle details are required for Vehicle type ads' })
   @ValidateNested()
-  @Type(() => CreateVehicleAdvDto)
-  vehicle?: CreateVehicleAdvDto;
+  @Type(() => CreateVehicleDto)
+  vehicle?: CreateVehicleDto;
 
   @ApiPropertyOptional({
     description: 'Property details. Required if type is Property',

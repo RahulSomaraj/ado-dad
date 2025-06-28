@@ -34,7 +34,10 @@ export class AppService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.sign(
         { id: user._id, email: user.email },
-        { secret: process.env.TOKEN_KEY },
+        {
+          secret: process.env.TOKEN_KEY,
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+        },
       ),
       this.jwtService.sign(
         { id: user._id, email: user.email },
