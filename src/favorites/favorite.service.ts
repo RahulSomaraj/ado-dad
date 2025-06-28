@@ -7,14 +7,22 @@ import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 
 @Injectable()
 export class FavoriteService {
-  constructor(@InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>) {}
+  constructor(
+    @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
+  ) {}
 
-  async addFavorite(userId: string, createFavoriteDto: CreateFavoriteDto): Promise<Favorite> {
+  async addFavorite(
+    userId: string,
+    createFavoriteDto: CreateFavoriteDto,
+  ): Promise<Favorite> {
     const favorite = new this.favoriteModel({ userId, ...createFavoriteDto });
     return await favorite.save();
   }
 
-  async getUserFavorites(userId: string, query: { itemId?: string; itemType?: string }): Promise<Favorite[]> {
+  async getUserFavorites(
+    userId: string,
+    query: { itemId?: string; itemType?: string },
+  ): Promise<Favorite[]> {
     const filter: any = { userId };
 
     if (query.itemId) {
@@ -29,14 +37,20 @@ export class FavoriteService {
   }
 
   async getFavoriteById(userId: string, favoriteId: string): Promise<Favorite> {
-    const favorite = await this.favoriteModel.findOne({ _id: favoriteId, userId }).populate('itemId');
+    const favorite = await this.favoriteModel
+      .findOne({ _id: favoriteId, userId })
+      .populate('itemId');
     if (!favorite) {
       throw new NotFoundException('Favorite not found');
     }
     return favorite;
   }
 
-  async updateFavorite(userId: string, favoriteId: string, updateFavoriteDto: UpdateFavoriteDto): Promise<Favorite> {
+  async updateFavorite(
+    userId: string,
+    favoriteId: string,
+    updateFavoriteDto: UpdateFavoriteDto,
+  ): Promise<Favorite> {
     const favorite = await this.favoriteModel.findOneAndUpdate(
       { _id: favoriteId, userId },
       updateFavoriteDto,
@@ -48,8 +62,14 @@ export class FavoriteService {
     return favorite;
   }
 
-  async removeFavorite(userId: string, favoriteId: string): Promise<{ message: string }> {
-    const favorite = await this.favoriteModel.findOneAndDelete({ _id: favoriteId, userId });
+  async removeFavorite(
+    userId: string,
+    favoriteId: string,
+  ): Promise<{ message: string }> {
+    const favorite = await this.favoriteModel.findOneAndDelete({
+      _id: favoriteId,
+      userId,
+    });
     if (!favorite) {
       throw new NotFoundException('Favorite not found');
     }

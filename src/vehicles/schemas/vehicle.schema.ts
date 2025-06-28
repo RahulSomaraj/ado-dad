@@ -7,10 +7,7 @@ import {
   WheelerType,
 } from '../enum/vehicle.type';
 
-
-
 export type VehicleDocument = Vehicle & Document;
-
 
 @Schema({ _id: false })
 export class VehicleDetails {
@@ -142,7 +139,6 @@ export class Vehicle extends Document {
 
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
-
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

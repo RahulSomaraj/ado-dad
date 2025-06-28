@@ -7,12 +7,9 @@ import { VehicleModule } from './vehicles/vehicle.module';
 import { ShowroomModule } from './showroom/showroom.module';
 import { CartModule } from './cart/cart.module';
 import { ProductModule } from './product/product.module';
-import { AdvertisementsModule } from './advertisement/advertisement.module';
 import { BannerModule } from './banner/banner.module';
 import { CategoryModule } from './category/category.module';
-import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
-import { PropertyModule } from './property/property.module';
 import { FavoriteModule } from './favorites/favorite.module';
 import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.module';
 import { EmailService } from './utils/email.service';
@@ -31,6 +28,7 @@ import { RefreshTokenService } from './auth/auth.refresh.service';
 import { User, UserSchema } from './users/schemas/user.schema';
 import { AuthModule } from './auth/auth.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { AdsModule } from './ads/ads.module';
 
 @Module({
   imports: [
@@ -61,17 +59,15 @@ import { GatewayModule } from './gateway/gateway.module';
     ShowroomModule,
     CartModule,
     ProductModule,
-    AdvertisementsModule,
     BannerModule,
     CategoryModule,
-    ModelModule,
     RatingModule,
-    PropertyModule,
     FavoriteModule,
     VehicleInventoryModule,
     AuthModule,
     UploadModule,
     GatewayModule,
+    AdsModule,
   ],
   providers: [EmailService, AppService, RefreshTokenService],
   controllers: [AppController],

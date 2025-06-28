@@ -49,3 +49,13 @@ export const ManufacturerSchema = SchemaFactory.createForClass(Manufacturer);
 // Indexes for fast lookups
 ManufacturerSchema.index({ name: 1 });
 ManufacturerSchema.index({ isActive: 1, isDeleted: 1 });
+ManufacturerSchema.index({ originCountry: 1 });
+ManufacturerSchema.index({ foundedYear: 1 });
+ManufacturerSchema.index({ headquarters: 1 });
+ManufacturerSchema.index({
+  name: 'text',
+  displayName: 'text',
+  description: 'text',
+  originCountry: 'text',
+  headquarters: 'text',
+});

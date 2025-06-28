@@ -1,0 +1,312 @@
+{
+  "basic_filters": {
+    "description": "Basic filtering examples",
+    "examples": {
+      "all_properties": {
+        "description": "Get all property advertisements",
+        "url": "/ads?category=property",
+        "query_params": {
+          "category": "property"
+        }
+      },
+      "search_by_location": {
+        "description": "Search for ads in Mumbai",
+        "url": "/ads?location=Mumbai",
+        "query_params": {
+          "location": "Mumbai"
+        }
+      },
+      "price_range": {
+        "description": "Find ads between 5 lakhs and 50 lakhs",
+        "url": "/ads?minPrice=500000&maxPrice=5000000",
+        "query_params": {
+          "minPrice": 500000,
+          "maxPrice": 5000000
+        }
+      },
+      "text_search": {
+        "description": "Search for Honda cars",
+        "url": "/ads?search=honda",
+        "query_params": {
+          "search": "honda"
+        }
+      },
+      "user_ads": {
+        "description": "Get ads posted by a specific user",
+        "url": "/ads?postedBy=507f1f77bcf86cd799439011",
+        "query_params": {
+          "postedBy": "507f1f77bcf86cd799439011"
+        }
+      }
+    }
+  },
+  "property_filters": {
+    "description": "Property-specific filtering examples",
+    "examples": {
+      "apartments_only": {
+        "description": "Get only apartment listings",
+        "url": "/ads?category=property&propertyType=apartment",
+        "query_params": {
+          "category": "property",
+          "propertyType": "apartment"
+        }
+      },
+      "2_3_bhk": {
+        "description": "Find 2-3 BHK properties",
+        "url": "/ads?category=property&minBedrooms=2&maxBedrooms=3",
+        "query_params": {
+          "category": "property",
+          "minBedrooms": 2,
+          "maxBedrooms": 3
+        }
+      },
+      "furnished_apartments": {
+        "description": "Find furnished apartments with parking",
+        "url": "/ads?category=property&propertyType=apartment&isFurnished=true&hasParking=true",
+        "query_params": {
+          "category": "property",
+          "propertyType": "apartment",
+          "isFurnished": true,
+          "hasParking": true
+        }
+      },
+      "large_properties": {
+        "description": "Find properties larger than 2000 sq ft",
+        "url": "/ads?category=property&minArea=2000",
+        "query_params": {
+          "category": "property",
+          "minArea": 2000
+        }
+      },
+      "luxury_properties": {
+        "description": "Find luxury properties with garden",
+        "url": "/ads?category=property&hasGarden=true&minPrice=10000000",
+        "query_params": {
+          "category": "property",
+          "hasGarden": true,
+          "minPrice": 10000000
+        }
+      }
+    }
+  },
+  "vehicle_filters": {
+    "description": "Vehicle-specific filtering examples",
+    "examples": {
+      "honda_cars": {
+        "description": "Find Honda cars",
+        "url": "/ads?category=private_vehicle&manufacturerId=507f1f77bcf86cd799439011",
+        "query_params": {
+          "category": "private_vehicle",
+          "manufacturerId": "507f1f77bcf86cd799439011"
+        }
+      },
+      "recent_cars": {
+        "description": "Find cars from 2020 onwards",
+        "url": "/ads?category=private_vehicle&minYear=2020",
+        "query_params": {
+          "category": "private_vehicle",
+          "minYear": 2020
+        }
+      },
+      "low_mileage": {
+        "description": "Find cars with less than 50,000 km",
+        "url": "/ads?category=private_vehicle&maxMileage=50000",
+        "query_params": {
+          "category": "private_vehicle",
+          "maxMileage": 50000
+        }
+      },
+      "first_owner": {
+        "description": "Find first owner cars with insurance",
+        "url": "/ads?category=private_vehicle&isFirstOwner=true&hasInsurance=true",
+        "query_params": {
+          "category": "private_vehicle",
+          "isFirstOwner": true,
+          "hasInsurance": true
+        }
+      },
+      "white_cars": {
+        "description": "Find white colored cars",
+        "url": "/ads?category=private_vehicle&color=white",
+        "query_params": {
+          "category": "private_vehicle",
+          "color": "white"
+        }
+      },
+      "two_wheelers": {
+        "description": "Find all two-wheelers",
+        "url": "/ads?category=two_wheeler",
+        "query_params": {
+          "category": "two_wheeler"
+        }
+      }
+    }
+  },
+  "commercial_vehicle_filters": {
+    "description": "Commercial vehicle-specific filtering examples",
+    "examples": {
+      "trucks_only": {
+        "description": "Find only trucks",
+        "url": "/ads?category=commercial_vehicle&commercialVehicleType=truck",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "commercialVehicleType": "truck"
+        }
+      },
+      "heavy_trucks": {
+        "description": "Find trucks with payload capacity > 5000 kg",
+        "url": "/ads?category=commercial_vehicle&commercialVehicleType=truck&minPayloadCapacity=5000",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "commercialVehicleType": "truck",
+          "minPayloadCapacity": 5000
+        }
+      },
+      "flatbed_trucks": {
+        "description": "Find flatbed trucks",
+        "url": "/ads?category=commercial_vehicle&bodyType=flatbed",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "bodyType": "flatbed"
+        }
+      },
+      "permitted_vehicles": {
+        "description": "Find commercial vehicles with all permits",
+        "url": "/ads?category=commercial_vehicle&hasFitness=true&hasPermit=true",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "hasFitness": true,
+          "hasPermit": true
+        }
+      },
+      "passenger_buses": {
+        "description": "Find passenger buses with seating capacity > 30",
+        "url": "/ads?category=commercial_vehicle&commercialVehicleType=bus&bodyType=passenger&minSeatingCapacity=30",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "commercialVehicleType": "bus",
+          "bodyType": "passenger",
+          "minSeatingCapacity": 30
+        }
+      }
+    }
+  },
+  "combined_filters": {
+    "description": "Complex filtering examples combining multiple criteria",
+    "examples": {
+      "luxury_property_mumbai": {
+        "description": "Find luxury properties in Mumbai with specific criteria",
+        "url": "/ads?category=property&location=Mumbai&minPrice=10000000&propertyType=apartment&minBedrooms=3&isFurnished=true&hasParking=true",
+        "query_params": {
+          "category": "property",
+          "location": "Mumbai",
+          "minPrice": 10000000,
+          "propertyType": "apartment",
+          "minBedrooms": 3,
+          "isFurnished": true,
+          "hasParking": true
+        }
+      },
+      "recent_honda_cars_delhi": {
+        "description": "Find recent Honda cars in Delhi with low mileage",
+        "url": "/ads?category=private_vehicle&location=Delhi&manufacturerId=507f1f77bcf86cd799439011&minYear=2020&maxMileage=30000&isFirstOwner=true",
+        "query_params": {
+          "category": "private_vehicle",
+          "location": "Delhi",
+          "manufacturerId": "507f1f77bcf86cd799439011",
+          "minYear": 2020,
+          "maxMileage": 30000,
+          "isFirstOwner": true
+        }
+      },
+      "commercial_trucks_pune": {
+        "description": "Find heavy trucks in Pune with all permits",
+        "url": "/ads?category=commercial_vehicle&location=Pune&commercialVehicleType=truck&minPayloadCapacity=5000&hasFitness=true&hasPermit=true",
+        "query_params": {
+          "category": "commercial_vehicle",
+          "location": "Pune",
+          "commercialVehicleType": "truck",
+          "minPayloadCapacity": 5000,
+          "hasFitness": true,
+          "hasPermit": true
+        }
+      }
+    }
+  },
+  "pagination_and_sorting": {
+    "description": "Pagination and sorting examples",
+    "examples": {
+      "first_page": {
+        "description": "Get first page of results",
+        "url": "/ads?page=1&limit=10",
+        "query_params": {
+          "page": 1,
+          "limit": 10
+        }
+      },
+      "sorted_by_price": {
+        "description": "Get results sorted by price (lowest first)",
+        "url": "/ads?sortBy=price&sortOrder=ASC",
+        "query_params": {
+          "sortBy": "price",
+          "sortOrder": "ASC"
+        }
+      },
+      "sorted_by_date": {
+        "description": "Get latest ads first",
+        "url": "/ads?sortBy=postedAt&sortOrder=DESC",
+        "query_params": {
+          "sortBy": "postedAt",
+          "sortOrder": "DESC"
+        }
+      },
+      "alphabetical": {
+        "description": "Get ads sorted alphabetically by title",
+        "url": "/ads?sortBy=title&sortOrder=ASC",
+        "query_params": {
+          "sortBy": "title",
+          "sortOrder": "ASC"
+        }
+      },
+      "large_page": {
+        "description": "Get more results per page",
+        "url": "/ads?limit=50",
+        "query_params": {
+          "limit": 50
+        }
+      }
+    }
+  },
+  "response_format": {
+    "description": "Example response format",
+    "example_response": {
+      "data": [
+        {
+          "id": "507f1f77bcf86cd799439011",
+          "title": "Beautiful 2BHK Apartment in Prime Location",
+          "description": "Spacious and well-maintained 2BHK apartment...",
+          "price": 8500000,
+          "images": ["https://example.com/image1.jpg"],
+          "location": "Bandra West, Mumbai, Maharashtra",
+          "category": "property",
+          "isActive": true,
+          "postedAt": "2024-01-15T10:30:00.000Z",
+          "updatedAt": "2024-01-15T10:30:00.000Z",
+          "postedBy": "507f1f77bcf86cd799439012",
+          "user": {
+            "id": "507f1f77bcf86cd799439012",
+            "name": "John Doe",
+            "email": "john@example.com",
+            "phone": "+91-9876543210"
+          }
+        }
+      ],
+      "total": 150,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 8,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}

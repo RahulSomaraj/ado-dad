@@ -7,7 +7,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
+import { VehicleTypes } from '../../vehicles/enum/vehicle.type';
 
 export class CreateVehicleModelDto {
   @ApiProperty({

@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { S3Service } from './s3.service';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
-import { RolesGuard } from 'src/roles/roles.guard';
-import { Roles } from 'src/roles/roles.decorator';
-import { UserType } from 'src/users/enums/user.types';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Upload')

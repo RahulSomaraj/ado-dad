@@ -22,12 +22,12 @@ import {
 } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto'; // Import CreateUserDto
 import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
-import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { HttpExceptionFilter } from '../shared/exception-service';
 import { GetUsersDto } from './dto/get-user.dto';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
-import { Roles } from 'src/roles/roles.decorator';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { Roles } from '../roles/roles.decorator';
 import { UserType } from './enums/user.types';
-import { RolesGuard } from 'src/roles/roles.guard';
+import { RolesGuard } from '../roles/roles.guard';
 
 @ApiTags('users')
 @Controller('users')

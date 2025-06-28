@@ -7,9 +7,9 @@ import { EmailService } from '../utils/email.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'User', schema: UserSchema }]),  // Register User schema here
+    MongooseModule.forFeature([{ name: 'User', schema: UserSchema }]), // Register User schema here
   ],
-  providers: [UsersService, EmailService],  // Make sure the email service is added
+  providers: [UsersService, EmailService], // Make sure the email service is added
   controllers: [UsersController],
 })
 export class UsersModule {}

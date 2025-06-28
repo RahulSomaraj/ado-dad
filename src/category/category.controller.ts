@@ -21,12 +21,12 @@ import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './schemas/category.schema';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
-import { HttpExceptionFilter } from 'src/shared/exception-service';
+import { HttpExceptionFilter } from '../shared/exception-service';
 import { FindAllCategoriesDto } from './dto/get-category.dto';
-import { Roles } from 'src/roles/roles.decorator';
-import { UserType } from 'src/users/enums/user.types';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
 
 @ApiTags('Categories')
 @Controller('categories')

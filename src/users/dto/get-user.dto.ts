@@ -41,7 +41,8 @@ export class GetUsersDto {
   type?: UserType;
 
   @ApiPropertyOptional({
-    description: 'Sorting field and order (e.g., "name:asc" or "createdAt:desc")',
+    description:
+      'Sorting field and order (e.g., "name:asc" or "createdAt:desc")',
     example: 'name:asc',
   })
   @IsOptional()

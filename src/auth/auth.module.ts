@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import appConfig from 'src/config/app.config';
+import appConfig from '../config/app.config';
 
 import { RefreshTokenService } from './auth.refresh.service';
 import { AuthService } from './auth.service';
@@ -11,7 +11,7 @@ import { CustomJwtStrategy } from './passport-strategies/custom-jwt-strategy';
 import { JwtStrategy } from './passport-strategies/jwt-strategy';
 import { LocalStrategy } from './passport-strategies/local-strategy';
 import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { AuthTokens, AuthTokensSchema } from './schemas/schema.refresh-token';
 
 @Module({

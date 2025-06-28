@@ -18,7 +18,14 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "ts-node src/vehicle-inventory/seed/seed-script.ts"
+    "seed": "ts-node src/vehicle-inventory/seed/seed-script.ts",
+    "seed:ads": "ts-node src/ads/seed/run-seed.ts",
+    "seed:manufacturers": "ts-node src/vehicle-inventory/seed/run-manufacturer-seed.ts",
+    "seed:vehicle-models": "ts-node src/vehicle-inventory/seed/seed-vehicle-models-standalone.ts",
+    "seed:vehicle-variants": "ts-node src/vehicle-inventory/seed/run-vehicle-variant-seed.ts",
+    "debug:manufacturers": "ts-node src/vehicle-inventory/seed/debug-manufacturers.ts",
+    "debug:vehicle-models": "ts-node src/vehicle-inventory/seed/debug-vehicle-models.ts",
+    "debug:vehicle-variants": "ts-node src/vehicle-inventory/seed/debug-vehicle-variants.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.744.0",
@@ -60,7 +67,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.7.3",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "typeorm": "^0.3.25"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

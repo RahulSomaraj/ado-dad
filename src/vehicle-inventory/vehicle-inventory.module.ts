@@ -3,6 +3,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { VehicleInventoryService } from './vehicle-inventory.service';
 import { VehicleInventoryController } from './vehicle-inventory.controller';
 import { SeedDataService } from './seed/seed-data';
+import { ManufacturerSeedService } from './seed/seed-manufacturers';
+import { VehicleModelSeedService } from './seed/seed-vehicle-models';
+import { VehicleVariantSeedService } from './seed/seed-vehicle-variants';
 import {
   Manufacturer,
   ManufacturerSchema,
@@ -32,7 +35,19 @@ import {
     ]),
   ],
   controllers: [VehicleInventoryController],
-  providers: [VehicleInventoryService, SeedDataService],
-  exports: [VehicleInventoryService, SeedDataService],
+  providers: [
+    VehicleInventoryService,
+    SeedDataService,
+    ManufacturerSeedService,
+    VehicleModelSeedService,
+    VehicleVariantSeedService,
+  ],
+  exports: [
+    VehicleInventoryService,
+    SeedDataService,
+    ManufacturerSeedService,
+    VehicleModelSeedService,
+    VehicleVariantSeedService,
+  ],
 })
 export class VehicleInventoryModule {}

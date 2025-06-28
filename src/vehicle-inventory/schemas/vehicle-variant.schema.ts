@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { FeaturePackage } from 'src/vehicles/enum/vehicle.type';
+import { FeaturePackage } from '../../vehicles/enum/vehicle.type';
 import {
   VehicleFeatures,
   VehicleFeaturesSchema,

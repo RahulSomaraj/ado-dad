@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { VehicleTypes } from 'src/vehicles/enum/vehicle.type';
+import { VehicleTypes } from '../../vehicles/enum/vehicle.type';
 
 export type VehicleModelDocument = VehicleModel & Document;
 
@@ -54,3 +54,9 @@ VehicleModelSchema.index({ manufacturer: 1, name: 1 }, { unique: true });
 VehicleModelSchema.index({ vehicleType: 1 });
 VehicleModelSchema.index({ isActive: 1, isDeleted: 1 });
 VehicleModelSchema.index({ manufacturer: 1, isActive: 1 });
+
+// Text index for search functionality
+VehicleModelSchema.index(
+  { name: 'text', displayName: 'text', description: 'text' },
+  { weights: { name: 10, displayName: 5, description: 1 } },
+);

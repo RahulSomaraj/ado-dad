@@ -28,7 +28,7 @@ export class CartService {
     const { items } = createCartDto;
 
     // Validate if the products exist
-    const productIds = items.map(item => item.product);
+    const productIds = items.map((item) => item.product);
     const products = await this.productModel.find({ _id: { $in: productIds } });
     if (products.length !== productIds.length) {
       throw new NotFoundException('One or more products not found');
@@ -40,16 +40,18 @@ export class CartService {
       // If no cart exists, create a new one
       cart = new this.cartModel({
         user: userId,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           product: new Types.ObjectId(item.product),
           quantity: item.quantity,
         })),
       });
     } else {
       // If cart exists, merge the items
-      items.forEach(newItem => {
+      items.forEach((newItem) => {
         const existingItem = cart?.items.find(
-          item => item.product.toString() === new Types.ObjectId(newItem.product).toString(),
+          (item) =>
+            item.product.toString() ===
+            new Types.ObjectId(newItem.product).toString(),
         );
         if (existingItem) {
           existingItem.quantity += newItem.quantity; // Update quantity if product already exists
@@ -67,14 +69,20 @@ export class CartService {
   }
 
   // Update item quantity in cart
-  async updateCartItem(userId: string, updateCartDto: UpdateCartDto): Promise<Cart> {
+  async updateCartItem(
+    userId: string,
+    updateCartDto: UpdateCartDto,
+  ): Promise<Cart> {
     const { product, quantity } = updateCartDto;
 
     const cart = await this.cartModel.findOne({ user: userId });
     if (!cart) throw new NotFoundException('Cart not found');
 
-    const itemIndex = cart.items.findIndex(item => item.product.toString() === product);
-    if (itemIndex === -1) throw new NotFoundException('Product not found in cart');
+    const itemIndex = cart.items.findIndex(
+      (item) => item.product.toString() === product,
+    );
+    if (itemIndex === -1)
+      throw new NotFoundException('Product not found in cart');
 
     cart.items[itemIndex].quantity = quantity; // Update product quantity
     await cart.save();
@@ -87,7 +95,9 @@ export class CartService {
     if (!cart) throw new NotFoundException('Cart not found');
 
     // Filter out the product to be removed
-    cart.items = cart.items.filter(item => item.product.toString() !== productId);
+    cart.items = cart.items.filter(
+      (item) => item.product.toString() !== productId,
+    );
     await cart.save();
     return cart.populate('items.product'); // Return updated cart with populated product details
   }

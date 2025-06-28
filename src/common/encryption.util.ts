@@ -3,7 +3,8 @@ import * as crypto from 'crypto';
 
 export class EncryptionUtil {
   private static readonly SALT_ROUNDS = 10; // For bcrypt
-  private static readonly ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your_32_char_secret_key'; // Must be 32 characters
+  private static readonly ENCRYPTION_KEY =
+    process.env.ENCRYPTION_KEY || 'your_32_char_secret_key'; // Must be 32 characters
   private static readonly IV_LENGTH = 16; // AES IV length
 
   /**
@@ -21,7 +22,10 @@ export class EncryptionUtil {
    * @param hash - The hashed password
    * @returns Boolean indicating if they match
    */
-  static async comparePasswords(password: string, hash: string): Promise<boolean> {
+  static async comparePasswords(
+    password: string,
+    hash: string,
+  ): Promise<boolean> {
     return bcrypt.compare(password, hash);
   }
 
@@ -31,7 +35,10 @@ export class EncryptionUtil {
    * @param password - The hashed password
    * @returns Boolean indicating if they match
    */
-  static async comparePassword(pass: string, password: string): Promise<boolean> {
+  static async comparePassword(
+    pass: string,
+    password: string,
+  ): Promise<boolean> {
     return this.comparePasswords(pass, password);
   }
 
@@ -42,7 +49,11 @@ export class EncryptionUtil {
    */
   static encrypt(text: string): string {
     const iv = crypto.randomBytes(this.IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(this.ENCRYPTION_KEY), iv);
+    const cipher = crypto.createCipheriv(
+      'aes-256-cbc',
+      Buffer.from(this.ENCRYPTION_KEY),
+      iv,
+    );
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     return iv.toString('hex') + ':' + encrypted;
@@ -57,9 +68,13 @@ export class EncryptionUtil {
     const [ivHex, encryptedHex] = encryptedText.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const encryptedTextBuffer = Buffer.from(encryptedHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(this.ENCRYPTION_KEY), iv);
-    let decrypted = decipher.update(encryptedTextBuffer);  // Pass Buffer here
-    decrypted = Buffer.concat([decrypted, decipher.final()]);  // Concatenate the final part
-    return decrypted.toString('utf8');  // Convert the final buffer to a string
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(this.ENCRYPTION_KEY),
+      iv,
+    );
+    let decrypted = decipher.update(encryptedTextBuffer); // Pass Buffer here
+    decrypted = Buffer.concat([decrypted, decipher.final()]); // Concatenate the final part
+    return decrypted.toString('utf8'); // Convert the final buffer to a string
   }
 }

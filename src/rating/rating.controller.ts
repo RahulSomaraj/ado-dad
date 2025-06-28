@@ -22,11 +22,11 @@ import {
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { RatingService } from './rating.service';
-import { HttpExceptionFilter } from 'src/shared/exception-service';
-import { UserType } from 'src/users/enums/user.types';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth-guard';
-import { RolesGuard } from 'src/roles/roles.guard';
-import { Roles } from 'src/roles/roles.decorator';
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { UserType } from '../users/enums/user.types';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
 
 @ApiTags('Ratings')
 @Controller('ratings')

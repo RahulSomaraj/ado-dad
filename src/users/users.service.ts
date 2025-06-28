@@ -58,7 +58,6 @@ export class UsersService {
       query.type = type;
     }
 
-
     // Sorting logic (default: createdAt descending)
     let sortOptions: any = { createdAt: -1 };
     if (sort) {

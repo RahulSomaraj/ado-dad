@@ -3,8 +3,8 @@
 // import { Strategy, ExtractJwt } from 'passport-firebase-jwt';
 // import * as firebaseConfig from '../../../firebase.config.json';
 // import * as firebase from 'firebase-admin';
-// import { UserType } from 'src/users/enums/user.types';
-// import { Customer } from 'src/customers/entity/customer.entity';
+// import { UserType } from '../../users/enums/user.types';
+// import { Customer } from '../../customers/entity/customer.entity';
 // import { Repository } from 'typeorm';
 // import { InjectRepository } from '@nestjs/typeorm';
 

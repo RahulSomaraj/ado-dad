@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { FeaturePackage } from 'src/vehicles/enum/vehicle.type';
+import { FeaturePackage } from '../../vehicles/enum/vehicle.type';
 import { VehicleFeaturesDto } from './vehicle-features.dto';
 
 export class EngineSpecsDto {
