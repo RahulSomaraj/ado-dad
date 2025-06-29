@@ -22,13 +22,6 @@ import {
 export class CreateAdDataDto {
   // Base ad properties (common to all types)
   @ApiProperty({
-    description: 'Advertisement title',
-    example: 'Beautiful Property for Sale',
-  })
-  @IsString()
-  title: string;
-
-  @ApiProperty({
     description: 'Advertisement description',
     example: 'This is a detailed description of the advertisement',
   })
@@ -357,7 +350,6 @@ export class CreateAdDto {
         summary: 'Property Ad Example',
         description: 'Complete example for creating a property advertisement',
         value: {
-          title: 'Beautiful 2BHK Apartment in Prime Location',
           description:
             'Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
           price: 8500000,
@@ -382,7 +374,6 @@ export class CreateAdDto {
         description:
           'Complete example for creating a private vehicle advertisement',
         value: {
-          title: 'Honda City 2020 Model - Single Owner',
           description:
             'Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
           price: 850000,
@@ -416,7 +407,6 @@ export class CreateAdDto {
         description:
           'Complete example for creating a commercial vehicle advertisement',
         value: {
-          title: 'Tata 407 Truck - Excellent Condition',
           description:
             'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
           price: 1800000,
@@ -455,7 +445,6 @@ export class CreateAdDto {
         description:
           'Complete example for creating a two-wheeler advertisement',
         value: {
-          title: 'Honda Activa 6G - 2021 Model',
           description:
             'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
           price: 65000,

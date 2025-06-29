@@ -837,43 +837,4 @@ export class AdsController {
   async getVehicleVariantById(@Param('id') id: string) {
     return this.vehicleInventoryService.findVehicleVariantById(id);
   }
-
-  @Get('lookup/fuel-types')
-  @ApiOperation({ summary: 'Get all fuel types' })
-  @ApiResponse({
-    status: 200,
-    description: 'Fuel types retrieved successfully',
-  })
-  async getFuelTypes() {
-    return this.vehicleInventoryService.findAllFuelTypes();
-  }
-
-  @Get('lookup/fuel-types/:id')
-  @ApiOperation({ summary: 'Get fuel type by ID' })
-  @ApiResponse({ status: 200, description: 'Fuel type retrieved successfully' })
-  @ApiParam({ name: 'id', description: 'Fuel type ID' })
-  async getFuelTypeById(@Param('id') id: string) {
-    return this.vehicleInventoryService.findFuelTypeById(id);
-  }
-
-  @Get('lookup/transmission-types')
-  @ApiOperation({ summary: 'Get all transmission types' })
-  @ApiResponse({
-    status: 200,
-    description: 'Transmission types retrieved successfully',
-  })
-  async getTransmissionTypes() {
-    return this.vehicleInventoryService.findAllTransmissionTypes();
-  }
-
-  @Get('lookup/transmission-types/:id')
-  @ApiOperation({ summary: 'Get transmission type by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Transmission type retrieved successfully',
-  })
-  @ApiParam({ name: 'id', description: 'Transmission type ID' })
-  async getTransmissionTypeById(@Param('id') id: string) {
-    return this.vehicleInventoryService.findTransmissionTypeById(id);
-  }
 }

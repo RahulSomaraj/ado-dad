@@ -800,10 +800,10 @@ export class AdsService {
   private validateRequiredFields(createDto: CreateAdDto): void {
     const { category, data } = createDto;
 
-    // Validate base required fields
-    if (!data.title || !data.description || !data.price || !data.location) {
+    // Validate base required fields (remove title)
+    if (!data.description || !data.price || !data.location) {
       throw new BadRequestException(
-        'Title, description, price, and location are required for all ad types',
+        'Description, price, and location are required for all ad types',
       );
     }
 
@@ -869,7 +869,7 @@ export class AdsService {
     userId: string,
   ): Promise<AdResponseDto> {
     const ad = new this.adModel({
-      title: data.title,
+      title: '', // No user-supplied title
       description: data.description,
       price: data.price,
       images: data.images || [],
@@ -902,20 +902,22 @@ export class AdsService {
     data: any,
     userId: string,
   ): Promise<AdResponseDto> {
-    // Validate that the referenced vehicle-inventory entities exist
-    await this.validateVehicleInventoryReferences(data);
+    // Fetch model name for title
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model ? model.displayName || model.name : 'Vehicle';
+    const year = data.year || '';
+    const title = `${modelName} ${year}`.trim();
 
     const ad = new this.adModel({
-      title: data.title,
+      title,
       description: data.description,
       price: data.price,
       images: data.images || [],
       location: data.location,
       postedBy: userId,
-      category:
-        data.vehicleType === 'two_wheeler'
-          ? AdCategory.TWO_WHEELER
-          : AdCategory.PRIVATE_VEHICLE,
+      category: AdCategory.PRIVATE_VEHICLE,
     });
 
     const savedAd = await ad.save();
@@ -946,11 +948,17 @@ export class AdsService {
     data: any,
     userId: string,
   ): Promise<AdResponseDto> {
-    // Validate that the referenced vehicle-inventory entities exist
     await this.validateVehicleInventoryReferences(data);
+    // Fetch model name for title
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model ? model.displayName || model.name : 'Vehicle';
+    const year = data.year || '';
+    const title = `${modelName} ${year}`.trim();
 
     const ad = new this.adModel({
-      title: data.title,
+      title,
       description: data.description,
       price: data.price,
       images: data.images || [],
@@ -985,6 +993,52 @@ export class AdsService {
     });
 
     await commercialVehicleAd.save();
+
+    return this.findOne((savedAd._id as any).toString());
+  }
+
+  private async createTwoWheelerAdFromUnified(
+    data: any,
+    userId: string,
+  ): Promise<AdResponseDto> {
+    // Fetch model name for title
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model ? model.displayName || model.name : 'Vehicle';
+    const year = data.year || '';
+    const title = `${modelName} ${year}`.trim();
+
+    const ad = new this.adModel({
+      title,
+      description: data.description,
+      price: data.price,
+      images: data.images || [],
+      location: data.location,
+      postedBy: userId,
+      category: AdCategory.TWO_WHEELER,
+    });
+
+    const savedAd = await ad.save();
+
+    const vehicleAd = new this.vehicleAdModel({
+      ad: savedAd._id as any,
+      vehicleType: data.vehicleType,
+      manufacturerId: data.manufacturerId,
+      modelId: data.modelId,
+      variantId: data.variantId,
+      year: data.year,
+      mileage: data.mileage,
+      transmissionTypeId: data.transmissionTypeId,
+      fuelTypeId: data.fuelTypeId,
+      color: data.color,
+      isFirstOwner: data.isFirstOwner,
+      hasInsurance: data.hasInsurance,
+      hasRcBook: data.hasRcBook,
+      additionalFeatures: data.additionalFeatures || [],
+    });
+
+    await vehicleAd.save();
 
     return this.findOne((savedAd._id as any).toString());
   }
@@ -1081,7 +1135,6 @@ export class AdsService {
   private mapToResponseDto(ad: any): AdResponseDto {
     return {
       id: (ad._id as any).toString(),
-      title: ad.title,
       description: ad.description,
       price: ad.price,
       images: ad.images,

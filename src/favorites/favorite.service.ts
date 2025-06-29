@@ -15,6 +15,9 @@ export class FavoriteService {
     userId: string,
     createFavoriteDto: CreateFavoriteDto,
   ): Promise<Favorite> {
+    if (createFavoriteDto.itemType !== 'ad') {
+      throw new Error('Only ads can be favorited');
+    }
     const favorite = new this.favoriteModel({ userId, ...createFavoriteDto });
     return await favorite.save();
   }
@@ -33,6 +36,7 @@ export class FavoriteService {
       filter.itemType = query.itemType;
     }
 
+    // Always populate ad details
     return await this.favoriteModel.find(filter).populate('itemId');
   }
 

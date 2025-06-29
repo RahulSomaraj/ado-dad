@@ -8,10 +8,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BaseAdDto {
-  @ApiProperty({ description: 'Advertisement title' })
-  @IsString()
-  title: string;
-
   @ApiProperty({ description: 'Advertisement description' })
   @IsString()
   description: string;

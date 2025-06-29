@@ -86,7 +86,7 @@ export class FilterAdDto {
   // ===== PAGINATION AND SORTING =====
   @ApiPropertyOptional({
     description: 'Sort by field',
-    enum: ['price', 'postedAt', 'title', 'createdAt', 'updatedAt'],
+    enum: ['price', 'postedAt', 'createdAt', 'updatedAt'],
     example: 'postedAt',
   })
   @IsOptional()

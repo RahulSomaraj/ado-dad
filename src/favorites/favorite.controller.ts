@@ -37,18 +37,17 @@ export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
   @Post()
-  async addToCart(
-    @Query('userId') userId: string,
-    @Body() createFavoriteDto: CreateFavoriteDto,
-  ) {
-    return this.favoriteService.addFavorite(userId, createFavoriteDto);
+  @ApiOperation({ summary: 'Add an ad to favorites' })
+  @ApiBody({ type: CreateFavoriteDto })
+  async addFavorite(@Req() req, @Body() createFavoriteDto: CreateFavoriteDto) {
+    return this.favoriteService.addFavorite(req.user.id, createFavoriteDto);
   }
 
   @Get()
   @Roles(UserType.USER, UserType.ADMIN)
-  @ApiOperation({ summary: "Get user's favorites" })
+  @ApiOperation({ summary: "Get user's favorite ads" })
   @ApiQuery({ name: 'itemId', required: false, type: String })
-  @ApiQuery({ name: 'itemType', required: false, enum: ['product', 'service'] })
+  @ApiQuery({ name: 'itemType', required: false, enum: ['ad'] })
   async getUserFavorites(@Req() req, @Query() query) {
     return await this.favoriteService.getUserFavorites(req.user.id, query);
   }

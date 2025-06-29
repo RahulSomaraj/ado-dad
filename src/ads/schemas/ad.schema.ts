@@ -13,9 +13,6 @@ export enum AdCategory {
 @Schema({ timestamps: true })
 export class Ad {
   @Prop({ required: true, trim: true })
-  title: string;
-
-  @Prop({ required: true })
   description: string;
 
   @Prop({ required: true, min: 0 })
@@ -45,4 +42,3 @@ AdSchema.index({ location: 1 });
 AdSchema.index({ postedBy: 1 });
 AdSchema.index({ isActive: 1 });
 AdSchema.index({ price: 1 });
-AdSchema.index({ title: 'text', description: 'text', location: 'text' });
