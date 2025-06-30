@@ -38,6 +38,7 @@ import { UserType } from '../users/enums/user.types';
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
+  
   @Get()
   @ApiQuery({
     name: 'modelVehicleName',

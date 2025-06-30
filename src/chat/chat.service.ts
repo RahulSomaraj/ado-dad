@@ -1,31 +1,49 @@
 // chat.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { ChatMessage } from './schemas/chat.schema';
+import { Model, Types } from 'mongoose';
+import { Chat } from './schemas/chat.schema';
+import { Message } from './schemas/message.schema';
+import { CreateMessageDto } from './dto/create-message.dto';
 
 @Injectable()
 export class ChatService {
   constructor(
-    @InjectModel(ChatMessage.name)
-    private readonly chatModel: Model<ChatMessage>,
+    @InjectModel(Chat.name) private chatModel: Model<Chat>,
+    @InjectModel(Message.name) private messageModel: Model<Message>,
   ) {}
 
-  async createMessage(payload: {
-    sender: string;
-    receiver: string;
-    message: string;
-  }): Promise<ChatMessage> {
-    const newMessage = new this.chatModel({
-      sender: payload.sender,
-      receiver: payload.receiver,
-      message: payload.message,
-    });
-    return newMessage.save();
+  async createChat(participants: Types.ObjectId[], contextType: string, contextId: string) {
+    const chat = new this.chatModel({ participants, contextType, contextId });
+    return chat.save();
   }
 
-  // Optional: method to retrieve chat history (sorted by creation time)
-  async getMessages(): Promise<ChatMessage[]> {
-    return this.chatModel.find().sort({ createdAt: 1 }).exec();
+  async findOrCreateChat(participants: Types.ObjectId[], contextType: string, contextId: string) {
+    let chat = await this.chatModel.findOne({
+      participants: { $all: participants, $size: 2 },
+      contextType,
+      contextId,
+    });
+    if (!chat) {
+      chat = await this.createChat(participants, contextType, contextId);
+    }
+    return chat;
+  }
+
+  async sendMessage(chatId: string, senderId: string, content: string) {
+    const message = new this.messageModel({
+      chat: chatId,
+      sender: senderId,
+      content,
+    });
+    return message.save();
+  }
+
+  async getMessages(chatId: string) {
+    return this.messageModel.find({ chat: chatId }).sort({ createdAt: 1 });
+  }
+
+  async getUserChats(userId: string) {
+    return this.chatModel.find({ participants: userId });
   }
 }

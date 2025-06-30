@@ -50,11 +50,14 @@ export class MyGateway
   // }
 
   @SubscribeMessage('message')
-  async handleMessage(@MessageBody() payload: any): Promise<void> {
+  async handleMessage(@MessageBody() payload: any, client: Socket): Promise<void> {
     this.logger.log(`Message received: ${JSON.stringify(payload)}`);
     try {
+      // Extract chatId, content, and senderId
+      const { chatId, content } = payload;
+      const senderId = payload.senderId || client.handshake.auth.userId;
       // Save the message in the database
-      const savedMessage = await this.chatService.createMessage(payload);
+      const savedMessage = await this.chatService.sendMessage(chatId, senderId, content);
       // Broadcast the saved message to all connected clients
       this.server.emit('message', savedMessage);
     } catch (error) {

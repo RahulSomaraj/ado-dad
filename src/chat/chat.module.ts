@@ -1,16 +1,20 @@
 // chat.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { MyGateway } from '../gateway/websocket.gateway';
+import { Chat, ChatSchema } from './schemas/chat.schema';
+import { Message, MessageSchema } from './schemas/message.schema';
 import { ChatService } from './chat.service';
-import { ChatMessage, ChatMessageSchema } from './schemas/chat.schema';
+import { ChatController } from './chat.controller';
+import { ChatGateway } from './chat.gateway';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: ChatMessage.name, schema: ChatMessageSchema },
+      { name: Chat.name, schema: ChatSchema },
+      { name: Message.name, schema: MessageSchema },
     ]),
   ],
-  providers: [ChatService, MyGateway],
+  providers: [ChatService, ChatGateway],
+  controllers: [ChatController],
 })
 export class ChatModule {}

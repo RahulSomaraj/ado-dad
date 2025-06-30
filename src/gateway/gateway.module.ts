@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { MyGateway } from './websocket.gateway';
 import { ChatService } from '../chat/chat.service';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ChatMessage, ChatMessageSchema } from '../chat/schemas/chat.schema';
+import { Chat, ChatSchema } from '../chat/schemas/chat.schema';
+import { Message, MessageSchema } from '../chat/schemas/message.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: ChatMessage.name, schema: ChatMessageSchema },
+      { name: Chat.name, schema: ChatSchema },
+      { name: Message.name, schema: MessageSchema },
     ]),
   ],
   providers: [MyGateway, ChatService],
