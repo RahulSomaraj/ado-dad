@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ado-Dad WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        font-weight: bold;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .connecting {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+
+      .log-container {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        margin: 10px 0;
+      }
+      .log-entry {
+        margin: 2px 0;
+        padding: 2px 0;
+      }
+      .log-info {
+        color: #0066cc;
+      }
+      .log-success {
+        color: #28a745;
+      }
+      .log-error {
+        color: #dc3545;
+      }
+      .log-warning {
+        color: #ffc107;
+      }
+
+      .form-group {
+        margin: 15px 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+
+      .chat-section {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 15px 0;
+      }
+      .message-list {
+        height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        background: #f9f9f9;
+        margin: 10px 0;
+      }
+      .message {
+        margin: 5px 0;
+        padding: 5px;
+        border-radius: 3px;
+      }
+      .message-sent {
+        background: #d4edda;
+      }
+      .message-received {
+        background: #d1ecf1;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      @media (max-width: 768px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔌 Ado-Dad WebSocket Connection Test</h1>
+
+      <!-- Connection Status -->
+      <div id="status" class="status disconnected">❌ Disconnected</div>
+
+      <!-- Connection Controls -->
+      <div class="form-group">
+        <label for="serverUrl">Server URL:</label>
+        <input
+          type="text"
+          id="serverUrl"
+          value="ws://localhost:5000"
+          placeholder="ws://localhost:5000"
+        />
+        <button onclick="connect()" id="connectBtn">🔌 Connect</button>
+        <button onclick="disconnect()" id="disconnectBtn" disabled>
+          🔌 Disconnect
+        </button>
+        <button onclick="clearLog()">🗑️ Clear Log</button>
+      </div>
+
+      <div class="grid">
+        <!-- Connection Testing -->
+        <div class="chat-section">
+          <h3>🔧 Connection Testing</h3>
+          <button onclick="ping()" id="pingBtn" disabled>🏓 Ping Server</button>
+          <button onclick="getServerInfo()" id="infoBtn" disabled>
+            ℹ️ Get Server Info
+          </button>
+          <button onclick="testMessage()" id="testBtn" disabled>
+            💬 Test Message
+          </button>
+        </div>
+
+        <!-- Chat Testing -->
+        <div class="chat-section">
+          <h3>💬 Chat Testing</h3>
+          <div class="form-group">
+            <label for="chatId">Chat ID:</label>
+            <input
+              type="text"
+              id="chatId"
+              value="test-chat-123"
+              placeholder="Enter chat ID"
+            />
+          </div>
+          <button onclick="joinChat()" id="joinBtn" disabled>
+            👥 Join Chat
+          </button>
+          <button onclick="leaveChat()" id="leaveBtn" disabled>
+            👋 Leave Chat
+          </button>
+
+          <div class="form-group">
+            <label for="messageContent">Message:</label>
+            <textarea
+              id="messageContent"
+              rows="3"
+              placeholder="Enter your message"
+            ></textarea>
+          </div>
+          <button onclick="sendMessage()" id="sendBtn" disabled>
+            📤 Send Message
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Display -->
+      <div class="chat-section">
+        <h3>📨 Messages</h3>
+        <div id="messageList" class="message-list"></div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="chat-section">
+        <h3>📋 Event Log</h3>
+        <div id="logContainer" class="log-container"></div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let isConnected = false;
+
+      // DOM elements
+      const statusEl = document.getElementById('status');
+      const logContainer = document.getElementById('logContainer');
+      const messageList = document.getElementById('messageList');
+
+      // Button elements
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const pingBtn = document.getElementById('pingBtn');
+      const infoBtn = document.getElementById('infoBtn');
+      const testBtn = document.getElementById('testBtn');
+      const joinBtn = document.getElementById('joinBtn');
+      const leaveBtn = document.getElementById('leaveBtn');
+      const sendBtn = document.getElementById('sendBtn');
+
+      function log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.innerHTML = `[${timestamp}] ${message}`;
+        logContainer.appendChild(logEntry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      function updateStatus(connected) {
+        isConnected = connected;
+        if (connected) {
+          statusEl.className = 'status connected';
+          statusEl.innerHTML = '✅ Connected';
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          pingBtn.disabled = false;
+          infoBtn.disabled = false;
+          testBtn.disabled = false;
+          joinBtn.disabled = false;
+          sendBtn.disabled = false;
+        } else {
+          statusEl.className = 'status disconnected';
+          statusEl.innerHTML = '❌ Disconnected';
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          pingBtn.disabled = true;
+          infoBtn.disabled = true;
+          testBtn.disabled = true;
+          joinBtn.disabled = true;
+          leaveBtn.disabled = true;
+          sendBtn.disabled = true;
+        }
+      }
+
+      function connect() {
+        const serverUrl = document.getElementById('serverUrl').value;
+        log(`🔌 Attempting to connect to ${serverUrl}...`, 'info');
+
+        try {
+          socket = io(serverUrl, {
+            transports: ['websocket', 'polling'],
+            timeout: 10000,
+            forceNew: true,
+          });
+
+          // Connection events
+          socket.on('connect', () => {
+            log(
+              `✅ Connected successfully! Client ID: ${socket.id}`,
+              'success',
+            );
+            updateStatus(true);
+          });
+
+          socket.on('disconnect', (reason) => {
+            log(`❌ Disconnected: ${reason}`, 'error');
+            updateStatus(false);
+          });
+
+          socket.on('connect_error', (error) => {
+            log(`❌ Connection error: ${error.message}`, 'error');
+            updateStatus(false);
+          });
+
+          // Server events
+          socket.on('connected', (data) => {
+            log(`🎉 Server welcome: ${JSON.stringify(data)}`, 'success');
+          });
+
+          socket.on('joinedChat', (data) => {
+            log(`👥 Joined chat: ${JSON.stringify(data)}`, 'success');
+            leaveBtn.disabled = false;
+          });
+
+          socket.on('leftChat', (data) => {
+            log(`👋 Left chat: ${JSON.stringify(data)}`, 'info');
+            leaveBtn.disabled = true;
+          });
+
+          socket.on('message', (data) => {
+            log(`📨 Message received: ${JSON.stringify(data)}`, 'info');
+            addMessage(data, 'received');
+          });
+
+          socket.on('messageSent', (data) => {
+            log(`✅ Message sent: ${JSON.stringify(data)}`, 'success');
+          });
+
+          socket.on('pong', (data) => {
+            log(`🏓 Pong received: ${JSON.stringify(data)}`, 'success');
+          });
+
+          socket.on('serverInfo', (data) => {
+            log(`ℹ️ Server info: ${JSON.stringify(data)}`, 'info');
+          });
+
+          socket.on('error', (data) => {
+            log(`❌ Server error: ${JSON.stringify(data)}`, 'error');
+          });
+        } catch (error) {
+          log(`❌ Failed to create socket: ${error.message}`, 'error');
+        }
+      }
+
+      function disconnect() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+          log('🔌 Disconnected from server', 'info');
+          updateStatus(false);
+        }
+      }
+
+      function ping() {
+        if (socket && isConnected) {
+          log('🏓 Sending ping...', 'info');
+          socket.emit('ping');
+        }
+      }
+
+      function getServerInfo() {
+        if (socket && isConnected) {
+          log('ℹ️ Requesting server info...', 'info');
+          socket.emit('getServerInfo');
+        }
+      }
+
+      function testMessage() {
+        if (socket && isConnected) {
+          const testPayload = {
+            chatId: 'test-chat-123',
+            content: 'This is a test message from the WebSocket test client',
+            senderId: 'test-user-123',
+          };
+          log(
+            `💬 Sending test message: ${JSON.stringify(testPayload)}`,
+            'info',
+          );
+          socket.emit('message', testPayload);
+        }
+      }
+
+      function joinChat() {
+        if (socket && isConnected) {
+          const chatId = document.getElementById('chatId').value;
+          if (chatId) {
+            log(`👥 Joining chat: ${chatId}`, 'info');
+            socket.emit('joinChat', { chatId });
+          } else {
+            log('❌ Please enter a chat ID', 'error');
+          }
+        }
+      }
+
+      function leaveChat() {
+        if (socket && isConnected) {
+          const chatId = document.getElementById('chatId').value;
+          if (chatId) {
+            log(`👋 Leaving chat: ${chatId}`, 'info');
+            socket.emit('leaveChat', { chatId });
+          }
+        }
+      }
+
+      function sendMessage() {
+        if (socket && isConnected) {
+          const chatId = document.getElementById('chatId').value;
+          const content = document.getElementById('messageContent').value;
+
+          if (!chatId || !content) {
+            log('❌ Please enter both chat ID and message content', 'error');
+            return;
+          }
+
+          const payload = {
+            chatId: chatId,
+            content: content,
+            senderId: 'test-user-123',
+          };
+
+          log(`📤 Sending message: ${JSON.stringify(payload)}`, 'info');
+          socket.emit('message', payload);
+
+          // Clear message input
+          document.getElementById('messageContent').value = '';
+        }
+      }
+
+      function addMessage(data, type) {
+        const messageEl = document.createElement('div');
+        messageEl.className = `message message-${type}`;
+
+        const timestamp = new Date().toLocaleTimeString();
+        const content =
+          typeof data === 'string'
+            ? data
+            : data.content || JSON.stringify(data);
+
+        messageEl.innerHTML = `
+                <strong>[${timestamp}] ${type.toUpperCase()}:</strong><br>
+                ${content}
+            `;
+
+        messageList.appendChild(messageEl);
+        messageList.scrollTop = messageList.scrollHeight;
+      }
+
+      function clearLog() {
+        logContainer.innerHTML = '';
+        messageList.innerHTML = '';
+      }
+
+      // Auto-connect on page load (optional)
+      // window.onload = () => {
+      //     setTimeout(connect, 1000);
+      // };
+
+      // Log page load
+      log('🚀 WebSocket Test Client Loaded', 'info');
+      log('📝 Instructions:', 'info');
+      log('1. Enter your server URL (default: ws://localhost:5000)', 'info');
+      log('2. Click "Connect" to establish WebSocket connection', 'info');
+      log('3. Use the testing buttons to verify functionality', 'info');
+      log('4. Check the event log for detailed information', 'info');
+    </script>
+  </body>
+</html>
