@@ -36,14 +36,14 @@ export class AppService {
         { id: user._id, email: user.email },
         {
           secret: process.env.TOKEN_KEY,
-          expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '1h',
         },
       ),
       this.jwtService.sign(
         { id: user._id, email: user.email },
         {
           secret: process.env.TOKEN_KEY,
-          expiresIn: process.env.REFRESH_TOKEN_EXPIRY, // e.g., '60d'
+          expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '60d', // e.g., '60d'
         },
       ),
     ]);
