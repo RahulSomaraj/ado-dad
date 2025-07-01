@@ -20,21 +20,24 @@ export class LoggingInterceptor implements NestInterceptor {
     const { method, url } = request;
     const start = Date.now();
 
-    // ✅ Dynamically import chalk (fixes ESM issue)
-    const chalk = (await import('chalk')).default;
-
     return next.handle().pipe(
       tap(() => {
         const duration = Date.now() - start;
-        const statusColor =
-          duration < 200
-            ? chalk.green
-            : duration < 500
-              ? chalk.yellow
-              : chalk.red;
+
+        // Simple color coding using ANSI escape codes
+        const getStatusColor = (duration: number) => {
+          if (duration < 200) return '\x1b[32m'; // Green
+          if (duration < 500) return '\x1b[33m'; // Yellow
+          return '\x1b[31m'; // Red
+        };
+
+        const resetColor = '\x1b[0m';
+        const methodColor = '\x1b[36m'; // Cyan
+        const urlColor = '\x1b[34m'; // Blue
+        const statusColor = getStatusColor(duration);
 
         this.logger.log(
-          `${chalk.cyan.bold(method)} ${chalk.blue(url)} - ${statusColor(`${duration}ms`)}`,
+          `${methodColor}${method}${resetColor} ${urlColor}${url}${resetColor} - ${statusColor}${duration}ms${resetColor}`,
         );
       }),
     );

@@ -16,6 +16,22 @@ import {
   BodyTypeEnum,
 } from '../schemas/commercial-vehicle-ad.schema';
 
+const ASSET_IMAGE_NAMES = [
+  'orange_benz.png',
+  'silver_car.png',
+  'orange_car.png',
+  'red_scooter.png',
+  'bike_hornet.png',
+];
+
+const ASSET_BASE_URL = 'https://uat.ado-dad.com/ado-dad/images';
+
+function getRandomImages(count = 3) {
+  // Shuffle and pick 'count' images
+  const shuffled = ASSET_IMAGE_NAMES.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count).map((name) => `${ASSET_BASE_URL}/${name}`);
+}
+
 @Injectable()
 export class AdsSeedService {
   constructor(
@@ -142,11 +158,7 @@ export class AdsSeedService {
       description:
         'Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
       price: 8500000,
-      images: [
-        'https://example.com/property/living-room.jpg',
-        'https://example.com/property/bedroom.jpg',
-        'https://example.com/property/kitchen.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Bandra West, Mumbai, Maharashtra',
       category: AdCategory.PROPERTY,
       postedBy: userIds[0],
@@ -182,11 +194,7 @@ export class AdsSeedService {
       description:
         'Exclusive 3BHK villa with private garden, modern amenities, and premium finishes. Located in a gated community with 24/7 security.',
       price: 25000000,
-      images: [
-        'https://example.com/property/villa-exterior.jpg',
-        'https://example.com/property/villa-garden.jpg',
-        'https://example.com/property/villa-master-bedroom.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Whitefield, Bangalore, Karnataka',
       category: AdCategory.PROPERTY,
       postedBy: userIds[1],
@@ -221,10 +229,7 @@ export class AdsSeedService {
       description:
         'Prime commercial space in Central Business District. Perfect for retail, office, or restaurant. High footfall area with excellent connectivity.',
       price: 15000000,
-      images: [
-        'https://example.com/property/commercial-exterior.jpg',
-        'https://example.com/property/commercial-interior.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Connaught Place, Delhi, NCR',
       category: AdCategory.PROPERTY,
       postedBy: userIds[2],
@@ -258,11 +263,7 @@ export class AdsSeedService {
       description:
         'Beautiful independent house with terrace garden. 4BHK with modern amenities, located in a peaceful residential area.',
       price: 18000000,
-      images: [
-        'https://example.com/property/house-exterior.jpg',
-        'https://example.com/property/house-terrace.jpg',
-        'https://example.com/property/house-living.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Koramangala, Bangalore, Karnataka',
       category: AdCategory.PROPERTY,
       postedBy: userIds[3],
@@ -296,10 +297,7 @@ export class AdsSeedService {
       description:
         'Prime residential plot in developing area with good appreciation potential. All approvals in place, ready for construction.',
       price: 4500000,
-      images: [
-        'https://example.com/property/plot-aerial.jpg',
-        'https://example.com/property/plot-location.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Electronic City, Bangalore, Karnataka',
       category: AdCategory.PROPERTY,
       postedBy: userIds[4],
@@ -340,11 +338,7 @@ export class AdsSeedService {
       description:
         'Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
       price: 850000,
-      images: [
-        'https://example.com/vehicle/exterior.jpg',
-        'https://example.com/vehicle/interior.jpg',
-        'https://example.com/vehicle/engine.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Dwarka, Delhi, NCR',
       category: AdCategory.PRIVATE_VEHICLE,
       postedBy: userIds[0],
@@ -383,10 +377,7 @@ export class AdsSeedService {
       description:
         'Toyota Innova Crysta in excellent condition. Perfect for family use. All service records available, single owner.',
       price: 1200000,
-      images: [
-        'https://example.com/vehicle/innova-exterior.jpg',
-        'https://example.com/vehicle/innova-interior.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Andheri West, Mumbai, Maharashtra',
       category: AdCategory.PRIVATE_VEHICLE,
       postedBy: userIds[1],
@@ -424,10 +415,7 @@ export class AdsSeedService {
       description:
         'Maruti Swift in pristine condition. Low mileage, excellent fuel efficiency. Perfect for city driving.',
       price: 650000,
-      images: [
-        'https://example.com/vehicle/swift-exterior.jpg',
-        'https://example.com/vehicle/swift-interior.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Koramangala, Bangalore, Karnataka',
       category: AdCategory.PRIVATE_VEHICLE,
       postedBy: userIds[2],
@@ -464,10 +452,7 @@ export class AdsSeedService {
       description:
         'Hyundai i20 Asta in excellent condition. Top model with all features. Single owner, full service history.',
       price: 950000,
-      images: [
-        'https://example.com/vehicle/i20-exterior.jpg',
-        'https://example.com/vehicle/i20-interior.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Pune, Maharashtra',
       category: AdCategory.PRIVATE_VEHICLE,
       postedBy: userIds[3],
@@ -518,11 +503,7 @@ export class AdsSeedService {
       description:
         'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
       price: 1800000,
-      images: [
-        'https://example.com/truck/exterior.jpg',
-        'https://example.com/truck/cargo-area.jpg',
-        'https://example.com/truck/engine.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Pune, Maharashtra',
       category: AdCategory.COMMERCIAL_VEHICLE,
       postedBy: userIds[0],
@@ -565,10 +546,7 @@ export class AdsSeedService {
       description:
         'Mahindra Bolero pickup in good condition. Perfect for small business transportation needs. Economical and reliable.',
       price: 450000,
-      images: [
-        'https://example.com/pickup/exterior.jpg',
-        'https://example.com/pickup/cargo-area.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Chennai, Tamil Nadu',
       category: AdCategory.COMMERCIAL_VEHICLE,
       postedBy: userIds[1],
@@ -605,10 +583,7 @@ export class AdsSeedService {
       description:
         'Eicher Pro 1049 heavy duty truck. Excellent for long distance transportation. Well-maintained with all documents.',
       price: 3500000,
-      images: [
-        'https://example.com/truck/eicher-exterior.jpg',
-        'https://example.com/truck/eicher-cabin.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Ahmedabad, Gujarat',
       category: AdCategory.COMMERCIAL_VEHICLE,
       postedBy: userIds[2],
@@ -663,11 +638,7 @@ export class AdsSeedService {
       description:
         'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
       price: 65000,
-      images: [
-        'https://example.com/scooter/exterior.jpg',
-        'https://example.com/scooter/dashboard.jpg',
-        'https://example.com/scooter/engine.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Koramangala, Bangalore, Karnataka',
       category: AdCategory.TWO_WHEELER,
       postedBy: userIds[0],
@@ -705,10 +676,7 @@ export class AdsSeedService {
       description:
         'Bajaj Pulsar 150 in excellent condition. Sporty bike with good performance. Well-maintained, single owner.',
       price: 85000,
-      images: [
-        'https://example.com/bike/pulsar-exterior.jpg',
-        'https://example.com/bike/pulsar-dashboard.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Dwarka, Delhi, NCR',
       category: AdCategory.TWO_WHEELER,
       postedBy: userIds[1],
@@ -746,10 +714,7 @@ export class AdsSeedService {
       description:
         'TVS Apache RTR 160 racing edition. High performance bike with racing features. Excellent condition, low mileage.',
       price: 95000,
-      images: [
-        'https://example.com/bike/apache-exterior.jpg',
-        'https://example.com/bike/apache-dashboard.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Andheri West, Mumbai, Maharashtra',
       category: AdCategory.TWO_WHEELER,
       postedBy: userIds[2],
@@ -787,10 +752,7 @@ export class AdsSeedService {
       description:
         'Hero Splendor Plus in good condition. Economical and reliable bike. Perfect for daily commute and long rides.',
       price: 45000,
-      images: [
-        'https://example.com/bike/splendor-exterior.jpg',
-        'https://example.com/bike/splendor-dashboard.jpg',
-      ],
+      images: getRandomImages(),
       location: 'Pune, Maharashtra',
       category: AdCategory.TWO_WHEELER,
       postedBy: userIds[3],

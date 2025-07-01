@@ -31,13 +31,13 @@ import { UserType } from '../users/enums/user.types';
 @ApiTags('Banners')
 @Controller('banners')
 @UseFilters(new HttpExceptionFilter('Banners'))
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
 export class BannerController {
   constructor(private readonly bannerService: BannerService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new banner' })
   @ApiResponse({ status: 201, description: 'Banner created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
@@ -79,6 +79,9 @@ export class BannerController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a banner' })
   @ApiResponse({ status: 200, description: 'Banner updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
@@ -93,6 +96,9 @@ export class BannerController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a banner' })
   @ApiResponse({ status: 200, description: 'Banner deleted successfully' })
   @ApiResponse({ status: 404, description: 'Banner not found' })

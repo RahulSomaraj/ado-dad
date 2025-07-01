@@ -13,13 +13,9 @@ async function bootstrap() {
   const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 3000;
 
   // Serve static assets from public/assets at /ado-dad
-  app.useStaticAssets(join(process.cwd(), 'public', 'assets'), {
-    prefix: '/ado-dad/',
-  });
 
-  // Serve static files from public folder at root
-  app.useStaticAssets(join(process.cwd(), 'public'), {
-    prefix: '/',
+  app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), {
+    prefix: '/ado-dad/',
   });
 
   // Apply global validation pipe with transformation enabled
