@@ -20,7 +20,7 @@ async function bootstrap() {
   });
 
   // Custom middleware to add CORS headers for static assets
-  app.use('/ado-dad/*', (req, res, next) => {
+  app.use('/ado-dad', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.header(
