@@ -19,7 +19,7 @@ export class CartService {
     const cart = await this.cartModel
       .findOne({ user: userId })
       .populate('items.product'); // Populate product details in items
-    if (!cart) throw new NotFoundException('Cart not here found');
+    if (!cart) throw new NotFoundException('Cart not found');
     return cart;
   }
 
