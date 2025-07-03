@@ -12,6 +12,25 @@ async function bootstrap() {
   const configService = app.get<ConfigService>(ConfigService);
   const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 3000;
 
+  // Enable CORS globally
+  app.enableCors({
+    origin: '*', // Allows requests from all origins. Adjust this for production.
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
+  });
+
+  // Custom middleware to add CORS headers for static assets
+  app.use('/ado-dad/*', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Accept, Authorization',
+    );
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
+    next();
+  });
+
   // Serve static assets from public/assets at /ado-dad
   app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), {
     prefix: '/ado-dad/',
@@ -27,13 +46,6 @@ async function bootstrap() {
 
   // Apply morgan logging middleware
   app.use(morgan('tiny'));
-
-  // Enable CORS globally
-  app.enableCors({
-    origin: '*', // Allows requests from all origins. Adjust this for production.
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type, Accept, Authorization',
-  });
 
   // Swagger setup
   const swaggerConfig = new DocumentBuilder()
