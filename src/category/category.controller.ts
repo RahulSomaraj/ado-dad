@@ -1,47 +1,68 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from 'src/roles/user-role.enum'; // ✅ Corrected path
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UseFilters,
+  Request,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './schemas/category.schema';
-import { AuthGuard } from '@nestjs/passport';
-import { RbacGuard } from '../guards/rbac.guard'; // ✅ Ensure correct path
-import { Roles } from 'src/roles/roles.decorator'; // ✅ Corrected path
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../auth/guard/roles.guards';
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { FindAllCategoriesDto } from './dto/get-category.dto';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
 
 @ApiTags('Categories')
 @Controller('categories')
+@UseFilters(new HttpExceptionFilter('Categories'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.SHOWROOM)
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @Roles(UserRole.Admin) 
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
-  async create(@Body() createCategoryDto: CreateCategoryDto): Promise<Category> {
-    return this.categoryService.create(createCategoryDto);
+  async create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @Request() req,
+  ): Promise<Category> {
+    const { user } = req;
+    return this.categoryService.create(createCategoryDto, user);
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all categories with optional filters' })
   @ApiResponse({ status: 200, description: 'Categories fetched successfully' })
-  @ApiQuery({ name: 'name', required: false, description: 'Filter by category name' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Limit the number of results' })
-  @ApiQuery({ name: 'page', required: false, description: 'Pagination - Page number' })
-  async findAll(
-    @Query('name') name?: string,
-    @Query('limit') limit?: number,
-    @Query('page') page?: number
-  ): Promise<Category[]> {
-    return this.categoryService.findAll({ name, limit, page });
+  async findAll(@Query() query: FindAllCategoriesDto): Promise<{
+    data: Category[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    return this.categoryService.findAll(query);
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a category by ID' })
   @ApiResponse({ status: 200, description: 'Category fetched successfully' })
@@ -50,22 +71,25 @@ export class CategoryController {
   }
 
   @Put(':id')
-  @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @Roles(UserRole.Admin)  
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({ status: 200, description: 'Category updated successfully' })
-  async update(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto): Promise<Category> {
-    return this.categoryService.update(id, updateCategoryDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateCategoryDto: UpdateCategoryDto,
+    @Request() req,
+  ): Promise<Category> {
+    const { user } = req;
+    return this.categoryService.update(id, updateCategoryDto, user);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @Roles(UserRole.Admin) 
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a category' })
   @ApiResponse({ status: 200, description: 'Category deleted successfully' })
-  async delete(@Param('id') id: string): Promise<void> {
-    return this.categoryService.delete(id);
+  async delete(@Param('id') id: string, @Request() req): Promise<void> {
+    const { user } = req;
+    return this.categoryService.delete(id, user);
   }
 }

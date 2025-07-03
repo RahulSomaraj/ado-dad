@@ -1,37 +1,59 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  UseFilters,
+} from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
-import { RolesGuard } from 'src/roles/roles.guard';
-import { Roles } from 'src/roles/roles.decorator';
-import { UserRole } from 'src/roles/user-role.enum';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { UserType } from '../users/enums/user.types';
 
 @ApiTags('Favorites')
 @ApiBearerAuth()
 @Controller('favorites')
-@UseGuards( RolesGuard)
+@UseFilters(new HttpExceptionFilter('Favorites'))
+@UseGuards(RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SHOWROOM) // Assuming you have a roles mechanism
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
   @Post()
-  @Roles(UserRole.User)
-  @ApiOperation({ summary: 'Add an item to favorites' })
+  @ApiOperation({ summary: 'Add an ad to favorites' })
+  @ApiBody({ type: CreateFavoriteDto })
   async addFavorite(@Req() req, @Body() createFavoriteDto: CreateFavoriteDto) {
-    return await this.favoriteService.addFavorite(req.user.id, createFavoriteDto);
+    return this.favoriteService.addFavorite(req.user.id, createFavoriteDto);
   }
 
   @Get()
-  @Roles(UserRole.User, UserRole.Admin)
-  @ApiOperation({ summary: 'Get user\'s favorites' })
+  @Roles(UserType.USER, UserType.ADMIN)
+  @ApiOperation({ summary: "Get user's favorite ads" })
   @ApiQuery({ name: 'itemId', required: false, type: String })
-  @ApiQuery({ name: 'itemType', required: false, enum: ['product', 'service'] })
+  @ApiQuery({ name: 'itemType', required: false, enum: ['ad'] })
   async getUserFavorites(@Req() req, @Query() query) {
     return await this.favoriteService.getUserFavorites(req.user.id, query);
   }
 
   @Get(':favoriteId')
-  @Roles(UserRole.User, UserRole.Admin)
+  @Roles(UserType.USER, UserType.ADMIN)
   @ApiOperation({ summary: 'Get a specific favorite by ID' })
   @ApiParam({ name: 'favoriteId', type: String })
   async getFavoriteById(@Req() req, @Param('favoriteId') favoriteId: string) {
@@ -39,19 +61,24 @@ export class FavoriteController {
   }
 
   @Put(':favoriteId')
-  @Roles(UserRole.User)
+  @Roles(UserType.USER)
   @ApiOperation({ summary: 'Update a favorite' })
   @ApiParam({ name: 'favoriteId', type: String })
+  @ApiBody({ type: UpdateFavoriteDto })
   async updateFavorite(
     @Req() req,
     @Param('favoriteId') favoriteId: string,
     @Body() updateFavoriteDto: UpdateFavoriteDto,
   ) {
-    return await this.favoriteService.updateFavorite(req.user.id, favoriteId, updateFavoriteDto);
+    return await this.favoriteService.updateFavorite(
+      req.user.id,
+      favoriteId,
+      updateFavoriteDto,
+    );
   }
 
   @Delete(':favoriteId')
-  @Roles(UserRole.User)
+  @Roles(UserType.USER)
   @ApiOperation({ summary: 'Remove an item from favorites' })
   @ApiParam({ name: 'favoriteId', type: String })
   async removeFavorite(@Req() req, @Param('favoriteId') favoriteId: string) {

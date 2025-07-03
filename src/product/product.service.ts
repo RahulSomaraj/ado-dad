@@ -10,14 +10,43 @@ export class ProductService {
   ) {}
 
   // Create a new product
-  async createProduct(createProductDto: any): Promise<Product> {
+  async createProduct(createProductDto: any, user: any): Promise<Product> {
     const createdProduct = new this.productModel(createProductDto);
     return createdProduct.save();
   }
 
   // Get all products
-  async getAllProducts(p0: { category: string | undefined; brand: string | undefined; minPrice: number | undefined; maxPrice: number | undefined; pagination: { page: number; limit: number; }; sortOptions: any; }): Promise<Product[]> {
-    return this.productModel.find().exec();
+  // Get all products
+  async getAllProducts(p0: {
+    category: string | undefined;
+    brand: string | undefined;
+    minPrice: number | undefined;
+    maxPrice: number | undefined;
+    pagination: { page: number; limit: number };
+    sortOptions: any;
+  }): Promise<{
+    products: Product[];
+    totalPages: number;
+    currentPage: number;
+  }> {
+    const { pagination } = p0;
+    const { page, limit } = pagination;
+
+    // Count total matching documents
+    const totalProducts = await this.productModel.countDocuments();
+
+    // Fetch products with pagination
+    const products = await this.productModel
+      .find()
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+
+    return {
+      products,
+      totalPages: Math.ceil(totalProducts / limit),
+      currentPage: page,
+    };
   }
 
   // Get a product by ID
@@ -30,7 +59,11 @@ export class ProductService {
   }
 
   // Update a product by ID
-  async updateProduct(productId: string, updateProductDto: any): Promise<Product> {
+  async updateProduct(
+    productId: string,
+    updateProductDto: any,
+    user: any,
+  ): Promise<Product> {
     const existingProduct = await this.productModel.findById(productId).exec();
     if (!existingProduct) {
       throw new NotFoundException(`Product with ID ${productId} not found`);
@@ -42,7 +75,7 @@ export class ProductService {
   }
 
   // Delete a product by ID
-  async deleteProduct(productId: string): Promise<void> {
+  async deleteProduct(productId: string, user: any): Promise<void> {
     const result = await this.productModel.deleteOne({ _id: productId }).exec();
     if (result.deletedCount === 0) {
       throw new NotFoundException(`Product with ID ${productId} not found`);

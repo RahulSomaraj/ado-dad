@@ -3,7 +3,7 @@ name: Deploy to AWS with PM2
 on:
   push:
     branches:
-      - main
+      - develop
 
 jobs:
   deploy:
@@ -38,11 +38,14 @@ jobs:
             cd ado-dad
 
             # Pull the latest changes from the GitHub repository
-            git pull origin main
+            git pull origin develop
 
             # Install dependencies
             npm install --legacy-peer-deps 
 
+            # Build Node 
+            npm run build
+
             # Restart the PM2 process by deleting the existing instance and restarting
-            pm2 delete all || true  # Delete existing PM2 processes (ignore errors if none)
-            pm2 start app.js --name "ado-dad"
+            pm2 delete 0 || true  # Delete existing PM2 processes (ignore errors if none)
+            pm2 start dist/main.js --name "ado-dad"

@@ -6,7 +6,9 @@ import { Showroom, ShowroomSchema } from './schemas/showroom.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Showroom.name, schema: ShowroomSchema }]),
+    MongooseModule.forFeature([
+      { name: Showroom.name, schema: ShowroomSchema },
+    ]),
   ],
   controllers: [ShowroomController],
   providers: [ShowroomService],

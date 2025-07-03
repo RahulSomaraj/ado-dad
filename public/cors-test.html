@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CORS Test for Images</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .image-container {
+        margin: 20px 0;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .image-container img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 5px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .loading {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CORS Test for Image Loading</h1>
+    <p>
+      This page tests if images can be loaded from the server with proper CORS
+      headers.
+    </p>
+
+    <div id="status"></div>
+
+    <h2>Testing Images from /upload/images endpoint (with CORS headers)</h2>
+    <div id="upload-images"></div>
+
+    <h2>Testing Images from /ado-dad/images endpoint (static assets)</h2>
+    <div id="static-images"></div>
+
+    <script>
+      const images = [
+        'orange_benz.png',
+        'silver_car.png',
+        'orange_car.png',
+        'red_scooter.png',
+        'bike_hornet.png',
+      ];
+
+      const baseUrl = window.location.origin;
+
+      function addStatus(message, type = 'loading') {
+        const statusDiv = document.getElementById('status');
+        const div = document.createElement('div');
+        div.className = `status ${type}`;
+        div.textContent = message;
+        statusDiv.appendChild(div);
+      }
+
+      function testImage(url, containerId, description) {
+        const container = document.getElementById(containerId);
+        const div = document.createElement('div');
+        div.className = 'image-container';
+
+        const img = document.createElement('img');
+        img.alt = description;
+
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'status loading';
+        statusDiv.textContent = `Loading ${description}...`;
+
+        div.appendChild(statusDiv);
+        div.appendChild(img);
+        container.appendChild(div);
+
+        img.onload = function () {
+          statusDiv.className = 'status success';
+          statusDiv.textContent = `✅ ${description} loaded successfully!`;
+          addStatus(
+            `✅ ${description} loaded successfully from ${url}`,
+            'success',
+          );
+        };
+
+        img.onerror = function () {
+          statusDiv.className = 'status error';
+          statusDiv.textContent = `❌ Failed to load ${description}`;
+          addStatus(`❌ Failed to load ${description} from ${url}`, 'error');
+        };
+
+        img.src = url;
+      }
+
+      // Test images from upload endpoint (with CORS headers)
+      images.forEach((image, index) => {
+        const uploadUrl = `${baseUrl}/upload/images/${image}`;
+        testImage(uploadUrl, 'upload-images', `Upload endpoint - ${image}`);
+      });
+
+      // Test images from static assets endpoint
+      images.forEach((image, index) => {
+        const staticUrl = `${baseUrl}/ado-dad/images/${image}`;
+        testImage(staticUrl, 'static-images', `Static assets - ${image}`);
+      });
+
+      // Test CORS headers
+      async function testCorsHeaders() {
+        try {
+          const response = await fetch(
+            `${baseUrl}/upload/images/orange_benz.png`,
+            {
+              method: 'HEAD',
+            },
+          );
+
+          const corsHeader = response.headers.get(
+            'Access-Control-Allow-Origin',
+          );
+          if (corsHeader) {
+            addStatus(
+              `✅ CORS headers found: Access-Control-Allow-Origin = ${corsHeader}`,
+              'success',
+            );
+          } else {
+            addStatus('❌ No CORS headers found in response', 'error');
+          }
+        } catch (error) {
+          addStatus(`❌ Error testing CORS headers: ${error.message}`, 'error');
+        }
+      }
+
+      testCorsHeaders();
+    </script>
+  </body>
+</html>

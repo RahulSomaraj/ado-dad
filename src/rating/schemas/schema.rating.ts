@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { User } from 'src/users/schemas/user.schema';  // Assuming you have a User schema
-import { Product } from 'src/product/schemas/product.schema';  // Assuming you have a Product schema
+import { User } from '../../users/schemas/user.schema';
+import { Product } from '../../product/schemas/product.schema';
 
 // Comment Schema
 @Schema({ _id: false })

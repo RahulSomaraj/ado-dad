@@ -9,16 +9,16 @@ import { UpdateRatingDto } from './dto/update-rating.dto';
 export class RatingService {
   constructor(@InjectModel(Rating.name) private ratingModel: Model<Rating>) {}
 
-  async create(createRatingDto: CreateRatingDto) {
+  async create(createRatingDto: CreateRatingDto, user: any) {
     const newRating = new this.ratingModel(createRatingDto);
     return await newRating.save();
   }
 
-  async update(ratingId: string, updateRatingDto: UpdateRatingDto) {
+  async update(ratingId: string, updateRatingDto: UpdateRatingDto, user: any) {
     const rating = await this.ratingModel.findByIdAndUpdate(
       ratingId,
       updateRatingDto,
-      { new: true }
+      { new: true },
     );
     if (!rating) {
       throw new Error('Rating not found');
@@ -40,7 +40,7 @@ export class RatingService {
       .exec();
   }
 
-  async delete(ratingId: string) {
+  async delete(ratingId: string, user: any) {
     const rating = await this.ratingModel.findByIdAndDelete(ratingId);
     if (!rating) {
       throw new Error('Rating not found');
