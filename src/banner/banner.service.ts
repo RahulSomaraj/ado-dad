@@ -8,19 +8,40 @@ import { Banner, BannerDocument } from './schemas/schema.banner';
 @Injectable()
 export class BannerService {
   constructor(
-    @InjectModel(Banner.name) private readonly bannerModel: Model<BannerDocument>,
+    @InjectModel(Banner.name)
+    private readonly bannerModel: Model<BannerDocument>,
   ) {}
 
   // Create a new banner
-  async create(createBannerDto: CreateBannerDto): Promise<Banner> {
+  async create(createBannerDto: CreateBannerDto, user: any): Promise<Banner> {
     const createdBanner = new this.bannerModel(createBannerDto);
     return createdBanner.save();
   }
 
   // Get all banners with optional title filtering
-  async findAll(title?: string): Promise<Banner[]> {
+  async findAll(
+    title?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ banners: Banner[]; totalPages: number; currentPage: number }> {
     const filter = title ? { title: { $regex: title, $options: 'i' } } : {};
-    return this.bannerModel.find(filter).exec();
+
+    // Count total matching documents for pagination
+    const count = await this.bannerModel.countDocuments(filter);
+
+    // Fetch banners with pagination and sorting
+    const banners = await this.bannerModel
+      .find(filter)
+      .sort({ createdAt: -1 }) // Sorting by newest first
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+
+    return {
+      banners,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+    };
   }
 
   // Get a banner by its ID
@@ -33,7 +54,11 @@ export class BannerService {
   }
 
   // Update a banner by its ID
-  async update(id: string, updateBannerDto: UpdateBannerDto): Promise<Banner> {
+  async update(
+    id: string,
+    updateBannerDto: UpdateBannerDto,
+    user: any,
+  ): Promise<Banner> {
     const updatedBanner = await this.bannerModel
       .findByIdAndUpdate(id, updateBannerDto, { new: true })
       .exec();
@@ -44,10 +69,12 @@ export class BannerService {
   }
 
   // Remove a banner by its ID
-  async remove(id: string): Promise<void> {
+  async remove(id: string, user: any): Promise<void> {
     const deletionResult = await this.bannerModel.findByIdAndDelete(id).exec();
     if (!deletionResult) {
-      throw new NotFoundException(`Banner with id ${id} not found for deletion`);
+      throw new NotFoundException(
+        `Banner with id ${id} not found for deletion`,
+      );
     }
   }
 }

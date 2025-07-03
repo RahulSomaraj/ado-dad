@@ -1,83 +1,216 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User } from './schemas/user.schema';  // Import the User schema
+import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
+import { EncryptionUtil } from '../common/encryption.util';
+import { GetUsersDto } from './dto/get-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserType } from './enums/user.types';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectModel('User') private userModel: Model<User>,  // Inject the model by name 'User'
+    @InjectModel('User') private userModel: Model<User>,
     private emailService: EmailService,
   ) {}
 
-  async getAllUsers(page: number, limit: number, filters: any) {
-    const query = { ...filters, isDeleted: false };
+  async getAllUsers(getUsersDto: GetUsersDto, currentUser: User) {
+    const { page = 1, limit = 10, search, type, sort } = getUsersDto;
+
+    // Build query with filters and ensure `isDeleted: false`
+    const query: any = { isDeleted: false };
+
+    /**
+     * Escapes special characters in the search string so that it can be used safely in a regex.
+     * @param text The raw search string input.
+     * @returns The escaped search string.
+     */
+    function escapeRegex(text: string): string {
+      return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    }
+
+    const escapedSearch = escapeRegex(search ?? '');
+    const regexPattern = `.*${escapedSearch}.*`;
+
+    query.$or = [
+      { name: { $regex: regexPattern, $options: 'i' } },
+      { email: { $regex: regexPattern, $options: 'i' } },
+      { phoneNumber: { $regex: regexPattern, $options: 'i' } },
+    ];
+
+    // If the current user is a SUPER_ADMIN, restrict user types
+    if (currentUser.type == UserType.SUPER_ADMIN) {
+      query.type = {
+        $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
+      };
+    }
+
+    if (type) {
+      // If a type filter is provided in the DTO, add it to the query
+      query.type = type;
+    }
+
+    // Sorting logic (default: createdAt descending)
+    let sortOptions: any = { createdAt: -1 };
+    if (sort) {
+      const [field, order] = sort.split(':');
+      sortOptions = { [field]: order === 'asc' ? 1 : -1 };
+    }
+
+    // Fetch paginated users with selected fields
     const users = await this.userModel
       .find(query)
+      .sort(sortOptions) // Added sorting
       .skip((page - 1) * limit)
       .limit(limit)
+      .select('_id name email type phoneNumber profilePic') // Only send required fields
       .exec();
+
+    // Count total documents that match the query
     const count = await this.userModel.countDocuments(query);
-    return { users, totalPages: Math.ceil(count / limit), currentPage: page };
+
+    return {
+      users,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+    };
   }
 
+  // Get user by ID
   async getUserById(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
+    const user = await this.userModel
+      .findById(id)
+      .select('_id name email type phoneNumber profilePic') // Only send required fields, adjust as necessary
+      .exec();
+    if (!user || user.isDeleted)
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User not found or deleted',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     return user;
   }
 
+  // Create a new user
   async createUser(userData: any): Promise<User> {
+    const existingUser = await this.userModel.findOne({
+      $or: [{ phoneNumber: userData.phoneNumber }, { email: userData.email }],
+    });
+
+    if (existingUser) {
+      if (existingUser.phoneNumber == userData.phoneNumber) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User Already Exist for same Phone Number ',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User Already Exist for same Email',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const newUser = new this.userModel(userData);
     return newUser.save();
   }
 
-  async updateUser(id: string, updateData: any): Promise<User> {
+  // Update user details
+  async updateUser(id: string, updateData: UpdateUserDto): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
-    // Cast user as User type to satisfy TypeScript
-    const updatedUser = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    if (!user || user.isDeleted) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User not found or deleted',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const existingUser = await this.userModel.findOne({
+      _id: { $ne: id },
+      $or: [
+        { phoneNumber: updateData.phoneNumber },
+        { email: updateData.email },
+      ],
+    });
+
+    if (existingUser) {
+      if (existingUser.phoneNumber == updateData.phoneNumber) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User Already Exist for same Phone Number ',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'User Already Exist for same Email',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .exec();
     return updatedUser!;
   }
-  
 
+  // Soft delete user
   async deleteUser(id: string): Promise<User> {
     const user = await this.userModel.findById(id).exec();
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     user.isDeleted = true;
     await user.save();
     return user;
   }
 
-  // Send OTP to a user via email
+  // Send OTP via email
   async sendOTP(email: string): Promise<void> {
     const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
-    
-    // Call the generateAndSendOTP method from the schema to generate OTP and send email
-    await user.generateAndSendOTP(this.emailService, generateOTP);
+    if (!user) throw new NotFoundException('User not found');
+
+    const otp = generateOTP();
+    user.otp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60000); // OTP expires in 10 minutes
+    await user.save();
+
+    await this.emailService.sendOtp(user.email, otp);
   }
 
-  // Verify the OTP
+  // Verify OTP
   async verifyOTP(email: string, otp: string): Promise<string> {
     const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
-    
-    // Check if OTP matches
-    if (user.otp !== otp) throw new Error('Invalid OTP');
-    
-    // Check if OTP expired (making sure otpExpires is defined)
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.otp !== otp) throw new BadRequestException('Invalid OTP');
+
     if (!user.otpExpires || user.otpExpires < new Date()) {
-      throw new Error('OTP expired');
+      throw new BadRequestException('OTP expired');
     }
-    
-    // Clear OTP and expiration date after verification
+
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();
     return 'OTP verified successfully';
   }
-  
 }

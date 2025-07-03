@@ -8,11 +8,17 @@ import { UpdateShowroomDto } from './dto/update-showroom.dto';
 @Injectable()
 export class ShowroomService {
   constructor(
-    @InjectModel(Showroom.name) private readonly showroomModel: Model<ShowroomDocument>,
+    @InjectModel(Showroom.name)
+    private readonly showroomModel: Model<ShowroomDocument>,
   ) {}
 
   // Get all showrooms
-  async getShowrooms(p0: { location: string | undefined; brand: string | undefined; pagination: { page: number; limit: number; }; sortOptions: any; }): Promise<ShowroomDocument[]> {
+  async getShowrooms(p0: {
+    location: string | undefined;
+    brand: string | undefined;
+    pagination: { page: number; limit: number };
+    sortOptions: any;
+  }): Promise<ShowroomDocument[]> {
     return this.showroomModel.find().exec();
   }
 
@@ -26,15 +32,25 @@ export class ShowroomService {
   }
 
   // Add a new showroom
-  async addShowroom(createShowroomDto: CreateShowroomDto): Promise<ShowroomDocument> {
+  async addShowroom(
+    createShowroomDto: CreateShowroomDto,
+    user: any,
+  ): Promise<ShowroomDocument> {
     const newShowroom = new this.showroomModel(createShowroomDto);
     return newShowroom.save();
   }
 
   // Update a showroom
-  async updateShowroom(id: string, updateShowroomDto: UpdateShowroomDto): Promise<ShowroomDocument> {
+  async updateShowroom(
+    id: string,
+    updateShowroomDto: UpdateShowroomDto,
+    user: any,
+  ): Promise<ShowroomDocument> {
     const updatedShowroom = await this.showroomModel
-      .findByIdAndUpdate(id, updateShowroomDto, { new: true, runValidators: true })
+      .findByIdAndUpdate(id, updateShowroomDto, {
+        new: true,
+        runValidators: true,
+      })
       .exec();
     if (!updatedShowroom) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);
@@ -43,7 +59,7 @@ export class ShowroomService {
   }
 
   // Delete a showroom
-  async deleteShowroom(id: string): Promise<void> {
+  async deleteShowroom(id: string, user: any): Promise<void> {
     const result = await this.showroomModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);

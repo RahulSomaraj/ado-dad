@@ -8,11 +8,11 @@ export class Favorite {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Item', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Ad', required: true })
   itemId: Types.ObjectId;
 
-  @Prop({ type: String, enum: ['product', 'service'], required: true })
-  itemType: string;
+  @Prop({ type: String, enum: ['ad'], required: true })
+  itemType: 'ad';
 }
 
 export const FavoriteSchema = SchemaFactory.createForClass(Favorite);

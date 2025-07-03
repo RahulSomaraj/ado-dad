@@ -8,33 +8,65 @@ import {
   Body,
   Query,
   UseGuards,
+  UseFilters,
+  Request,
 } from '@nestjs/common';
 import { ShowroomService } from './showroom.service';
 import { Showroom } from './schemas/showroom.schema';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { AuthGuard } from '../auth/auth.guard';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreateShowroomDto } from './dto/create-showroom.dto';
 import { UpdateShowroomDto } from './dto/update-showroom.dto';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
+import { HttpExceptionFilter } from '../shared/exception-service';
 
 @ApiTags('Showrooms')
 @Controller('showrooms')
+@UseFilters(new HttpExceptionFilter('Showrooms'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
 export class ShowroomController {
   constructor(private readonly showroomService: ShowroomService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all showrooms with optional query filters' })
   @ApiResponse({ status: 200, description: 'List of all showrooms' })
-  @ApiQuery({ name: 'location', required: false, description: 'Filter by location' })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    description: 'Filter by location',
+  })
   @ApiQuery({ name: 'brand', required: false, description: 'Filter by brand' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
-  @ApiQuery({ name: 'sort', required: false, description: 'Sort by field (e.g., name:asc, location:desc)' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    description: 'Sort by field (e.g., name:asc, location:desc)',
+  })
   async getShowrooms(
     @Query('location') location?: string,
     @Query('brand') brand?: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Query('sort') sort?: string
+    @Query('sort') sort?: string,
   ): Promise<Showroom[]> {
     const pagination = {
       page: parseInt(page.toString(), 10),
@@ -45,7 +77,12 @@ export class ShowroomController {
       ? Object.fromEntries(sort.split(',').map((s) => s.split(':')))
       : {};
 
-    return this.showroomService.getShowrooms({location,brand,pagination,sortOptions,});
+    return this.showroomService.getShowrooms({
+      location,
+      brand,
+      pagination,
+      sortOptions,
+    });
   }
 
   @Get(':id')
@@ -56,19 +93,21 @@ export class ShowroomController {
   }
 
   @Post()
-  @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Add a new showroom' })
   @ApiResponse({
     status: 201,
     description: 'Showroom added successfully',
     type: Showroom,
   })
-  async addShowroom(@Body() createShowroomDto: CreateShowroomDto): Promise<Showroom> {
-    return this.showroomService.addShowroom(createShowroomDto);
+  async addShowroom(
+    @Body() createShowroomDto: CreateShowroomDto,
+    @Request() req,
+  ): Promise<Showroom> {
+    const { user } = req;
+    return this.showroomService.addShowroom(createShowroomDto, user);
   }
 
   @Put(':id')
-  @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Update a showroom' })
   @ApiResponse({
     status: 200,
@@ -78,15 +117,17 @@ export class ShowroomController {
   async updateShowroom(
     @Param('id') id: string,
     @Body() updateShowroomDto: UpdateShowroomDto,
+    @Request() req,
   ): Promise<Showroom> {
-    return this.showroomService.updateShowroom(id, updateShowroomDto);
+    const { user } = req;
+    return this.showroomService.updateShowroom(id, updateShowroomDto, user);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Delete a showroom' })
   @ApiResponse({ status: 200, description: 'Showroom deleted successfully' })
-  async deleteShowroom(@Param('id') id: string): Promise<void> {
-    return this.showroomService.deleteShowroom(id);
+  async deleteShowroom(@Param('id') id: string, @Request() req): Promise<void> {
+    const { user } = req;
+    return this.showroomService.deleteShowroom(id, user);
   }
 }

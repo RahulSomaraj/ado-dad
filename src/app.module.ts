@@ -1,52 +1,81 @@
-import { Module } from '@nestjs/common';
+import { ChatModule } from './chat/chat.module';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { VehicleModule } from './vehicles/vehicle.module';
 import { ShowroomModule } from './showroom/showroom.module';
 import { CartModule } from './cart/cart.module';
-import { ProductModule } from './product/product.module'; // Import ProductModule
-import { EmailService } from './utils/email.service';
-import { AdvertisementsModule } from './advertisement/advertisement.module';
-import { BannerModule } from './banner/banner.module'; // Import BannerModule
-import { CategoryController } from './category/category.controller';
+import { ProductModule } from './product/product.module';
+import { BannerModule } from './banner/banner.module';
 import { CategoryModule } from './category/category.module';
-import { VehicleCompanyModule } from './vehicle-company/vehicle-company.module';
-import { VendorController } from './vendor/vendor.controller';
-import { VendorModule } from './vendor/vendor.module';
-import { ModelService } from './model/model.service';
-import { ModelController } from './model/model.controller';
-import { ModelModule } from './model/model.module';
 import { RatingModule } from './rating/rating.module';
-import { PropertyService } from './property/property.service';
-import { PropertyController } from './property/property.controller';
-import { PropertyModule } from './property/property.module';
-import { FavoriteModule } from './favorites/favorite.module'; // Correct import
-// Removed FavoriteController from the controller array because it is handled inside FavoriteModule
+import { FavoriteModule } from './favorites/favorite.module';
+import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.module';
+import { EmailService } from './utils/email.service';
+import { configService } from './config/mongo.config';
+import { UploadModule } from './shared/upload.module';
+import appConfig from './config/app.config';
+import helmet from 'helmet';
+import {
+  AuthTokens,
+  AuthTokensSchema,
+} from './auth/schemas/schema.refresh-token';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { JwtModule } from '@nestjs/jwt';
+import { RefreshTokenService } from './auth/auth.refresh.service';
+import { User, UserSchema } from './users/schemas/user.schema';
+import { AuthModule } from './auth/auth.module';
+import { GatewayModule } from './gateway/gateway.module';
+import { AdsModule } from './ads/ads.module';
 
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/nestjs'), // MongoDB connection
+    ChatModule,
+    ConfigModule.forRoot({
+      load: [appConfig],
+      isGlobal: true,
+    }),
+
+    MongooseModule.forRootAsync({
+      useFactory: () => {
+        const mongoConfig = configService.getMongoConfig();
+        console.log('Applying MongoDB configuration:', mongoConfig);
+        return mongoConfig;
+      },
+    }),
+    MongooseModule.forFeature([
+      { name: AuthTokens.name, schema: AuthTokensSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
+    JwtModule.register({
+      secret: process.env.TOKEN_KEY || 'default-secret',
+      signOptions: { expiresIn: '1h' },
+    }),
+
     UsersModule,
     VehicleModule,
     ShowroomModule,
     CartModule,
     ProductModule,
-    AdvertisementsModule,
     BannerModule,
     CategoryModule,
-    VehicleCompanyModule,
-    VendorModule,
-    ModelModule,
     RatingModule,
-    PropertyModule,
-    FavoriteModule, // Ensures FavoriteController is registered via FavoriteModule
+    FavoriteModule,
+    VehicleInventoryModule,
+    AuthModule,
+    UploadModule,
+    GatewayModule,
+    AdsModule,
   ],
-  providers: [EmailService],  
-  controllers: [
-    CategoryController, 
-    VendorController, 
-    ModelController,
-    PropertyController,
-  ],
+  providers: [EmailService, AppService, RefreshTokenService],
+  controllers: [AppController],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(helmet()) // ✅ Apply Helmet & CORS
+      .forRoutes('*'); // ✅ Correct
+  }
+}
