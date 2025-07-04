@@ -24,7 +24,7 @@ const ASSET_IMAGE_NAMES = [
   'bike_hornet.png',
 ];
 
-const ASSET_BASE_URL = 'https://uat.ado-dad.com/upload/images';
+const ASSET_BASE_URL = 'https://uat.ado-dad.com/ado-dad/images';
 
 function getRandomImages(count = 3) {
   // Shuffle and pick 'count' images

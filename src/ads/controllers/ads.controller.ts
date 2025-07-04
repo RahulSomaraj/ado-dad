@@ -426,7 +426,7 @@ export class AdsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create a new advertisement',
