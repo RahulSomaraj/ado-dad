@@ -38,6 +38,5 @@ export const TransmissionTypeSchema =
   SchemaFactory.createForClass(TransmissionType);
 
 // Indexes for fast lookups
-TransmissionTypeSchema.index({ name: 1 }, { unique: true });
 TransmissionTypeSchema.index({ isActive: 1, isDeleted: 1 });
 TransmissionTypeSchema.index({ sortOrder: 1 });

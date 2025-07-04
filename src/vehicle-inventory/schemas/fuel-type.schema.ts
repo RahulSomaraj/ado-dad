@@ -37,6 +37,5 @@ export class FuelType {
 export const FuelTypeSchema = SchemaFactory.createForClass(FuelType);
 
 // Indexes for fast lookups
-FuelTypeSchema.index({ name: 1 }, { unique: true });
 FuelTypeSchema.index({ isActive: 1, isDeleted: 1 });
 FuelTypeSchema.index({ sortOrder: 1 });

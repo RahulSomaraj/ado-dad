@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -23,8 +27,10 @@ import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
 import { CreateVehicleVariantDto } from './dto/create-vehicle-variant.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
+import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
 import { PaginatedVehicleModelResponseDto } from './dto/vehicle-model-response.dto';
+import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
 
 @Injectable()
 export class VehicleInventoryService {
@@ -57,6 +63,12 @@ export class VehicleInventoryService {
   }
 
   async findManufacturerById(id: string): Promise<Manufacturer> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid manufacturer ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
     const manufacturer = await this.manufacturerModel
       .findOne({ _id: id, isActive: true, isDeleted: false })
       .exec();
@@ -265,6 +277,12 @@ export class VehicleInventoryService {
   }
 
   async findVehicleModelById(id: string): Promise<VehicleModel> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid vehicle model ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
     const vehicleModel = await this.vehicleModelModel
       .findOne({ _id: id, isActive: true, isDeleted: false })
       .populate('manufacturer', 'name displayName logo')
@@ -943,28 +961,113 @@ export class VehicleInventoryService {
   }
 
   async findAllVehicleVariants(
-    modelId?: string,
-    fuelTypeId?: string,
-    transmissionTypeId?: string,
-    maxPrice?: number,
+    modelId?: string | undefined,
+    fuelTypeId?: string | undefined,
+    transmissionTypeId?: string | undefined,
+    maxPrice?: number | undefined,
   ): Promise<VehicleVariant[]> {
+    console.log('findAllVehicleVariants called with:', {
+      modelId,
+      fuelTypeId,
+      transmissionTypeId,
+      maxPrice,
+    });
+
+    // Validation logs
+    if (modelId) {
+      console.log('Validating modelId:', modelId);
+      if (!Types.ObjectId.isValid(modelId)) {
+        console.error('Invalid modelId:', modelId);
+        throw new BadRequestException(
+          `Invalid modelId format: ${modelId}. Expected a valid MongoDB ObjectId.`,
+        );
+      } else if (fuelTypeId) {
+        console.log('Validating fuelTypeId:', fuelTypeId);
+        if (!Types.ObjectId.isValid(fuelTypeId)) {
+          console.error('Invalid fuelTypeId:', fuelTypeId);
+          throw new BadRequestException(
+            `Invalid fuelTypeId format: ${fuelTypeId}. Expected a valid MongoDB ObjectId.`,
+          );
+        } else if (transmissionTypeId) {
+          console.log('Validating transmissionTypeId:', transmissionTypeId);
+          if (!Types.ObjectId.isValid(transmissionTypeId)) {
+            console.error('Invalid transmissionTypeId:', transmissionTypeId);
+            throw new BadRequestException(
+              `Invalid transmissionTypeId format: ${transmissionTypeId}. Expected a valid MongoDB ObjectId.`,
+            );
+          }
+        }
+      }
+    } else if (fuelTypeId) {
+      console.log('Validating fuelTypeId:', fuelTypeId);
+      if (!Types.ObjectId.isValid(fuelTypeId)) {
+        console.error('Invalid fuelTypeId:', fuelTypeId);
+        throw new BadRequestException(
+          `Invalid fuelTypeId format: ${fuelTypeId}. Expected a valid MongoDB ObjectId.`,
+        );
+      } else if (transmissionTypeId) {
+        console.log('Validating transmissionTypeId:', transmissionTypeId);
+        if (!Types.ObjectId.isValid(transmissionTypeId)) {
+          console.error('Invalid transmissionTypeId:', transmissionTypeId);
+          throw new BadRequestException(
+            `Invalid transmissionTypeId format: ${transmissionTypeId}. Expected a valid MongoDB ObjectId.`,
+          );
+        }
+      }
+    } else if (transmissionTypeId) {
+      console.log('Validating transmissionTypeId:', transmissionTypeId);
+      if (!Types.ObjectId.isValid(transmissionTypeId)) {
+        console.error('Invalid transmissionTypeId:', transmissionTypeId);
+        throw new BadRequestException(
+          `Invalid transmissionTypeId format: ${transmissionTypeId}. Expected a valid MongoDB ObjectId.`,
+        );
+      }
+    }
+
     const filter: any = { isActive: true, isDeleted: false };
+    console.log('Initial filter:', filter);
 
-    if (modelId) filter.vehicleModel = modelId;
-    if (fuelTypeId) filter.fuelType = fuelTypeId;
-    if (transmissionTypeId) filter.transmissionType = transmissionTypeId;
-    if (maxPrice) filter.price = { $lte: maxPrice };
+    if (modelId) {
+      filter.vehicleModel = new Types.ObjectId(modelId);
+      console.log('Added modelId to filter:', filter);
+    }
+    if (fuelTypeId) {
+      filter.fuelType = new Types.ObjectId(fuelTypeId);
+      console.log('Added fuelTypeId to filter:', filter);
+    }
+    if (transmissionTypeId) {
+      filter.transmissionType = new Types.ObjectId(transmissionTypeId);
+      console.log('Added transmissionTypeId to filter:', filter);
+    }
+    if (typeof maxPrice === 'number') {
+      filter.price = { $lte: maxPrice };
+      console.log('Added maxPrice to filter:', filter);
+    }
 
-    return this.vehicleVariantModel
-      .find(filter)
-      .populate('vehicleModel', 'name displayName')
-      .populate('fuelType', 'name displayName')
-      .populate('transmissionType', 'name displayName')
-      .sort({ price: 1 })
-      .exec();
+    try {
+      console.log('Querying vehicleVariantModel with filter:', filter);
+      const result = await this.vehicleVariantModel
+        .find(filter)
+        .populate('vehicleModel', 'name displayName')
+        .populate('fuelType', 'name displayName')
+        .populate('transmissionType', 'name displayName')
+        .sort({ price: 1 })
+        .exec();
+      console.log('Query successful, result count:', result.length);
+      return result;
+    } catch (error) {
+      console.error('Error during vehicleVariantModel query:', error);
+      throw error;
+    }
   }
 
   async findVehicleVariantById(id: string): Promise<VehicleVariant> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid variant ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
     const vehicleVariant = await this.vehicleVariantModel
       .findOne({ _id: id, isActive: true, isDeleted: false })
       .populate('vehicleModel', 'name displayName')
@@ -979,6 +1082,12 @@ export class VehicleInventoryService {
 
   // Lookup methods
   async findFuelTypeById(id: string): Promise<FuelType> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid fuel type ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
     const fuelType = await this.fuelTypeModel
       .findOne({ _id: id, isActive: true, isDeleted: false })
       .exec();
@@ -989,6 +1098,12 @@ export class VehicleInventoryService {
   }
 
   async findTransmissionTypeById(id: string): Promise<TransmissionType> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid transmission type ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
     const transmissionType = await this.transmissionTypeModel
       .findOne({ _id: id, isActive: true, isDeleted: false })
       .exec();
@@ -996,5 +1111,153 @@ export class VehicleInventoryService {
       throw new NotFoundException(`Transmission type with id ${id} not found`);
     }
     return transmissionType;
+  }
+
+  async findAllVehicleVariantsWithPagination(
+    filters: FilterVehicleVariantDto,
+  ): Promise<PaginatedVehicleVariantResponseDto> {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'price',
+      sortOrder = 'ASC',
+    } = filters;
+
+    // Build the aggregation pipeline
+    const pipeline: any[] = [];
+
+    // Handle text search first (must be the first stage if present)
+    if (filters.search) {
+      pipeline.push({
+        $match: {
+          $text: { $search: filters.search },
+        },
+      });
+    }
+
+    // Add basic filters
+    const matchStage: any = { isActive: true, isDeleted: false };
+
+    if (filters.modelId) {
+      matchStage.vehicleModel = new Types.ObjectId(filters.modelId);
+    }
+
+    if (filters.fuelTypeId) {
+      matchStage.fuelType = new Types.ObjectId(filters.fuelTypeId);
+    }
+
+    if (filters.transmissionTypeId) {
+      matchStage.transmissionType = new Types.ObjectId(
+        filters.transmissionTypeId,
+      );
+    }
+
+    // Handle price range
+    if (
+      typeof filters.minPrice === 'number' ||
+      typeof filters.maxPrice === 'number'
+    ) {
+      matchStage.price = {};
+      if (typeof filters.minPrice === 'number') {
+        matchStage.price.$gte = filters.minPrice;
+      }
+      if (typeof filters.maxPrice === 'number') {
+        matchStage.price.$lte = filters.maxPrice;
+      }
+    }
+
+    pipeline.push({ $match: matchStage });
+
+    // Get total count before pagination
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countResult = await this.vehicleVariantModel.aggregate(countPipeline);
+    const total =
+      countResult.length > 0 ? (countResult[0] as { total: number }).total : 0;
+
+    // Add sorting
+    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
+    pipeline.push({ $sort: { [sortBy]: sortDirection } });
+
+    // Add pagination
+    pipeline.push({ $skip: (page - 1) * limit });
+    pipeline.push({ $limit: limit });
+
+    // Add population
+    pipeline.push({
+      $lookup: {
+        from: 'vehiclemodels',
+        localField: 'vehicleModel',
+        foreignField: '_id',
+        as: 'vehicleModel',
+      },
+    });
+    pipeline.push({
+      $lookup: {
+        from: 'fueltypes',
+        localField: 'fuelType',
+        foreignField: '_id',
+        as: 'fuelType',
+      },
+    });
+    pipeline.push({
+      $lookup: {
+        from: 'transmissiontypes',
+        localField: 'transmissionType',
+        foreignField: '_id',
+        as: 'transmissionType',
+      },
+    });
+
+    // Unwind the arrays
+    pipeline.push({
+      $unwind: { path: '$vehicleModel', preserveNullAndEmptyArrays: true },
+    });
+    pipeline.push({
+      $unwind: { path: '$fuelType', preserveNullAndEmptyArrays: true },
+    });
+    pipeline.push({
+      $unwind: { path: '$transmissionType', preserveNullAndEmptyArrays: true },
+    });
+
+    // Project only needed fields
+    pipeline.push({
+      $project: {
+        _id: 1,
+        name: 1,
+        displayName: 1,
+        price: 1,
+        isActive: 1,
+        isDeleted: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        'vehicleModel._id': 1,
+        'vehicleModel.name': 1,
+        'vehicleModel.displayName': 1,
+        'fuelType._id': 1,
+        'fuelType.name': 1,
+        'fuelType.displayName': 1,
+        'transmissionType._id': 1,
+        'transmissionType.name': 1,
+        'transmissionType.displayName': 1,
+      },
+    });
+
+    // Execute the main query
+    const vehicleVariants = await this.vehicleVariantModel.aggregate(pipeline);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return {
+      data: vehicleVariants,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext,
+      hasPrev,
+    };
   }
 }

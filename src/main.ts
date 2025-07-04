@@ -4,85 +4,154 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import * as morgan from 'morgan';
+import helmet from 'helmet';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const configService = app.get<ConfigService>(ConfigService);
-  const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 3000;
+  try {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    const configService = app.get<ConfigService>(ConfigService);
+    const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
+    const NODE_ENV = configService.get('NODE_ENV') || 'development';
 
-  // Enable CORS globally
-  app.enableCors({
-    origin: '*', // Allows requests from all origins. Adjust this for production.
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type, Accept, Authorization',
-  });
-
-  // Custom middleware to add CORS headers for static assets
-  app.use('/ado-dad', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Accept, Authorization',
+    // Security headers
+    app.use(
+      helmet({
+        contentSecurityPolicy: NODE_ENV === 'production' ? undefined : false,
+      }),
     );
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours
-    next();
-  });
 
-  // Serve static assets from public/assets at /ado-dad
-  app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), {
-    prefix: '/ado-dad/',
-  });
+    // Optimized CORS configuration
+    const allowedOrigins =
+      NODE_ENV === 'production'
+        ? [configService.get('FRONTEND_URL') || 'http://localhost:3000']
+        : [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:5000',
+          ];
 
-  // Serve static files from public folder at root (for HTML files)
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
-    prefix: '/',
-  });
+    app.enableCors({
+      origin: allowedOrigins,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'X-Requested-With',
+      ],
+      credentials: true,
+      maxAge: 86400, // 24 hours
+    });
 
-  // Apply global validation pipe with transformation enabled
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    // Static file serving with caching
+    const staticOptions = {
+      maxAge: '1d',
+      etag: true,
+      lastModified: true,
+    };
 
-  // Apply morgan logging middleware
-  app.use(morgan('tiny'));
+    app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), {
+      prefix: '/ado-dad/',
+      ...staticOptions,
+    });
 
-  // Swagger setup
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Ado-dad API')
-    .setDescription('API for managing ado-dad')
-    .setVersion('1.0')
-    .addTag('Ado-Dad')
-    .addBearerAuth()
-    .build();
+    app.useStaticAssets(join(__dirname, '..', 'public'), {
+      prefix: '/',
+      ...staticOptions,
+    });
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true, // Keep token after reload
-    },
-    customJs: `
-      window.onload = function() {
-        const storedToken = localStorage.getItem('token');
-        if (storedToken) {
-          const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-          if (bearerInput) {
-            bearerInput.value = storedToken;
-          }
-        }
-        document.querySelector('button[class*="authorize"]').onclick = function() {
-          const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-          if (bearerInput) {
-            localStorage.setItem('token', bearerInput.value);
-          }
-        };
-      };
-    `,
-  });
+    // Global validation pipe with optimized settings
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
 
-  await app.listen(PORT, () => {
-    Logger.log(`Server started at port ${PORT}`);
-  });
+    // Conditional logging based on environment
+    if (NODE_ENV !== 'test') {
+      app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
+    }
+
+    // Swagger configuration
+    if (NODE_ENV !== 'production') {
+      const swaggerConfig = new DocumentBuilder()
+        .setTitle('Ado-dad API')
+        .setDescription(
+          'API for managing ado-dad - A comprehensive advertisement platform',
+        )
+        .setVersion('1.0.0')
+        .addTag(
+          'Authentication',
+          'User authentication and authorization endpoints',
+        )
+        .addTag('Ads', 'Advertisement management endpoints')
+        .addTag('Users', 'User management endpoints')
+        .addTag('Vehicles', 'Vehicle-related endpoints')
+        .addTag('Categories', 'Category management endpoints')
+        .addBearerAuth(
+          {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            name: 'JWT',
+            description: 'Enter JWT token',
+            in: 'header',
+          },
+          'JWT-auth',
+        )
+        .build();
+
+      const document = SwaggerModule.createDocument(app, swaggerConfig);
+      SwaggerModule.setup('docs', app, document, {
+        swaggerOptions: {
+          persistAuthorization: true,
+          docExpansion: 'none',
+          filter: true,
+          showRequestDuration: true,
+        },
+        customSiteTitle: 'Ado-dad API Documentation',
+        customCss: '.swagger-ui .topbar { display: none }',
+        customJs: `
+          window.onload = function() {
+            const storedToken = localStorage.getItem('ado-dad-token');
+            if (storedToken) {
+              const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
+              if (bearerInput) {
+                bearerInput.value = storedToken;
+              }
+            }
+            document.querySelector('button[class*="authorize"]').onclick = function() {
+              const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
+              if (bearerInput) {
+                localStorage.setItem('ado-dad-token', bearerInput.value);
+              }
+            };
+          };
+        `,
+      });
+    }
+
+    await app.listen(PORT, '0.0.0.0', () => {
+      Logger.log(`🚀 Server started successfully on port ${PORT}`);
+      Logger.log(
+        `📚 API Documentation available at http://localhost:${PORT}/docs`,
+      );
+      Logger.log(`🌍 Environment: ${NODE_ENV}`);
+    });
+  } catch (error) {
+    Logger.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  Logger.error('❌ Bootstrap failed:', error);
+  process.exit(1);
+});

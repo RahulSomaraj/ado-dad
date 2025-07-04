@@ -8,7 +8,9 @@ node_modules/
 .env.example
 package-lock.json
 
-
+# Test reports and generated files
+/reports
+reports/
 
 # Logs
 logs

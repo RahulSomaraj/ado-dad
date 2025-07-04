@@ -5,5 +5,29 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "reporters": [
+    "default",
+    [
+      "jest-html-reporter",
+      {
+        "pageTitle": "E2E Test Report",
+        "outputPath": "./reports/e2e-test-report.html",
+        "includeFailureMsg": true,
+        "includeConsoleLog": true,
+        "includeStackTrace": true
+      }
+    ],
+    [
+      "jest-junit",
+      {
+        "outputDirectory": "./reports",
+        "outputName": "e2e-test-results.xml",
+        "classNameTemplate": "{classname}",
+        "titleTemplate": "{title}",
+        "ancestorSeparator": " › ",
+        "usePathForSuiteName": true
+      }
+    ]
+  ]
 }

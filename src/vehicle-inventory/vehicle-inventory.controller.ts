@@ -8,6 +8,7 @@ import {
   UseFilters,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { VehicleInventoryService } from './vehicle-inventory.service';
 import { CreateManufacturerDto } from './dto/create-manufacturer.dto';
@@ -30,6 +31,9 @@ import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { UserType } from '../users/enums/user.types';
+import { Types } from 'mongoose';
+import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
+import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
 
 @ApiTags('Vehicle Inventory')
 @Controller('vehicle-inventory')
@@ -991,7 +995,9 @@ export class VehicleInventoryController {
   }
 
   @Get('variants')
-  @ApiOperation({ summary: 'Get all vehicle variants with filters' })
+  @ApiOperation({
+    summary: 'Get all vehicle variants with filters and pagination',
+  })
   @ApiQuery({
     name: 'modelId',
     required: false,
@@ -1008,25 +1014,52 @@ export class VehicleInventoryController {
     description: 'Filter by transmission type ID',
   })
   @ApiQuery({
+    name: 'minPrice',
+    required: false,
+    description: 'Filter by minimum price',
+  })
+  @ApiQuery({
     name: 'maxPrice',
     required: false,
     description: 'Filter by maximum price',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search term',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Sort by field',
+    enum: ['price', 'name', 'createdAt', 'updatedAt'],
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Sort order',
+    enum: ['ASC', 'DESC'],
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+    example: 20,
+  })
   @ApiResponse({
     status: 200,
     description: 'Vehicle variants retrieved successfully',
+    type: PaginatedVehicleVariantResponseDto,
   })
-  async findAllVehicleVariants(
-    @Query('modelId') modelId?: string,
-    @Query('fuelTypeId') fuelTypeId?: string,
-    @Query('transmissionTypeId') transmissionTypeId?: string,
-    @Query('maxPrice') maxPrice?: number,
-  ) {
-    return this.vehicleInventoryService.findAllVehicleVariants(
-      modelId,
-      fuelTypeId,
-      transmissionTypeId,
-      maxPrice,
+  async findAllVehicleVariants(@Query() filters: FilterVehicleVariantDto) {
+    return this.vehicleInventoryService.findAllVehicleVariantsWithPagination(
+      filters,
     );
   }
 

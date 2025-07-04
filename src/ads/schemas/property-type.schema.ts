@@ -34,6 +34,5 @@ export class PropertyType {
 export const PropertyTypeSchema = SchemaFactory.createForClass(PropertyType);
 
 // Indexes for fast lookups
-PropertyTypeSchema.index({ name: 1 }, { unique: true });
 PropertyTypeSchema.index({ isActive: 1, isDeleted: 1 });
 PropertyTypeSchema.index({ sortOrder: 1 });
