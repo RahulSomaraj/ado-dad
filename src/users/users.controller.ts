@@ -29,7 +29,7 @@ import { Roles } from '../roles/roles.decorator';
 import { UserType } from './enums/user.types';
 import { RolesGuard } from '../roles/roles.guard';
 
-@ApiTags('users')
+@ApiTags('Users')
 @Controller('users')
 @UseFilters(new HttpExceptionFilter('Users'))
 export class UsersController {

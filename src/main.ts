@@ -92,7 +92,6 @@ async function bootstrap() {
           'User authentication and authorization endpoints',
         )
         .addTag('Ads', 'Advertisement management endpoints')
-        .addTag('Users', 'User management endpoints')
         .addTag('Vehicles', 'Vehicle-related endpoints')
         .addTag('Categories', 'Category management endpoints')
         .addBearerAuth(
