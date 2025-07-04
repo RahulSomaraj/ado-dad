@@ -112,7 +112,7 @@ async function bootstrap() {
       SwaggerModule.setup('docs', app, document, {
         swaggerOptions: {
           persistAuthorization: true,
-          docExpansion: 'none',
+          docExpansion: 'list',
           filter: true,
           showRequestDuration: true,
         },
