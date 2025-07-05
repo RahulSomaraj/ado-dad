@@ -1,26 +1,20 @@
-version: '3.8'
-
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:7.0
-    container_name: adodad_mongodb_dev
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: adodad_db
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: adodad_redis_dev
     ports:
-      - '27017:27017'
+      - '6379:6379'
     volumes:
-      - mongodb_data_dev:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - redis_data_dev:/data
     networks:
       - adodad_network_dev
     healthcheck:
-      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # NestJS Application (Development)
   app:
@@ -31,7 +25,10 @@ services:
     environment:
       NODE_ENV: development
       APP_CONFIG__BACKEND_PORT: 5000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/adodad_db?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: 0
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_REGION: ${AWS_REGION:-us-east-1}
@@ -45,33 +42,29 @@ services:
       - .:/app
       - /app/node_modules
     depends_on:
-      mongodb:
+      redis:
         condition: service_healthy
     networks:
       - adodad_network_dev
     command: npm run start:dev
     restart: unless-stopped
 
-  # MongoDB Express (for database management)
-  mongo-express:
-    image: mongo-express:1.0.0
-    container_name: adodad_mongo_express_dev
+  # Redis Commander (for Redis management)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: adodad_redis_commander_dev
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: password123
+      REDIS_HOSTS: local:redis:6379
     ports:
-      - '8081:8081'
+      - '8082:8081'
     depends_on:
-      mongodb:
+      redis:
         condition: service_healthy
     networks:
       - adodad_network_dev
 
 volumes:
-  mongodb_data_dev:
+  redis_data_dev:
     driver: local
 
 networks:

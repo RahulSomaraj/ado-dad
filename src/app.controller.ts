@@ -6,6 +6,11 @@ import {
   Request,
   UseFilters,
   UseGuards,
+  Patch,
+  Param,
+  Delete,
+  Res,
+  Header,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -15,15 +20,199 @@ import { CustomAuthGuard } from './auth/guard/custom-auth-guard';
 import { LocalAuthGuard } from './auth/guard/local-auth-guard';
 import { LoginUserDto } from './common/dtos/userLoginDto';
 import { HttpExceptionFilter } from './shared/exception-service';
+import { RedisService } from './shared/redis.service';
+import { Response } from 'express';
+import { join } from 'path';
+import { existsSync, readFileSync } from 'fs';
 
 @Controller()
 @UseFilters(new HttpExceptionFilter('App'))
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly redisService: RedisService,
+  ) {}
 
   @Get()
   getHello(): string {
     return this.appService.getHello();
+  }
+
+  @Get('cors-test')
+  async testCors() {
+    return {
+      message: 'CORS is working!',
+      timestamp: new Date().toISOString(),
+      status: 'success',
+    };
+  }
+
+  @Get('images/:filename')
+  @Header('Access-Control-Allow-Origin', '*')
+  @Header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+  @Header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Accept, Authorization, X-Requested-With',
+  )
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
+  @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
+  async serveImage(@Param('filename') filename: string, @Res() res: Response) {
+    try {
+      const imagePath = join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        'images',
+        filename,
+      );
+
+      if (!existsSync(imagePath)) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+
+      const imageBuffer = readFileSync(imagePath);
+
+      // Set proper content type based on file extension
+      let contentType = 'image/jpeg';
+      if (filename.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (filename.endsWith('.gif')) {
+        contentType = 'image/gif';
+      } else if (filename.endsWith('.webp')) {
+        contentType = 'image/webp';
+      } else if (filename.endsWith('.svg')) {
+        contentType = 'image/svg+xml';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Accept, Authorization, X-Requested-With',
+      );
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+
+      res.send(imageBuffer);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to serve image' });
+    }
+  }
+
+  @Get('assets/:filename')
+  @Header('Access-Control-Allow-Origin', '*')
+  @Header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+  @Header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Accept, Authorization, X-Requested-With',
+  )
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
+  @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
+  async serveAsset(@Param('filename') filename: string, @Res() res: Response) {
+    try {
+      const assetPath = join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        'assets',
+        filename,
+      );
+
+      if (!existsSync(assetPath)) {
+        return res.status(404).json({ error: 'Asset not found' });
+      }
+
+      const assetBuffer = readFileSync(assetPath);
+
+      // Set proper content type based on file extension
+      let contentType = 'application/octet-stream';
+      if (filename.endsWith('.json')) {
+        contentType = 'application/json';
+      } else if (filename.endsWith('.css')) {
+        contentType = 'text/css';
+      } else if (filename.endsWith('.js')) {
+        contentType = 'application/javascript';
+      } else if (filename.endsWith('.xml')) {
+        contentType = 'application/xml';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Accept, Authorization, X-Requested-With',
+      );
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+
+      res.send(assetBuffer);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to serve asset' });
+    }
+  }
+
+  @Get('data/:filename')
+  @Header('Access-Control-Allow-Origin', '*')
+  @Header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+  @Header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Accept, Authorization, X-Requested-With',
+  )
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
+  @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
+  async serveData(@Param('filename') filename: string, @Res() res: Response) {
+    try {
+      const dataPath = join(__dirname, '..', '..', 'public', filename);
+
+      if (!existsSync(dataPath)) {
+        return res.status(404).json({ error: 'Data file not found' });
+      }
+
+      const dataBuffer = readFileSync(dataPath);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Accept, Authorization, X-Requested-With',
+      );
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+
+      res.send(dataBuffer);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to serve data' });
+    }
+  }
+
+  @Get('redis/test')
+  async testRedis() {
+    try {
+      const ping = await this.redisService.ping();
+      await this.redisService.set('test', 'Hello Redis!', 60);
+      const testValue = await this.redisService.get('test');
+
+      return {
+        status: 'success',
+        ping,
+        testValue,
+        message: 'Redis connection is working!',
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: 'Redis connection failed',
+        error: error.message,
+      };
+    }
   }
 
   @UseGuards(LocalAuthGuard)

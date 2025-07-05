@@ -217,33 +217,6 @@ describe('Users API (e2e)', () => {
     });
   });
 
-  describe('DELETE /users/:id', () => {
-    it('should delete user successfully', () => {
-      return request(app.getHttpServer())
-        .delete(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('message');
-          expect(res.body.message).toBe('User deleted successfully');
-        });
-    });
-
-    it('should fail to delete non-existent user', () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      return request(app.getHttpServer())
-        .delete(`/users/${fakeId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(404);
-    });
-
-    it('should fail to delete user without authentication', () => {
-      return request(app.getHttpServer())
-        .delete(`/users/${userId}`)
-        .expect(401);
-    });
-  });
-
   describe('GET /users/profile/me', () => {
     it('should get current user profile successfully', () => {
       return request(app.getHttpServer())

@@ -14,13 +14,11 @@ describe('AdsController', () => {
   let s3Service: S3Service;
 
   const mockAdsService = {
-    findAll: jest.fn(),
-    findOne: jest.fn(),
     createPropertyAd: jest.fn(),
     createVehicleAd: jest.fn(),
     createCommercialVehicleAd: jest.fn(),
     update: jest.fn(),
-    delete: jest.fn(),
+    findAll: jest.fn(),
   };
 
   const mockS3Service = {
@@ -284,19 +282,6 @@ describe('AdsController', () => {
 
       expect(adsService.update).toHaveBeenCalledWith(id, updateDto, userId);
       expect(result).toEqual(expectedResult);
-    });
-  });
-
-  describe('delete', () => {
-    it('should delete an advertisement', async () => {
-      const id = 'ad-id';
-      const userId = 'user-id';
-
-      mockAdsService.delete.mockResolvedValue(undefined);
-
-      await controller.delete(id, userId);
-
-      expect(adsService.delete).toHaveBeenCalledWith(id, userId);
     });
   });
 

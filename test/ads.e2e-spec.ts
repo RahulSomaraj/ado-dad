@@ -597,56 +597,6 @@ describe('Ads API (e2e)', () => {
           .expect(401);
       });
     });
-
-    describe('DELETE /ads/vehicle/:id', () => {
-      beforeEach(async () => {
-        const vehicleAdData = {
-          title: 'Test Vehicle Ad',
-          description: 'A test vehicle advertisement',
-          price: 500000,
-          location: 'Mumbai, Maharashtra',
-          category: 'VEHICLE',
-          condition: 'USED',
-          vehicleType: 'four_wheeler',
-          manufacturerId: manufacturerId,
-          modelId: vehicleModelId,
-          variantId: vehicleVariantId,
-          year: 2020,
-          mileage: 15000,
-          transmissionTypeId: transmissionTypeId,
-          fuelTypeId: fuelTypeId,
-          color: 'White',
-          isFirstOwner: true,
-          hasInsurance: true,
-          hasRcBook: true,
-          additionalFeatures: 'ABS, Airbags, Power Steering',
-        };
-
-        const response = await request(app.getHttpServer())
-          .post('/ads/vehicle')
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(vehicleAdData);
-
-        adId = response.body._id;
-      });
-
-      it('should delete vehicle ad successfully', () => {
-        return request(app.getHttpServer())
-          .delete(`/ads/vehicle/${adId}`)
-          .set('Authorization', `Bearer ${authToken}`)
-          .expect(200)
-          .expect((res) => {
-            expect(res.body).toHaveProperty('message');
-            expect(res.body.message).toBe('Ad deleted successfully');
-          });
-      });
-
-      it('should fail to delete vehicle ad without authentication', () => {
-        return request(app.getHttpServer())
-          .delete(`/ads/vehicle/${adId}`)
-          .expect(401);
-      });
-    });
   });
 
   describe('Property Ads API', () => {

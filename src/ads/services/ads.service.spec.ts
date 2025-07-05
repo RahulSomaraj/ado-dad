@@ -20,7 +20,6 @@ describe('AdsService', () => {
     findById: jest.fn(),
     findOne: jest.fn(),
     aggregate: jest.fn(),
-    findByIdAndDelete: jest.fn(),
   };
 
   const mockPropertyAdModel = {

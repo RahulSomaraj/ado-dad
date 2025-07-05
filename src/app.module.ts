@@ -6,6 +6,7 @@ import helmet from 'helmet';
 
 // Configuration imports
 import appConfig from './config/app.config';
+import redisConfig from './config/redis.config';
 
 // Core modules
 import { AppController } from './app.controller';
@@ -31,6 +32,7 @@ import { VehicleModule } from './vehicles/vehicle.module';
 // Services
 import { EmailService } from './utils/email.service';
 import { RefreshTokenService } from './auth/auth.refresh.service';
+import { RedisService } from './shared/redis.service';
 
 // Schemas
 import {
@@ -46,7 +48,7 @@ import { configService } from './config/mongo.config';
   imports: [
     // Configuration
     ConfigModule.forRoot({
-      load: [appConfig],
+      load: [appConfig, redisConfig],
       isGlobal: true,
       cache: true,
       envFilePath: ['.env.local', '.env'],
@@ -116,26 +118,12 @@ import { configService } from './config/mongo.config';
     VehicleInventoryModule,
     VehicleModule,
   ],
-  providers: [AppService, RefreshTokenService, EmailService],
+  providers: [AppService, RefreshTokenService, EmailService, RedisService],
   controllers: [AppController],
   exports: [JwtModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(
-        helmet({
-          contentSecurityPolicy: {
-            directives: {
-              defaultSrc: ["'self'"],
-              styleSrc: ["'self'", "'unsafe-inline'"],
-              scriptSrc: ["'self'"],
-              imgSrc: ["'self'", 'data:', 'https:'],
-            },
-          },
-          crossOriginEmbedderPolicy: false,
-        }),
-      )
-      .forRoutes('*');
+    // No restrictive middleware - allow all platforms
   }
 }

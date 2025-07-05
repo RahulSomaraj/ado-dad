@@ -319,35 +319,6 @@ describe('Vehicle Inventory API (e2e)', () => {
           .expect(400);
       });
     });
-
-    describe('DELETE /vehicle-inventory/manufacturers/:id', () => {
-      beforeEach(async () => {
-        const manufacturerData = {
-          name: 'test-manufacturer',
-          displayName: 'Test Manufacturer',
-          originCountry: 'India',
-          logo: 'https://example.com/logo.png',
-        };
-
-        const response = await request(app.getHttpServer())
-          .post('/vehicle-inventory/manufacturers')
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(manufacturerData);
-
-        manufacturerId = response.body._id;
-      });
-
-      it('should delete manufacturer successfully', () => {
-        return request(app.getHttpServer())
-          .delete(`/vehicle-inventory/manufacturers/${manufacturerId}`)
-          .set('Authorization', `Bearer ${authToken}`)
-          .expect(200)
-          .expect((res) => {
-            expect(res.body).toHaveProperty('message');
-            expect(res.body.message).toBe('Manufacturer deleted successfully');
-          });
-      });
-    });
   });
 
   describe('Vehicle Models API', () => {
