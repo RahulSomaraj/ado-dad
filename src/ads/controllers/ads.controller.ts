@@ -836,4 +836,22 @@ export class AdsController {
   async getVehicleVariantById(@Param('id') id: string) {
     return this.vehicleInventoryService.findVehicleVariantById(id);
   }
+
+  @Post('cache/warm-up')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Warm up ads cache',
+    description:
+      'Pre-populate cache with popular queries for better performance',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cache warmed up successfully',
+  })
+  @ApiBearerAuth()
+  async warmUpCache() {
+    await this.adsService.warmUpCache();
+    return { message: 'Cache warmed up successfully' };
+  }
 }

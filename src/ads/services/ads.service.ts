@@ -23,6 +23,7 @@ import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-c
 import { CreateAdDto } from '../dto/common/create-ad.dto';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { DetailedAdResponseDto } from '../dto/common/ad-response.dto';
+import { RedisService } from '../../shared/redis.service';
 
 interface MatchStage {
   isActive?: boolean;
@@ -80,7 +81,53 @@ export class AdsService {
     @InjectModel(CommercialVehicleAd.name)
     private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
     private readonly vehicleInventoryService: VehicleInventoryService,
-  ) {}
+    private readonly redisService: RedisService,
+  ) {
+    // Create indexes for better performance
+    this.createIndexes();
+  }
+
+  private async createIndexes(): Promise<void> {
+    try {
+      // Create compound indexes for common query patterns
+      await this.adModel.collection.createIndex(
+        { isActive: 1, category: 1, postedAt: -1 },
+        { background: true },
+      );
+
+      await this.adModel.collection.createIndex(
+        { isActive: 1, location: 1, price: 1 },
+        { background: true },
+      );
+
+      await this.adModel.collection.createIndex(
+        { postedBy: 1, isActive: 1 },
+        { background: true },
+      );
+
+      // Text index for search
+      await this.adModel.collection.createIndex(
+        { title: 'text', description: 'text' },
+        { background: true },
+      );
+
+      // Indexes for property ads
+      await this.propertyAdModel.collection.createIndex(
+        { ad: 1, propertyType: 1, bedrooms: 1, bathrooms: 1 },
+        { background: true },
+      );
+
+      // Indexes for vehicle ads
+      await this.vehicleAdModel.collection.createIndex(
+        { ad: 1, vehicleType: 1, manufacturerId: 1, modelId: 1 },
+        { background: true },
+      );
+
+      console.log('✅ Database indexes created successfully');
+    } catch (error) {
+      console.error('❌ Error creating indexes:', error);
+    }
+  }
 
   async findAll(filters: FilterAdDto): Promise<PaginatedAdResponseDto> {
     const {
@@ -89,6 +136,22 @@ export class AdsService {
       sortBy = 'postedAt',
       sortOrder = 'DESC',
     } = filters;
+
+    // Check if this query should be cached
+    const shouldCache = this.shouldCacheQuery(filters);
+    
+    if (shouldCache) {
+      // Generate optimized cache key (normalize filters for better cache hit rate)
+      const normalizedFilters = this.normalizeFilters(filters);
+      const cacheKey = `ads:findAll:${JSON.stringify(normalizedFilters)}`;
+
+      // Try to get from cache first
+      const cachedResult =
+        await this.redisService.cacheGet<PaginatedAdResponseDto>(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
+      }
+    }
 
     // Build the aggregation pipeline
     const pipeline: any[] = [];
@@ -129,7 +192,7 @@ export class AdsService {
       matchStage.isActive = filters.isActive;
     }
 
-    // Add user lookup
+    // Add user lookup with projection for better performance
     pipeline.push(
       {
         $lookup: {
@@ -137,6 +200,15 @@ export class AdsService {
           localField: 'postedBy',
           foreignField: '_id',
           as: 'user',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+                phone: 1,
+              },
+            },
+          ],
         },
       },
       {
@@ -167,6 +239,21 @@ export class AdsService {
           localField: '_id',
           foreignField: 'ad',
           as: 'propertyDetails',
+          pipeline: [
+            {
+              $project: {
+                propertyType: 1,
+                bedrooms: 1,
+                bathrooms: 1,
+                areaSqft: 1,
+                floor: 1,
+                isFurnished: 1,
+                hasParking: 1,
+                hasGarden: 1,
+                amenities: 1,
+              },
+            },
+          ],
         },
       });
 
@@ -242,6 +329,25 @@ export class AdsService {
           localField: '_id',
           foreignField: 'ad',
           as: 'vehicleDetails',
+          pipeline: [
+            {
+              $project: {
+                vehicleType: 1,
+                manufacturerId: 1,
+                modelId: 1,
+                variantId: 1,
+                year: 1,
+                mileage: 1,
+                transmissionTypeId: 1,
+                fuelTypeId: 1,
+                color: 1,
+                isFirstOwner: 1,
+                hasInsurance: 1,
+                hasRcBook: 1,
+                additionalFeatures: 1,
+              },
+            },
+          ],
         },
       });
 
@@ -389,7 +495,7 @@ export class AdsService {
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
-    return {
+    const result = {
       data: ads.map((ad) => this.mapToResponseDto(ad)),
       total,
       page,
@@ -398,6 +504,16 @@ export class AdsService {
       hasNext,
       hasPrev,
     };
+
+    // Cache the result if caching is enabled
+    if (shouldCache) {
+      const normalizedFilters = this.normalizeFilters(filters);
+      const cacheKey = `ads:findAll:${JSON.stringify(normalizedFilters)}`;
+      const ttl = this.calculateCacheTTL(filters);
+      await this.redisService.cacheSet(cacheKey, result, ttl);
+    }
+
+    return result;
   }
 
   async findOne(id: string): Promise<AdResponseDto> {
@@ -413,8 +529,63 @@ export class AdsService {
     return this.mapToResponseDto(ad);
   }
 
+  async findByIds(ids: string[]): Promise<AdResponseDto[]> {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    // Try to get from cache first
+    const cacheKeys = ids.map((id) => `ads:getById:${id}`);
+    const cachedResults = await Promise.all(
+      cacheKeys.map((key) =>
+        this.redisService.cacheGet<DetailedAdResponseDto>(key),
+      ),
+    );
+
+    const uncachedIds = ids.filter((_, index) => !cachedResults[index]);
+    const cachedAds = cachedResults.filter((result) => result !== null);
+
+    if (uncachedIds.length === 0) {
+      return cachedAds.map((ad) => this.mapToResponseDto(ad));
+    }
+
+    // Fetch uncached ads from database
+    const uncachedAds = await this.adModel
+      .find({ _id: { $in: uncachedIds } })
+      .populate('postedBy', 'name email phone')
+      .exec();
+
+    // Cache the newly fetched ads
+    const adsToCache = uncachedAds.map((ad) => ({
+      key: `ads:getById:${ad._id}`,
+      data: this.mapToResponseDto(ad),
+      ttl: 900, // 15 minutes
+    }));
+
+    await Promise.all(
+      adsToCache.map(({ key, data, ttl }) =>
+        this.redisService.cacheSet(key, data, ttl),
+      ),
+    );
+
+    return [
+      ...cachedAds,
+      ...uncachedAds.map((ad) => this.mapToResponseDto(ad)),
+    ];
+  }
+
   async getAdById(id: string): Promise<DetailedAdResponseDto> {
-    // Use aggregation pipeline to get all related data in one query
+    // Generate cache key
+    const cacheKey = `ads:getById:${id}`;
+
+    // Try to get from cache first
+    const cachedResult =
+      await this.redisService.cacheGet<DetailedAdResponseDto>(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
+    // Use optimized aggregation pipeline with projections
     const pipeline = [
       {
         $match: { _id: new (require('mongoose').Types.ObjectId)(id) },
@@ -477,7 +648,177 @@ export class AdsService {
       await this.populateVehicleInventoryDetails(detailedAd);
     }
 
+    // Cache the result for 15 minutes (longer TTL for individual ads)
+    await this.redisService.cacheSet(cacheKey, detailedAd, 900);
+
     return detailedAd;
+  }
+
+  private normalizeFilters(filters: FilterAdDto): any {
+    // Normalize filters to improve cache hit rate
+    const normalized = { ...filters };
+
+    // Remove undefined values
+    Object.keys(normalized).forEach((key) => {
+      if (normalized[key] === undefined || normalized[key] === null) {
+        delete normalized[key];
+      }
+    });
+
+    // Normalize string values (trim, lowercase)
+    if (normalized.search) {
+      normalized.search = normalized.search.trim().toLowerCase();
+    }
+    if (normalized.location) {
+      normalized.location = normalized.location.trim().toLowerCase();
+    }
+    if (normalized.color) {
+      normalized.color = normalized.color.trim().toLowerCase();
+    }
+
+    // Round numeric values to reduce cache key variations
+    if (normalized.minPrice) {
+      normalized.minPrice = Math.floor(normalized.minPrice / 1000) * 1000;
+    }
+    if (normalized.maxPrice) {
+      normalized.maxPrice = Math.ceil(normalized.maxPrice / 1000) * 1000;
+    }
+    if (normalized.minBedrooms) {
+      normalized.minBedrooms = Math.floor(normalized.minBedrooms);
+    }
+    if (normalized.maxBedrooms) {
+      normalized.maxBedrooms = Math.ceil(normalized.maxBedrooms);
+    }
+    if (normalized.minYear) {
+      normalized.minYear = Math.floor(normalized.minYear);
+    }
+    if (normalized.maxYear) {
+      normalized.maxYear = Math.ceil(normalized.maxYear);
+    }
+
+    // Sort object keys for consistent cache keys
+    return Object.keys(normalized)
+      .sort()
+      .reduce((obj, key) => {
+        obj[key] = normalized[key];
+        return obj;
+      }, {});
+  }
+
+  private shouldCacheQuery(filters: FilterAdDto): boolean {
+    // Don't cache complex queries that are likely to have low cache hit rates
+    const filterCount = Object.keys(filters).filter(
+      (key) => filters[key] !== undefined && filters[key] !== null,
+    ).length;
+
+    // Skip caching for very complex queries
+    if (filterCount > 6) {
+      return false;
+    }
+
+    // Skip caching for search queries (too dynamic)
+    if (filters.search) {
+      return false;
+    }
+
+    // Skip caching for specific filters that are rarely repeated
+    if (filters.postedBy || filters.manufacturerId || filters.modelId || filters.variantId) {
+      return false;
+    }
+
+    // Cache simple queries and moderate complexity queries
+    return true;
+  }
+
+  private calculateCacheTTL(filters: FilterAdDto): number {
+    // Base TTL of 3 minutes
+    let ttl = 180;
+
+    // Reduce TTL for complex queries (more filters = more dynamic data)
+    const filterCount = Object.keys(filters).filter(
+      (key) => filters[key] !== undefined && filters[key] !== null,
+    ).length;
+
+    if (filterCount > 5) {
+      ttl = 60; // 1 minute for complex queries
+    } else if (filterCount > 3) {
+      ttl = 120; // 2 minutes for moderate queries
+    }
+
+    // Reduce TTL for search queries (more dynamic)
+    if (filters.search) {
+      ttl = Math.min(ttl, 60); // Max 1 minute for search
+    }
+
+    // Increase TTL for simple queries (more stable)
+    if (filterCount <= 2 && !filters.search) {
+      ttl = 300; // 5 minutes for simple queries
+    }
+
+    return ttl;
+  }
+
+  private async invalidateAdCache(adId?: string): Promise<void> {
+    try {
+      // Invalidate all ads cache
+      const keys = await this.redisService.keys('ads:findAll:*');
+      if (keys.length > 0) {
+        await Promise.all(keys.map((key) => this.redisService.cacheDel(key)));
+      }
+
+      // Invalidate specific ad cache if ID provided
+      if (adId) {
+        await this.redisService.cacheDel(`ads:getById:${adId}`);
+      }
+    } catch (error) {
+      // Log error but don't fail the operation
+      console.error('Error invalidating ad cache:', error);
+    }
+  }
+
+  async warmUpCache(): Promise<void> {
+    try {
+      console.log('🔥 Warming up ads cache...');
+
+      // Warm up popular queries
+      const popularQueries: FilterAdDto[] = [
+        { page: 1, limit: 20, sortBy: 'postedAt', sortOrder: 'DESC' },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.PRIVATE_VEHICLE,
+          sortBy: 'postedAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.PROPERTY,
+          sortBy: 'postedAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.COMMERCIAL_VEHICLE,
+          sortBy: 'postedAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.TWO_WHEELER,
+          sortBy: 'postedAt',
+          sortOrder: 'DESC',
+        },
+      ];
+
+      await Promise.all(popularQueries.map((query) => this.findAll(query)));
+
+      console.log('✅ Ads cache warmed up successfully');
+    } catch (error) {
+      console.error('❌ Error warming up ads cache:', error);
+    }
   }
 
   private async populateVehicleInventoryDetails(
@@ -778,23 +1119,34 @@ export class AdsService {
     // Validate required fields based on category
     this.validateRequiredFields(createDto);
 
+    let result: AdResponseDto;
+
     switch (createDto.category) {
       case AdCategory.PROPERTY:
-        return this.createPropertyAdFromUnified(createDto.data, userId);
+        result = await this.createPropertyAdFromUnified(createDto.data, userId);
+        break;
       case AdCategory.PRIVATE_VEHICLE:
-        return this.createVehicleAdFromUnified(createDto.data, userId);
+        result = await this.createVehicleAdFromUnified(createDto.data, userId);
+        break;
       case AdCategory.COMMERCIAL_VEHICLE:
-        return this.createCommercialVehicleAdFromUnified(
+        result = await this.createCommercialVehicleAdFromUnified(
           createDto.data,
           userId,
         );
+        break;
       case AdCategory.TWO_WHEELER:
-        return this.createVehicleAdFromUnified(createDto.data, userId);
+        result = await this.createVehicleAdFromUnified(createDto.data, userId);
+        break;
       default:
         throw new BadRequestException(
           `Invalid ad category: ${createDto.category}`,
         );
     }
+
+    // Invalidate cache after creating new ad
+    await this.invalidateAdCache();
+
+    return result;
   }
 
   private validateRequiredFields(createDto: CreateAdDto): void {
@@ -1073,6 +1425,9 @@ export class AdsService {
         break;
     }
 
+    // Invalidate cache after updating ad
+    await this.invalidateAdCache(id);
+
     return this.findOne(id);
   }
 
@@ -1086,6 +1441,9 @@ export class AdsService {
     }
 
     await this.adModel.findByIdAndDelete(id);
+
+    // Invalidate cache after deleting ad
+    await this.invalidateAdCache(id);
   }
 
   private async validateVehicleInventoryReferences(

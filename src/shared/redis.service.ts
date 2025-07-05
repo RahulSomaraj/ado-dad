@@ -387,6 +387,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Get keys by pattern
+  async keys(pattern: string): Promise<string[]> {
+    try {
+      const fullPattern = this.getKey(pattern);
+      return await this.redisClient.keys(fullPattern);
+    } catch (error) {
+      this.logger.error(`Error getting keys with pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
   // Flush Database (use with caution)
   async flushDb(): Promise<void> {
     try {

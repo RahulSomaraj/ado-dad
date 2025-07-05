@@ -26,6 +26,7 @@ import {
 // External modules and services
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { S3Service } from '../shared/s3.service';
+import { RedisService } from '../shared/redis.service';
 
 @Module({
   imports: [
@@ -41,7 +42,13 @@ import { S3Service } from '../shared/s3.service';
     VehicleInventoryModule,
   ],
   controllers: [AdsController, LookupController],
-  providers: [AdsService, LookupService, AdsSeedService, S3Service],
+  providers: [
+    AdsService,
+    LookupService,
+    AdsSeedService,
+    S3Service,
+    RedisService,
+  ],
   exports: [AdsService, LookupService, MongooseModule],
 })
 export class AdsModule {}

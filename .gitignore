@@ -11,6 +11,11 @@ package-lock.json
 # Test reports and generated files
 /reports
 reports/
+test/performance-report.html
+test/*.html
+test/*.json
+test/*.xml
+test/*.txt
 
 # Logs
 logs

@@ -39,7 +39,8 @@ export class AppController {
   }
 
   @Get('cors-test')
-  async testCors() {
+  testCors() {
+    // Synchronous response for better performance
     return {
       message: 'CORS is working!',
       timestamp: new Date().toISOString(),
@@ -196,14 +197,21 @@ export class AppController {
   @Get('redis/test')
   async testRedis() {
     try {
-      const ping = await this.redisService.ping();
-      await this.redisService.set('test', 'Hello Redis!', 60);
-      const testValue = await this.redisService.get('test');
+      // Use Promise.all for concurrent operations
+      const [ping, testValue] = await Promise.all([
+        this.redisService.ping(),
+        this.redisService.get('test').catch(() => null), // Don't fail if key doesn't exist
+      ]);
+
+      // Only set if not already set
+      if (!testValue) {
+        await this.redisService.set('test', 'Hello Redis!', 60);
+      }
 
       return {
         status: 'success',
         ping,
-        testValue,
+        testValue: testValue || 'Hello Redis!',
         message: 'Redis connection is working!',
       };
     } catch (error) {

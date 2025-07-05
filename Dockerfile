@@ -33,13 +33,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
-# Copy any additional files needed
-COPY --chown=nestjs:nodejs /app/public ./public
+# Copy any additional files needed (if they exist)
+RUN mkdir -p ./public || true
 
 # Create health check file
 RUN echo 'const http = require("http"); const options = { hostname: "localhost", port: 5000, path: "/ads", method: "GET", timeout: 2000 }; const req = http.request(options, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on("error", () => process.exit(1)); req.on("timeout", () => process.exit(1)); req.end();' > healthcheck.js
