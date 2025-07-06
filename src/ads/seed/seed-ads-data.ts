@@ -24,12 +24,32 @@ const ASSET_IMAGE_NAMES = [
   'bike_hornet.png',
 ];
 
-const ASSET_BASE_URL = 'https://uat.ado-dad.com/ado-dad/images';
+const ASSET_BASE_URL = 'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads';
 
+// Helper function to get random images
 function getRandomImages(count = 3) {
-  // Shuffle and pick 'count' images
   const shuffled = ASSET_IMAGE_NAMES.sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count).map((name) => `${ASSET_BASE_URL}/${name}`);
+}
+
+// Helper function to get random element from array
+function getRandomElement<T>(array: T[]): T {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+// Helper function to get random number between min and max
+function getRandomNumber(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Helper function to get random boolean
+function getRandomBoolean(): boolean {
+  return Math.random() > 0.5;
+}
+
+// Helper function to get random price in a range
+function getRandomPrice(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 @Injectable()
@@ -47,16 +67,13 @@ export class AdsSeedService {
   async seedAdsData() {
     console.log('🌱 Starting Ads data seeding...');
 
-    // Sample user IDs (these should match actual users in your system)
-    const sampleUserIds = [
-      '507f1f77bcf86cd799439021',
-      '507f1f77bcf86cd799439022',
-      '507f1f77bcf86cd799439023',
-      '507f1f77bcf86cd799439024',
-      '507f1f77bcf86cd799439025',
-    ];
+    // Extended sample user IDs
+    const sampleUserIds = Array.from(
+      { length: 20 },
+      (_, i) => `507f1f77bcf86cd7994390${(21 + i).toString().padStart(2, '0')}`,
+    );
 
-    // Sample vehicle inventory IDs (these should match actual inventory in your system)
+    // Extended vehicle inventory IDs
     const sampleManufacturerIds = [
       '507f1f77bcf86cd799439031', // Honda
       '507f1f77bcf86cd799439032', // Toyota
@@ -65,6 +82,9 @@ export class AdsSeedService {
       '507f1f77bcf86cd799439035', // Hyundai
       '507f1f77bcf86cd799439036', // Bajaj
       '507f1f77bcf86cd799439037', // TVS
+      '507f1f77bcf86cd799439038', // Hero
+      '507f1f77bcf86cd799439039', // Mahindra
+      '507f1f77bcf86cd799439040', // Ford
     ];
 
     const sampleModelIds = [
@@ -75,6 +95,9 @@ export class AdsSeedService {
       '507f1f77bcf86cd799439045', // i20
       '507f1f77bcf86cd799439046', // Pulsar
       '507f1f77bcf86cd799439047', // Apache
+      '507f1f77bcf86cd799439048', // Splendor
+      '507f1f77bcf86cd799439049', // Scorpio
+      '507f1f77bcf86cd799439050', // EcoSport
     ];
 
     const sampleVariantIds = [
@@ -85,6 +108,9 @@ export class AdsSeedService {
       '507f1f77bcf86cd799439055', // Asta
       '507f1f77bcf86cd799439056', // 150
       '507f1f77bcf86cd799439057', // RTR 160
+      '507f1f77bcf86cd799439058', // Plus
+      '507f1f77bcf86cd799439059', // S11
+      '507f1f77bcf86cd799439060', // Titanium
     ];
 
     const sampleTransmissionTypeIds = [
@@ -104,10 +130,10 @@ export class AdsSeedService {
     // Clear existing data
     await this.clearExistingData();
 
-    // Seed Property Ads
+    // Seed Property Ads (30 ads)
     await this.seedPropertyAds(sampleUserIds);
 
-    // Seed Vehicle Ads
+    // Seed Vehicle Ads (35 ads)
     await this.seedVehicleAds(
       sampleUserIds,
       sampleManufacturerIds,
@@ -117,7 +143,7 @@ export class AdsSeedService {
       sampleFuelTypeIds,
     );
 
-    // Seed Commercial Vehicle Ads
+    // Seed Commercial Vehicle Ads (20 ads)
     await this.seedCommercialVehicleAds(
       sampleUserIds,
       sampleManufacturerIds,
@@ -127,7 +153,7 @@ export class AdsSeedService {
       sampleFuelTypeIds,
     );
 
-    // Seed Two Wheeler Ads
+    // Seed Two Wheeler Ads (25 ads)
     await this.seedTwoWheelerAds(
       sampleUserIds,
       sampleManufacturerIds,
@@ -152,174 +178,205 @@ export class AdsSeedService {
   private async seedPropertyAds(userIds: string[]) {
     console.log('🏠 Seeding property ads...');
 
-    // Property 1: 2BHK Apartment
-    const ad1 = new this.adModel({
-      title: 'Beautiful 2BHK Apartment in Prime Location',
-      description:
-        'Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
-      price: 8500000,
-      images: getRandomImages(),
-      location: 'Bandra West, Mumbai, Maharashtra',
-      category: AdCategory.PROPERTY,
-      postedBy: userIds[0],
-      isActive: true,
-    });
-    const savedAd1 = await ad1.save();
+    const propertyTitles = [
+      'Beautiful 2BHK Apartment in Prime Location',
+      'Luxury 3BHK Villa with Private Garden',
+      'Commercial Space in CBD Area',
+      'Independent House with Terrace',
+      'Residential Plot in Developing Area',
+      'Modern 1BHK Studio Apartment',
+      'Premium 4BHK Penthouse',
+      'Cozy 2BHK Flat Near Metro',
+      'Spacious 3BHK Duplex',
+      'Investment Property in High Growth Area',
+      'Luxury Apartment with City View',
+      'Family Villa with Swimming Pool',
+      'Office Space in Business District',
+      'Retail Shop in Shopping Mall',
+      'Warehouse Space for Rent',
+      'Farmhouse with Agricultural Land',
+      'Beachfront Property',
+      'Mountain View Villa',
+      'Garden Apartment Complex',
+      'Serviced Apartment for Business Travelers',
+      'Student Accommodation Near University',
+      'Senior Living Community',
+      'Luxury Condominium',
+      'Townhouse in Gated Community',
+      'Loft Style Apartment',
+      'Heritage Property for Sale',
+      'Industrial Plot with Approvals',
+      'Medical Clinic Space',
+      'Restaurant Space in Food Court',
+      'Hotel Property for Investment',
+    ];
 
-    const propertyAd1 = new this.propertyAdModel({
-      ad: savedAd1._id,
-      propertyType: PropertyTypeEnum.APARTMENT,
-      bedrooms: 2,
-      bathrooms: 2,
-      areaSqft: 1200,
-      floor: 8,
-      isFurnished: true,
-      hasParking: true,
-      hasGarden: false,
-      amenities: [
-        'Gym',
-        'Swimming Pool',
-        'Garden',
-        'Security',
-        'Lift',
-        '24/7 Water Supply',
-        'Power Backup',
-      ],
-    });
-    await propertyAd1.save();
+    const propertyDescriptions = [
+      'Spacious and well-maintained apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
+      'Exclusive villa with private garden, modern amenities, and premium finishes. Located in a gated community with 24/7 security.',
+      'Prime commercial space in Central Business District. Perfect for retail, office, or restaurant. High footfall area with excellent connectivity.',
+      'Beautiful independent house with terrace garden. Modern amenities, located in a peaceful residential area.',
+      'Prime residential plot in developing area with good appreciation potential. All approvals in place, ready for construction.',
+      'Compact and modern studio apartment perfect for singles or couples. Fully furnished with all basic amenities.',
+      'Luxurious penthouse with panoramic city views. Premium finishes and exclusive amenities included.',
+      'Well-maintained flat in a prime location with excellent metro connectivity. Perfect for daily commute.',
+      'Spacious duplex with modern design and premium amenities. Ideal for large families.',
+      'High-potential investment property in rapidly developing area with excellent ROI prospects.',
+      'Premium apartment with stunning city skyline views. World-class amenities and security.',
+      'Family-friendly villa with private swimming pool and garden. Perfect for large families.',
+      'Professional office space in prime business district. Ready for immediate occupation.',
+      'High-traffic retail space in popular shopping mall. Excellent business opportunity.',
+      'Large warehouse space suitable for storage and logistics. Good connectivity to highways.',
+      'Peaceful farmhouse with agricultural land. Perfect for weekend getaways or farming.',
+      'Exclusive beachfront property with direct access to the beach. Rare opportunity.',
+      'Scenic mountain view villa with fresh air and tranquility. Perfect for nature lovers.',
+      'Well-maintained garden apartment with green surroundings. Family-friendly environment.',
+      'Fully furnished serviced apartment perfect for business travelers. All amenities included.',
+      'Student-friendly accommodation near university campus. Affordable and convenient.',
+      'Senior living community with medical facilities and recreational activities.',
+      'Luxury condominium with premium amenities and security. Exclusive lifestyle.',
+      'Modern townhouse in gated community. Perfect balance of privacy and community living.',
+      'Contemporary loft-style apartment with high ceilings and modern design.',
+      'Heritage property with historical significance. Unique investment opportunity.',
+      'Industrial plot with all necessary approvals. Ready for industrial development.',
+      'Medical clinic space in healthcare hub. Perfect for medical professionals.',
+      'Restaurant space in popular food court. High footfall and business potential.',
+      'Hotel property in tourist destination. Excellent investment opportunity.',
+    ];
 
-    // Property 2: 3BHK Villa
-    const ad2 = new this.adModel({
-      title: 'Luxury 3BHK Villa with Private Garden',
-      description:
-        'Exclusive 3BHK villa with private garden, modern amenities, and premium finishes. Located in a gated community with 24/7 security.',
-      price: 25000000,
-      images: getRandomImages(),
-      location: 'Whitefield, Bangalore, Karnataka',
-      category: AdCategory.PROPERTY,
-      postedBy: userIds[1],
-      isActive: true,
-    });
-    const savedAd2 = await ad2.save();
+    const locations = [
+      'Bandra West, Mumbai, Maharashtra',
+      'Whitefield, Bangalore, Karnataka',
+      'Connaught Place, Delhi, NCR',
+      'Koramangala, Bangalore, Karnataka',
+      'Electronic City, Bangalore, Karnataka',
+      'Andheri West, Mumbai, Maharashtra',
+      'Dwarka, Delhi, NCR',
+      'Pune, Maharashtra',
+      'Chennai, Tamil Nadu',
+      'Ahmedabad, Gujarat',
+      'Hyderabad, Telangana',
+      'Kolkata, West Bengal',
+      'Noida, Uttar Pradesh',
+      'Gurgaon, Haryana',
+      'Thane, Maharashtra',
+      'Navi Mumbai, Maharashtra',
+      'Indore, Madhya Pradesh',
+      'Jaipur, Rajasthan',
+      'Lucknow, Uttar Pradesh',
+      'Chandigarh, Punjab',
+      'Vadodara, Gujarat',
+      'Coimbatore, Tamil Nadu',
+      'Bhopal, Madhya Pradesh',
+      'Patna, Bihar',
+      'Bhubaneswar, Odisha',
+      'Guwahati, Assam',
+      'Dehradun, Uttarakhand',
+      'Shimla, Himachal Pradesh',
+      'Goa, Goa',
+      'Kerala, Kerala',
+    ];
 
-    const propertyAd2 = new this.propertyAdModel({
-      ad: savedAd2._id,
-      propertyType: PropertyTypeEnum.VILLA,
-      bedrooms: 3,
-      bathrooms: 3,
-      areaSqft: 2800,
-      floor: 1,
-      isFurnished: false,
-      hasParking: true,
-      hasGarden: true,
-      amenities: [
-        'Private Garden',
-        'Swimming Pool',
-        'Gym',
-        'Security',
-        'Servant Quarters',
-        'Modular Kitchen',
-      ],
-    });
-    await propertyAd2.save();
+    const amenities = [
+      'Gym',
+      'Swimming Pool',
+      'Garden',
+      'Security',
+      'Lift',
+      '24/7 Water Supply',
+      'Power Backup',
+      'Private Garden',
+      'Servant Quarters',
+      'Modular Kitchen',
+      'Parking Space',
+      'Loading Area',
+      'Terrace Garden',
+      'Climate Control',
+      'Touch Screen',
+      'Reverse Camera',
+      'Alloy Wheels',
+      'Fog Lamps',
+      'Power Windows',
+      'Central Locking',
+      'Music System',
+      'Steering Mounted Controls',
+      'Sunroof',
+      'Leather Seats',
+      'Navigation System',
+      'Bluetooth Connectivity',
+      'Climate Control',
+      'Wireless Charging',
+      'Ventilated Seats',
+      'Connected Car Tech',
+      'LED Headlamps',
+      'Digital Console',
+      'Mobile Charging Port',
+      'External Fuel Filler',
+      'Combi Brake System',
+      'Digital Speedometer',
+      'LED Tail Lamp',
+      'Tubeless Tyres',
+      'Electric Start',
+      'Kick Start',
+      'Racing Graphics',
+      'Performance Exhaust',
+      'Racing Seat',
+      'LED Indicators',
+      'ABS',
+      'Economy Mode',
+      'Side Stand Indicator',
+      'Pass Light',
+      'GPS Tracking',
+      'Safety Features',
+      'Anti-lock Braking System',
+      'Load Sensing Valve',
+      'Sleeping Berth',
+      'GPS Navigation',
+      'Fleet Management System',
+    ];
 
-    // Property 3: Commercial Space
-    const ad3 = new this.adModel({
-      title: 'Commercial Space in CBD Area',
-      description:
-        'Prime commercial space in Central Business District. Perfect for retail, office, or restaurant. High footfall area with excellent connectivity.',
-      price: 15000000,
-      images: getRandomImages(),
-      location: 'Connaught Place, Delhi, NCR',
-      category: AdCategory.PROPERTY,
-      postedBy: userIds[2],
-      isActive: true,
-    });
-    const savedAd3 = await ad3.save();
+    for (let i = 0; i < 30; i++) {
+      const propertyType = getRandomElement(Object.values(PropertyTypeEnum));
+      const bedrooms =
+        propertyType === PropertyTypeEnum.COMMERCIAL ||
+        propertyType === PropertyTypeEnum.PLOT
+          ? 0
+          : getRandomNumber(1, 5);
+      const bathrooms =
+        propertyType === PropertyTypeEnum.PLOT ? 0 : getRandomNumber(1, 4);
+      const areaSqft = getRandomNumber(500, 5000);
+      const floor =
+        propertyType === PropertyTypeEnum.PLOT ? 0 : getRandomNumber(1, 25);
+      const price = getRandomPrice(2000000, 50000000);
 
-    const propertyAd3 = new this.propertyAdModel({
-      ad: savedAd3._id,
-      propertyType: PropertyTypeEnum.COMMERCIAL,
-      bedrooms: 0,
-      bathrooms: 2,
-      areaSqft: 1500,
-      floor: 2,
-      isFurnished: false,
-      hasParking: true,
-      hasGarden: false,
-      amenities: [
-        'Lift',
-        'Security',
-        'Power Backup',
-        'Parking Space',
-        'Loading Area',
-      ],
-    });
-    await propertyAd3.save();
+      const ad = new this.adModel({
+        title: propertyTitles[i % propertyTitles.length],
+        description: propertyDescriptions[i % propertyDescriptions.length],
+        price: price,
+        images: getRandomImages(getRandomNumber(2, 4)),
+        location: getRandomElement(locations),
+        category: AdCategory.PROPERTY,
+        postedBy: getRandomElement(userIds),
+        isActive: getRandomBoolean(),
+      });
+      const savedAd = await ad.save();
 
-    // Property 4: Independent House
-    const ad4 = new this.adModel({
-      title: 'Independent House with Terrace',
-      description:
-        'Beautiful independent house with terrace garden. 4BHK with modern amenities, located in a peaceful residential area.',
-      price: 18000000,
-      images: getRandomImages(),
-      location: 'Koramangala, Bangalore, Karnataka',
-      category: AdCategory.PROPERTY,
-      postedBy: userIds[3],
-      isActive: true,
-    });
-    const savedAd4 = await ad4.save();
+      const propertyAd = new this.propertyAdModel({
+        ad: savedAd._id,
+        propertyType: propertyType,
+        bedrooms: bedrooms,
+        bathrooms: bathrooms,
+        areaSqft: areaSqft,
+        floor: floor,
+        isFurnished: getRandomBoolean(),
+        hasParking: getRandomBoolean(),
+        hasGarden: getRandomBoolean(),
+        amenities: amenities.slice(0, getRandomNumber(3, 8)),
+      });
+      await propertyAd.save();
+    }
 
-    const propertyAd4 = new this.propertyAdModel({
-      ad: savedAd4._id,
-      propertyType: PropertyTypeEnum.HOUSE,
-      bedrooms: 4,
-      bathrooms: 4,
-      areaSqft: 3200,
-      floor: 2,
-      isFurnished: true,
-      hasParking: true,
-      hasGarden: true,
-      amenities: [
-        'Terrace Garden',
-        'Servant Quarters',
-        'Modular Kitchen',
-        'Security',
-        'Parking',
-      ],
-    });
-    await propertyAd4.save();
-
-    // Property 5: Residential Plot
-    const ad5 = new this.adModel({
-      title: 'Residential Plot in Developing Area',
-      description:
-        'Prime residential plot in developing area with good appreciation potential. All approvals in place, ready for construction.',
-      price: 4500000,
-      images: getRandomImages(),
-      location: 'Electronic City, Bangalore, Karnataka',
-      category: AdCategory.PROPERTY,
-      postedBy: userIds[4],
-      isActive: true,
-    });
-    const savedAd5 = await ad5.save();
-
-    const propertyAd5 = new this.propertyAdModel({
-      ad: savedAd5._id,
-      propertyType: PropertyTypeEnum.PLOT,
-      bedrooms: 0,
-      bathrooms: 0,
-      areaSqft: 2400,
-      floor: 0,
-      isFurnished: false,
-      hasParking: false,
-      hasGarden: false,
-      amenities: [],
-    });
-    await propertyAd5.save();
-
-    console.log('✅ Seeded 5 property ads');
+    console.log('✅ Seeded 30 property ads');
   }
 
   private async seedVehicleAds(
@@ -332,159 +389,215 @@ export class AdsSeedService {
   ) {
     console.log('🚗 Seeding vehicle ads...');
 
-    // Vehicle 1: Honda City
-    const ad6 = new this.adModel({
-      title: 'Honda City 2020 Model - Single Owner',
-      description:
-        'Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
-      price: 850000,
-      images: getRandomImages(),
-      location: 'Dwarka, Delhi, NCR',
-      category: AdCategory.PRIVATE_VEHICLE,
-      postedBy: userIds[0],
-      isActive: true,
-    });
-    const savedAd6 = await ad6.save();
+    const vehicleTitles = [
+      'Honda City 2020 Model - Single Owner',
+      'Toyota Innova Crysta 2019 - Well Maintained',
+      'Maruti Swift 2021 - Low Mileage',
+      'Hyundai i20 2022 - Top Model',
+      'Tata Nexon 2021 - Electric Vehicle',
+      'Mahindra XUV500 2018 - Family SUV',
+      'Ford EcoSport 2020 - Compact SUV',
+      'Renault Duster 2019 - Adventure Ready',
+      'Nissan Magnite 2022 - New Model',
+      'MG Hector 2021 - Connected SUV',
+      'Kia Seltos 2020 - Premium SUV',
+      'Skoda Rapid 2019 - German Engineering',
+      'Volkswagen Polo 2021 - Hatchback',
+      'BMW 3 Series 2018 - Luxury Sedan',
+      'Mercedes C-Class 2019 - Premium Sedan',
+      'Audi A4 2020 - Executive Sedan',
+      'Jaguar XE 2018 - Sports Sedan',
+      'Land Rover Discovery 2019 - Luxury SUV',
+      'Volvo XC60 2020 - Safety First',
+      'Lexus ES 2021 - Japanese Luxury',
+      'Mitsubishi Outlander 2018 - 7 Seater',
+      'Subaru Forester 2019 - All Wheel Drive',
+      'Jeep Compass 2020 - American SUV',
+      'Fiat Linea 2018 - Italian Design',
+      'Chevrolet Beat 2019 - Compact Car',
+      'Datsun GO 2020 - Budget Friendly',
+      'Force Gurkha 2018 - Off Roader',
+      'Isuzu D-Max 2019 - Pickup Truck',
+      'Mahindra Bolero 2020 - Rural SUV',
+      'Tata Sumo 2018 - People Carrier',
+      'Maruti Eeco 2019 - Van',
+      'Force Traveller 2020 - Passenger Van',
+      'Mahindra Supro 2018 - Mini Van',
+      'Tata Magic 2019 - Auto Rickshaw',
+    ];
 
-    const vehicleAd1 = new this.vehicleAdModel({
-      ad: savedAd6._id,
-      vehicleType: VehicleTypeEnum.FOUR_WHEELER,
-      manufacturerId: manufacturerIds[0], // Honda
-      modelId: modelIds[0], // City
-      variantId: variantIds[0], // ZX CVT
-      year: 2020,
-      mileage: 25000,
-      transmissionTypeId: transmissionTypeIds[2], // CVT
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'White',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Sunroof',
-        'Leather Seats',
-        'Navigation System',
-        'Reverse Camera',
-        'Bluetooth Connectivity',
-        'Climate Control',
-      ],
-    });
-    await vehicleAd1.save();
+    const vehicleDescriptions = [
+      'Well-maintained car in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
+      'Family car in excellent condition. Perfect for family use. All service records available, single owner.',
+      'Car in pristine condition. Low mileage, excellent fuel efficiency. Perfect for city driving.',
+      'Top model with all features. Single owner, full service history.',
+      'Electric vehicle with excellent range. Eco-friendly and economical to run.',
+      'Spacious SUV perfect for family trips. Well-maintained with all features.',
+      'Compact SUV with good ground clearance. Perfect for city and highway driving.',
+      'Adventure-ready SUV with excellent off-road capabilities.',
+      'New model with latest features and technology.',
+      'Connected SUV with internet features and premium amenities.',
+      'Premium SUV with luxury features and excellent build quality.',
+      'German engineering with excellent performance and reliability.',
+      'Compact hatchback perfect for city driving and parking.',
+      'Luxury sedan with premium features and excellent performance.',
+      'Premium sedan with world-class amenities and comfort.',
+      'Executive sedan with sophisticated design and technology.',
+      'Sports sedan with excellent performance and handling.',
+      'Luxury SUV with premium features and excellent off-road capability.',
+      'Safety-focused SUV with advanced safety features.',
+      'Japanese luxury with excellent reliability and comfort.',
+      '7-seater SUV perfect for large families.',
+      'All-wheel drive SUV with excellent traction and stability.',
+      'American SUV with robust build and good performance.',
+      'Italian design with unique styling and features.',
+      'Compact car perfect for city driving.',
+      'Budget-friendly car with good fuel efficiency.',
+      'Off-road vehicle with excellent terrain capability.',
+      'Pickup truck with good payload capacity.',
+      'Rural SUV with excellent ground clearance.',
+      'People carrier with good seating capacity.',
+      'Van with excellent cargo space.',
+      'Passenger van with comfortable seating.',
+      'Mini van perfect for small families.',
+      'Auto rickshaw with good fuel efficiency.',
+    ];
 
-    // Vehicle 2: Toyota Innova
-    const ad7 = new this.adModel({
-      title: 'Toyota Innova Crysta 2019 - Well Maintained',
-      description:
-        'Toyota Innova Crysta in excellent condition. Perfect for family use. All service records available, single owner.',
-      price: 1200000,
-      images: getRandomImages(),
-      location: 'Andheri West, Mumbai, Maharashtra',
-      category: AdCategory.PRIVATE_VEHICLE,
-      postedBy: userIds[1],
-      isActive: true,
-    });
-    const savedAd7 = await ad7.save();
+    const colors = [
+      'White',
+      'Silver',
+      'Red',
+      'Blue',
+      'Black',
+      'Grey',
+      'Orange',
+      'Green',
+      'Yellow',
+      'Purple',
+      'Brown',
+      'Pink',
+      'Gold',
+      'Bronze',
+      'Navy Blue',
+      'Maroon',
+      'Teal',
+      'Cream',
+      'Beige',
+      'Pearl White',
+    ];
 
-    const vehicleAd2 = new this.vehicleAdModel({
-      ad: savedAd7._id,
-      vehicleType: VehicleTypeEnum.FOUR_WHEELER,
-      manufacturerId: manufacturerIds[1], // Toyota
-      modelId: modelIds[1], // Innova
-      variantId: variantIds[1], // GX MT
-      year: 2019,
-      mileage: 45000,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[1], // Diesel
-      color: 'Silver',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Climate Control',
-        'Touch Screen',
-        'Reverse Camera',
-        'Alloy Wheels',
-        'Fog Lamps',
-      ],
-    });
-    await vehicleAd2.save();
+    const additionalFeatures = [
+      'Sunroof',
+      'Leather Seats',
+      'Navigation System',
+      'Reverse Camera',
+      'Bluetooth Connectivity',
+      'Climate Control',
+      'Touch Screen',
+      'Alloy Wheels',
+      'Fog Lamps',
+      'Power Windows',
+      'Central Locking',
+      'Music System',
+      'Steering Mounted Controls',
+      'Wireless Charging',
+      'Ventilated Seats',
+      'Connected Car Tech',
+      'LED Headlamps',
+      'Digital Console',
+      'Mobile Charging Port',
+      'External Fuel Filler',
+      'Combi Brake System',
+      'Digital Speedometer',
+      'LED Tail Lamp',
+      'Tubeless Tyres',
+      'Electric Start',
+      'Kick Start',
+      'Racing Graphics',
+      'Performance Exhaust',
+      'Racing Seat',
+      'LED Indicators',
+      'ABS',
+      'Economy Mode',
+      'Side Stand Indicator',
+      'Pass Light',
+      'GPS Tracking',
+      'Safety Features',
+      'Anti-lock Braking System',
+      'Load Sensing Valve',
+      'Sleeping Berth',
+      'GPS Navigation',
+      'Fleet Management System',
+      'Cruise Control',
+      'Auto Headlamps',
+      'Rain Sensing Wipers',
+      'Push Button Start',
+      'Keyless Entry',
+      'Auto Climate Control',
+      'Heated Seats',
+      'Ventilated Seats',
+      'Panoramic Sunroof',
+      '360 Degree Camera',
+      'Parking Sensors',
+      'Auto Parking',
+      'Lane Departure Warning',
+      'Blind Spot Detection',
+      'Forward Collision Warning',
+    ];
 
-    // Vehicle 3: Maruti Swift
-    const ad8 = new this.adModel({
-      title: 'Maruti Swift 2021 - Low Mileage',
-      description:
-        'Maruti Swift in pristine condition. Low mileage, excellent fuel efficiency. Perfect for city driving.',
-      price: 650000,
-      images: getRandomImages(),
-      location: 'Koramangala, Bangalore, Karnataka',
-      category: AdCategory.PRIVATE_VEHICLE,
-      postedBy: userIds[2],
-      isActive: true,
-    });
-    const savedAd8 = await ad8.save();
+    for (let i = 0; i < 35; i++) {
+      const year = getRandomNumber(2015, 2023);
+      const mileage = getRandomNumber(5000, 150000);
+      const price = getRandomPrice(300000, 5000000);
 
-    const vehicleAd3 = new this.vehicleAdModel({
-      ad: savedAd8._id,
-      vehicleType: VehicleTypeEnum.FOUR_WHEELER,
-      manufacturerId: manufacturerIds[2], // Maruti Suzuki
-      modelId: modelIds[2], // Swift
-      variantId: variantIds[2], // VXI
-      year: 2021,
-      mileage: 18000,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Red',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Power Windows',
-        'Central Locking',
-        'Music System',
-        'Steering Mounted Controls',
-      ],
-    });
-    await vehicleAd3.save();
+      const ad = new this.adModel({
+        title: vehicleTitles[i % vehicleTitles.length],
+        description: vehicleDescriptions[i % vehicleDescriptions.length],
+        price: price,
+        images: getRandomImages(getRandomNumber(2, 4)),
+        location: getRandomElement([
+          'Dwarka, Delhi, NCR',
+          'Andheri West, Mumbai, Maharashtra',
+          'Koramangala, Bangalore, Karnataka',
+          'Pune, Maharashtra',
+          'Chennai, Tamil Nadu',
+          'Ahmedabad, Gujarat',
+          'Hyderabad, Telangana',
+          'Kolkata, West Bengal',
+          'Noida, Uttar Pradesh',
+          'Gurgaon, Haryana',
+          'Thane, Maharashtra',
+          'Navi Mumbai, Maharashtra',
+          'Indore, Madhya Pradesh',
+          'Jaipur, Rajasthan',
+          'Lucknow, Uttar Pradesh',
+        ]),
+        category: AdCategory.PRIVATE_VEHICLE,
+        postedBy: getRandomElement(userIds),
+        isActive: getRandomBoolean(),
+      });
+      const savedAd = await ad.save();
 
-    // Vehicle 4: Hyundai i20
-    const ad9 = new this.adModel({
-      title: 'Hyundai i20 2022 - Top Model',
-      description:
-        'Hyundai i20 Asta in excellent condition. Top model with all features. Single owner, full service history.',
-      price: 950000,
-      images: getRandomImages(),
-      location: 'Pune, Maharashtra',
-      category: AdCategory.PRIVATE_VEHICLE,
-      postedBy: userIds[3],
-      isActive: true,
-    });
-    const savedAd9 = await ad9.save();
+      const vehicleAd = new this.vehicleAdModel({
+        ad: savedAd._id,
+        vehicleType: VehicleTypeEnum.FOUR_WHEELER,
+        manufacturerId: getRandomElement(manufacturerIds),
+        modelId: getRandomElement(modelIds),
+        variantId: getRandomElement(variantIds),
+        year: year,
+        mileage: mileage,
+        transmissionTypeId: getRandomElement(transmissionTypeIds),
+        fuelTypeId: getRandomElement(fuelTypeIds),
+        color: getRandomElement(colors),
+        isFirstOwner: getRandomBoolean(),
+        hasInsurance: getRandomBoolean(),
+        hasRcBook: getRandomBoolean(),
+        additionalFeatures: additionalFeatures.slice(0, getRandomNumber(3, 8)),
+      });
+      await vehicleAd.save();
+    }
 
-    const vehicleAd4 = new this.vehicleAdModel({
-      ad: savedAd9._id,
-      vehicleType: VehicleTypeEnum.FOUR_WHEELER,
-      manufacturerId: manufacturerIds[4], // Hyundai
-      modelId: modelIds[4], // i20
-      variantId: variantIds[4], // Asta
-      year: 2022,
-      mileage: 12000,
-      transmissionTypeId: transmissionTypeIds[1], // Automatic
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Blue',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Sunroof',
-        'Wireless Charging',
-        'Ventilated Seats',
-        'Connected Car Tech',
-        'LED Headlamps',
-      ],
-    });
-    await vehicleAd4.save();
-
-    console.log('✅ Seeded 4 vehicle ads');
+    console.log('✅ Seeded 35 vehicle ads');
   }
 
   private async seedCommercialVehicleAds(
@@ -497,129 +610,129 @@ export class AdsSeedService {
   ) {
     console.log('🚛 Seeding commercial vehicle ads...');
 
-    // Commercial Vehicle 1: Tata 407 Truck
-    const ad10 = new this.adModel({
-      title: 'Tata 407 Truck - Excellent Condition',
-      description:
-        'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
-      price: 1800000,
-      images: getRandomImages(),
-      location: 'Pune, Maharashtra',
-      category: AdCategory.COMMERCIAL_VEHICLE,
-      postedBy: userIds[0],
-      isActive: true,
-    });
-    const savedAd10 = await ad10.save();
+    const commercialTitles = [
+      'Tata 407 Truck - Excellent Condition',
+      'Mahindra Bolero Pickup - Business Ready',
+      'Eicher Pro 1049 - Heavy Duty Truck',
+      'Ashok Leyland Dost - Light Commercial',
+      'Tata Ace - Mini Truck',
+      'Mahindra Jeeto - Mini Pickup',
+      'Force Traveller - Passenger Van',
+      'Tata Winger - Passenger Van',
+      'Mahindra Supro - Mini Van',
+      'Force Gurkha - Off Road Vehicle',
+      'Isuzu D-Max - Pickup Truck',
+      'Mahindra Bolero Camper - Mobile Home',
+      'Tata 709 - Medium Truck',
+      'Ashok Leyland Boss - Medium Truck',
+      'Eicher Pro 3015 - Medium Truck',
+      'Tata 1109 - Heavy Truck',
+      'Ashok Leyland 1616 - Heavy Truck',
+      'Eicher Pro 6023 - Heavy Truck',
+      'Tata Prima - Premium Truck',
+      'Ashok Leyland Captain - Premium Truck',
+    ];
 
-    const commercialVehicleAd1 = new this.commercialVehicleAdModel({
-      ad: savedAd10._id,
-      vehicleType: CommercialVehicleTypeEnum.TRUCK,
-      bodyType: BodyTypeEnum.FLATBED,
-      manufacturerId: manufacturerIds[3], // Tata Motors
-      modelId: modelIds[3], // 407
-      variantId: variantIds[3], // 407 Turbo
-      year: 2019,
-      mileage: 75000,
-      payloadCapacity: 5000,
-      payloadUnit: 'kg',
-      axleCount: 2,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[1], // Diesel
-      color: 'Blue',
-      hasInsurance: true,
-      hasFitness: true,
-      hasPermit: true,
-      additionalFeatures: [
-        'GPS Tracking',
-        'Climate Control',
-        'Safety Features',
-        'Anti-lock Braking System',
-        'Load Sensing Valve',
-      ],
-      seatingCapacity: 3,
-    });
-    await commercialVehicleAd1.save();
+    const commercialDescriptions = [
+      'Heavy duty truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
+      'Pickup in good condition. Perfect for small business transportation needs. Economical and reliable.',
+      'Heavy duty truck. Excellent for long distance transportation. Well-maintained with all documents.',
+      'Light commercial vehicle perfect for local deliveries. Fuel efficient and reliable.',
+      'Mini truck ideal for last-mile delivery. Easy to maneuver in city traffic.',
+      'Mini pickup perfect for small business needs. Economical and practical.',
+      'Passenger van with comfortable seating. Perfect for group transportation.',
+      'Spacious passenger van with good seating capacity. Ideal for tours and transportation.',
+      'Mini van perfect for small group transportation. Economical and practical.',
+      'Off-road vehicle with excellent terrain capability. Perfect for adventure tours.',
+      'Pickup truck with good payload capacity. Ideal for construction and logistics.',
+      'Mobile home conversion perfect for travel and tourism business.',
+      'Medium truck with good payload capacity. Perfect for medium distance transportation.',
+      'Reliable medium truck with excellent performance. Well-maintained and ready for business.',
+      'Medium truck with good fuel efficiency. Perfect for regular transportation needs.',
+      'Heavy truck with excellent payload capacity. Ideal for long distance transportation.',
+      'Heavy duty truck with robust build quality. Perfect for heavy cargo transportation.',
+      'Heavy truck with excellent performance. Well-maintained with all permits.',
+      'Premium truck with advanced features. Perfect for premium logistics services.',
+      'Premium truck with luxury features. Ideal for high-end transportation needs.',
+    ];
 
-    // Commercial Vehicle 2: Mahindra Bolero Pickup
-    const ad11 = new this.adModel({
-      title: 'Mahindra Bolero Pickup - Business Ready',
-      description:
-        'Mahindra Bolero pickup in good condition. Perfect for small business transportation needs. Economical and reliable.',
-      price: 450000,
-      images: getRandomImages(),
-      location: 'Chennai, Tamil Nadu',
-      category: AdCategory.COMMERCIAL_VEHICLE,
-      postedBy: userIds[1],
-      isActive: true,
-    });
-    const savedAd11 = await ad11.save();
+    const bodyTypes = Object.values(BodyTypeEnum);
+    const vehicleTypes = Object.values(CommercialVehicleTypeEnum);
 
-    const commercialVehicleAd2 = new this.commercialVehicleAdModel({
-      ad: savedAd11._id,
-      vehicleType: CommercialVehicleTypeEnum.VAN,
-      bodyType: BodyTypeEnum.PICKUP,
-      manufacturerId: manufacturerIds[3], // Tata Motors (using same for Mahindra)
-      modelId: modelIds[2], // Swift (using as Bolero)
-      variantId: variantIds[2], // VXI
-      year: 2018,
-      mileage: 95000,
-      payloadCapacity: 1500,
-      payloadUnit: 'kg',
-      axleCount: 2,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[1], // Diesel
-      color: 'White',
-      hasInsurance: true,
-      hasFitness: true,
-      hasPermit: true,
-      additionalFeatures: ['Power Steering', 'Music System', 'Tachometer'],
-      seatingCapacity: 2,
-    });
-    await commercialVehicleAd2.save();
+    for (let i = 0; i < 20; i++) {
+      const year = getRandomNumber(2015, 2023);
+      const mileage = getRandomNumber(20000, 300000);
+      const payloadCapacity = getRandomNumber(1000, 15000);
+      const price = getRandomPrice(400000, 8000000);
 
-    // Commercial Vehicle 3: Eicher Pro 1049
-    const ad12 = new this.adModel({
-      title: 'Eicher Pro 1049 - Heavy Duty Truck',
-      description:
-        'Eicher Pro 1049 heavy duty truck. Excellent for long distance transportation. Well-maintained with all documents.',
-      price: 3500000,
-      images: getRandomImages(),
-      location: 'Ahmedabad, Gujarat',
-      category: AdCategory.COMMERCIAL_VEHICLE,
-      postedBy: userIds[2],
-      isActive: true,
-    });
-    const savedAd12 = await ad12.save();
+      const ad = new this.adModel({
+        title: commercialTitles[i % commercialTitles.length],
+        description: commercialDescriptions[i % commercialDescriptions.length],
+        price: price,
+        images: getRandomImages(getRandomNumber(2, 4)),
+        location: getRandomElement([
+          'Pune, Maharashtra',
+          'Chennai, Tamil Nadu',
+          'Ahmedabad, Gujarat',
+          'Mumbai, Maharashtra',
+          'Delhi, NCR',
+          'Bangalore, Karnataka',
+          'Hyderabad, Telangana',
+          'Kolkata, West Bengal',
+          'Noida, Uttar Pradesh',
+          'Gurgaon, Haryana',
+          'Thane, Maharashtra',
+          'Navi Mumbai, Maharashtra',
+        ]),
+        category: AdCategory.COMMERCIAL_VEHICLE,
+        postedBy: getRandomElement(userIds),
+        isActive: getRandomBoolean(),
+      });
+      const savedAd = await ad.save();
 
-    const commercialVehicleAd3 = new this.commercialVehicleAdModel({
-      ad: savedAd12._id,
-      vehicleType: CommercialVehicleTypeEnum.TRUCK,
-      bodyType: BodyTypeEnum.CONTAINER,
-      manufacturerId: manufacturerIds[4], // Hyundai (using for Eicher)
-      modelId: modelIds[4], // i20 (using as Pro 1049)
-      variantId: variantIds[4], // Asta
-      year: 2020,
-      mileage: 120000,
-      payloadCapacity: 9000,
-      payloadUnit: 'kg',
-      axleCount: 3,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[1], // Diesel
-      color: 'Red',
-      hasInsurance: true,
-      hasFitness: true,
-      hasPermit: true,
-      additionalFeatures: [
-        'Sleeping Berth',
-        'Climate Control',
-        'GPS Navigation',
-        'Fleet Management System',
-      ],
-      seatingCapacity: 2,
-    });
-    await commercialVehicleAd3.save();
+      const commercialVehicleAd = new this.commercialVehicleAdModel({
+        ad: savedAd._id,
+        vehicleType: getRandomElement(vehicleTypes),
+        bodyType: getRandomElement(bodyTypes),
+        manufacturerId: getRandomElement(manufacturerIds),
+        modelId: getRandomElement(modelIds),
+        variantId: getRandomElement(variantIds),
+        year: year,
+        mileage: mileage,
+        payloadCapacity: payloadCapacity,
+        payloadUnit: 'kg',
+        axleCount: getRandomNumber(2, 4),
+        transmissionTypeId: getRandomElement(transmissionTypeIds),
+        fuelTypeId: getRandomElement(fuelTypeIds),
+        color: getRandomElement([
+          'Blue',
+          'White',
+          'Red',
+          'Green',
+          'Yellow',
+          'Orange',
+          'Grey',
+          'Black',
+        ]),
+        hasInsurance: getRandomBoolean(),
+        hasFitness: getRandomBoolean(),
+        hasPermit: getRandomBoolean(),
+        additionalFeatures: [
+          'GPS Tracking',
+          'Climate Control',
+          'Safety Features',
+          'Anti-lock Braking System',
+          'Load Sensing Valve',
+          'Sleeping Berth',
+          'GPS Navigation',
+          'Fleet Management System',
+        ].slice(0, getRandomNumber(2, 5)),
+        seatingCapacity: getRandomNumber(2, 6),
+      });
+      await commercialVehicleAd.save();
+    }
 
-    console.log('✅ Seeded 3 commercial vehicle ads');
+    console.log('✅ Seeded 20 commercial vehicle ads');
   }
 
   private async seedTwoWheelerAds(
@@ -632,157 +745,165 @@ export class AdsSeedService {
   ) {
     console.log('🛵 Seeding two-wheeler ads...');
 
-    // Two Wheeler 1: Honda Activa
-    const ad13 = new this.adModel({
-      title: 'Honda Activa 6G - 2021 Model',
-      description:
-        'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
-      price: 65000,
-      images: getRandomImages(),
-      location: 'Koramangala, Bangalore, Karnataka',
-      category: AdCategory.TWO_WHEELER,
-      postedBy: userIds[0],
-      isActive: true,
-    });
-    const savedAd13 = await ad13.save();
+    const twoWheelerTitles = [
+      'Honda Activa 6G - 2021 Model',
+      'Bajaj Pulsar 150 - Sporty Ride',
+      'TVS Apache RTR 160 - Racing Edition',
+      'Hero Splendor Plus - Economical Ride',
+      'Yamaha R15 V4 - Sports Bike',
+      'Royal Enfield Classic 350 - Heritage',
+      'KTM Duke 200 - Performance Bike',
+      'Honda CB Shine - Reliable Commuter',
+      'Suzuki Gixxer - Sporty Commuter',
+      'Bajaj Platina - Economical',
+      'TVS Jupiter - Family Scooter',
+      'Hero HF Deluxe - Budget Friendly',
+      'Yamaha FZ - Street Fighter',
+      'Royal Enfield Bullet 350 - Classic',
+      'KTM RC 200 - Racing Bike',
+      'Honda Dio - Stylish Scooter',
+      'Suzuki Access - Comfortable Scooter',
+      'Bajaj CT 100 - Basic Commuter',
+      'TVS Star City - City Commuter',
+      'Hero Passion Pro - Reliable',
+      'Yamaha Ray ZR - Sporty Scooter',
+      'Royal Enfield Himalayan - Adventure',
+      'KTM 390 Duke - Premium Performance',
+      'Honda CB Unicorn - Smooth Ride',
+      'Suzuki Intruder - Cruiser',
+    ];
 
-    const twoWheelerAd1 = new this.vehicleAdModel({
-      ad: savedAd13._id,
-      vehicleType: VehicleTypeEnum.TWO_WHEELER,
-      manufacturerId: manufacturerIds[0], // Honda
-      modelId: modelIds[0], // City (using as Activa)
-      variantId: variantIds[0], // ZX CVT (using as 6G)
-      year: 2021,
-      mileage: 15000,
-      transmissionTypeId: transmissionTypeIds[2], // CVT
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Red',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Digital Console',
-        'LED Headlight',
-        'Mobile Charging Port',
-        'External Fuel Filler',
-        'Combi Brake System',
-      ],
-    });
-    await twoWheelerAd1.save();
+    const twoWheelerDescriptions = [
+      'Scooter in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
+      'Sporty bike with good performance. Well-maintained, single owner.',
+      'High performance bike with racing features. Excellent condition, low mileage.',
+      'Economical and reliable bike. Perfect for daily commute and long rides.',
+      'Sports bike with excellent performance and handling. Perfect for enthusiasts.',
+      'Heritage bike with classic design and excellent build quality.',
+      'Performance bike with excellent power and handling. Perfect for thrill seekers.',
+      'Reliable commuter bike with good fuel efficiency. Perfect for daily use.',
+      'Sporty commuter with good performance and style.',
+      'Economical bike with excellent fuel efficiency. Perfect for budget-conscious buyers.',
+      'Family scooter with comfortable seating and good storage.',
+      'Budget-friendly bike with reliable performance.',
+      'Street fighter with aggressive design and good performance.',
+      'Classic bike with heritage design and excellent reliability.',
+      'Racing bike with track-focused features and performance.',
+      'Stylish scooter with modern design and good features.',
+      'Comfortable scooter with good ride quality and features.',
+      'Basic commuter bike with reliable performance and economy.',
+      'City commuter with good maneuverability and fuel efficiency.',
+      'Reliable bike with good performance and low maintenance.',
+      'Sporty scooter with good performance and style.',
+      'Adventure bike with excellent off-road capability.',
+      'Premium performance bike with advanced features.',
+      'Smooth riding bike with excellent comfort and reliability.',
+      'Cruiser bike with comfortable riding position and style.',
+    ];
 
-    // Two Wheeler 2: Bajaj Pulsar
-    const ad14 = new this.adModel({
-      title: 'Bajaj Pulsar 150 - Sporty Ride',
-      description:
-        'Bajaj Pulsar 150 in excellent condition. Sporty bike with good performance. Well-maintained, single owner.',
-      price: 85000,
-      images: getRandomImages(),
-      location: 'Dwarka, Delhi, NCR',
-      category: AdCategory.TWO_WHEELER,
-      postedBy: userIds[1],
-      isActive: true,
-    });
-    const savedAd14 = await ad14.save();
+    const colors = [
+      'Red',
+      'Black',
+      'Blue',
+      'White',
+      'Silver',
+      'Grey',
+      'Orange',
+      'Green',
+      'Yellow',
+      'Purple',
+      'Brown',
+      'Pink',
+      'Gold',
+      'Bronze',
+      'Navy Blue',
+      'Maroon',
+      'Teal',
+      'Cream',
+      'Beige',
+      'Pearl White',
+    ];
 
-    const twoWheelerAd2 = new this.vehicleAdModel({
-      ad: savedAd14._id,
-      vehicleType: VehicleTypeEnum.TWO_WHEELER,
-      manufacturerId: manufacturerIds[5], // Bajaj
-      modelId: modelIds[5], // Pulsar
-      variantId: variantIds[5], // 150
-      year: 2020,
-      mileage: 25000,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Black',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Digital Speedometer',
-        'LED Tail Lamp',
-        'Tubeless Tyres',
-        'Electric Start',
-        'Kick Start',
-      ],
-    });
-    await twoWheelerAd2.save();
+    const additionalFeatures = [
+      'Digital Console',
+      'LED Headlight',
+      'Mobile Charging Port',
+      'External Fuel Filler',
+      'Combi Brake System',
+      'Digital Speedometer',
+      'LED Tail Lamp',
+      'Tubeless Tyres',
+      'Electric Start',
+      'Kick Start',
+      'Racing Graphics',
+      'Performance Exhaust',
+      'Racing Seat',
+      'LED Indicators',
+      'ABS',
+      'Economy Mode',
+      'Side Stand Indicator',
+      'Pass Light',
+      'GPS Tracking',
+      'Safety Features',
+      'Anti-lock Braking System',
+      'Load Sensing Valve',
+      'Sleeping Berth',
+      'GPS Navigation',
+      'Fleet Management System',
+    ];
 
-    // Two Wheeler 3: TVS Apache
-    const ad15 = new this.adModel({
-      title: 'TVS Apache RTR 160 - Racing Edition',
-      description:
-        'TVS Apache RTR 160 racing edition. High performance bike with racing features. Excellent condition, low mileage.',
-      price: 95000,
-      images: getRandomImages(),
-      location: 'Andheri West, Mumbai, Maharashtra',
-      category: AdCategory.TWO_WHEELER,
-      postedBy: userIds[2],
-      isActive: true,
-    });
-    const savedAd15 = await ad15.save();
+    for (let i = 0; i < 25; i++) {
+      const year = getRandomNumber(2015, 2023);
+      const mileage = getRandomNumber(5000, 80000);
+      const price = getRandomPrice(30000, 300000);
 
-    const twoWheelerAd3 = new this.vehicleAdModel({
-      ad: savedAd15._id,
-      vehicleType: VehicleTypeEnum.TWO_WHEELER,
-      manufacturerId: manufacturerIds[6], // TVS
-      modelId: modelIds[6], // Apache
-      variantId: variantIds[6], // RTR 160
-      year: 2021,
-      mileage: 12000,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Blue',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Racing Graphics',
-        'Performance Exhaust',
-        'Racing Seat',
-        'LED Indicators',
-        'ABS',
-      ],
-    });
-    await twoWheelerAd3.save();
+      const ad = new this.adModel({
+        title: twoWheelerTitles[i % twoWheelerTitles.length],
+        description: twoWheelerDescriptions[i % twoWheelerDescriptions.length],
+        price: price,
+        images: getRandomImages(getRandomNumber(2, 4)),
+        location: getRandomElement([
+          'Koramangala, Bangalore, Karnataka',
+          'Dwarka, Delhi, NCR',
+          'Andheri West, Mumbai, Maharashtra',
+          'Pune, Maharashtra',
+          'Chennai, Tamil Nadu',
+          'Ahmedabad, Gujarat',
+          'Hyderabad, Telangana',
+          'Kolkata, West Bengal',
+          'Noida, Uttar Pradesh',
+          'Gurgaon, Haryana',
+          'Thane, Maharashtra',
+          'Navi Mumbai, Maharashtra',
+          'Indore, Madhya Pradesh',
+          'Jaipur, Rajasthan',
+          'Lucknow, Uttar Pradesh',
+        ]),
+        category: AdCategory.TWO_WHEELER,
+        postedBy: getRandomElement(userIds),
+        isActive: getRandomBoolean(),
+      });
+      const savedAd = await ad.save();
 
-    // Two Wheeler 4: Hero Splendor
-    const ad16 = new this.adModel({
-      title: 'Hero Splendor Plus - Economical Ride',
-      description:
-        'Hero Splendor Plus in good condition. Economical and reliable bike. Perfect for daily commute and long rides.',
-      price: 45000,
-      images: getRandomImages(),
-      location: 'Pune, Maharashtra',
-      category: AdCategory.TWO_WHEELER,
-      postedBy: userIds[3],
-      isActive: true,
-    });
-    const savedAd16 = await ad16.save();
+      const twoWheelerAd = new this.vehicleAdModel({
+        ad: savedAd._id,
+        vehicleType: VehicleTypeEnum.TWO_WHEELER,
+        manufacturerId: getRandomElement(manufacturerIds),
+        modelId: getRandomElement(modelIds),
+        variantId: getRandomElement(variantIds),
+        year: year,
+        mileage: mileage,
+        transmissionTypeId: getRandomElement(transmissionTypeIds),
+        fuelTypeId: getRandomElement(fuelTypeIds),
+        color: getRandomElement(colors),
+        isFirstOwner: getRandomBoolean(),
+        hasInsurance: getRandomBoolean(),
+        hasRcBook: getRandomBoolean(),
+        additionalFeatures: additionalFeatures.slice(0, getRandomNumber(3, 8)),
+      });
+      await twoWheelerAd.save();
+    }
 
-    const twoWheelerAd4 = new this.vehicleAdModel({
-      ad: savedAd16._id,
-      vehicleType: VehicleTypeEnum.TWO_WHEELER,
-      manufacturerId: manufacturerIds[0], // Honda (using for Hero)
-      modelId: modelIds[1], // Innova (using as Splendor)
-      variantId: variantIds[1], // GX MT (using as Plus)
-      year: 2019,
-      mileage: 35000,
-      transmissionTypeId: transmissionTypeIds[0], // Manual
-      fuelTypeId: fuelTypeIds[0], // Petrol
-      color: 'Silver',
-      isFirstOwner: true,
-      hasInsurance: true,
-      hasRcBook: true,
-      additionalFeatures: [
-        'Economy Mode',
-        'Side Stand Indicator',
-        'Pass Light',
-        'Tubeless Tyres',
-      ],
-    });
-    await twoWheelerAd4.save();
-
-    console.log('✅ Seeded 4 two-wheeler ads');
+    console.log('✅ Seeded 25 two-wheeler ads');
   }
 }

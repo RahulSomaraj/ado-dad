@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -14,6 +16,7 @@ async function bootstrap() {
     const configService = app.get<ConfigService>(ConfigService);
     const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
     const NODE_ENV = configService.get('NODE_ENV') || 'development';
+    console.log(process.env);
 
     // Security headers - Permissive for all platforms
     app.use(
@@ -98,6 +101,12 @@ async function bootstrap() {
       prefix: '/images/',
       ...staticOptions,
     });
+
+    // // Serve uploads directory with CORS support
+    // app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
+    //   prefix: '/uploads/',
+    //   ...staticOptions,
+    // });
 
     // Serve all public files with CORS support
     app.useStaticAssets(join(__dirname, '..', 'public'), {
