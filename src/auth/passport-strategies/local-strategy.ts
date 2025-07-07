@@ -12,18 +12,18 @@ import { AuthService } from '../auth.service';
 export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
   constructor(private readonly authService: AuthService) {
     super({
-      usernameField: 'username', // ✅ Define input field name
+      usernameField: 'phone', // ✅ Changed from 'username' to 'phone'
       passwordField: 'password',
     });
   }
 
-  async validate(username: string, password: string): Promise<any> {
-    const user = await this.authService.validateUser(username, password);
+  async validate(phone: string, password: string): Promise<any> {
+    const user = await this.authService.validateUser(phone, password);
     if (!user) {
       throw new HttpException(
         {
           status: HttpStatus.UNAUTHORIZED,
-          error: 'Invalid username or password',
+          error: 'Invalid phone or password',
         },
         HttpStatus.UNAUTHORIZED,
       );
