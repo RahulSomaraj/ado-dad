@@ -12,13 +12,13 @@ import { AuthService } from '../auth.service';
 export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
   constructor(private readonly authService: AuthService) {
     super({
-      usernameField: 'phone', // ✅ Changed from 'username' to 'phone'
+      usernameField: 'username', // ✅ Changed from 'username' to 'phone'
       passwordField: 'password',
     });
   }
 
-  async validate(phone: string, password: string): Promise<any> {
-    const user = await this.authService.validateUser(phone, password);
+  async validate(username: string, password: string): Promise<any> {
+    const user = await this.authService.validateUser(username, password);
     if (!user) {
       throw new HttpException(
         {
