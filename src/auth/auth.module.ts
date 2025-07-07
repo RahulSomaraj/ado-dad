@@ -30,7 +30,7 @@ import { AuthTokens, AuthTokensSchema } from './schemas/schema.refresh-token';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         // secret: configService.get<string>('jwt.secret'),
-        secret: process.env.TOKEN_KEY,
+        secret: process.env.TOKEN_KEY || 'default-secret',
       }),
       inject: [ConfigService],
     }),

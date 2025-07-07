@@ -28,7 +28,7 @@ import {
 } from '@nestjs/swagger';
 import { HttpExceptionFilter } from '../shared/exception-service';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
-import { RolesGuard } from '../roles/roles.guard';
+import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../roles/roles.decorator';
 import { UserType } from '../users/enums/user.types';
 import { Types } from 'mongoose';

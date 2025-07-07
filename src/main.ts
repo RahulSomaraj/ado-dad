@@ -11,169 +11,104 @@ import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  try {
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
-    const configService = app.get<ConfigService>(ConfigService);
-    const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
-    const NODE_ENV = configService.get('NODE_ENV') || 'development';
-    console.log(process.env);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const configService = app.get<ConfigService>(ConfigService);
+  const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
+  const NODE_ENV = configService.get('NODE_ENV') || 'development';
 
-    // Security headers - Permissive for all platforms
-    app.use(
-      helmet({
-        contentSecurityPolicy: false, // Disable CSP for all platforms
-        crossOriginEmbedderPolicy: false,
-        crossOriginResourcePolicy: { policy: 'cross-origin' },
-        crossOriginOpenerPolicy: false,
-        referrerPolicy: false,
-        hsts: false,
-        noSniff: false,
-        frameguard: false,
-        dnsPrefetchControl: false,
-        ieNoOpen: false,
-        permittedCrossDomainPolicies: false,
-      }),
-    );
+  // (a) Enable CORS globally via Nest
+  app.enableCors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'X-Requested-With',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers',
+      'X-API-Key',
+      'X-Client-Version',
+      'X-Platform',
+      'User-Agent',
+    ],
+  });
 
-    // Global CORS middleware for all responses
-    app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header(
-        'Access-Control-Allow-Methods',
-        'GET, POST, PUT, DELETE, OPTIONS, HEAD',
-      );
-      res.header(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Accept, Authorization, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, X-API-Key, X-Client-Version, X-Platform, User-Agent',
-      );
-      res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-      res.header('Cross-Origin-Opener-Policy', 'unsafe-none');
+  // (b) Global security headers via Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: false /* …etc… */,
+    }),
+  );
 
-      // Handle preflight requests
-      if (req.method === 'OPTIONS') {
-        res.status(204).end();
-        return;
-      }
+  // (c) Set up Swagger **before** any “catch-all” static mount
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Ado-dad API')
+    .setDescription('The Ado-dad API description')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
 
-      next();
-    });
-
-    // Static file serving with CORS support for all platforms
-    const staticOptions = {
-      maxAge: '1d',
-      etag: true,
-      lastModified: true,
-      setHeaders: (res, path) => {
-        // Allow CORS for all static files
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        res.setHeader(
-          'Access-Control-Allow-Headers',
-          'Content-Type, Accept, Authorization, X-Requested-With',
-        );
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-
-        // Set proper content type for images
-        if (path.endsWith('.png')) {
-          res.setHeader('Content-Type', 'image/png');
-        } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
-          res.setHeader('Content-Type', 'image/jpeg');
-        } else if (path.endsWith('.gif')) {
-          res.setHeader('Content-Type', 'image/gif');
-        } else if (path.endsWith('.webp')) {
-          res.setHeader('Content-Type', 'image/webp');
-        } else if (path.endsWith('.svg')) {
-          res.setHeader('Content-Type', 'image/svg+xml');
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      showRequestDuration: true,
+    },
+    customSiteTitle: 'Ado-dad API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+    customJs: `
+      window.onload = () => {
+        const token = localStorage.getItem('ado-dad-token');
+        if (token) {
+          const inp = document.querySelector('input[placeholder="Bearer token"]');
+          if (inp) inp.value = token;
         }
-      },
-    };
+        document.querySelector('button[class*="authorize"]')
+          ?.addEventListener('click', () => {
+            const inp = document.querySelector('input[placeholder="Bearer token"]');
+            if (inp) localStorage.setItem('ado-dad-token', inp.value);
+          });
+      };
+    `,
+  });
 
-    // Serve assets with CORS support
-    app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), {
-      prefix: '/assets/',
-      ...staticOptions,
-    });
+  // (d) Now mount only the **specific** static folders you actually need…
+  const staticOptions = {
+    prefix: '/assets/',
+    maxAge: '1d',
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, path) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      // …etc…
+    },
+  };
+  app.useStaticAssets(join(__dirname, '..', 'public', 'assets'), staticOptions);
 
-    // Serve images with CORS support
-    app.useStaticAssets(join(__dirname, '..', 'public', 'images'), {
-      prefix: '/images/',
-      ...staticOptions,
-    });
+  // …any other specific mounts…
 
-    // // Serve uploads directory with CORS support
-    // app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
-    //   prefix: '/uploads/',
-    //   ...staticOptions,
-    // });
+  // (e) Global pipes, logging, etc.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+  app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-    // Serve all public files with CORS support
-    app.useStaticAssets(join(__dirname, '..', 'public'), {
-      prefix: '/',
-      ...staticOptions,
-    });
-
-    // Global validation pipe with optimized settings
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transformOptions: {
-          enableImplicitConversion: true,
-        },
-      }),
-    );
-
-    app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('Ado-dad API')
-      .setDescription('The Ado-dad API description')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .build();
-
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('docs', app, document, {
-      swaggerOptions: {
-        persistAuthorization: true,
-        docExpansion: 'list',
-        filter: true,
-        showRequestDuration: true,
-      },
-      customSiteTitle: 'Ado-dad API Documentation',
-      customCss: '.swagger-ui .topbar { display: none }',
-      customJs: `
-          window.onload = function() {
-            const storedToken = localStorage.getItem('ado-dad-token');
-            if (storedToken) {
-              const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-              if (bearerInput) {
-                bearerInput.value = storedToken;
-              }
-            }
-            document.querySelector('button[class*="authorize"]').onclick = function() {
-              const bearerInput = document.querySelector('input[placeholder="Bearer token"]');
-              if (bearerInput) {
-                localStorage.setItem('ado-dad-token', bearerInput.value);
-              }
-            };
-          };
-        `,
-    });
-
-    await app.listen(PORT, '0.0.0.0', () => {
-      Logger.log(`🚀 Server started successfully on port ${PORT}`);
-      Logger.log(
-        `📚 API Documentation available at http://localhost:${PORT}/docs`,
-      );
-      Logger.log(`🌍 Environment: ${NODE_ENV}`);
-    });
-  } catch (error) {
-    Logger.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
+  await app.listen(PORT, '0.0.0.0', () => {
+    Logger.log(`🚀 Server listening on port ${PORT}`);
+    Logger.log(`📚 Swagger UI: http://localhost:${PORT}/docs`);
+    Logger.log(`🌍 ENV: ${NODE_ENV}`);
+  });
 }
 
 bootstrap().catch((error) => {

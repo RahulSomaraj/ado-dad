@@ -8,7 +8,7 @@ export default registerAs('APP_CONFIG', () => ({
 
   // JWT Configuration
   TOKEN_KEY: process.env.TOKEN_KEY || 'default-secret-key-change-in-production',
-  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '1h',
+  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '8460000000',
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || '60d',
 
   // Database Configuration

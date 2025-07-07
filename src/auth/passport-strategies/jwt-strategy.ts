@@ -12,15 +12,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.TOKEN_KEY || 'default-secret',
+      secretOrKey:
+        process.env.TOKEN_KEY || 'default-secret-key-change-in-production',
     });
   }
 
   async validate(payload: any) {
     // 🔹 Check if user exists
+    console.log('JWT Strategy - Payload:', payload);
     const user = await this.userModel.findById(payload.id).exec();
+    console.log('JWT Strategy - Payload:', payload);
+    console.log('JWT Strategy - User from DB:', user);
 
     if (!user) {
+      console.log('User not found');
       throw new HttpException(
         {
           status: HttpStatus.UNAUTHORIZED,
@@ -30,6 +35,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    return user; // ✅ Return user if valid
+    // 🔹 Ensure userType is available for role checking
+    const userWithType = {
+      ...user.toObject(),
+      userType: payload.userType || (user as any).userType,
+    };
+
+    console.log('JWT Strategy - Final user object:', userWithType);
+    return userWithType; // ✅ Return user if valid
   }
 }
