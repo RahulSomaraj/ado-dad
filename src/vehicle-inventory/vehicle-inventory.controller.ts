@@ -38,6 +38,9 @@ import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-respon
 @ApiTags('Vehicle Inventory')
 @Controller('vehicle-inventory')
 @UseFilters(new HttpExceptionFilter('Vehicle Inventory'))
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
 export class VehicleInventoryController {
   constructor(
     private readonly vehicleInventoryService: VehicleInventoryService,
@@ -45,8 +48,6 @@ export class VehicleInventoryController {
 
   // Manufacturer endpoints
   @Post('manufacturers')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a new manufacturer' })
   @ApiResponse({
@@ -205,8 +206,6 @@ export class VehicleInventoryController {
 
   // Vehicle Model endpoints
   @Post('models')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a new vehicle model' })
   @ApiResponse({
@@ -975,8 +974,6 @@ export class VehicleInventoryController {
 
   // Vehicle Variant endpoints
   @Post('variants')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a new vehicle variant' })
   @ApiResponse({
