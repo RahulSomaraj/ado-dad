@@ -371,86 +371,32 @@ export class AdsController {
     return this.adsService.getAdById(id);
   }
 
-  @Post('property')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new property advertisement' })
-  @ApiResponse({
-    status: 201,
-    description: 'Property advertisement created successfully',
-    type: AdResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createPropertyAd(
-    @Body() createDto: CreatePropertyAdDto,
-    @Param('userId') userId: string,
-  ): Promise<AdResponseDto> {
-    return this.adsService.createPropertyAd(createDto, userId);
-  }
-
-  @Post('vehicle')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new vehicle advertisement' })
-  @ApiResponse({
-    status: 201,
-    description: 'Vehicle advertisement created successfully',
-    type: AdResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createVehicleAd(
-    @Body() createDto: CreateVehicleAdDto,
-    @Param('userId') userId: string,
-  ): Promise<AdResponseDto> {
-    return this.adsService.createVehicleAd(createDto, userId);
-  }
-
-  @Post('commercial-vehicle')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Create a commercial vehicle advertisement' })
-  @ApiResponse({
-    status: 201,
-    description: 'Commercial vehicle advertisement created successfully',
-    type: AdResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createCommercialVehicleAd(
-    @Body() createDto: CreateCommercialVehicleAdDto,
-    @Request() req: any,
-  ): Promise<AdResponseDto> {
-    return this.adsService.createCommercialVehicleAd(createDto, req.user.id);
-  }
-
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create a new advertisement',
     description:
-      'Create an advertisement for any category (Property, Private Vehicle, Commercial Vehicle, Two Wheeler). All fields in the data object are optional, but you should include the fields relevant to your selected category.',
+      'Create an advertisement for any category (Property, Private Vehicle, Commercial Vehicle, Two Wheeler). Include fields relevant to your selected category.',
   })
   @ApiBody({
     type: CreateAdDto,
-    description:
-      'Advertisement data - include fields relevant to the selected category',
+    description: 'Advertisement data with category-specific fields',
     examples: {
-      property: {
-        summary: 'Property Ad Example',
-        description: 'Complete example for creating a property advertisement',
+      property_example: {
+        summary: 'Property Advertisement',
+        description: 'Create a property advertisement with all relevant fields',
         value: {
           category: 'property',
           data: {
             title: 'Beautiful 2BHK Apartment in Prime Location',
             description:
-              'Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
+              'Spacious and well-maintained 2BHK apartment with modern amenities and excellent connectivity.',
             price: 8500000,
             location: 'Bandra West, Mumbai, Maharashtra',
             images: [
-              'https://example.com/property/living-room.jpg',
-              'https://example.com/property/bedroom.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property1.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property2.jpg',
             ],
             propertyType: 'apartment',
             bedrooms: 2,
@@ -460,34 +406,40 @@ export class AdsController {
             isFurnished: true,
             hasParking: true,
             hasGarden: false,
-            amenities: ['Gym', 'Swimming Pool', 'Garden', 'Security', 'Lift'],
+            amenities: [
+              'Gym',
+              'Swimming Pool',
+              'Security',
+              'Lift',
+              '24/7 Water Supply',
+            ],
           },
         },
       },
-      private_vehicle: {
-        summary: 'Private Vehicle Ad Example',
+      vehicle_example: {
+        summary: 'Private Vehicle Advertisement',
         description:
-          'Complete example for creating a private vehicle advertisement',
+          'Create a private vehicle advertisement with vehicle-specific details',
         value: {
           category: 'private_vehicle',
           data: {
             title: 'Honda City 2020 Model - Single Owner',
             description:
-              'Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
+              'Well-maintained Honda City in excellent condition. Single owner, full service history.',
             price: 850000,
             location: 'Dwarka, Delhi, NCR',
             images: [
-              'https://example.com/vehicle/exterior.jpg',
-              'https://example.com/vehicle/interior.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/vehicle1.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/vehicle2.jpg',
             ],
             vehicleType: 'four_wheeler',
-            manufacturerId: '507f1f77bcf86cd799439011',
-            modelId: '507f1f77bcf86cd799439012',
-            variantId: '507f1f77bcf86cd799439013',
+            manufacturerId: '507f1f77bcf86cd799439031',
+            modelId: '507f1f77bcf86cd799439041',
+            variantId: '507f1f77bcf86cd799439051',
             year: 2020,
             mileage: 25000,
-            transmissionTypeId: '507f1f77bcf86cd799439014',
-            fuelTypeId: '507f1f77bcf86cd799439015',
+            transmissionTypeId: '507f1f77bcf86cd799439061',
+            fuelTypeId: '507f1f77bcf86cd799439071',
             color: 'White',
             isFirstOwner: true,
             hasInsurance: true,
@@ -497,36 +449,37 @@ export class AdsController {
               'Leather Seats',
               'Navigation System',
               'Reverse Camera',
+              'Bluetooth Connectivity',
             ],
           },
         },
       },
-      commercial_vehicle: {
-        summary: 'Commercial Vehicle Ad Example',
+      commercial_example: {
+        summary: 'Commercial Vehicle Advertisement',
         description:
-          'Complete example for creating a commercial vehicle advertisement',
+          'Create a commercial vehicle advertisement for business use',
         value: {
           category: 'commercial_vehicle',
           data: {
             title: 'Tata 407 Truck - Excellent Condition',
             description:
-              'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
+              'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business.',
             price: 1800000,
             location: 'Pune, Maharashtra',
             images: [
-              'https://example.com/truck/exterior.jpg',
-              'https://example.com/truck/cargo-area.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck1.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck2.jpg',
             ],
             vehicleType: 'four_wheeler',
             commercialVehicleType: 'truck',
             bodyType: 'flatbed',
-            manufacturerId: '507f1f77bcf86cd799439011',
-            modelId: '507f1f77bcf86cd799439012',
-            variantId: '507f1f77bcf86cd799439013',
+            manufacturerId: '507f1f77bcf86cd799439034',
+            modelId: '507f1f77bcf86cd799439044',
+            variantId: '507f1f77bcf86cd799439054',
             year: 2019,
             mileage: 75000,
-            transmissionTypeId: '507f1f77bcf86cd799439014',
-            fuelTypeId: '507f1f77bcf86cd799439015',
+            transmissionTypeId: '507f1f77bcf86cd799439061',
+            fuelTypeId: '507f1f77bcf86cd799439072',
             color: 'Blue',
             payloadCapacity: 5000,
             payloadUnit: 'kg',
@@ -538,35 +491,36 @@ export class AdsController {
               'GPS Tracking',
               'Climate Control',
               'Safety Features',
+              'Anti-lock Braking System',
             ],
             seatingCapacity: 3,
           },
         },
       },
-      two_wheeler: {
-        summary: 'Two Wheeler Ad Example',
+      two_wheeler_example: {
+        summary: 'Two Wheeler Advertisement',
         description:
-          'Complete example for creating a two-wheeler advertisement',
+          'Create a two-wheeler advertisement for bikes and scooters',
         value: {
           category: 'two_wheeler',
           data: {
             title: 'Honda Activa 6G - 2021 Model',
             description:
-              'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
+              'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency.',
             price: 65000,
             location: 'Koramangala, Bangalore, Karnataka',
             images: [
-              'https://example.com/scooter/exterior.jpg',
-              'https://example.com/scooter/dashboard.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/scooter1.jpg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/scooter2.jpg',
             ],
             vehicleType: 'two_wheeler',
-            manufacturerId: '507f1f77bcf86cd799439011',
-            modelId: '507f1f77bcf86cd799439012',
-            variantId: '507f1f77bcf86cd799439013',
+            manufacturerId: '507f1f77bcf86cd799439031',
+            modelId: '507f1f77bcf86cd799439041',
+            variantId: '507f1f77bcf86cd799439051',
             year: 2021,
             mileage: 12000,
-            transmissionTypeId: '507f1f77bcf86cd799439014',
-            fuelTypeId: '507f1f77bcf86cd799439015',
+            transmissionTypeId: '507f1f77bcf86cd799439063',
+            fuelTypeId: '507f1f77bcf86cd799439071',
             color: 'Red',
             isFirstOwner: true,
             hasInsurance: true,
@@ -575,6 +529,8 @@ export class AdsController {
               'Digital Console',
               'LED Headlight',
               'Mobile Charging Port',
+              'External Fuel Filler',
+              'Combi Brake System',
             ],
           },
         },
@@ -585,25 +541,88 @@ export class AdsController {
     status: 201,
     description: 'Advertisement created successfully',
     type: AdResponseDto,
+    schema: {
+      example: {
+        id: '507f1f77bcf86cd799439011',
+        title: 'Beautiful 2BHK Apartment in Prime Location',
+        description:
+          'Spacious and well-maintained 2BHK apartment with modern amenities.',
+        price: 8500000,
+        images: [
+          'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property1.jpg',
+        ],
+        location: 'Bandra West, Mumbai, Maharashtra',
+        category: 'property',
+        isActive: true,
+        postedAt: '2024-01-15T10:30:00.000Z',
+        updatedAt: '2024-01-15T10:30:00.000Z',
+        postedBy: '507f1f77bcf86cd799439021',
+      },
+    },
   })
   @ApiResponse({
     status: 400,
-    description:
-      'Bad request - validation error or missing required fields for the selected category',
+    description: 'Bad request - validation error or missing required fields',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: [
+          'title should not be empty',
+          'price must be a positive number',
+        ],
+        error: 'Bad Request',
+      },
+    },
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+    },
   })
   async createAd(
     @Body() createAdDto: CreateAdDto,
     @Request() req: any,
   ): Promise<AdResponseDto> {
-    return this.adsService.createAd(createAdDto, req.user.id);
+    try {
+      console.log('Creating advertisement for user:', req.user.id);
+      console.log('Advertisement category:', createAdDto.category);
+
+      const result = await this.adsService.createAd(createAdDto, req.user.id);
+
+      console.log('Advertisement created successfully with ID:', result.id);
+      return result;
+    } catch (error) {
+      console.error('Error creating advertisement:', error);
+      throw error;
+    }
   }
 
   @Post('upload-images')

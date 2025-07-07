@@ -126,50 +126,25 @@ async function bootstrap() {
       }),
     );
 
-    // Conditional logging based on environment
-    if (NODE_ENV !== 'test') {
-      app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
-    }
+    app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Ado-dad API')
+      .setDescription('The Ado-dad API description')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
 
-    // Swagger configuration
-    if (NODE_ENV !== 'production') {
-      const swaggerConfig = new DocumentBuilder()
-        .setTitle('Ado-dad API')
-        .setDescription(
-          'API for managing ado-dad - A comprehensive advertisement platform',
-        )
-        .setVersion('1.0.0')
-        .addTag(
-          'Authentication',
-          'User authentication and authorization endpoints',
-        )
-        .addTag('Ads', 'Advertisement management endpoints')
-        .addTag('Vehicles', 'Vehicle-related endpoints')
-        .addTag('Categories', 'Category management endpoints')
-        .addBearerAuth(
-          {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-            name: 'JWT',
-            description: 'Enter JWT token',
-            in: 'header',
-          },
-          'JWT-auth',
-        )
-        .build();
-
-      const document = SwaggerModule.createDocument(app, swaggerConfig);
-      SwaggerModule.setup('docs', app, document, {
-        swaggerOptions: {
-          persistAuthorization: true,
-          docExpansion: 'list',
-          filter: true,
-          showRequestDuration: true,
-        },
-        customSiteTitle: 'Ado-dad API Documentation',
-        customCss: '.swagger-ui .topbar { display: none }',
-        customJs: `
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'list',
+        filter: true,
+        showRequestDuration: true,
+      },
+      customSiteTitle: 'Ado-dad API Documentation',
+      customCss: '.swagger-ui .topbar { display: none }',
+      customJs: `
           window.onload = function() {
             const storedToken = localStorage.getItem('ado-dad-token');
             if (storedToken) {
@@ -186,8 +161,7 @@ async function bootstrap() {
             };
           };
         `,
-      });
-    }
+    });
 
     await app.listen(PORT, '0.0.0.0', () => {
       Logger.log(`🚀 Server started successfully on port ${PORT}`);

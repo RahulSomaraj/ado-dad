@@ -139,7 +139,7 @@ export class AdsService {
 
     // Check if this query should be cached
     const shouldCache = this.shouldCacheQuery(filters);
-    
+
     if (shouldCache) {
       // Generate optimized cache key (normalize filters for better cache hit rate)
       const normalizedFilters = this.normalizeFilters(filters);
@@ -722,7 +722,12 @@ export class AdsService {
     }
 
     // Skip caching for specific filters that are rarely repeated
-    if (filters.postedBy || filters.manufacturerId || filters.modelId || filters.variantId) {
+    if (
+      filters.postedBy ||
+      filters.manufacturerId ||
+      filters.modelId ||
+      filters.variantId
+    ) {
       return false;
     }
 
@@ -1000,115 +1005,6 @@ export class AdsService {
     }
 
     return detailedAd;
-  }
-
-  async createPropertyAd(
-    createDto: CreatePropertyAdDto,
-    userId: string,
-  ): Promise<AdResponseDto> {
-    const ad = new this.adModel({
-      ...createDto,
-      postedBy: userId,
-      category: AdCategory.PROPERTY,
-    });
-
-    const savedAd = await ad.save();
-
-    const propertyAd = new this.propertyAdModel({
-      ad: savedAd._id as any,
-      propertyType: createDto.propertyType,
-      bedrooms: createDto.bedrooms,
-      bathrooms: createDto.bathrooms,
-      areaSqft: createDto.areaSqft,
-      floor: createDto.floor,
-      isFurnished: createDto.isFurnished,
-      hasParking: createDto.hasParking,
-      hasGarden: createDto.hasGarden,
-      amenities: createDto.amenities,
-    });
-
-    await propertyAd.save();
-
-    return this.findOne((savedAd._id as any).toString());
-  }
-
-  async createVehicleAd(
-    createDto: CreateVehicleAdDto,
-    userId: string,
-  ): Promise<AdResponseDto> {
-    // Validate that the referenced vehicle-inventory entities exist
-    await this.validateVehicleInventoryReferences(createDto);
-
-    const ad = new this.adModel({
-      ...createDto,
-      postedBy: userId,
-      category: AdCategory.PRIVATE_VEHICLE,
-    });
-
-    const savedAd = await ad.save();
-
-    const vehicleAd = new this.vehicleAdModel({
-      ad: savedAd._id as any,
-      vehicleType: createDto.vehicleType,
-      manufacturerId: createDto.manufacturerId,
-      modelId: createDto.modelId,
-      variantId: createDto.variantId,
-      year: createDto.year,
-      mileage: createDto.mileage,
-      transmissionTypeId: createDto.transmissionTypeId,
-      fuelTypeId: createDto.fuelTypeId,
-      color: createDto.color,
-      isFirstOwner: createDto.isFirstOwner,
-      hasInsurance: createDto.hasInsurance,
-      hasRcBook: createDto.hasRcBook,
-      additionalFeatures: createDto.additionalFeatures,
-    });
-
-    await vehicleAd.save();
-
-    return this.findOne((savedAd._id as any).toString());
-  }
-
-  async createCommercialVehicleAd(
-    createDto: CreateCommercialVehicleAdDto,
-    userId: string,
-  ): Promise<AdResponseDto> {
-    // Validate that the referenced vehicle-inventory entities exist
-    await this.validateVehicleInventoryReferences(createDto);
-
-    const ad = new this.adModel({
-      ...createDto,
-      postedBy: userId,
-      category: AdCategory.COMMERCIAL_VEHICLE,
-    });
-
-    const savedAd = await ad.save();
-
-    const commercialVehicleAd = new this.commercialVehicleAdModel({
-      ad: savedAd._id as any,
-      vehicleType: createDto.vehicleType,
-      bodyType: createDto.bodyType,
-      manufacturerId: createDto.manufacturerId,
-      modelId: createDto.modelId,
-      variantId: createDto.variantId,
-      year: createDto.year,
-      mileage: createDto.mileage,
-      payloadCapacity: createDto.payloadCapacity,
-      payloadUnit: createDto.payloadUnit,
-      axleCount: createDto.axleCount,
-      transmissionTypeId: createDto.transmissionTypeId,
-      fuelTypeId: createDto.fuelTypeId,
-      color: createDto.color,
-      hasInsurance: createDto.hasInsurance,
-      hasFitness: createDto.hasFitness,
-      hasPermit: createDto.hasPermit,
-      additionalFeatures: createDto.additionalFeatures,
-      seatingCapacity: createDto.seatingCapacity,
-    });
-
-    await commercialVehicleAd.save();
-
-    return this.findOne((savedAd._id as any).toString());
   }
 
   // Unified method to create any type of ad
