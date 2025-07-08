@@ -1,12 +1,23 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, MinLength } from 'class-validator';
 
 export class LoginUserDto {
-  @ApiProperty({ default: '1212121212' }) // Set your default value here
-  @IsOptional()
-  username: string = '1212121212'; // Default value in code
+  @ApiProperty({
+    description: 'Username (email, phone, or name)',
+    example: 'user@example.com',
+    default: '1212121212',
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
 
-  @ApiProperty({ default: '123456' }) // Set your default value here
-  @IsOptional()
-  password: string = '123456'; // Default value in code
+  @ApiProperty({
+    description: 'Password',
+    example: '123456',
+    default: '123456',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  password: string;
 }

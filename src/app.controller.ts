@@ -236,6 +236,12 @@ export class AppController {
     email: string;
     userType: string;
   }> {
+    console.log('🚀 Login endpoint called with:', {
+      username: userLoginDto.username,
+      password: '***',
+    });
+    console.log('👤 User from request:', req.user);
+
     const user = req.user;
     return this.appService.login(userLoginDto, user);
   }
