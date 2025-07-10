@@ -97,6 +97,81 @@ export class CreateVehicleModelDto {
   @IsString()
   brochureUrl?: string;
 
+  // Commercial vehicle metadata fields
+  @ApiProperty({
+    description: 'Whether this is a commercial vehicle model.',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isCommercialVehicle?: boolean;
+
+  @ApiProperty({
+    description: 'Commercial vehicle type (if applicable).',
+    example: 'truck',
+    required: false,
+    enum: ['truck', 'bus', 'van', 'tractor', 'trailer', 'forklift'],
+  })
+  @IsOptional()
+  @IsString()
+  commercialVehicleType?: string;
+
+  @ApiProperty({
+    description: 'Commercial body type (if applicable).',
+    example: 'flatbed',
+    required: false,
+    enum: [
+      'flatbed',
+      'container',
+      'refrigerated',
+      'tanker',
+      'dump',
+      'pickup',
+      'box',
+      'passenger',
+    ],
+  })
+  @IsOptional()
+  @IsString()
+  commercialBodyType?: string;
+
+  @ApiProperty({
+    description: 'Default payload capacity for commercial vehicles.',
+    example: 5000,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  defaultPayloadCapacity?: number;
+
+  @ApiProperty({
+    description: 'Default payload unit for commercial vehicles.',
+    example: 'kg',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  defaultPayloadUnit?: string;
+
+  @ApiProperty({
+    description: 'Default number of axles for commercial vehicles.',
+    example: 2,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  defaultAxleCount?: number;
+
+  @ApiProperty({
+    description: 'Default seating capacity for commercial vehicles.',
+    example: 3,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  defaultSeatingCapacity?: number;
+
   @ApiProperty({
     description: 'Whether the model is active.',
     example: true,

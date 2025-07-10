@@ -36,6 +36,28 @@ export class VehicleModel {
   @Prop({ required: false })
   brochureUrl?: string;
 
+  // Commercial vehicle metadata for auto-detection
+  @Prop({ required: false })
+  isCommercialVehicle?: boolean;
+
+  @Prop({ required: false })
+  commercialVehicleType?: string; // truck, bus, van, tractor, trailer, forklift
+
+  @Prop({ required: false })
+  commercialBodyType?: string; // flatbed, container, refrigerated, tanker, dump, pickup, box, passenger
+
+  @Prop({ required: false })
+  defaultPayloadCapacity?: number;
+
+  @Prop({ required: false })
+  defaultPayloadUnit?: string; // kg, tons, etc.
+
+  @Prop({ required: false })
+  defaultAxleCount?: number;
+
+  @Prop({ required: false })
+  defaultSeatingCapacity?: number;
+
   @Prop({ default: true })
   isActive: boolean;
 
@@ -54,6 +76,7 @@ VehicleModelSchema.index({ manufacturer: 1, name: 1 }, { unique: true });
 VehicleModelSchema.index({ vehicleType: 1 });
 VehicleModelSchema.index({ isActive: 1, isDeleted: 1 });
 VehicleModelSchema.index({ manufacturer: 1, isActive: 1 });
+VehicleModelSchema.index({ isCommercialVehicle: 1 }); // New index for commercial vehicle detection
 
 // Text index for search functionality
 VehicleModelSchema.index(

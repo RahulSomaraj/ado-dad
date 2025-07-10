@@ -60,6 +60,31 @@ export class VehicleModelDto {
   @ApiProperty({ description: 'Manufacturer information' })
   manufacturer: ManufacturerInfoDto;
 
+  // Commercial vehicle metadata fields
+  @ApiProperty({
+    description: 'Whether this is a commercial vehicle model',
+    required: false,
+  })
+  isCommercialVehicle?: boolean;
+
+  @ApiProperty({ description: 'Commercial vehicle type', required: false })
+  commercialVehicleType?: string;
+
+  @ApiProperty({ description: 'Commercial body type', required: false })
+  commercialBodyType?: string;
+
+  @ApiProperty({ description: 'Default payload capacity', required: false })
+  defaultPayloadCapacity?: number;
+
+  @ApiProperty({ description: 'Default payload unit', required: false })
+  defaultPayloadUnit?: string;
+
+  @ApiProperty({ description: 'Default number of axles', required: false })
+  defaultAxleCount?: number;
+
+  @ApiProperty({ description: 'Default seating capacity', required: false })
+  defaultSeatingCapacity?: number;
+
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt: Date;
 
@@ -75,10 +100,16 @@ export class VehicleModelDto {
     max: number;
   };
 
-  @ApiProperty({ description: 'Available fuel types for this model', required: false })
+  @ApiProperty({
+    description: 'Available fuel types for this model',
+    required: false,
+  })
   availableFuelTypes?: string[];
 
-  @ApiProperty({ description: 'Available transmission types for this model', required: false })
+  @ApiProperty({
+    description: 'Available transmission types for this model',
+    required: false,
+  })
   availableTransmissionTypes?: string[];
 }
 
@@ -103,4 +134,4 @@ export class PaginatedVehicleModelResponseDto {
 
   @ApiProperty({ description: 'Whether there is a previous page' })
   hasPrev: boolean;
-} 
+}

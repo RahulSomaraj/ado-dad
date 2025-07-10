@@ -51,8 +51,28 @@ export class VehicleInventoryService {
   async createManufacturer(
     createManufacturerDto: CreateManufacturerDto,
   ): Promise<Manufacturer> {
-    const manufacturer = new this.manufacturerModel(createManufacturerDto);
-    return manufacturer.save();
+    try {
+      const manufacturer = new this.manufacturerModel(createManufacturerDto);
+      return await manufacturer.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        // Duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new BadRequestException(
+          `Manufacturer with ${field} '${error.keyValue[field]}' already exists`,
+        );
+      }
+      if (error.name === 'ValidationError') {
+        // Mongoose validation error
+        const validationErrors = Object.values(error.errors).map(
+          (err: any) => err.message,
+        );
+        throw new BadRequestException(
+          `Validation failed: ${validationErrors.join(', ')}`,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAllManufacturers(): Promise<Manufacturer[]> {
@@ -259,8 +279,28 @@ export class VehicleInventoryService {
   async createVehicleModel(
     createVehicleModelDto: CreateVehicleModelDto,
   ): Promise<VehicleModel> {
-    const vehicleModel = new this.vehicleModelModel(createVehicleModelDto);
-    return vehicleModel.save();
+    try {
+      const vehicleModel = new this.vehicleModelModel(createVehicleModelDto);
+      return await vehicleModel.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        // Duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new BadRequestException(
+          `Vehicle model with ${field} '${error.keyValue[field]}' already exists`,
+        );
+      }
+      if (error.name === 'ValidationError') {
+        // Mongoose validation error
+        const validationErrors = Object.values(error.errors).map(
+          (err: any) => err.message,
+        );
+        throw new BadRequestException(
+          `Validation failed: ${validationErrors.join(', ')}`,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAllVehicleModels(manufacturerId?: string): Promise<VehicleModel[]> {
@@ -954,10 +994,30 @@ export class VehicleInventoryService {
   async createVehicleVariant(
     createVehicleVariantDto: CreateVehicleVariantDto,
   ): Promise<VehicleVariant> {
-    const vehicleVariant = new this.vehicleVariantModel(
-      createVehicleVariantDto,
-    );
-    return vehicleVariant.save();
+    try {
+      const vehicleVariant = new this.vehicleVariantModel(
+        createVehicleVariantDto,
+      );
+      return await vehicleVariant.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        // Duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new BadRequestException(
+          `Vehicle variant with ${field} '${error.keyValue[field]}' already exists`,
+        );
+      }
+      if (error.name === 'ValidationError') {
+        // Mongoose validation error
+        const validationErrors = Object.values(error.errors).map(
+          (err: any) => err.message,
+        );
+        throw new BadRequestException(
+          `Validation failed: ${validationErrors.join(', ')}`,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAllVehicleVariants(

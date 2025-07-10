@@ -9,6 +9,7 @@ import { LookupController } from './controllers/lookup.controller';
 import { AdsService } from './services/ads.service';
 import { LookupService } from './services/lookup.service';
 import { AdsSeedService } from './seed/seed-ads-data';
+import { CommercialVehicleDetectionService } from './services/commercial-vehicle-detection.service';
 
 // Schemas
 import { Ad, AdSchema } from './schemas/ad.schema';
@@ -46,6 +47,7 @@ import { RedisService } from '../shared/redis.service';
     AdsService,
     LookupService,
     AdsSeedService,
+    CommercialVehicleDetectionService,
     S3Service,
     RedisService,
   ],

@@ -1,0 +1,110 @@
+{
+  "description": "Examples of automatic commercial vehicle detection when creating ads",
+  "scenarios": {
+    "auto_detection_with_commercial_model": {
+      "description": "When creating an ad with a commercial vehicle model, fields are auto-populated",
+      "request": {
+        "category": "commercial_vehicle",
+        "data": {
+          "description": "Well-maintained Tata 407 truck for sale",
+          "price": 850000,
+          "location": "Mumbai, Maharashtra",
+          "images": ["https://example.com/truck1.jpg"],
+          "vehicleType": "four_wheeler",
+          "manufacturerId": "507f1f77bcf86cd799439011",
+          "modelId": "507f1f77bcf86cd799439012", // This is a commercial vehicle model
+          "year": 2018,
+          "mileage": 125000,
+          "transmissionTypeId": "507f1f77bcf86cd799439014",
+          "fuelTypeId": "507f1f77bcf86cd799439015",
+          "color": "White"
+          // Note: commercialVehicleType, bodyType, payloadCapacity, etc. are NOT provided
+        }
+      },
+      "auto_populated_fields": {
+        "commercialVehicleType": "truck",
+        "bodyType": "flatbed",
+        "payloadCapacity": 4000,
+        "payloadUnit": "kg",
+        "axleCount": 2,
+        "seatingCapacity": 3
+      },
+      "explanation": "The system detects that modelId refers to a commercial vehicle model and automatically populates the commercial vehicle specific fields"
+    },
+    "auto_detection_without_category": {
+      "description": "When no category is specified but model is commercial, category is auto-set",
+      "request": {
+        "data": {
+          "description": "Tata 407 truck for sale",
+          "price": 850000,
+          "location": "Mumbai, Maharashtra",
+          "modelId": "507f1f77bcf86cd799439012" // Commercial vehicle model
+        }
+      },
+      "auto_detected_category": "commercial_vehicle",
+      "explanation": "The system automatically sets the category to commercial_vehicle when a commercial vehicle model is detected"
+    },
+    "manual_override": {
+      "description": "Manual values override auto-populated defaults",
+      "request": {
+        "category": "commercial_vehicle",
+        "data": {
+          "description": "Custom configured truck",
+          "price": 850000,
+          "location": "Mumbai, Maharashtra",
+          "modelId": "507f1f77bcf86cd799439012", // Commercial vehicle model
+          "year": 2018,
+          "mileage": 125000,
+          "transmissionTypeId": "507f1f77bcf86cd799439014",
+          "fuelTypeId": "507f1f77bcf86cd799439015",
+          "color": "White",
+          "payloadCapacity": 6000, // Manual override
+          "payloadUnit": "tons", // Manual override
+          "axleCount": 3 // Manual override
+        }
+      },
+      "result": {
+        "payloadCapacity": 6000, // Manual value used
+        "payloadUnit": "tons", // Manual value used
+        "axleCount": 3, // Manual value used
+        "commercialVehicleType": "truck", // Auto-populated
+        "bodyType": "flatbed", // Auto-populated
+        "seatingCapacity": 3 // Auto-populated
+      },
+      "explanation": "Manual values take precedence over auto-populated defaults"
+    }
+  },
+  "model_metadata_examples": {
+    "tata_407_model": {
+      "name": "tata-407",
+      "displayName": "Tata 407",
+      "vehicleType": "Truck",
+      "isCommercialVehicle": true,
+      "commercialVehicleType": "truck",
+      "commercialBodyType": "flatbed",
+      "defaultPayloadCapacity": 4000,
+      "defaultPayloadUnit": "kg",
+      "defaultAxleCount": 2,
+      "defaultSeatingCapacity": 3
+    },
+    "bus_model": {
+      "name": "ashok-leyland-bus",
+      "displayName": "Ashok Leyland Bus",
+      "vehicleType": "Truck",
+      "isCommercialVehicle": true,
+      "commercialVehicleType": "bus",
+      "commercialBodyType": "passenger",
+      "defaultPayloadCapacity": 2000,
+      "defaultPayloadUnit": "kg",
+      "defaultAxleCount": 2,
+      "defaultSeatingCapacity": 45
+    }
+  },
+  "benefits": [
+    "Reduces user input errors",
+    "Speeds up ad creation process",
+    "Ensures consistency in commercial vehicle data",
+    "Allows manual overrides when needed",
+    "Automatic category detection"
+  ]
+}

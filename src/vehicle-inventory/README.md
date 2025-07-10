@@ -39,6 +39,16 @@ Represents specific vehicle models like Swift, Creta, Nexon, etc.
 - `segment`: A, B, C, D, E segment classification
 - `launchYear`, `bodyType`, `images`: Additional model info
 
+**Commercial Vehicle Metadata (New):**
+
+- `isCommercialVehicle`: Boolean flag for commercial vehicles
+- `commercialVehicleType`: truck, bus, van, tractor, trailer, forklift
+- `commercialBodyType`: flatbed, container, refrigerated, tanker, dump, pickup, box, passenger
+- `defaultPayloadCapacity`: Default payload capacity
+- `defaultPayloadUnit`: Default payload unit (kg, tons, etc.)
+- `defaultAxleCount`: Default number of axles
+- `defaultSeatingCapacity`: Default seating capacity
+
 ### 3. Vehicle Variant
 
 Represents specific variants with detailed specifications.
@@ -55,73 +65,119 @@ Represents specific variants with detailed specifications.
 - `performanceSpecs`: Mileage, acceleration, etc.
 - `dimensions`: Length, width, height, etc.
 - `price`: Price in INR
-- `seatingCapacity`, `colors`, `images`: Additional variant info
 
-### 4. Fuel Type (Lookup)
+## 🚛 Commercial Vehicle Detection Feature
 
-Reusable lookup for fuel types.
+### Overview
 
-**Key Fields:**
+The system now includes automatic commercial vehicle detection when creating advertisements. When a vehicle model is marked as commercial or has a commercial vehicle type (like "Truck"), the system automatically:
 
-- `name` (unique): Internal identifier
-- `displayName`: User-friendly name
-- `description`, `icon`, `color`: UI representation
-- `sortOrder`: For dropdown ordering
+1. **Detects commercial vehicles** based on model metadata
+2. **Auto-populates commercial vehicle fields** when creating ads
+3. **Sets the correct ad category** automatically
+4. **Allows manual overrides** for custom values
 
-### 5. Transmission Type (Lookup)
+### Creating Commercial Vehicle Models
 
-Reusable lookup for transmission types.
+When creating a vehicle model, you can now specify commercial vehicle metadata:
 
-**Key Fields:**
-
-- `name` (unique): Internal identifier
-- `displayName`: User-friendly name
-- `abbreviation`: MT, AT, AMT, etc.
-- `description`, `icon`, `sortOrder`: UI representation
-
-## 🔍 Key Features
-
-### 1. Advanced Querying
-
-The system supports complex queries as per requirements:
-
-```typescript
-// List all Diesel variants of Creta
-GET /vehicle-inventory/variants/diesel/creta
-
-// Show all CNG variants under ₹8 Lakh
-GET /vehicle-inventory/variants/cng/under-price?maxPrice=800000
-
-// Which models does Maruti offer in both Petrol & CNG?
-GET /vehicle-inventory/manufacturers/{manufacturerId}/models/multiple-fuel-types
+```json
+POST /vehicle-inventory/models
+{
+  "name": "tata-407",
+  "displayName": "Tata 407",
+  "manufacturer": "507f1f77bcf86cd799439011",
+  "vehicleType": "Truck",
+  "description": "Heavy duty commercial truck for logistics",
+  "launchYear": 1986,
+  "segment": "Commercial",
+  "bodyType": "Truck",
+  "isCommercialVehicle": true,
+  "commercialVehicleType": "truck",
+  "commercialBodyType": "flatbed",
+  "defaultPayloadCapacity": 4000,
+  "defaultPayloadUnit": "kg",
+  "defaultAxleCount": 2,
+  "defaultSeatingCapacity": 3
+}
 ```
 
-### 2. Flexible Filtering
+### Automatic Field Population
 
-```typescript
-// Get variants with multiple filters
-GET /vehicle-inventory/variants?modelId=123&fuelTypeId=456&maxPrice=1000000
+When creating an ad with a commercial vehicle model, the system automatically populates:
 
-// Search variants by name
-GET /vehicle-inventory/variants/search?q=swift
+- `commercialVehicleType`: Based on model metadata
+- `bodyType`: Based on model metadata
+- `payloadCapacity`: Default value from model
+- `payloadUnit`: Default value from model
+- `axleCount`: Default value from model
+- `seatingCapacity`: Default value from model
 
-// Get price range
-GET /vehicle-inventory/price-range
+### Example: Creating Commercial Vehicle Ad
+
+**Minimal Input (Auto-populated):**
+
+```json
+POST /ads
+{
+  "category": "commercial_vehicle",
+  "data": {
+    "description": "Tata 407 truck for sale",
+    "price": 850000,
+    "location": "Mumbai, Maharashtra",
+    "modelId": "507f1f77bcf86cd799439012", // Commercial vehicle model
+    "year": 2018,
+    "mileage": 125000,
+    "transmissionTypeId": "507f1f77bcf86cd799439014",
+    "fuelTypeId": "507f1f77bcf86cd799439015",
+    "color": "White"
+    // Commercial vehicle fields are auto-populated
+  }
+}
 ```
 
-### 3. Extensible Design
+**Result (Auto-populated fields):**
 
-- **Lookup Tables**: Fuel types and transmission types can be easily extended
-- **Soft Delete**: All entities support soft deletion
-- **Indexes**: Optimized for fast lookups
-- **Validation**: Comprehensive input validation
+```json
+{
+  "commercialVehicleType": "truck",
+  "bodyType": "flatbed",
+  "payloadCapacity": 4000,
+  "payloadUnit": "kg",
+  "axleCount": 2,
+  "seatingCapacity": 3
+}
+```
 
-## 🛠️ API Endpoints
+**Manual Override:**
+
+```json
+POST /ads
+{
+  "category": "commercial_vehicle",
+  "data": {
+    "description": "Custom configured truck",
+    "price": 850000,
+    "location": "Mumbai, Maharashtra",
+    "modelId": "507f1f77bcf86cd799439012",
+    "year": 2018,
+    "mileage": 125000,
+    "transmissionTypeId": "507f1f77bcf86cd799439014",
+    "fuelTypeId": "507f1f77bcf86cd799439015",
+    "color": "White",
+    "payloadCapacity": 6000, // Manual override
+    "payloadUnit": "tons", // Manual override
+    "axleCount": 3 // Manual override
+  }
+}
+```
+
+## 🛣️ API Endpoints
 
 ### Manufacturers
 
 - `POST /vehicle-inventory/manufacturers` - Create manufacturer
-- `GET /vehicle-inventory/manufacturers` - Get all manufacturers
+- `GET /vehicle-inventory/manufacturers` - Get all manufacturers (with filters)
 - `GET /vehicle-inventory/manufacturers/:id` - Get manufacturer by ID
 
 ### Vehicle Models
@@ -170,20 +226,27 @@ POST /vehicle-inventory/manufacturers
 }
 ```
 
-### 2. Creating a Vehicle Model
+### 2. Creating a Commercial Vehicle Model
 
 ```json
 POST /vehicle-inventory/models
 {
-  "name": "swift",
-  "displayName": "Swift",
+  "name": "tata-407",
+  "displayName": "Tata 407",
   "manufacturer": "507f1f77bcf86cd799439011",
-  "vehicleType": "HATCHBACK",
-  "description": "Popular hatchback with excellent fuel efficiency",
-  "launchYear": 2005,
-  "segment": "B",
-  "bodyType": "Hatchback",
-  "images": ["https://example.com/swift1.jpg"]
+  "vehicleType": "Truck",
+  "description": "Heavy duty commercial truck for logistics and transportation",
+  "launchYear": 1986,
+  "segment": "Commercial",
+  "bodyType": "Truck",
+  "images": ["https://example.com/tata407.jpg"],
+  "isCommercialVehicle": true,
+  "commercialVehicleType": "truck",
+  "commercialBodyType": "flatbed",
+  "defaultPayloadCapacity": 4000,
+  "defaultPayloadUnit": "kg",
+  "defaultAxleCount": 2,
+  "defaultSeatingCapacity": 3
 }
 ```
 
@@ -194,116 +257,42 @@ POST /vehicle-inventory/variants
 {
   "name": "swift-lxi-petrol-manual",
   "displayName": "Swift LXi Petrol Manual",
-  "vehicleModel": "507f1f77bcf86cd799439012",
-  "fuelType": "507f1f77bcf86cd799439013",
-  "transmissionType": "507f1f77bcf86cd799439014",
+  "vehicleModel": "507f1f77bcf86cd799439011",
+  "fuelType": "507f1f77bcf86cd799439012",
+  "transmissionType": "507f1f77bcf86cd799439013",
   "featurePackage": "LX",
   "engineSpecs": {
-    "capacity": 1200,
-    "maxPower": 88,
-    "maxTorque": 113,
-    "cylinders": 4,
-    "turbocharged": false
+    "capacity": 1197,
+    "power": 82,
+    "torque": 113,
+    "cylinders": 4
   },
   "performanceSpecs": {
-    "mileage": 22.38,
+    "mileage": 22.4,
     "acceleration": 12.5,
-    "topSpeed": 165,
-    "fuelCapacity": 37
-  },
-  "dimensions": {
-    "length": 3840,
-    "width": 1735,
-    "height": 1530,
-    "wheelbase": 2450,
-    "groundClearance": 163,
-    "bootSpace": 268
+    "topSpeed": 165
   },
   "seatingCapacity": 5,
-  "price": 550000,
-  "exShowroomPrice": 520000,
-  "onRoadPrice": 620000,
-  "colors": ["Pearl Arctic White", "Solid Fire Red"],
-  "description": "Base variant with essential features"
+  "price": 550000
 }
 ```
 
-## 🔧 Database Indexes
+## 🎯 Benefits of Commercial Vehicle Detection
 
-The system includes optimized indexes for fast queries:
+1. **Reduced User Input Errors**: Automatic field population reduces manual entry mistakes
+2. **Faster Ad Creation**: Users don't need to fill in all commercial vehicle fields manually
+3. **Data Consistency**: Ensures consistent commercial vehicle specifications across ads
+4. **Flexibility**: Manual overrides allow customization when needed
+5. **Automatic Category Detection**: System automatically identifies commercial vehicle ads
 
-### Manufacturer
+## 🔧 Technical Implementation
 
-- `{ name: 1 }` - Unique index on name
-- `{ isActive: 1, isDeleted: 1 }` - Filter active manufacturers
+The commercial vehicle detection feature includes:
 
-### Vehicle Model
+- **CommercialVehicleDetectionService**: Handles detection and mapping logic
+- **Enhanced VehicleModel Schema**: Includes commercial vehicle metadata fields
+- **Auto-population Logic**: Automatically fills commercial vehicle fields during ad creation
+- **Validation Updates**: Flexible validation that allows auto-populated fields
+- **Manual Override Support**: Users can override auto-populated values
 
-- `{ manufacturer: 1, name: 1 }` - Unique compound index
-- `{ vehicleType: 1 }` - Filter by vehicle type
-- `{ manufacturer: 1, isActive: 1 }` - Filter by manufacturer
-
-### Vehicle Variant
-
-- `{ vehicleModel: 1, fuelType: 1, transmissionType: 1, featurePackage: 1 }` - Unique compound index
-- `{ fuelType: 1 }` - Filter by fuel type
-- `{ price: 1 }` - Sort by price
-- `{ fuelType: 1, price: 1 }` - Price-based queries
-- `{ vehicleModel: 1, fuelType: 1 }` - Model + fuel type queries
-
-### Lookup Tables
-
-- `{ name: 1 }` - Unique index on name
-- `{ sortOrder: 1 }` - Order in dropdowns
-
-## 🚀 Getting Started
-
-1. **Install Dependencies**
-
-   ```bash
-   npm install
-   ```
-
-2. **Run Seed Data**
-
-   ```bash
-   # The seed data will automatically populate fuel types and transmission types
-   ```
-
-3. **Start the Application**
-
-   ```bash
-   npm run start:dev
-   ```
-
-4. **Access API Documentation**
-   ```
-   http://localhost:3000/api
-   ```
-
-## 🔒 Security & Authorization
-
-- All endpoints require JWT authentication
-- Admin/Super Admin roles required for create/update operations
-- Read operations are available to authenticated users
-- Input validation using class-validator
-- SQL injection protection through Mongoose
-
-## 📈 Scalability Features
-
-- **Normalized Design**: Proper separation of concerns
-- **Indexed Queries**: Fast lookups on common filters
-- **Soft Delete**: Data preservation and audit trails
-- **Extensible Lookups**: Easy to add new fuel types or transmission types
-- **Pagination Ready**: Can be easily extended for large datasets
-- **Caching Ready**: Structure supports Redis caching
-
-## 🎯 Future Enhancements
-
-- **Pagination**: For large datasets
-- **Caching**: Redis integration for frequently accessed data
-- **Image Management**: S3 integration for vehicle images
-- **Price History**: Track price changes over time
-- **Comparison Tools**: Compare multiple variants
-- **Recommendation Engine**: Suggest vehicles based on preferences
-- **Analytics**: Sales and popularity analytics
+This system provides a comprehensive vehicle inventory management solution with intelligent commercial vehicle detection and automatic field population for improved user experience.

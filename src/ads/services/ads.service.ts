@@ -24,6 +24,7 @@ import { CreateAdDto } from '../dto/common/create-ad.dto';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { DetailedAdResponseDto } from '../dto/common/ad-response.dto';
 import { RedisService } from '../../shared/redis.service';
+import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
 
 interface MatchStage {
   isActive?: boolean;
@@ -82,6 +83,7 @@ export class AdsService {
     private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
+    private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
   ) {
     // Create indexes for better performance
     this.createIndexes();
@@ -1012,6 +1014,39 @@ export class AdsService {
     createDto: CreateAdDto,
     userId: string,
   ): Promise<AdResponseDto> {
+    // Auto-detect commercial vehicle if modelId is provided
+    if (createDto.data.modelId) {
+      const commercialDefaults =
+        await this.commercialVehicleDetectionService.detectCommercialVehicleDefaults(
+          createDto.data.modelId,
+        );
+
+      // If commercial vehicle detected and no category specified, set it automatically
+      if (commercialDefaults.isCommercialVehicle && !createDto.category) {
+        createDto.category = AdCategory.COMMERCIAL_VEHICLE;
+      }
+
+      // Auto-populate commercial vehicle fields if commercial vehicle detected
+      if (commercialDefaults.isCommercialVehicle) {
+        createDto.data = {
+          ...createDto.data,
+          commercialVehicleType:
+            createDto.data.commercialVehicleType ||
+            commercialDefaults.commercialVehicleType,
+          bodyType: createDto.data.bodyType || commercialDefaults.bodyType,
+          payloadCapacity:
+            createDto.data.payloadCapacity ||
+            commercialDefaults.payloadCapacity,
+          payloadUnit:
+            createDto.data.payloadUnit || commercialDefaults.payloadUnit,
+          axleCount: createDto.data.axleCount || commercialDefaults.axleCount,
+          seatingCapacity:
+            createDto.data.seatingCapacity ||
+            commercialDefaults.seatingCapacity,
+        };
+      }
+    }
+
     // Validate required fields based on category
     this.validateRequiredFields(createDto);
 
@@ -1089,23 +1124,34 @@ export class AdsService {
         break;
 
       case AdCategory.COMMERCIAL_VEHICLE:
+        // For commercial vehicles, some fields can be auto-populated
+        const requiredFields = [
+          'vehicleType',
+          'manufacturerId',
+          'modelId',
+          'year',
+          'mileage',
+          'transmissionTypeId',
+          'fuelTypeId',
+          'color',
+        ];
+
+        const missingFields = requiredFields.filter((field) => !data[field]);
+
+        if (missingFields.length > 0) {
+          throw new BadRequestException(
+            `Commercial vehicle ads require: ${missingFields.join(', ')}`,
+          );
+        }
+
+        // Check if commercial vehicle specific fields are present (either provided or auto-populated)
         if (
-          !data.vehicleType ||
-          !data.commercialVehicleType ||
-          !data.bodyType ||
-          !data.manufacturerId ||
-          !data.modelId ||
-          !data.year ||
-          !data.mileage ||
-          !data.payloadCapacity ||
-          !data.payloadUnit ||
-          !data.axleCount ||
-          !data.transmissionTypeId ||
-          !data.fuelTypeId ||
-          !data.color
+          !data.commercialVehicleType &&
+          !data.bodyType &&
+          !data.payloadCapacity
         ) {
           throw new BadRequestException(
-            'Commercial vehicle ads require: vehicleType, commercialVehicleType, bodyType, manufacturerId, modelId, year, mileage, payloadCapacity, payloadUnit, axleCount, transmissionTypeId, fuelTypeId, and color',
+            'Commercial vehicle ads require commercial vehicle specific fields. Please provide commercialVehicleType, bodyType, and payloadCapacity, or ensure the vehicle model has commercial vehicle metadata.',
           );
         }
         break;
