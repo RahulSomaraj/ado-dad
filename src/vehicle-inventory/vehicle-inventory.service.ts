@@ -98,6 +98,65 @@ export class VehicleInventoryService {
     return manufacturer;
   }
 
+  async updateManufacturer(
+    id: string,
+    updateManufacturerDto: any,
+  ): Promise<Manufacturer> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid manufacturer ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
+    try {
+      const manufacturer = await this.manufacturerModel
+        .findOneAndUpdate(
+          { _id: id, isActive: true, isDeleted: false },
+          { $set: updateManufacturerDto },
+          { new: true, runValidators: true },
+        )
+        .exec();
+
+      if (!manufacturer) {
+        throw new NotFoundException(`Manufacturer with id ${id} not found`);
+      }
+
+      return manufacturer;
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new BadRequestException(
+          'Manufacturer with this name already exists',
+        );
+      }
+      if (error.name === 'ValidationError') {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  async deleteManufacturer(id: string): Promise<{ message: string }> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid manufacturer ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
+    const manufacturer = await this.manufacturerModel
+      .findOneAndUpdate(
+        { _id: id, isActive: true, isDeleted: false },
+        { $set: { isDeleted: true, isActive: false } },
+        { new: true },
+      )
+      .exec();
+
+    if (!manufacturer) {
+      throw new NotFoundException(`Manufacturer with id ${id} not found`);
+    }
+
+    return { message: 'Manufacturer deleted successfully' };
+  }
+
   async findManufacturersWithFilters(
     filters: FilterManufacturerDto,
   ): Promise<PaginatedManufacturerResponseDto> {
@@ -108,11 +167,15 @@ export class VehicleInventoryService {
       sortOrder = 'ASC',
     } = filters;
 
+    // Convert string parameters to numbers
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
+    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
+
     // Build the aggregation pipeline
     const pipeline: any[] = [];
 
     // Handle text search first (must be the first stage if present)
-    if (filters.search) {
+    if (filters.search && filters.search.trim()) {
       pipeline.push({
         $match: {
           $text: { $search: filters.search },
@@ -131,16 +194,24 @@ export class VehicleInventoryService {
     }
 
     if (filters.minFoundedYear !== undefined) {
+      const minYear =
+        typeof filters.minFoundedYear === 'string'
+          ? parseInt(filters.minFoundedYear, 10)
+          : filters.minFoundedYear;
       matchStage.foundedYear = {
         ...matchStage.foundedYear,
-        $gte: filters.minFoundedYear,
+        $gte: minYear,
       };
     }
 
     if (filters.maxFoundedYear !== undefined) {
+      const maxYear =
+        typeof filters.maxFoundedYear === 'string'
+          ? parseInt(filters.maxFoundedYear, 10)
+          : filters.maxFoundedYear;
       matchStage.foundedYear = {
         ...matchStage.foundedYear,
-        $lte: filters.maxFoundedYear,
+        $lte: maxYear,
       };
     }
 
@@ -181,22 +252,22 @@ export class VehicleInventoryService {
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
 
     // Add pagination
-    pipeline.push({ $skip: (page - 1) * limit });
-    pipeline.push({ $limit: limit });
+    pipeline.push({ $skip: (pageNum - 1) * limitNum });
+    pipeline.push({ $limit: limitNum });
 
     // Execute the main query
     const manufacturers = await this.manufacturerModel.aggregate(pipeline);
 
     // Calculate pagination info
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
+    const totalPages = Math.ceil(total / limitNum);
+    const hasNext = pageNum < totalPages;
+    const hasPrev = pageNum > 1;
 
     return {
       data: manufacturers,
       total,
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
       totalPages,
       hasNext,
       hasPrev,

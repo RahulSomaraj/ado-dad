@@ -9,6 +9,8 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  Put,
+  Delete,
 } from '@nestjs/common';
 import { VehicleInventoryService } from './vehicle-inventory.service';
 import { CreateManufacturerDto } from './dto/create-manufacturer.dto';
@@ -202,6 +204,43 @@ export class VehicleInventoryController {
   @ApiResponse({ status: 404, description: 'Manufacturer not found' })
   async findManufacturerById(@Param('id') id: string) {
     return this.vehicleInventoryService.findManufacturerById(id);
+  }
+
+  @Put('manufacturers/:id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiOperation({ summary: 'Update a manufacturer' })
+  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Manufacturer updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 404, description: 'Manufacturer not found' })
+  async updateManufacturer(
+    @Param('id') id: string,
+    @Body() updateManufacturerDto: any,
+    @Request() req,
+  ) {
+    const { user } = req;
+    return this.vehicleInventoryService.updateManufacturer(
+      id,
+      updateManufacturerDto,
+    );
+  }
+
+  @Delete('manufacturers/:id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiOperation({ summary: 'Delete a manufacturer' })
+  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Manufacturer deleted successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid ID format' })
+  @ApiResponse({ status: 404, description: 'Manufacturer not found' })
+  async deleteManufacturer(@Param('id') id: string, @Request() req) {
+    const { user } = req;
+    return this.vehicleInventoryService.deleteManufacturer(id);
   }
 
   // Vehicle Model endpoints

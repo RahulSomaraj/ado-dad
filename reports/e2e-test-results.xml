@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="19" failures="1" errors="0" time="9.748">
-  <testsuite name="Vehicle Manufacturers API (e2e)" errors="0" failures="1" skipped="18" timestamp="2025-07-10T11:11:59" time="9.64" tests="19">
+<testsuites name="jest tests" tests="19" failures="1" errors="0" time="15.408">
+  <testsuite name="Vehicle Manufacturers API (e2e)" errors="0" failures="1" skipped="18" timestamp="2025-07-10T11:23:48" time="15.265" tests="19">
     <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should create a manufacturer successfully" time="0">
       <skipped/>
     </testcase>
@@ -13,9 +13,24 @@
     <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid logo URL" time="0">
       <skipped/>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0.409">
-      <failure>Error: expected 200 &quot;OK&quot;, got 401 &quot;Unauthorized&quot;
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers.e2e-spec.ts:195:10)
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by country" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by category" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0.885">
+      <failure>Error: expected 200 &quot;OK&quot;, got 500 &quot;Internal Server Error&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers.e2e-spec.ts:264:10)
     at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
@@ -40,21 +55,6 @@
     at Server.emit (node:events:536:35)
     at emitCloseNT (node:net:2344:8)
     at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by country" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by category" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0">
-      <skipped/>
     </testcase>
     <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0">
       <skipped/>

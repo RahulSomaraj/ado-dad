@@ -192,65 +192,80 @@ describe('Vehicle Manufacturers API (e2e)', () => {
     it('should get all manufacturers successfully', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeGreaterThanOrEqual(3);
-          expect(res.body[0]).toHaveProperty('_id');
-          expect(res.body[0]).toHaveProperty('name');
-          expect(res.body[0]).toHaveProperty('displayName');
-          expect(res.body[0]).toHaveProperty('originCountry');
-          expect(res.body[0]).toHaveProperty('logo');
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.data.length).toBeGreaterThanOrEqual(3);
+          expect(res.body.data[0]).toHaveProperty('_id');
+          expect(res.body.data[0]).toHaveProperty('name');
+          expect(res.body.data[0]).toHaveProperty('displayName');
+          expect(res.body.data[0]).toHaveProperty('originCountry');
+          expect(res.body.data[0]).toHaveProperty('logo');
+          expect(res.body).toHaveProperty('total');
+          expect(res.body).toHaveProperty('page');
+          expect(res.body).toHaveProperty('limit');
         });
     });
 
     it('should filter manufacturers by search term', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers?search=Manufacturer 1')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBe(1);
-          expect(res.body[0].displayName).toBe('Manufacturer 1');
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.data.length).toBe(1);
+          expect(res.body.data[0].displayName).toBe('Manufacturer 1');
         });
     });
 
     it('should filter manufacturers by country', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers?originCountry=India')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBe(1);
-          expect(res.body[0].originCountry).toBe('India');
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.data.length).toBe(1);
+          expect(res.body.data[0].originCountry).toBe('India');
         });
     });
 
     it('should filter manufacturers by category', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers?category=passenger_car')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
         });
     });
 
     it('should filter manufacturers by region', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers?region=Asia')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
         });
     });
 
     it('should paginate manufacturers', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers?page=1&limit=2')
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeLessThanOrEqual(2);
+          expect(res.body).toHaveProperty('data');
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.data.length).toBeLessThanOrEqual(2);
         });
     });
   });
@@ -276,6 +291,7 @@ describe('Vehicle Manufacturers API (e2e)', () => {
     it('should get manufacturer by ID successfully', () => {
       return request(app.getHttpServer())
         .get(`/vehicle-inventory/manufacturers/${manufacturerId}`)
+        .set('Authorization', authToken)
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('_id', manufacturerId);
@@ -293,12 +309,14 @@ describe('Vehicle Manufacturers API (e2e)', () => {
       const nonExistentId = '507f1f77bcf86cd799439011';
       return request(app.getHttpServer())
         .get(`/vehicle-inventory/manufacturers/${nonExistentId}`)
+        .set('Authorization', authToken)
         .expect(404);
     });
 
     it('should return 400 for invalid ID format', () => {
       return request(app.getHttpServer())
         .get('/vehicle-inventory/manufacturers/invalid-id')
+        .set('Authorization', authToken)
         .expect(400);
     });
   });
