@@ -404,6 +404,44 @@ export class VehicleInventoryService {
     return vehicleModel;
   }
 
+  async updateVehicleModel(
+    id: string,
+    updateVehicleModelDto: any,
+  ): Promise<VehicleModel> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid vehicle model ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
+    try {
+      const vehicleModel = await this.vehicleModelModel
+        .findOneAndUpdate(
+          { _id: id, isActive: true, isDeleted: false },
+          { $set: updateVehicleModelDto },
+          { new: true, runValidators: true },
+        )
+        .populate('manufacturer', 'name displayName logo')
+        .exec();
+
+      if (!vehicleModel) {
+        throw new NotFoundException(`Vehicle model with id ${id} not found`);
+      }
+
+      return vehicleModel;
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new BadRequestException(
+          'Vehicle model with this name already exists',
+        );
+      }
+      if (error.name === 'ValidationError') {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
   async findVehicleModelsWithFilters(
     filters: FilterVehicleModelDto,
   ): Promise<PaginatedVehicleModelResponseDto> {
@@ -413,6 +451,10 @@ export class VehicleInventoryService {
       sortBy = 'displayName',
       sortOrder = 'ASC',
     } = filters;
+
+    // Convert string parameters to numbers
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
+    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
 
     // Build the aggregation pipeline
     const pipeline: any[] = [];
@@ -696,8 +738,8 @@ export class VehicleInventoryService {
     pipeline.push({ $sort: { [sortField]: sortDirection } });
 
     // Add pagination
-    pipeline.push({ $skip: (page - 1) * limit });
-    pipeline.push({ $limit: limit });
+    pipeline.push({ $skip: (pageNum - 1) * limitNum });
+    pipeline.push({ $limit: limitNum });
 
     // Clean up the output
     pipeline.push({
@@ -712,15 +754,15 @@ export class VehicleInventoryService {
     const vehicleModels = await this.vehicleModelModel.aggregate(pipeline);
 
     // Calculate pagination info
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
+    const totalPages = Math.ceil(total / limitNum);
+    const hasNext = pageNum < totalPages;
+    const hasPrev = pageNum > 1;
 
     return {
       data: vehicleModels,
       total,
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
       totalPages,
       hasNext,
       hasPrev,

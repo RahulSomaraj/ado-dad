@@ -1,3 +1,5 @@
+process.env.MONGO_URI =
+  process.env.MONGO_URI || 'mongodb://localhost:27017/ado-dad';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
@@ -22,7 +24,7 @@ describe('Vehicle Models API (e2e)', () => {
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
 
-    // Login to get auth token using provided credentials
+    // Login with existing super admin user
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({

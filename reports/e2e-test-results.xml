@@ -1,23 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="19" failures="1" errors="0" time="23.388">
-  <testsuite name="Vehicle Manufacturers API (e2e)" errors="0" failures="1" skipped="0" timestamp="2025-07-10T11:26:46" time="23.246" tests="19">
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should create a manufacturer successfully" time="0.195">
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with duplicate name" time="0.336">
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid data" time="0.144">
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid logo URL" time="0.217">
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0.911">
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="1.031">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: 1
-Received: 3
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers.e2e-spec.ts:217:10)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+<testsuites name="jest tests" tests="19" failures="19" errors="0" time="15.148">
+  <testsuite name="Vehicle Manufacturers API (e2e)" errors="0" failures="19" skipped="0" timestamp="2025-07-10T17:11:00" time="15.002" tests="19">
+    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should create a manufacturer successfully" time="0.017">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
     at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
@@ -30,43 +23,234 @@ Received: 3
     at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
     at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
     at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers.e2e-spec.ts:220:40
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by country" time="0.81">
+    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with duplicate name" time="0.006">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by category" time="0.915">
+    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid data" time="0.007">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="1.023">
+    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid logo URL" time="0.01">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="1.024">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0.006">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0.511">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.41">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by country" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.416">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by category" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should update manufacturer successfully" time="0.51">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0.008">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.38">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0.006">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid update data" time="0.45">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0.006">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should delete manufacturer successfully" time="0.314">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.486">
+    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.309">
+    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should update manufacturer successfully" time="0.004">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.008">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid update data" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should delete manufacturer successfully" time="0.006">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.005">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.004">
+      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
+    at ClientRequest.setHeader (node:_http_outgoing:658:3)
+    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
+    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
+    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
+    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    at new Promise (&lt;anonymous&gt;)
+    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="" name="Test execution failure: could be caused by test hooks like &apos;afterAll&apos;." time="0">
+      <failure>{&quot;message&quot;:&quot;&quot;,&quot;stack&quot;:&quot;Error: thrown: \&quot;Exceeded timeout of 5000 ms for a hook.\nAdd a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.\&quot;\n    at C:\\personal\\personal\\ado-dad-repo\\ado-dad\\test\\vehicle-inventory-manufacturers.e2e-spec.ts:42:3\n    at _dispatchDescribe (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\index.js:91:26)\n    at describe (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\index.js:55:5)\n    at Object.&lt;anonymous&gt; (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\test\\vehicle-inventory-manufacturers.e2e-spec.ts:10:1)\n    at Runtime._execModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:1439:24)\n    at Runtime._loadModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:1022:12)\n    at Runtime.requireModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:882:12)\n    at jestAdapter (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:77:13)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at runTestInternal (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runner\\build\\runTest.js:444:34)&quot;}</failure>
     </testcase>
   </testsuite>
 </testsuites>

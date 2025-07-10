@@ -1,3 +1,5 @@
+process.env.MONGO_URI =
+  process.env.MONGO_URI || 'mongodb://localhost:27017/ado-dad';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
@@ -31,7 +33,6 @@ describe('Vehicle Inventory API (e2e)', () => {
 
   beforeEach(async () => {
     // Clear test data before each test
-    await mongoConnection.db.collection('users').deleteMany({});
     await mongoConnection.db.collection('refreshtokens').deleteMany({});
     await mongoConnection.db.collection('manufacturers').deleteMany({});
     await mongoConnection.db.collection('vehiclemodels').deleteMany({});

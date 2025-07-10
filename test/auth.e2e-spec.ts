@@ -31,7 +31,6 @@ describe('Authentication API (e2e)', () => {
     // Clear test data before each test
     if (!mongoConnection.db)
       throw new Error('Mongo connection not initialized');
-    await mongoConnection.db.collection('users').deleteMany({});
     await mongoConnection.db.collection('refreshtokens').deleteMany({});
   });
 

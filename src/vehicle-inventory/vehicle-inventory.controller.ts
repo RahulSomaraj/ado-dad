@@ -1011,6 +1011,28 @@ export class VehicleInventoryController {
     return this.vehicleInventoryService.findVehicleModelById(id);
   }
 
+  @Put('models/:id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiOperation({ summary: 'Update a vehicle model' })
+  @ApiParam({ name: 'id', description: 'Vehicle model ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Vehicle model updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 404, description: 'Vehicle model not found' })
+  async updateVehicleModel(
+    @Param('id') id: string,
+    @Body() updateVehicleModelDto: any,
+    @Request() req,
+  ) {
+    const { user } = req;
+    return this.vehicleInventoryService.updateVehicleModel(
+      id,
+      updateVehicleModelDto,
+    );
+  }
+
   // Vehicle Variant endpoints
   @Post('variants')
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)

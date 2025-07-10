@@ -30,7 +30,6 @@ describe('Users API (e2e)', () => {
   beforeEach(async () => {
     // Clear test data before each test
     if (mongoConnection.db) {
-      await mongoConnection.db.collection('users').deleteMany({});
       await mongoConnection.db.collection('refreshtokens').deleteMany({});
     }
 
