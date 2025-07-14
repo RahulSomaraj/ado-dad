@@ -5,59 +5,60 @@ import {
   IsBoolean,
   IsNumber,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateManufacturerDto {
-  @ApiProperty({
+export class UpdateManufacturerDto {
+  @ApiPropertyOptional({
     description: 'The unique name of the manufacturer.',
     example: 'maruti-suzuki',
   })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'The display name of the manufacturer.',
     example: 'Maruti Suzuki',
   })
+  @IsOptional()
   @IsString()
-  displayName: string;
+  displayName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'The country of origin of the manufacturer.',
     example: 'Japan',
   })
+  @IsOptional()
   @IsString()
-  originCountry: string;
+  originCountry?: string;
 
   @ApiPropertyOptional({
     description: 'Description of the manufacturer.',
     example: 'Leading automobile manufacturer in India',
-    required: false,
   })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'URL of the manufacturer logo.',
     example: 'https://example.com/maruti-logo.png',
   })
+  @IsOptional()
   @IsUrl()
-  logo: string;
+  logo?: string;
 
   @ApiPropertyOptional({
     description: 'Official website of the manufacturer.',
     example: 'https://www.marutisuzuki.com',
-    required: false,
   })
   @IsOptional()
   @IsUrl()
   website?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Year when the manufacturer was founded.',
     example: 1981,
-    required: false,
   })
   @IsOptional()
   @IsNumber()
@@ -66,16 +67,14 @@ export class CreateManufacturerDto {
   @ApiPropertyOptional({
     description: 'Headquarters location of the manufacturer.',
     example: 'New Delhi, India',
-    required: false,
   })
   @IsOptional()
   @IsString()
   headquarters?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Whether the manufacturer is active.',
     example: true,
-    default: true,
   })
   @IsOptional()
   @IsBoolean()

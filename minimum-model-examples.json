@@ -1,0 +1,78 @@
+{
+  "description": "Minimum data examples for creating vehicle models",
+  "required_fields": ["name", "displayName", "manufacturer", "vehicleType"],
+  "valid_vehicle_types": [
+    "SUV",
+    "Sedan",
+    "Truck",
+    "Coupe",
+    "Hatchback",
+    "Convertible",
+    "two-wheeler",
+    "MUV",
+    "Compact SUV",
+    "Sub-Compact SUV"
+  ],
+  "examples": {
+    "minimal_hatchback": {
+      "name": "test-model-minimal",
+      "displayName": "Test Model Minimal",
+      "manufacturer": "686fb37cab966c7e18f263f8",
+      "vehicleType": "Hatchback"
+    },
+    "minimal_sedan": {
+      "name": "test-sedan-minimal",
+      "displayName": "Test Sedan Minimal",
+      "manufacturer": "686fb37cab966c7e18f26417",
+      "vehicleType": "Sedan"
+    },
+    "minimal_suv": {
+      "name": "test-suv-minimal",
+      "displayName": "Test SUV Minimal",
+      "manufacturer": "686fb37cab966c7e18f26419",
+      "vehicleType": "SUV"
+    },
+    "minimal_two_wheeler": {
+      "name": "test-bike-minimal",
+      "displayName": "Test Bike Minimal",
+      "manufacturer": "686fb37cab966c7e18f26406",
+      "vehicleType": "two-wheeler"
+    },
+    "minimal_truck": {
+      "name": "test-truck-minimal",
+      "displayName": "Test Truck Minimal",
+      "manufacturer": "686fb37cab966c7e18f263fd",
+      "vehicleType": "Truck"
+    }
+  },
+  "available_manufacturers": {
+    "maruti_suzuki": "686fb37cab966c7e18f263f8",
+    "honda": "686fb37cab966c7e18f26417",
+    "toyota": "686fb37cab966c7e18f26419",
+    "hyundai": "686fb37cab966c7e18f26424",
+    "tata_motors": "686fb37cab966c7e18f263fd",
+    "mahindra": "686fb37cab966c7e18f26403",
+    "hero_moto": "686fb37cab966c7e18f26406"
+  },
+  "optional_fields": [
+    "description",
+    "launchYear",
+    "segment",
+    "bodyType",
+    "images",
+    "brochureUrl",
+    "isCommercialVehicle",
+    "commercialVehicleType",
+    "commercialBodyType",
+    "defaultPayloadCapacity",
+    "defaultPayloadUnit",
+    "defaultAxleCount",
+    "defaultSeatingCapacity",
+    "isActive"
+  ],
+  "usage": {
+    "endpoint": "POST /vehicle-inventory/models",
+    "authentication": "Bearer token required",
+    "content_type": "application/json"
+  }
+}

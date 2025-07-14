@@ -25,6 +25,8 @@ import {
 import { CreateManufacturerDto } from './dto/create-manufacturer.dto';
 import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
 import { CreateVehicleVariantDto } from './dto/create-vehicle-variant.dto';
+import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
+import { UpdateVehicleModelDto } from './dto/update-vehicle-model.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
 import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
@@ -100,7 +102,7 @@ export class VehicleInventoryService {
 
   async updateManufacturer(
     id: string,
-    updateManufacturerDto: any,
+    updateManufacturerDto: UpdateManufacturerDto,
   ): Promise<Manufacturer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(
@@ -406,7 +408,7 @@ export class VehicleInventoryService {
 
   async updateVehicleModel(
     id: string,
-    updateVehicleModelDto: any,
+    updateVehicleModelDto: UpdateVehicleModelDto,
   ): Promise<VehicleModel> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(

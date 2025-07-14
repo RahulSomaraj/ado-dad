@@ -16,6 +16,8 @@ import { VehicleInventoryService } from './vehicle-inventory.service';
 import { CreateManufacturerDto } from './dto/create-manufacturer.dto';
 import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
 import { CreateVehicleVariantDto } from './dto/create-vehicle-variant.dto';
+import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
+import { UpdateVehicleModelDto } from './dto/update-vehicle-model.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
@@ -218,7 +220,7 @@ export class VehicleInventoryController {
   @ApiResponse({ status: 404, description: 'Manufacturer not found' })
   async updateManufacturer(
     @Param('id') id: string,
-    @Body() updateManufacturerDto: any,
+    @Body() updateManufacturerDto: UpdateManufacturerDto,
     @Request() req,
   ) {
     const { user } = req;
@@ -1023,7 +1025,7 @@ export class VehicleInventoryController {
   @ApiResponse({ status: 404, description: 'Vehicle model not found' })
   async updateVehicleModel(
     @Param('id') id: string,
-    @Body() updateVehicleModelDto: any,
+    @Body() updateVehicleModelDto: UpdateVehicleModelDto,
     @Request() req,
   ) {
     const { user } = req;
