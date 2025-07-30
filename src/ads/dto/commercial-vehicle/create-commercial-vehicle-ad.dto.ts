@@ -16,11 +16,11 @@ import {
 
 export class CreateCommercialVehicleAdDto extends BaseAdDto {
   @ApiProperty({
-    description: 'Commercial vehicle type',
+    description: 'Commercial Vehicle type',
     enum: CommercialVehicleTypeEnum,
   })
   @IsEnum(CommercialVehicleTypeEnum)
-  vehicleType: CommercialVehicleTypeEnum;
+  CommercialVehicleType: CommercialVehicleTypeEnum;
 
   @ApiProperty({ description: 'Body type', enum: BodyTypeEnum })
   @IsEnum(BodyTypeEnum)

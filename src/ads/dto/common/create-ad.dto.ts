@@ -416,7 +416,7 @@ export class CreateAdDto {
             'https://example.com/truck/cargo-area.jpg',
           ],
           vehicleType: 'four_wheeler',
-          commercialVehicleType: 'truck',
+          CommercialVehicleType: 'truck',
           bodyType: 'flatbed',
           manufacturerId: '507f1f77bcf86cd799439011',
           modelId: '507f1f77bcf86cd799439012',

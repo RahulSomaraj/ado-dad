@@ -1126,7 +1126,7 @@ export class AdsService {
       case AdCategory.COMMERCIAL_VEHICLE:
         // For commercial vehicles, some fields can be auto-populated
         const requiredFields = [
-          'vehicleType',
+          'commercialVehicleType',
           'manufacturerId',
           'modelId',
           'year',
@@ -1265,7 +1265,6 @@ export class AdsService {
 
     const commercialVehicleAd = new this.commercialVehicleAdModel({
       ad: savedAd._id as any,
-      vehicleType: data.vehicleType,
       commercialVehicleType: data.commercialVehicleType,
       bodyType: data.bodyType,
       manufacturerId: data.manufacturerId,

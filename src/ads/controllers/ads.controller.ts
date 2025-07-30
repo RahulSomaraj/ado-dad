@@ -470,7 +470,6 @@ export class AdsController {
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck1.jpg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck2.jpg',
             ],
-            vehicleType: 'four_wheeler',
             commercialVehicleType: 'truck',
             bodyType: 'flatbed',
             manufacturerId: '507f1f77bcf86cd799439034',

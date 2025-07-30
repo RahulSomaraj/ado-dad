@@ -29,7 +29,7 @@ export class CommercialVehicleAd {
   ad: Types.ObjectId;
 
   @Prop({ required: true, enum: CommercialVehicleTypeEnum })
-  vehicleType: CommercialVehicleTypeEnum;
+  commercialVehicleType: CommercialVehicleTypeEnum;
 
   @Prop({ required: true, enum: BodyTypeEnum })
   bodyType: BodyTypeEnum;
@@ -93,7 +93,7 @@ export const CommercialVehicleAdSchema =
 
 // Indexes for fast lookups
 CommercialVehicleAdSchema.index({ ad: 1 }, { unique: true });
-CommercialVehicleAdSchema.index({ vehicleType: 1 });
+CommercialVehicleAdSchema.index({ commercialvehicleType: 1 });
 CommercialVehicleAdSchema.index({ bodyType: 1 });
 CommercialVehicleAdSchema.index({ manufacturerId: 1 });
 CommercialVehicleAdSchema.index({ modelId: 1 });
