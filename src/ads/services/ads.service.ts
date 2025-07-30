@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Ad, AdDocument, AdCategory } from '../schemas/ad.schema';
 import { PropertyAd, PropertyAdDocument } from '../schemas/property-ad.schema';
 import { VehicleAd, VehicleAdDocument } from '../schemas/vehicle-ad.schema';
@@ -1065,9 +1065,9 @@ export class AdsService {
           userId,
         );
         break;
-      case AdCategory.TWO_WHEELER:
-        result = await this.createVehicleAdFromUnified(createDto.data, userId);
-        break;
+        case AdCategory.TWO_WHEELER:
+          result = await this.createTwoWheelerAdFromUnified(createDto.data, userId);
+          break;        
       default:
         throw new BadRequestException(
           `Invalid ad category: ${createDto.category}`,
@@ -1168,7 +1168,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
     });
 
@@ -1210,7 +1210,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
     });
 
@@ -1257,7 +1257,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.COMMERCIAL_VEHICLE,
     });
 
@@ -1309,7 +1309,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,
     });
 

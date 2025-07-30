@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 
 export type AdDocument = Ad & Document;
 
@@ -30,8 +30,9 @@ export class Ad {
   @Prop({ default: true })
   isActive: boolean;
 
-  @Prop({ required: true, ref: 'User', type: Types.ObjectId })
-  postedBy: Types.ObjectId;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+postedBy: mongoose.Types.ObjectId;
+
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);
