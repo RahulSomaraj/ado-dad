@@ -130,22 +130,23 @@ export class AdsService {
       console.error('❌ Error creating indexes:', error);
     }
   }
+
   async findAll(filters: FilterAdDto): Promise<PaginatedAdResponseDto> {
     const {
       page = 1,
       limit = 20,
-      sortBy = 'postedAt',
+      sortBy = 'createdAt',
       sortOrder = 'DESC',
       search,
     } = filters;
-  
+
     const pipeline: any[] = [];
-  
+
     // 🔍 Text Search
     if (search) {
       pipeline.push({ $match: { $text: { $search: search } } });
     }
-  
+
     // 🧾 Basic filters
     const matchStage: any = { isActive: filters.isActive ?? true };
     if (filters.category) matchStage.category = filters.category;
@@ -154,12 +155,14 @@ export class AdsService {
     }
     if (filters.minPrice || filters.maxPrice) {
       matchStage.price = {};
-      if (filters.minPrice !== undefined) matchStage.price.$gte = filters.minPrice;
-      if (filters.maxPrice !== undefined) matchStage.price.$lte = filters.maxPrice;
+      if (filters.minPrice !== undefined)
+        matchStage.price.$gte = filters.minPrice;
+      if (filters.maxPrice !== undefined)
+        matchStage.price.$lte = filters.maxPrice;
     }
-  
+
     pipeline.push({ $match: matchStage });
-  
+
     // 👤 User lookup
     pipeline.push(
       {
@@ -178,7 +181,7 @@ export class AdsService {
         },
       },
     );
-  
+
     // 🏠 Property lookup
     pipeline.push({
       $lookup: {
@@ -188,7 +191,7 @@ export class AdsService {
         as: 'propertyDetails',
       },
     });
-  
+
     // 🚗 Vehicle lookup and filter (basic)
     pipeline.push({
       $lookup: {
@@ -198,11 +201,11 @@ export class AdsService {
         as: 'vehicleDetails',
       },
     });
-  
+
     const vehicleMatch: any = {};
     if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
     if (filters.modelId) vehicleMatch.modelId = filters.modelId;
-  
+
     if (Object.keys(vehicleMatch).length > 0) {
       pipeline.push({
         $match: {
@@ -210,7 +213,7 @@ export class AdsService {
         },
       });
     }
-  
+
     // 🚛 Commercial vehicle lookup and filter (basic)
     pipeline.push({
       $lookup: {
@@ -220,11 +223,11 @@ export class AdsService {
         as: 'commercialVehicleDetails',
       },
     });
-  
+
     const commercialMatch: any = {};
     if (filters.commercialVehicleType)
       commercialMatch.vehicleType = filters.commercialVehicleType;
-  
+
     if (Object.keys(commercialMatch).length > 0) {
       pipeline.push({
         $match: {
@@ -232,21 +235,21 @@ export class AdsService {
         },
       });
     }
-  
+
     // 📊 Count total
     const countPipeline = [...pipeline, { $count: 'total' }];
     const countResult = await this.adModel.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
-  
+
     // 📦 Pagination & sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
-  
+
     // 🚀 Fetch ads
     const ads = await this.adModel.aggregate(pipeline);
-  
+
     return {
       data: ads.map((ad) => this.mapToResponseDto(ad)),
       total,
@@ -257,8 +260,6 @@ export class AdsService {
       hasPrev: page > 1,
     };
   }
-  
-  
 
   async findOne(id: string): Promise<AdResponseDto> {
     const ad = await this.adModel
@@ -807,9 +808,12 @@ export class AdsService {
           userId,
         );
         break;
-        case AdCategory.TWO_WHEELER:
-          result = await this.createTwoWheelerAdFromUnified(createDto.data, userId);
-          break;        
+      case AdCategory.TWO_WHEELER:
+        result = await this.createTwoWheelerAdFromUnified(
+          createDto.data,
+          userId,
+        );
+        break;
       default:
         throw new BadRequestException(
           `Invalid ad category: ${createDto.category}`,
@@ -1182,7 +1186,7 @@ export class AdsService {
       location: ad.location,
       category: ad.category,
       isActive: ad.isActive,
-      postedAt: ad.postedAt,
+      postedAt: ad.createdAt, // Map createdAt to postedAt for API consistency
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy,
       user: ad.user

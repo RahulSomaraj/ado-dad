@@ -31,14 +31,13 @@ export class Ad {
   isActive: boolean;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-postedBy: mongoose.Types.ObjectId;
-
+  postedBy: mongoose.Types.ObjectId;
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);
 
 // Indexes for fast lookups
-AdSchema.index({ category: 1, postedAt: -1 });
+AdSchema.index({ category: 1, createdAt: -1 });
 AdSchema.index({ location: 1 });
 AdSchema.index({ postedBy: 1 });
 AdSchema.index({ isActive: 1 });
