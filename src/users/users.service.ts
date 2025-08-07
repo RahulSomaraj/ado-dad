@@ -14,7 +14,7 @@ import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
 import { EncryptionUtil } from '../common/encryption.util';
-import { GetUsersDto } from './dto/get-user.dto';
+import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserType } from './enums/user.types';
@@ -162,7 +162,7 @@ export class UsersService {
   /**
    * Create a new user
    */
-  async createUser(userData: CreateUserDto): Promise<User> {
+  async createUser(userData: CreateUserDto): Promise<UserResponseDto> {
     try {
       this.logger.log(`Creating new user: ${userData.email}`);
 
@@ -181,7 +181,16 @@ export class UsersService {
       // Return user without sensitive data
       const { password, otp, otpExpires, ...userResponse } =
         savedUser.toObject();
-      return userResponse as User;
+      // Map to UserResponseDto
+      const response: UserResponseDto = {
+        name: userResponse.name,
+        email: userResponse.email,
+        phoneNumber: userResponse.phoneNumber,
+        type: userResponse.type,
+        profilePic: userResponse.profilePic,
+        isDeleted: userResponse.isDeleted,
+      };
+      return response;
     } catch (error) {
       this.logger.error(`Failed to create user ${userData.email}:`, error);
       if (error instanceof HttpException) {

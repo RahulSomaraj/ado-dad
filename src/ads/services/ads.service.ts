@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Ad, AdDocument, AdCategory } from '../schemas/ad.schema';
 import { PropertyAd, PropertyAdDocument } from '../schemas/property-ad.schema';
 import { VehicleAd, VehicleAdDocument } from '../schemas/vehicle-ad.schema';
@@ -130,71 +130,37 @@ export class AdsService {
       console.error('❌ Error creating indexes:', error);
     }
   }
-
   async findAll(filters: FilterAdDto): Promise<PaginatedAdResponseDto> {
     const {
       page = 1,
       limit = 20,
       sortBy = 'postedAt',
       sortOrder = 'DESC',
+      search,
     } = filters;
-
-    // Check if this query should be cached
-    const shouldCache = this.shouldCacheQuery(filters);
-
-    if (shouldCache) {
-      // Generate optimized cache key (normalize filters for better cache hit rate)
-      const normalizedFilters = this.normalizeFilters(filters);
-      const cacheKey = `ads:findAll:${JSON.stringify(normalizedFilters)}`;
-
-      // Try to get from cache first
-      const cachedResult =
-        await this.redisService.cacheGet<PaginatedAdResponseDto>(cacheKey);
-      if (cachedResult) {
-        return cachedResult;
-      }
-    }
-
-    // Build the aggregation pipeline
+  
     const pipeline: any[] = [];
-
-    // Handle text search first (must be the first stage if present)
-    if (filters.search) {
-      pipeline.push({
-        $match: {
-          $text: { $search: filters.search },
-        },
-      });
+  
+    // 🔍 Text Search
+    if (search) {
+      pipeline.push({ $match: { $text: { $search: search } } });
     }
-
-    // Add basic filters (excluding text search which is handled above)
-    const matchStage: MatchStage = { isActive: true };
-
-    if (filters.category) {
-      matchStage.category = filters.category;
-    }
-
+  
+    // 🧾 Basic filters
+    const matchStage: any = { isActive: filters.isActive ?? true };
+    if (filters.category) matchStage.category = filters.category;
     if (filters.location) {
       matchStage.location = { $regex: filters.location, $options: 'i' };
     }
-
-    if (filters.minPrice !== undefined) {
-      matchStage.price = { ...matchStage.price, $gte: filters.minPrice };
+    if (filters.minPrice || filters.maxPrice) {
+      matchStage.price = {};
+      if (filters.minPrice !== undefined) matchStage.price.$gte = filters.minPrice;
+      if (filters.maxPrice !== undefined) matchStage.price.$lte = filters.maxPrice;
     }
-
-    if (filters.maxPrice !== undefined) {
-      matchStage.price = { ...matchStage.price, $lte: filters.maxPrice };
-    }
-
-    if (filters.postedBy) {
-      matchStage.postedBy = filters.postedBy;
-    }
-
-    if (filters.isActive !== undefined) {
-      matchStage.isActive = filters.isActive;
-    }
-
-    // Add user lookup with projection for better performance
+  
+    pipeline.push({ $match: matchStage });
+  
+    // 👤 User lookup
     pipeline.push(
       {
         $lookup: {
@@ -202,15 +168,7 @@ export class AdsService {
           localField: 'postedBy',
           foreignField: '_id',
           as: 'user',
-          pipeline: [
-            {
-              $project: {
-                name: 1,
-                email: 1,
-                phone: 1,
-              },
-            },
-          ],
+          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
         },
       },
       {
@@ -219,304 +177,88 @@ export class AdsService {
           preserveNullAndEmptyArrays: true,
         },
       },
-      { $match: matchStage },
     );
-
-    // Add property-specific filters
-    if (
-      filters.propertyType ||
-      filters.minBedrooms ||
-      filters.maxBedrooms ||
-      filters.minBathrooms ||
-      filters.maxBathrooms ||
-      filters.minArea ||
-      filters.maxArea ||
-      filters.isFurnished !== undefined ||
-      filters.hasParking !== undefined ||
-      filters.hasGarden !== undefined
-    ) {
+  
+    // 🏠 Property lookup
+    pipeline.push({
+      $lookup: {
+        from: 'propertyads',
+        localField: '_id',
+        foreignField: 'ad',
+        as: 'propertyDetails',
+      },
+    });
+  
+    // 🚗 Vehicle lookup and filter (basic)
+    pipeline.push({
+      $lookup: {
+        from: 'vehicleads',
+        localField: '_id',
+        foreignField: 'ad',
+        as: 'vehicleDetails',
+      },
+    });
+  
+    const vehicleMatch: any = {};
+    if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
+    if (filters.modelId) vehicleMatch.modelId = filters.modelId;
+  
+    if (Object.keys(vehicleMatch).length > 0) {
       pipeline.push({
-        $lookup: {
-          from: 'propertyads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'propertyDetails',
-          pipeline: [
-            {
-              $project: {
-                propertyType: 1,
-                bedrooms: 1,
-                bathrooms: 1,
-                areaSqft: 1,
-                floor: 1,
-                isFurnished: 1,
-                hasParking: 1,
-                hasGarden: 1,
-                amenities: 1,
-              },
-            },
-          ],
+        $match: {
+          vehicleDetails: { $elemMatch: vehicleMatch },
         },
       });
-
-      const propertyMatch: PropertyMatchStage = {};
-      if (filters.propertyType)
-        propertyMatch.propertyType = filters.propertyType;
-      if (filters.minBedrooms !== undefined)
-        propertyMatch.bedrooms = {
-          ...propertyMatch.bedrooms,
-          $gte: filters.minBedrooms,
-        };
-      if (filters.maxBedrooms !== undefined)
-        propertyMatch.bedrooms = {
-          ...propertyMatch.bedrooms,
-          $lte: filters.maxBedrooms,
-        };
-      if (filters.minBathrooms !== undefined)
-        propertyMatch.bathrooms = {
-          ...propertyMatch.bathrooms,
-          $gte: filters.minBathrooms,
-        };
-      if (filters.maxBathrooms !== undefined)
-        propertyMatch.bathrooms = {
-          ...propertyMatch.bathrooms,
-          $lte: filters.maxBathrooms,
-        };
-      if (filters.minArea !== undefined)
-        propertyMatch.areaSqft = {
-          ...propertyMatch.areaSqft,
-          $gte: filters.minArea,
-        };
-      if (filters.maxArea !== undefined)
-        propertyMatch.areaSqft = {
-          ...propertyMatch.areaSqft,
-          $lte: filters.maxArea,
-        };
-      if (filters.isFurnished !== undefined)
-        propertyMatch.isFurnished = filters.isFurnished;
-      if (filters.hasParking !== undefined)
-        propertyMatch.hasParking = filters.hasParking;
-      if (filters.hasGarden !== undefined)
-        propertyMatch.hasGarden = filters.hasGarden;
-
-      if (Object.keys(propertyMatch).length > 0) {
-        pipeline.push({
-          $match: {
-            'propertyDetails.0': { $exists: true },
-            $or: [{ 'propertyDetails.0': propertyMatch }],
-          },
-        });
-      }
     }
-
-    // Add vehicle-specific filters (for both PRIVATE_VEHICLE and TWO_WHEELER)
-    if (
-      filters.vehicleType ||
-      filters.manufacturerId ||
-      filters.modelId ||
-      filters.variantId ||
-      filters.minYear ||
-      filters.maxYear ||
-      filters.maxMileage ||
-      filters.transmissionTypeId ||
-      filters.fuelTypeId ||
-      filters.color ||
-      filters.isFirstOwner !== undefined ||
-      filters.hasInsurance !== undefined ||
-      filters.hasRcBook !== undefined
-    ) {
+  
+    // 🚛 Commercial vehicle lookup and filter (basic)
+    pipeline.push({
+      $lookup: {
+        from: 'commercialvehicleads',
+        localField: '_id',
+        foreignField: 'ad',
+        as: 'commercialVehicleDetails',
+      },
+    });
+  
+    const commercialMatch: any = {};
+    if (filters.commercialVehicleType)
+      commercialMatch.vehicleType = filters.commercialVehicleType;
+  
+    if (Object.keys(commercialMatch).length > 0) {
       pipeline.push({
-        $lookup: {
-          from: 'vehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'vehicleDetails',
-          pipeline: [
-            {
-              $project: {
-                vehicleType: 1,
-                manufacturerId: 1,
-                modelId: 1,
-                variantId: 1,
-                year: 1,
-                mileage: 1,
-                transmissionTypeId: 1,
-                fuelTypeId: 1,
-                color: 1,
-                isFirstOwner: 1,
-                hasInsurance: 1,
-                hasRcBook: 1,
-                additionalFeatures: 1,
-              },
-            },
-          ],
+        $match: {
+          commercialVehicleDetails: { $elemMatch: commercialMatch },
         },
       });
-
-      const vehicleMatch: VehicleMatchStage = {};
-      if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
-      if (filters.manufacturerId)
-        vehicleMatch.manufacturerId = filters.manufacturerId;
-      if (filters.modelId) vehicleMatch.modelId = filters.modelId;
-      if (filters.variantId) vehicleMatch.variantId = filters.variantId;
-      if (filters.minYear !== undefined)
-        vehicleMatch.year = { ...vehicleMatch.year, $gte: filters.minYear };
-      if (filters.maxYear !== undefined)
-        vehicleMatch.year = { ...vehicleMatch.year, $lte: filters.maxYear };
-      if (filters.maxMileage !== undefined)
-        vehicleMatch.mileage = { $lte: filters.maxMileage };
-      if (filters.transmissionTypeId)
-        vehicleMatch.transmissionTypeId = filters.transmissionTypeId;
-      if (filters.fuelTypeId) vehicleMatch.fuelTypeId = filters.fuelTypeId;
-      if (filters.color)
-        vehicleMatch.color = { $regex: filters.color, $options: 'i' };
-      if (filters.isFirstOwner !== undefined)
-        vehicleMatch.isFirstOwner = filters.isFirstOwner;
-      if (filters.hasInsurance !== undefined)
-        vehicleMatch.hasInsurance = filters.hasInsurance;
-      if (filters.hasRcBook !== undefined)
-        vehicleMatch.hasRcBook = filters.hasRcBook;
-
-      if (Object.keys(vehicleMatch).length > 0) {
-        pipeline.push({
-          $match: {
-            'vehicleDetails.0': { $exists: true },
-            $or: [{ 'vehicleDetails.0': vehicleMatch }],
-          },
-        });
-      }
     }
-
-    // Add commercial vehicle-specific filters
-    if (
-      filters.commercialVehicleType ||
-      filters.bodyType ||
-      filters.minPayloadCapacity ||
-      filters.maxPayloadCapacity ||
-      filters.axleCount ||
-      filters.hasFitness !== undefined ||
-      filters.hasPermit !== undefined ||
-      filters.minSeatingCapacity ||
-      filters.maxSeatingCapacity
-    ) {
-      pipeline.push({
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'commercialVehicleDetails',
-        },
-      });
-
-      const commercialVehicleMatch: CommercialVehicleMatchStage = {};
-      if (filters.commercialVehicleType)
-        commercialVehicleMatch.vehicleType = filters.commercialVehicleType;
-      if (filters.bodyType) commercialVehicleMatch.bodyType = filters.bodyType;
-      if (filters.minPayloadCapacity !== undefined)
-        commercialVehicleMatch.payloadCapacity = {
-          ...commercialVehicleMatch.payloadCapacity,
-          $gte: filters.minPayloadCapacity,
-        };
-      if (filters.maxPayloadCapacity !== undefined)
-        commercialVehicleMatch.payloadCapacity = {
-          ...commercialVehicleMatch.payloadCapacity,
-          $lte: filters.maxPayloadCapacity,
-        };
-      if (filters.axleCount !== undefined)
-        commercialVehicleMatch.axleCount = filters.axleCount;
-      if (filters.hasFitness !== undefined)
-        commercialVehicleMatch.hasFitness = filters.hasFitness;
-      if (filters.hasPermit !== undefined)
-        commercialVehicleMatch.hasPermit = filters.hasPermit;
-      if (filters.minSeatingCapacity !== undefined)
-        commercialVehicleMatch.seatingCapacity = {
-          ...commercialVehicleMatch.seatingCapacity,
-          $gte: filters.minSeatingCapacity,
-        };
-      if (filters.maxSeatingCapacity !== undefined)
-        commercialVehicleMatch.seatingCapacity = {
-          ...commercialVehicleMatch.seatingCapacity,
-          $lte: filters.maxSeatingCapacity,
-        };
-
-      if (Object.keys(commercialVehicleMatch).length > 0) {
-        pipeline.push({
-          $match: {
-            'commercialVehicleDetails.0': { $exists: true },
-            $or: [{ 'commercialVehicleDetails.0': commercialVehicleMatch }],
-          },
-        });
-      }
-    }
-
-    // Add additional lookups for detailed information
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'propertyads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'propertyDetails',
-        },
-      },
-      {
-        $lookup: {
-          from: 'vehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'vehicleDetails',
-        },
-      },
-      {
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'commercialVehicleDetails',
-        },
-      },
-    );
-
-    // Get total count before pagination
+  
+    // 📊 Count total
     const countPipeline = [...pipeline, { $count: 'total' }];
     const countResult = await this.adModel.aggregate(countPipeline);
-    const total =
-      countResult.length > 0 ? (countResult[0] as { total: number }).total : 0;
-
-    // Add sorting and pagination
+    const total = countResult[0]?.total || 0;
+  
+    // 📦 Pagination & sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
-
-    // Execute the main query
+  
+    // 🚀 Fetch ads
     const ads = await this.adModel.aggregate(pipeline);
-
-    // Calculate pagination info
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
-
-    const result = {
+  
+    return {
       data: ads.map((ad) => this.mapToResponseDto(ad)),
       total,
       page,
       limit,
-      totalPages,
-      hasNext,
-      hasPrev,
+      totalPages: Math.ceil(total / limit),
+      hasNext: page * limit < total,
+      hasPrev: page > 1,
     };
-
-    // Cache the result if caching is enabled
-    if (shouldCache) {
-      const normalizedFilters = this.normalizeFilters(filters);
-      const cacheKey = `ads:findAll:${JSON.stringify(normalizedFilters)}`;
-      const ttl = this.calculateCacheTTL(filters);
-      await this.redisService.cacheSet(cacheKey, result, ttl);
-    }
-
-    return result;
   }
+  
+  
 
   async findOne(id: string): Promise<AdResponseDto> {
     const ad = await this.adModel
@@ -1065,9 +807,9 @@ export class AdsService {
           userId,
         );
         break;
-      case AdCategory.TWO_WHEELER:
-        result = await this.createVehicleAdFromUnified(createDto.data, userId);
-        break;
+        case AdCategory.TWO_WHEELER:
+          result = await this.createTwoWheelerAdFromUnified(createDto.data, userId);
+          break;        
       default:
         throw new BadRequestException(
           `Invalid ad category: ${createDto.category}`,
@@ -1126,7 +868,7 @@ export class AdsService {
       case AdCategory.COMMERCIAL_VEHICLE:
         // For commercial vehicles, some fields can be auto-populated
         const requiredFields = [
-          'vehicleType',
+          'commercialVehicleType',
           'manufacturerId',
           'modelId',
           'year',
@@ -1168,7 +910,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
     });
 
@@ -1210,7 +952,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
     });
 
@@ -1257,7 +999,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.COMMERCIAL_VEHICLE,
     });
 
@@ -1265,7 +1007,6 @@ export class AdsService {
 
     const commercialVehicleAd = new this.commercialVehicleAdModel({
       ad: savedAd._id as any,
-      vehicleType: data.vehicleType,
       commercialVehicleType: data.commercialVehicleType,
       bodyType: data.bodyType,
       manufacturerId: data.manufacturerId,
@@ -1309,7 +1050,7 @@ export class AdsService {
       price: data.price,
       images: data.images || [],
       location: data.location,
-      postedBy: userId,
+      postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,
     });
 

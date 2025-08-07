@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsNumber, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UserType } from '../enums/user.types';
@@ -48,4 +48,25 @@ export class GetUsersDto {
   @IsOptional()
   @IsString()
   sort?: string;
+}
+
+// DTO for safe user API responses
+export class UserResponseDto {
+  @ApiProperty({ example: 'John Doe' })
+  name: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  email: string;
+
+  @ApiProperty({ example: '+123456789' })
+  phoneNumber: string;
+
+  @ApiProperty({ example: 'NU', enum: UserType })
+  type: UserType;
+
+  @ApiProperty({ example: 'https://example.com/profile.jpg', required: false })
+  profilePic?: string;
+
+  @ApiProperty({ example: false, required: false })
+  isDeleted?: boolean;
 }
