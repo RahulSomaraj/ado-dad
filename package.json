@@ -24,6 +24,7 @@
     "test:users": "jest --config ./test/jest-e2e.json --testPathPattern=users.e2e-spec.ts",
     "test:vehicle-inventory": "jest --config ./test/jest-e2e.json --testPathPattern=vehicle-inventory.e2e-spec.ts",
     "test:ads": "jest --config ./test/jest-e2e.json --testPathPattern=ads.e2e-spec.ts",
+    "test:ads-minimal": "node test/run-ads-minimal-tests.js",
     "test:report": "npm run test:all && open coverage/test-execution-report.json",
     "test:report:html": "npm run test:all:html && open reports/comprehensive-test-report.html",
     "test:coverage:html": "npm run test:cov && open coverage/lcov-report/index.html",

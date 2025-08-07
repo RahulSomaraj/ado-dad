@@ -1288,6 +1288,21 @@ export class VehicleInventoryService {
     return transmissionType;
   }
 
+  // Lookup methods for fuel types and transmission types
+  async getFuelTypes(): Promise<FuelType[]> {
+    return this.fuelTypeModel
+      .find({ isDeleted: false })
+      .sort({ sortOrder: 1, name: 1 })
+      .exec();
+  }
+
+  async getTransmissionTypes(): Promise<TransmissionType[]> {
+    return this.transmissionTypeModel
+      .find({ isDeleted: false })
+      .sort({ sortOrder: 1, name: 1 })
+      .exec();
+  }
+
   async findAllVehicleVariantsWithPagination(
     filters: FilterVehicleVariantDto,
   ): Promise<PaginatedVehicleVariantResponseDto> {

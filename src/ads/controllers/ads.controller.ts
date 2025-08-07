@@ -612,10 +612,10 @@ export class AdsController {
     @Request() req: any,
   ): Promise<AdResponseDto> {
     try {
-      console.log('Creating advertisement for user:', req.user.id);
+      console.log('Creating advertisement for user:', req.user._id);
       console.log('Advertisement category:', createAdDto.category);
 
-      const result = await this.adsService.createAd(createAdDto, req.user.id);
+      const result = await this.adsService.createAd(createAdDto, req.user._id.toString());
 
       console.log('Advertisement created successfully with ID:', result.id);
       return result;

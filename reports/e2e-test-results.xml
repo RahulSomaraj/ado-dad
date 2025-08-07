@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="19" failures="19" errors="0" time="15.148">
-  <testsuite name="Vehicle Manufacturers API (e2e)" errors="0" failures="19" skipped="0" timestamp="2025-07-10T17:11:00" time="15.002" tests="19">
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should create a manufacturer successfully" time="0.017">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
+<testsuites name="jest tests" tests="22" failures="8" errors="0" time="17.749">
+  <testsuite name="Ads API - Minimal Data Test Cases (e2e)" errors="0" failures="8" skipped="0" timestamp="2025-07-17T04:58:32" time="17.595" tests="22">
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Property Ads - Minimal Data Tests › POST /ads - Property Category" name="should create property ad with minimal required data" time="0.591">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Property Ads - Minimal Data Tests › POST /ads - Property Category" name="should create property ad with all optional fields" time="0.314">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Property Ads - Minimal Data Tests › POST /ads - Property Category" name="should fail to create property ad with missing required fields" time="0.298">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Property Ads - Minimal Data Tests › POST /ads - Property Category" name="should fail to create property ad with invalid property type" time="0.264">
+      <failure>Error: expected 400 &quot;Bad Request&quot;, got 500 &quot;Internal Server Error&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:280:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
     at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
@@ -19,33 +19,27 @@
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
     at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
     at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
     at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with duplicate name" time="0.006">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid data" time="0.007">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Private Vehicle Ads - Minimal Data Tests › POST /ads - Private Vehicle Category" name="should create private vehicle ad with minimal required data" time="0.285">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:324:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
     at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
@@ -54,22 +48,27 @@
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
     at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
     at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
     at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid logo URL" time="0.01">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:305:21)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Private Vehicle Ads - Minimal Data Tests › POST /ads - Private Vehicle Category" name="should create private vehicle ad with all optional fields" time="0.279">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:373:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
     at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
@@ -78,179 +77,189 @@
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
     at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
     at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
     at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
     at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0.006">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Private Vehicle Ads - Minimal Data Tests › POST /ads - Private Vehicle Category" name="should fail to create vehicle ad with missing required fields" time="0.27">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Private Vehicle Ads - Minimal Data Tests › POST /ads - Private Vehicle Category" name="should fail to create vehicle ad with invalid vehicle type" time="0.268">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Two Wheeler Ads - Minimal Data Tests › POST /ads - Two Wheeler Category" name="should create two wheeler ad with minimal required data" time="0.313">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:456:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Two Wheeler Ads - Minimal Data Tests › POST /ads - Two Wheeler Category" name="should create two wheeler ad with all optional fields" time="0.275">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:505:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by country" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Commercial Vehicle Ads - Minimal Data Tests › POST /ads - Commercial Vehicle Category" name="should create commercial vehicle ad with minimal required data" time="0.289">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:550:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by category" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Commercial Vehicle Ads - Minimal Data Tests › POST /ads - Commercial Vehicle Category" name="should create commercial vehicle ad with all optional fields" time="0.283">
+      <failure>Error: expected 201 &quot;Created&quot;, got 400 &quot;Bad Request&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:601:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0.008">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Commercial Vehicle Ads - Minimal Data Tests › POST /ads - Commercial Vehicle Category" name="should fail to create commercial vehicle ad with missing required fields" time="0.281">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Edge Cases and Validation Tests › POST /ads - Edge Cases" name="should fail to create ad without authentication" time="0.251">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Edge Cases and Validation Tests › POST /ads - Edge Cases" name="should fail to create ad with invalid category" time="0.266">
+    </testcase>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Edge Cases and Validation Tests › POST /ads - Edge Cases" name="should fail to create ad with negative price" time="0.262">
+      <failure>Error: expected 400 &quot;Bad Request&quot;, got 500 &quot;Internal Server Error&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:692:12)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0.006">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Edge Cases and Validation Tests › POST /ads - Edge Cases" name="should fail to create ad with empty description" time="0.26">
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0.006">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › Edge Cases and Validation Tests › POST /ads - Edge Cases" name="should fail to create ad with invalid manufacturer ID" time="0.239">
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › GET /ads - Retrieval Tests" name="should get all ads successfully" time="0.281">
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › GET /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › GET /ads - Retrieval Tests" name="should filter ads by category" time="0.273">
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should update manufacturer successfully" time="0.004">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › GET /ads - Retrieval Tests" name="should filter ads by price range" time="0.347">
     </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.008">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › PUT /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid update data" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should delete manufacturer successfully" time="0.006">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.005">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Vehicle Manufacturers API (e2e) › DELETE /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.004">
-      <failure>TypeError: Invalid value &quot;undefined&quot; for header &quot;Authorization&quot;
-    at ClientRequest.setHeader (node:_http_outgoing:658:3)
-    at Test.setHeader [as request] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:825:39)
-    at Test.request [as end] (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\node\index.js:960:8)
-    at Test.end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:118:11)
-    at end (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:283:12)
-    at new Promise (&lt;anonymous&gt;)
-    at Test.Object.&lt;anonymous&gt;.RequestBase.then (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\superagent\src\request-base.js:265:31)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="" name="Test execution failure: could be caused by test hooks like &apos;afterAll&apos;." time="0">
-      <failure>{&quot;message&quot;:&quot;&quot;,&quot;stack&quot;:&quot;Error: thrown: \&quot;Exceeded timeout of 5000 ms for a hook.\nAdd a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.\&quot;\n    at C:\\personal\\personal\\ado-dad-repo\\ado-dad\\test\\vehicle-inventory-manufacturers.e2e-spec.ts:42:3\n    at _dispatchDescribe (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\index.js:91:26)\n    at describe (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\index.js:55:5)\n    at Object.&lt;anonymous&gt; (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\test\\vehicle-inventory-manufacturers.e2e-spec.ts:10:1)\n    at Runtime._execModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:1439:24)\n    at Runtime._loadModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:1022:12)\n    at Runtime.requireModule (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runtime\\build\\index.js:882:12)\n    at jestAdapter (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:77:13)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at runTestInternal (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (C:\\personal\\personal\\ado-dad-repo\\ado-dad\\node_modules\\jest-runner\\build\\runTest.js:444:34)&quot;}</failure>
+    <testcase classname="Ads API - Minimal Data Test Cases (e2e) › GET /ads - Retrieval Tests" name="should search ads by description" time="0.291">
     </testcase>
   </testsuite>
 </testsuites>
