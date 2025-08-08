@@ -130,7 +130,6 @@ export class AdsService {
       console.error('❌ Error creating indexes:', error);
     }
   }
-
   async findAll(filters: FilterAdDto): Promise<PaginatedAdResponseDto> {
     const {
       page = 1,
@@ -139,14 +138,14 @@ export class AdsService {
       sortOrder = 'DESC',
       search,
     } = filters;
-
+  
     const pipeline: any[] = [];
-
+  
     // 🔍 Text Search
     if (search) {
       pipeline.push({ $match: { $text: { $search: search } } });
     }
-
+  
     // 🧾 Basic filters
     const matchStage: any = { isActive: filters.isActive ?? true };
     if (filters.category) matchStage.category = filters.category;
@@ -155,14 +154,12 @@ export class AdsService {
     }
     if (filters.minPrice || filters.maxPrice) {
       matchStage.price = {};
-      if (filters.minPrice !== undefined)
-        matchStage.price.$gte = filters.minPrice;
-      if (filters.maxPrice !== undefined)
-        matchStage.price.$lte = filters.maxPrice;
+      if (filters.minPrice !== undefined) matchStage.price.$gte = filters.minPrice;
+      if (filters.maxPrice !== undefined) matchStage.price.$lte = filters.maxPrice;
     }
-
+  
     pipeline.push({ $match: matchStage });
-
+  
     // 👤 User lookup
     pipeline.push(
       {
@@ -181,7 +178,7 @@ export class AdsService {
         },
       },
     );
-
+  
     // 🏠 Property lookup
     pipeline.push({
       $lookup: {
@@ -191,8 +188,8 @@ export class AdsService {
         as: 'propertyDetails',
       },
     });
-
-    // 🚗 Vehicle lookup and filter (basic)
+  
+    // 🚗 Vehicle lookup
     pipeline.push({
       $lookup: {
         from: 'vehicleads',
@@ -201,20 +198,8 @@ export class AdsService {
         as: 'vehicleDetails',
       },
     });
-
-    const vehicleMatch: any = {};
-    if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
-    if (filters.modelId) vehicleMatch.modelId = filters.modelId;
-
-    if (Object.keys(vehicleMatch).length > 0) {
-      pipeline.push({
-        $match: {
-          vehicleDetails: { $elemMatch: vehicleMatch },
-        },
-      });
-    }
-
-    // 🚛 Commercial vehicle lookup and filter (basic)
+  
+    // 🚛 Commercial vehicle lookup
     pipeline.push({
       $lookup: {
         from: 'commercialvehicleads',
@@ -223,11 +208,49 @@ export class AdsService {
         as: 'commercialVehicleDetails',
       },
     });
-
+  
+    // 🚦 Vehicle / Commercial filters
+    const vehicleMatch: any = {};
+    if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
+    if (filters.modelId) vehicleMatch.modelId = filters.modelId;
+  
     const commercialMatch: any = {};
     if (filters.commercialVehicleType)
       commercialMatch.vehicleType = filters.commercialVehicleType;
-
+  
+    // 📅 Year filtering for both types
+    if (filters.minYear || filters.maxYear) {
+      const yearCond: any = {};
+      if (filters.minYear) yearCond.$gte = Number(filters.minYear);
+      if (filters.maxYear) yearCond.$lte = Number(filters.maxYear);
+  
+      // Add year to matches if specific type already has filters
+      if (Object.keys(vehicleMatch).length) vehicleMatch.year = yearCond;
+      if (Object.keys(commercialMatch).length) commercialMatch.year = yearCond;
+  
+      // Or add generic year filter for either type
+      if (!Object.keys(vehicleMatch).length && !Object.keys(commercialMatch).length) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { vehicleDetails: { $elemMatch: { year: yearCond } } },
+              { commercialVehicleDetails: { $elemMatch: { year: yearCond } } },
+            ],
+          },
+        });
+      }
+    }
+  
+    // Apply vehicle match if needed
+    if (Object.keys(vehicleMatch).length > 0) {
+      pipeline.push({
+        $match: {
+          vehicleDetails: { $elemMatch: vehicleMatch },
+        },
+      });
+    }
+  
+    // Apply commercial match if needed
     if (Object.keys(commercialMatch).length > 0) {
       pipeline.push({
         $match: {
@@ -235,23 +258,30 @@ export class AdsService {
         },
       });
     }
-
+  
     // 📊 Count total
     const countPipeline = [...pipeline, { $count: 'total' }];
     const countResult = await this.adModel.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
-
+  
     // 📦 Pagination & sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
-
+  
     // 🚀 Fetch ads
     const ads = await this.adModel.aggregate(pipeline);
-
+  
     return {
-      data: ads.map((ad) => this.mapToResponseDto(ad)),
+      data: ads.map((ad) => {
+        const dto = this.mapToResponseDto(ad);
+        dto.year =
+          ad.vehicleDetails?.[0]?.year ||
+          ad.commercialVehicleDetails?.[0]?.year ||
+          null;
+        return dto;
+      }),
       total,
       page,
       limit,
@@ -260,6 +290,7 @@ export class AdsService {
       hasPrev: page > 1,
     };
   }
+  
 
   async findOne(id: string): Promise<AdResponseDto> {
     const ad = await this.adModel

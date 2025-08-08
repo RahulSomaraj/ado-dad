@@ -18,6 +18,13 @@ export class AdResponseDto {
   price: number;
 
   @ApiPropertyOptional({
+    description: 'Manufacturing year (if applicable)',
+  })
+  year?: number;
+
+  
+
+  @ApiPropertyOptional({
     description: 'Advertisement images URLs',
     type: [String],
   })
