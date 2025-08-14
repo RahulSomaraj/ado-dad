@@ -273,3 +273,26 @@ export class PaginatedAdResponseDto {
   @ApiProperty({ description: 'Has previous page' })
   hasPrev: boolean;
 }
+
+export class PaginatedDetailedAdResponseDto {
+  @ApiProperty({ description: 'List of advertisements with details', type: [DetailedAdResponseDto] })
+  data: DetailedAdResponseDto[];
+
+  @ApiProperty({ description: 'Total number of advertisements' })
+  total: number;
+
+  @ApiProperty({ description: 'Current page number' })
+  page: number;
+
+  @ApiProperty({ description: 'Number of items per page' })
+  limit: number;
+
+  @ApiProperty({ description: 'Total number of pages' })
+  totalPages: number;
+
+  @ApiProperty({ description: 'Has next page' })
+  hasNext: boolean;
+
+  @ApiProperty({ description: 'Has previous page' })
+  hasPrev: boolean;
+}

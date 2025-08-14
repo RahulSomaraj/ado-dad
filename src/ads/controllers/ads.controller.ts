@@ -36,6 +36,7 @@ import {
   AdResponseDto,
   PaginatedAdResponseDto,
   DetailedAdResponseDto,
+  PaginatedDetailedAdResponseDto,
 } from '../dto/common/ad-response.dto';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth-guard';
 import { S3Service } from '../../shared/s3.service';
@@ -327,23 +328,9 @@ export class AdsController {
     status: 200,
     description:
       'Advertisements retrieved successfully with comprehensive filtering',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/AdResponseDto' },
-        },
-        total: { type: 'number', example: 150 },
-        page: { type: 'number', example: 1 },
-        limit: { type: 'number', example: 20 },
-        totalPages: { type: 'number', example: 8 },
-        hasNext: { type: 'boolean', example: true },
-        hasPrev: { type: 'boolean', example: false },
-      },
-    },
+    type: PaginatedDetailedAdResponseDto,
   })
-  async getAllAds(@Query() filterDto: FilterAdDto) {
+  async getAllAds(@Query() filterDto: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
     return this.adsService.findAll(filterDto);
   }
 

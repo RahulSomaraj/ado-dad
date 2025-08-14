@@ -10,7 +10,13 @@ import {
   UseFilters,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { EmailService } from '../utils/email.service';
 import {
@@ -19,8 +25,9 @@ import {
   ApiResponse,
   ApiBody,
   ApiBearerAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/create-user.dto'; // Import CreateUserDto
+import { CreateUserDto, CreateUserWithFileDto } from './dto/create-user.dto'; // Import both DTOs
 import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
 import { HttpExceptionFilter } from '../shared/exception-service';
 import { GetUsersDto } from './dto/get-user.dto';
@@ -28,6 +35,7 @@ import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { Roles } from '../roles/roles.decorator';
 import { UserType } from './enums/user.types';
 import { RolesGuard } from '../roles/roles.guard';
+import { S3Service } from '../shared/s3.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -36,16 +44,85 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
+    private readonly s3Service: S3Service,
   ) {}
 
   @Post()
   @ApiBody({
-    description: 'Create a new user',
-    type: CreateUserDto, // Use CreateUserDto for creating user
+    description: 'Create a new user with profile picture URL',
+    type: CreateUserDto, // Use CreateUserDto for creating user with URL
   })
   @ApiResponse({ status: 201, description: 'User created' })
   async createUser(@Body() userData: CreateUserDto) {
     return this.usersService.createUser(userData);
+  }
+
+  @Post('with-profile-picture')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create a new user with profile picture file upload',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'John Doe' },
+        phoneNumber: { type: 'string', example: '+123456789' },
+        email: { type: 'string', example: 'john@example.com' },
+        password: { type: 'string', example: 'password123' },
+        type: { type: 'string', enum: ['SA', 'AD', 'NU', 'SR'], example: 'NU' },
+        profilePic: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile picture file (JPG, PNG, WebP supported)',
+        },
+      },
+      required: ['name', 'phoneNumber', 'email', 'password', 'type'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'User created with profile picture' })
+  @UseInterceptors(FileInterceptor('profilePic'))
+  async createUserWithProfilePicture(
+    @Body() userData: CreateUserWithFileDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|webp)' }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    profilePic?: Express.Multer.File,
+  ) {
+    // Upload profile picture if provided
+    let profilePicUrl: string | undefined;
+    if (profilePic) {
+      try {
+        profilePicUrl = await this.s3Service.uploadFile(profilePic);
+      } catch (error) {
+        console.log('S3 upload failed, falling back to local storage:', error.message);
+        // Fallback to local storage
+        const uploadsDir = require('path').join(__dirname, '..', '..', 'public', 'uploads');
+        const fs = require('fs');
+        const { v4: uuidv4 } = require('uuid');
+        
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        
+        const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
+        const filePath = require('path').join(uploadsDir, uniqueFileName);
+        fs.writeFileSync(filePath, profilePic.buffer);
+        profilePicUrl = `/uploads/${uniqueFileName}`;
+      }
+    }
+
+    // Create user with profile picture URL
+    const createUserDto: CreateUserDto = {
+      ...userData,
+      profilePic: profilePicUrl,
+    };
+
+    return this.usersService.createUser(createUserDto);
   }
 
   @ApiBearerAuth()
@@ -110,5 +187,64 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })
   async verifyOTP(@Body() body: { email: string; otp: string }) {
     return this.usersService.verifyOTP(body.email, body.otp);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Post('profile-picture')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update user profile picture',
+    schema: {
+      type: 'object',
+      properties: {
+        profilePic: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile picture file (JPG, PNG, WebP supported)',
+        },
+      },
+      required: ['profilePic'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Profile picture updated' })
+  @UseInterceptors(FileInterceptor('profilePic'))
+  async updateProfilePicture(
+    @Request() req: any,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|webp)' }),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    profilePic: Express.Multer.File,
+  ) {
+    // Upload profile picture
+    let profilePicUrl: string;
+    try {
+      profilePicUrl = await this.s3Service.uploadFile(profilePic);
+    } catch (error) {
+      console.log('S3 upload failed, falling back to local storage:', error.message);
+      // Fallback to local storage
+      const uploadsDir = require('path').join(__dirname, '..', '..', 'public', 'uploads');
+      const fs = require('fs');
+      const { v4: uuidv4 } = require('uuid');
+      
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
+      const filePath = require('path').join(uploadsDir, uniqueFileName);
+      fs.writeFileSync(filePath, profilePic.buffer);
+      profilePicUrl = `/uploads/${uniqueFileName}`;
+    }
+
+    // Update user profile picture
+    return this.usersService.updateUser(req.user.id, { profilePic: profilePicUrl });
   }
 }

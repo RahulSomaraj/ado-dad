@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
+  IsUrl,
 } from 'class-validator';
 import { UserType } from '../enums/user.types';
 
@@ -14,30 +15,38 @@ export class UpdateUserDto {
   @IsString()
   @IsNotEmpty()
   @IsOptional()
-  name: string;
+  name?: string;
 
   @ApiPropertyOptional({ example: '+123456789' })
   @IsString()
   @IsNotEmpty()
   @IsPhoneNumber('IN')
   @IsOptional()
-  phoneNumber: string;
+  phoneNumber?: string;
 
   @ApiPropertyOptional({ example: 'john@example.com' })
   @IsEmail()
   @IsNotEmpty()
   @IsOptional()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional({ example: 'password123' })
   @IsString()
   @IsNotEmpty()
   @IsOptional()
-  password: string;
+  password?: string;
 
   @ApiPropertyOptional({ example: 'SA', enum: UserType })
   @IsEnum(UserType)
   @IsNotEmpty()
   @IsOptional()
-  type: UserType;
+  type?: UserType;
+
+  @ApiPropertyOptional({ 
+    example: 'https://example.com/profile.jpg',
+    description: 'Profile picture URL (optional)',
+  })
+  @IsOptional()
+  @IsUrl()
+  profilePic?: string;
 }

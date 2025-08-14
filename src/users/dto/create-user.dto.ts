@@ -5,10 +5,48 @@ import {
   IsEnum,
   IsNotEmpty,
   IsOptional,
+  IsUrl,
 } from 'class-validator';
 import { UserType } from '../enums/user.types';
 
 export class CreateUserDto {
+  @ApiProperty({ example: 'John Doe' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ example: '+123456789' })
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: 'password123' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @ApiProperty({ example: 'SA', enum: UserType })
+  @IsEnum(UserType)
+  @IsNotEmpty()
+  type: UserType;
+
+  @ApiProperty({ 
+    example: 'https://example.com/profile.jpg',
+    description: 'Profile picture URL (optional)',
+    required: false 
+  })
+  @IsOptional()
+  @IsUrl()
+  profilePic?: string;
+}
+
+// DTO for creating user with file upload
+export class CreateUserWithFileDto {
   @ApiProperty({ example: 'John Doe' })
   @IsString()
   @IsNotEmpty()
