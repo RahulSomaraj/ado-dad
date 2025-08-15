@@ -98,3 +98,4 @@ async function testSwaggerManufacturer() {
 }
 
 testSwaggerManufacturer();
+

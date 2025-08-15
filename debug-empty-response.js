@@ -1,133 +1,50 @@
 const axios = require('axios');
 
+const BASE_URL = 'http://localhost:5001';
+
 async function debugEmptyResponse() {
+  console.log('🔍 DEBUGGING EMPTY RESPONSE...\n');
+  
   try {
-    console.log('🔍 Debugging Empty Response...\n');
+    // Test 1: Get all ads without any filters
+    console.log('1️⃣ Testing: GET /ads (no filters)');
+    const response1 = await axios.get(`${BASE_URL}/ads`, {
+      timeout: 10000
+    });
     
-    const baseURL = 'http://localhost:5001';
-    const manufacturerId = '686fb37cab966c7e18f263f8';
-
-    // Test 1: Get all ads and check their manufacturerIds
-    console.log('1. Checking all ads for manufacturerId...');
+    console.log(`   Status: ${response1.status}`);
+    console.log(`   Response:`, JSON.stringify(response1.data, null, 2));
+    
+    // Test 2: Check if server is running
+    console.log('\n2️⃣ Testing: Server health');
     try {
-      const allAdsResponse = await axios.get(`${baseURL}/ads?limit=50`);
-      console.log(`✅ Found ${allAdsResponse.data.total} ads total`);
-      
-      const vehicleAds = allAdsResponse.data.data.filter(ad => 
-        ad.category === 'private_vehicle' || ad.category === 'commercial_vehicle'
-      );
-      
-      console.log(`📊 Vehicle ads found: ${vehicleAds.length}`);
-      
-      // Check each vehicle ad for manufacturerId
-      vehicleAds.forEach((ad, index) => {
-        console.log(`\n   Ad ${index + 1}:`);
-        console.log(`   ID: ${ad.id}`);
-        console.log(`   Category: ${ad.category}`);
-        
-        if (ad.vehicleDetails && ad.vehicleDetails.length > 0) {
-          const vehicleDetail = ad.vehicleDetails[0];
-          console.log(`   Manufacturer ID: ${vehicleDetail.manufacturerId}`);
-          console.log(`   Model ID: ${vehicleDetail.modelId}`);
-          console.log(`   Year: ${vehicleDetail.year}`);
-          
-          // Check if this matches our target
-          if (vehicleDetail.manufacturerId === manufacturerId) {
-            console.log(`   ✅ MATCHES TARGET MANUFACTURER!`);
-          }
-        } else {
-          console.log(`   ❌ No vehicleDetails found`);
-        }
+      const healthResponse = await axios.get(`${BASE_URL}/health`, {
+        timeout: 5000
       });
+      console.log(`   Health Status: ${healthResponse.status}`);
     } catch (error) {
-      console.log('❌ Error getting all ads:', error.response?.data || error.message);
+      console.log(`   Health Check Failed: ${error.message}`);
     }
-
-    // Test 2: Check the specific Honda City ad
-    console.log('\n2. Checking specific Honda City ad...');
-    try {
-      const hondaAdId = '689db5ad4ac1b812b8257ea4';
-      const hondaResponse = await axios.get(`${baseURL}/ads/${hondaAdId}`);
-      
-      console.log('✅ Honda City ad details:');
-      console.log(`   ID: ${hondaResponse.data.id}`);
-      console.log(`   Category: ${hondaResponse.data.category}`);
-      
-      if (hondaResponse.data.vehicleDetails && hondaResponse.data.vehicleDetails.length > 0) {
-        const vehicleDetail = hondaResponse.data.vehicleDetails[0];
-        console.log(`   Manufacturer ID: ${vehicleDetail.manufacturerId}`);
-        console.log(`   Model ID: ${vehicleDetail.modelId}`);
-        console.log(`   Year: ${vehicleDetail.year}`);
-        
-        // Check if manufacturerId matches
-        if (vehicleDetail.manufacturerId === manufacturerId) {
-          console.log(`   ✅ Manufacturer ID matches target`);
-        } else {
-          console.log(`   ❌ Manufacturer ID does NOT match target`);
-          console.log(`   Expected: ${manufacturerId}`);
-          console.log(`   Actual: ${vehicleDetail.manufacturerId}`);
-        }
-      }
-    } catch (error) {
-      console.log('❌ Error getting Honda City ad:', error.response?.data || error.message);
-    }
-
-    // Test 3: Test the filter with different approaches
-    console.log('\n3. Testing filter with different approaches...');
     
-    const filterTests = [
-      { name: 'Basic manufacturerId filter', url: `${baseURL}/ads?manufacturerId=${manufacturerId}` },
-      { name: 'With category filter', url: `${baseURL}/ads?category=private_vehicle&manufacturerId=${manufacturerId}` },
-      { name: 'With limit', url: `${baseURL}/ads?manufacturerId=${manufacturerId}&limit=10` },
-      { name: 'URL encoded', url: `${baseURL}/ads?manufacturerId=${encodeURIComponent(manufacturerId)}` }
-    ];
-
-    for (const test of filterTests) {
-      try {
-        const response = await axios.get(test.url);
-        console.log(`✅ ${test.name}:`);
-        console.log(`   URL: ${test.url}`);
-        console.log(`   Status: ${response.status}`);
-        console.log(`   Data length: ${response.data.data.length}`);
-        console.log(`   Total: ${response.data.total}`);
-        
-        if (response.data.data.length > 0) {
-          console.log(`   First ad ID: ${response.data.data[0].id}`);
-        }
-      } catch (error) {
-        console.log(`❌ ${test.name}: ${error.response?.status || error.message}`);
-      }
-    }
-
-    // Test 4: Check if there's a data type issue
-    console.log('\n4. Checking for data type issues...');
+    // Test 3: Check database directly
+    console.log('\n3️⃣ Testing: Direct database check');
     try {
-      const allAdsResponse = await axios.get(`${baseURL}/ads?limit=10`);
-      const vehicleAds = allAdsResponse.data.data.filter(ad => 
-        ad.vehicleDetails && ad.vehicleDetails.length > 0
-      );
-      
-      if (vehicleAds.length > 0) {
-        const sampleVehicle = vehicleAds[0];
-        const manufacturerIdInDb = sampleVehicle.vehicleDetails[0].manufacturerId;
-        
-        console.log('📊 Data type analysis:');
-        console.log(`   Target manufacturerId type: ${typeof manufacturerId}`);
-        console.log(`   Target manufacturerId value: ${manufacturerId}`);
-        console.log(`   DB manufacturerId type: ${typeof manufacturerIdInDb}`);
-        console.log(`   DB manufacturerId value: ${manufacturerIdInDb}`);
-        console.log(`   Strict equality: ${manufacturerId === manufacturerIdInDb}`);
-        console.log(`   Loose equality: ${manufacturerId == manufacturerIdInDb}`);
-      }
+      const dbResponse = await axios.get(`${BASE_URL}/ads/count`, {
+        timeout: 5000
+      });
+      console.log(`   Database Count:`, JSON.stringify(dbResponse.data, null, 2));
     } catch (error) {
-      console.log('❌ Error checking data types:', error.response?.data || error.message);
+      console.log(`   Database Check Failed: ${error.message}`);
     }
-
-    console.log('\n✅ Debugging completed!');
     
   } catch (error) {
-    console.error('❌ Debug failed:', error.message);
+    console.log(`❌ Error: ${error.message}`);
+    if (error.response) {
+      console.log(`   Status: ${error.response.status}`);
+      console.log(`   Data:`, JSON.stringify(error.response.data, null, 2));
+    }
   }
 }
 
 debugEmptyResponse();
+

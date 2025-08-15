@@ -140,6 +140,8 @@ export class AdsService {
       search,
     } = filters;
   
+    console.log('🔍 DEBUG: findAll called with filters:', JSON.stringify(filters, null, 2));
+  
     const pipeline: any[] = [];
   
     // 🔍 Text Search
@@ -162,6 +164,7 @@ export class AdsService {
       matchStage.postedBy = new Types.ObjectId(filters.postedBy);
     }
   
+    console.log('🔍 DEBUG: Initial matchStage:', JSON.stringify(matchStage, null, 2));
     pipeline.push({ $match: matchStage });
   
     // 👤 User lookup
@@ -254,9 +257,9 @@ export class AdsService {
       
       const vehicleMatch: any = {};
       if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
-      if (filters.manufacturerId) vehicleMatch.manufacturerId = new Types.ObjectId(filters.manufacturerId);
-      if (filters.modelId) vehicleMatch.modelId = new Types.ObjectId(filters.modelId);
-      if (filters.variantId) vehicleMatch.variantId = new Types.ObjectId(filters.variantId);
+      if (filters.manufacturerId) vehicleMatch.manufacturerId = filters.manufacturerId;
+      if (filters.modelId) vehicleMatch.modelId = filters.modelId;
+      if (filters.variantId) vehicleMatch.variantId = filters.variantId;
       if (filters.transmissionTypeId) vehicleMatch.transmissionTypeId = new Types.ObjectId(filters.transmissionTypeId);
       if (filters.fuelTypeId) vehicleMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
       if (filters.color) vehicleMatch.color = { $regex: filters.color, $options: 'i' };
@@ -310,8 +313,10 @@ export class AdsService {
   
     // 📊 Count total
     const countPipeline = [...pipeline, { $count: 'total' }];
+    console.log('🔍 DEBUG: Count pipeline:', JSON.stringify(countPipeline, null, 2));
     const countResult = await this.adModel.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
+    console.log('🔍 DEBUG: Total count result:', total);
   
     // 📦 Pagination & sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
@@ -319,8 +324,13 @@ export class AdsService {
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
   
+    console.log('🔍 DEBUG: Final pipeline length:', pipeline.length);
+    console.log('🔍 DEBUG: Final pipeline:', JSON.stringify(pipeline, null, 2));
+  
     // 🚀 Fetch ads
     const ads = await this.adModel.aggregate(pipeline);
+    console.log('🔍 DEBUG: Raw ads result length:', ads.length);
+    console.log('🔍 DEBUG: First ad sample:', ads.length > 0 ? JSON.stringify(ads[0], null, 2) : 'No ads found');
   
     return {
       data: ads.map((ad) => {
