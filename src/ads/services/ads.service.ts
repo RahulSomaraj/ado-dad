@@ -250,7 +250,7 @@ export class AdsService {
     }
   
     // 🚗 Vehicle filters (only apply if vehicle filters are provided)
-    if (filters.vehicleType || filters.manufacturerId || filters.modelId || filters.variantId ||
+    if (filters.vehicleType || filters.manufacturerId || filters.manufacturerIds || filters.modelId || filters.variantId ||
         filters.transmissionTypeId || filters.fuelTypeId || filters.color || filters.maxMileage !== undefined ||
         filters.isFirstOwner !== undefined || filters.hasInsurance !== undefined || filters.hasRcBook !== undefined ||
         filters.minYear || filters.maxYear) {
@@ -258,6 +258,9 @@ export class AdsService {
       const vehicleMatch: any = {};
       if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
       if (filters.manufacturerId) vehicleMatch.manufacturerId = filters.manufacturerId;
+      if (filters.manufacturerIds && filters.manufacturerIds.length > 0) {
+        vehicleMatch.manufacturerId = { $in: filters.manufacturerIds };
+      }
       if (filters.modelId) vehicleMatch.modelId = filters.modelId;
       if (filters.variantId) vehicleMatch.variantId = filters.variantId;
       if (filters.transmissionTypeId) vehicleMatch.transmissionTypeId = new Types.ObjectId(filters.transmissionTypeId);

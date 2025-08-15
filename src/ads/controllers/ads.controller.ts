@@ -204,6 +204,13 @@ export class AdsController {
     description: 'Manufacturer ID filter',
   })
   @ApiQuery({
+    name: 'manufacturerIds',
+    required: false,
+    type: [String],
+    description: 'Array of Manufacturer IDs filter (comma-separated)',
+    example: '507f1f77bcf86cd799439011,507f1f77bcf86cd799439012',
+  })
+  @ApiQuery({
     name: 'modelId',
     required: false,
     type: String,

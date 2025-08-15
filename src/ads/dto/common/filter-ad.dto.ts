@@ -4,6 +4,7 @@ import {
   IsString,
   IsNumber,
   IsBoolean,
+  IsArray,
   Min,
   Max,
 } from 'class-validator';
@@ -246,6 +247,22 @@ export class FilterAdDto {
   @IsOptional()
   @IsString()
   manufacturerId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Array of Manufacturer IDs filter (MongoDB ObjectIds)',
+    type: [String],
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.split(',').map(id => id.trim());
+    }
+    return value;
+  })
+  @IsArray()
+  @IsString({ each: true })
+  manufacturerIds?: string[];
 
   @ApiPropertyOptional({
     description: 'Model ID filter (MongoDB ObjectId)',
