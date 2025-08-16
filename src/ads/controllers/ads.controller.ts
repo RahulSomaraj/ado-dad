@@ -56,7 +56,7 @@ export class AdsController {
     private readonly vehicleInventoryService: VehicleInventoryService,
   ) {}
 
-  @Get('list')
+  @Get()
   @ApiOperation({
     summary: 'Get all advertisements with advanced filtering',
     description: `
