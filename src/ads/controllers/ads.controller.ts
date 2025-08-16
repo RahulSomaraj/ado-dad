@@ -56,288 +56,50 @@ export class AdsController {
     private readonly vehicleInventoryService: VehicleInventoryService,
   ) {}
 
-  @Get()
+  @Get('list')
   @ApiOperation({
-    summary:
-      'Get all advertisements with comprehensive filtering and pagination',
-    description:
-      'Retrieve advertisements with advanced filtering capabilities. Supports filtering by category, price range, location, search terms, and category-specific filters. All filters are optional and can be combined for precise results.',
+    summary: 'Get all advertisements with advanced filtering',
+    description: `
+      Retrieve advertisements with comprehensive filtering capabilities.
+      
+      **Features:**
+      - Full-text search across title and description
+      - Category-specific filtering (Property, Vehicle, Commercial Vehicle)
+      - Price range filtering
+      - Location-based filtering
+      - Advanced vehicle filtering (manufacturer, model, variant, year, etc.)
+      - Property-specific filtering (bedrooms, bathrooms, area, amenities)
+      - Commercial vehicle filtering (payload, axles, permits, etc.)
+      - Pagination and sorting
+      - All filters are optional and can be combined
+      
+      **Response includes:**
+      - Advertisement details
+      - User information (name, email, phone)
+      - Category-specific details
+      - Vehicle inventory data (for vehicle ads)
+      - Pagination metadata
+    `,
   })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    enum: ['property', 'private_vehicle', 'commercial_vehicle', 'two_wheeler'],
-    description: 'Filter by advertisement category',
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Search in title and description (text search)',
-  })
-  @ApiQuery({
-    name: 'location',
-    required: false,
-    type: String,
-    description: 'Filter by location (partial match)',
-  })
-  @ApiQuery({
-    name: 'minPrice',
-    required: false,
-    type: Number,
-    description: 'Minimum price filter',
-  })
-  @ApiQuery({
-    name: 'maxPrice',
-    required: false,
-    type: Number,
-    description: 'Maximum price filter',
-  })
-  @ApiQuery({
-    name: 'postedBy',
-    required: false,
-    type: String,
-    description: 'Filter by user who posted the advertisement',
-  })
-  @ApiQuery({
-    name: 'isActive',
-    required: false,
-    type: Boolean,
-    description: 'Filter by advertisement status (active/inactive)',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number for pagination (default: 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Items per page (default: 20, max: 100)',
-  })
-  @ApiQuery({
-    name: 'sortBy',
-    required: false,
-    enum: ['price', 'postedAt', 'title', 'createdAt', 'updatedAt'],
-    description: 'Sort by field (default: postedAt)',
-  })
-  @ApiQuery({
-    name: 'sortOrder',
-    required: false,
-    enum: ['ASC', 'DESC'],
-    description: 'Sort order (default: DESC)',
-  })
-  // Property-specific filters
-  @ApiQuery({
-    name: 'propertyType',
-    required: false,
-    enum: ['apartment', 'house', 'villa', 'plot', 'commercial'],
-    description: 'Property type filter',
-  })
-  @ApiQuery({
-    name: 'minBedrooms',
-    required: false,
-    type: Number,
-    description: 'Minimum number of bedrooms',
-  })
-  @ApiQuery({
-    name: 'maxBedrooms',
-    required: false,
-    type: Number,
-    description: 'Maximum number of bedrooms',
-  })
-  @ApiQuery({
-    name: 'minBathrooms',
-    required: false,
-    type: Number,
-    description: 'Minimum number of bathrooms',
-  })
-  @ApiQuery({
-    name: 'maxBathrooms',
-    required: false,
-    type: Number,
-    description: 'Maximum number of bathrooms',
-  })
-  @ApiQuery({
-    name: 'minArea',
-    required: false,
-    type: Number,
-    description: 'Minimum area in square feet',
-  })
-  @ApiQuery({
-    name: 'maxArea',
-    required: false,
-    type: Number,
-    description: 'Maximum area in square feet',
-  })
-  @ApiQuery({
-    name: 'isFurnished',
-    required: false,
-    type: Boolean,
-    description: 'Filter by furnished status',
-  })
-  @ApiQuery({
-    name: 'hasParking',
-    required: false,
-    type: Boolean,
-    description: 'Filter by parking availability',
-  })
-  @ApiQuery({
-    name: 'hasGarden',
-    required: false,
-    type: Boolean,
-    description: 'Filter by garden availability',
-  })
-  // Vehicle-specific filters
-  @ApiQuery({
-    name: 'vehicleType',
-    required: false,
-    enum: ['two_wheeler', 'four_wheeler'],
-    description: 'Vehicle type filter',
-  })
-  @ApiQuery({
-    name: 'manufacturerId',
-    required: false,
-    type: String,
-    description: 'Manufacturer ID filter',
-  })
-  @ApiQuery({
-    name: 'manufacturerIds',
-    required: false,
-    type: [String],
-    description: 'Array of Manufacturer IDs filter (comma-separated)',
-    example: '507f1f77bcf86cd799439011,507f1f77bcf86cd799439012',
-  })
-  @ApiQuery({
-    name: 'modelId',
-    required: false,
-    type: String,
-    description: 'Model ID filter',
-  })
-  @ApiQuery({
-    name: 'variantId',
-    required: false,
-    type: String,
-    description: 'Variant ID filter',
-  })
-  @ApiQuery({
-    name: 'minYear',
-    required: false,
-    type: Number,
-    description: 'Minimum manufacturing year',
-  })
-  @ApiQuery({
-    name: 'maxYear',
-    required: false,
-    type: Number,
-    description: 'Maximum manufacturing year',
-  })
-  @ApiQuery({
-    name: 'maxMileage',
-    required: false,
-    type: Number,
-    description: 'Maximum mileage',
-  })
-  @ApiQuery({
-    name: 'transmissionTypeId',
-    required: false,
-    type: String,
-    description: 'Transmission type ID filter',
-  })
-  @ApiQuery({
-    name: 'fuelTypeId',
-    required: false,
-    type: String,
-    description: 'Fuel type ID filter',
-  })
-  @ApiQuery({
-    name: 'color',
-    required: false,
-    type: String,
-    description: 'Vehicle color filter',
-  })
-  @ApiQuery({
-    name: 'isFirstOwner',
-    required: false,
-    type: Boolean,
-    description: 'Filter by first owner status',
-  })
-  @ApiQuery({
-    name: 'hasInsurance',
-    required: false,
-    type: Boolean,
-    description: 'Filter by insurance status',
-  })
-  @ApiQuery({
-    name: 'hasRcBook',
-    required: false,
-    type: Boolean,
-    description: 'Filter by RC book availability',
-  })
-  // Commercial vehicle-specific filters
-  @ApiQuery({
-    name: 'commercialVehicleType',
-    required: false,
-    enum: ['truck', 'bus', 'tractor', 'trailer', 'other'],
-    description: 'Commercial vehicle type filter',
-  })
-  @ApiQuery({
-    name: 'bodyType',
-    required: false,
-    enum: ['flatbed', 'container', 'tanker', 'pickup', 'passenger', 'other'],
-    description: 'Body type filter',
-  })
-  @ApiQuery({
-    name: 'minPayloadCapacity',
-    required: false,
-    type: Number,
-    description: 'Minimum payload capacity',
-  })
-  @ApiQuery({
-    name: 'maxPayloadCapacity',
-    required: false,
-    type: Number,
-    description: 'Maximum payload capacity',
-  })
-  @ApiQuery({
-    name: 'axleCount',
-    required: false,
-    type: Number,
-    description: 'Number of axles filter',
-  })
-  @ApiQuery({
-    name: 'hasFitness',
-    required: false,
-    type: Boolean,
-    description: 'Filter by fitness certificate status',
-  })
-  @ApiQuery({
-    name: 'hasPermit',
-    required: false,
-    type: Boolean,
-    description: 'Filter by permit status',
-  })
-  @ApiQuery({
-    name: 'minSeatingCapacity',
-    required: false,
-    type: Number,
-    description: 'Minimum seating capacity',
-  })
-  @ApiQuery({
-    name: 'maxSeatingCapacity',
-    required: false,
-    type: Number,
-    description: 'Maximum seating capacity',
-  })
+  // ===== BASIC FILTERS =====
+
+  // ===== RESPONSES =====
   @ApiResponse({
     status: 200,
-    description:
-      'Advertisements retrieved successfully with comprehensive filtering',
+    description: 'Advertisements retrieved successfully',
     type: PaginatedDetailedAdResponseDto,
   })
-  async getAllAds(@Query() filterDto: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid filter parameters',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+  })
+  async getAllAds(
+    @Query() filterDto: FilterAdDto,
+  ): Promise<PaginatedDetailedAdResponseDto> {
     return this.adsService.findAll(filterDto);
   }
 
@@ -608,7 +370,10 @@ export class AdsController {
       console.log('Creating advertisement for user:', req.user._id);
       console.log('Advertisement category:', createAdDto.category);
 
-      const result = await this.adsService.createAd(createAdDto, req.user._id.toString());
+      const result = await this.adsService.createAd(
+        createAdDto,
+        req.user._id.toString(),
+      );
 
       console.log('Advertisement created successfully with ID:', result.id);
       return result;
