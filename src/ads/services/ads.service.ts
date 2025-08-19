@@ -216,6 +216,15 @@ export class AdsService {
       },
     });
 
+    // 🚛 Ensure commercial vehicle ads have details
+    if (filters.category === 'commercial_vehicle') {
+      pipeline.push({
+        $match: {
+          commercialVehicleDetails: { $ne: [] }
+        }
+      });
+    }
+
     // 🏠 Property filters (only apply if property filters are provided)
     if (filters.propertyType || filters.minBedrooms || filters.maxBedrooms || 
         filters.minBathrooms || filters.maxBathrooms || filters.minArea || filters.maxArea ||
@@ -249,18 +258,16 @@ export class AdsService {
       });
     }
   
-    // 🚗 Vehicle filters (only apply if vehicle filters are provided)
-    if (filters.vehicleType || filters.manufacturerId || filters.manufacturerIds || filters.modelId || filters.variantId ||
-        filters.transmissionTypeId || filters.fuelTypeId || filters.color || filters.maxMileage !== undefined ||
+    // 🚗 Vehicle filters (only apply if vehicle filters are provided AND category is not commercial_vehicle)
+    if ((filters.vehicleType || filters.manufacturerId || filters.modelId || filters.variantId ||
+        filters.transmissionTypeId || filters.fuelTypeId || 
+        filters.color || filters.maxMileage !== undefined ||
         filters.isFirstOwner !== undefined || filters.hasInsurance !== undefined || filters.hasRcBook !== undefined ||
-        filters.minYear || filters.maxYear) {
+        filters.minYear || filters.maxYear) && filters.category !== 'commercial_vehicle') {
       
       const vehicleMatch: any = {};
       if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
       if (filters.manufacturerId) vehicleMatch.manufacturerId = filters.manufacturerId;
-      if (filters.manufacturerIds && filters.manufacturerIds.length > 0) {
-        vehicleMatch.manufacturerId = { $in: filters.manufacturerIds };
-      }
       if (filters.modelId) vehicleMatch.modelId = filters.modelId;
       if (filters.variantId) vehicleMatch.variantId = filters.variantId;
       if (filters.transmissionTypeId) vehicleMatch.transmissionTypeId = new Types.ObjectId(filters.transmissionTypeId);
@@ -286,13 +293,36 @@ export class AdsService {
     }
 
     // 🚛 Commercial vehicle filters (only apply if commercial vehicle filters are provided)
+    console.log('🔍 DEBUG: Checking commercial vehicle filters:', {
+      commercialVehicleType: filters.commercialVehicleType,
+      bodyType: filters.bodyType,
+      manufacturerId: filters.manufacturerId,
+      modelId: filters.modelId,
+      variantId: filters.variantId,
+      transmissionTypeId: filters.transmissionTypeId,
+      fuelTypeId: filters.fuelTypeId,
+      color: filters.color
+    });
+    
     if (filters.commercialVehicleType || filters.bodyType || filters.minPayloadCapacity || filters.maxPayloadCapacity ||
         filters.axleCount || filters.hasFitness !== undefined || filters.hasPermit !== undefined ||
-        filters.minSeatingCapacity || filters.maxSeatingCapacity) {
+        filters.minSeatingCapacity || filters.maxSeatingCapacity || filters.manufacturerId ||
+        filters.modelId || filters.variantId || filters.transmissionTypeId || 
+        filters.fuelTypeId || filters.color ||
+        filters.minYear || filters.maxYear || filters.maxMileage !== undefined) {
+      
+      console.log('🔍 DEBUG: Commercial vehicle filter condition triggered');
       
       const commercialMatch: any = {};
       if (filters.commercialVehicleType) commercialMatch.commercialVehicleType = filters.commercialVehicleType;
       if (filters.bodyType) commercialMatch.bodyType = filters.bodyType;
+      if (filters.manufacturerId) commercialMatch.manufacturerId = filters.manufacturerId;
+      if (filters.modelId) commercialMatch.modelId = filters.modelId;
+      if (filters.variantId) commercialMatch.variantId = filters.variantId;
+      if (filters.transmissionTypeId) commercialMatch.transmissionTypeId = filters.transmissionTypeId;
+      if (filters.fuelTypeId) commercialMatch.fuelTypeId = filters.fuelTypeId;
+      if (filters.color) commercialMatch.color = { $regex: filters.color, $options: 'i' };
+      if (filters.maxMileage !== undefined) commercialMatch.mileage = { $lte: filters.maxMileage };
       if (filters.minPayloadCapacity || filters.maxPayloadCapacity) {
         commercialMatch.payloadCapacity = {};
         if (filters.minPayloadCapacity) commercialMatch.payloadCapacity.$gte = filters.minPayloadCapacity;
@@ -306,12 +336,21 @@ export class AdsService {
         if (filters.minSeatingCapacity) commercialMatch.seatingCapacity.$gte = filters.minSeatingCapacity;
         if (filters.maxSeatingCapacity) commercialMatch.seatingCapacity.$lte = filters.maxSeatingCapacity;
       }
+      
+      // Year filter
+      if (filters.minYear || filters.maxYear) {
+        commercialMatch.year = {};
+        if (filters.minYear) commercialMatch.year.$gte = Number(filters.minYear);
+        if (filters.maxYear) commercialMatch.year.$lte = Number(filters.maxYear);
+      }
 
+      console.log('🔍 DEBUG: Commercial vehicle match object:', commercialMatch);
       pipeline.push({
         $match: {
           commercialVehicleDetails: { $elemMatch: commercialMatch },
         },
       });
+      console.log('🔍 DEBUG: Commercial vehicle filter added to pipeline');
     }
   
     // 📊 Count total
@@ -1160,7 +1199,11 @@ export class AdsService {
     data: any,
     userId: string,
   ): Promise<AdResponseDto> {
+    console.log('🚛 Starting commercial vehicle ad creation...');
+    
+    // Validate vehicle inventory references first
     await this.validateVehicleInventoryReferences(data);
+    
     // Fetch model name for title
     const model = await this.vehicleInventoryService.findVehicleModelById(
       data.modelId,
@@ -1169,43 +1212,83 @@ export class AdsService {
     const year = data.year || '';
     const title = `${modelName} ${year}`.trim();
 
-    const ad = new this.adModel({
-      title,
-      description: data.description,
-      price: data.price,
-      images: data.images || [],
-      location: data.location,
-      postedBy: new Types.ObjectId(userId),
-      category: AdCategory.COMMERCIAL_VEHICLE,
-    });
+    console.log('🔍 Creating commercial vehicle ad with title:', title);
 
-    const savedAd = await ad.save();
+    // Use database transaction to ensure data consistency
+    const session = await this.adModel.startSession();
+    session.startTransaction();
 
-    const commercialVehicleAd = new this.commercialVehicleAdModel({
-      ad: savedAd._id as any,
-      commercialVehicleType: data.commercialVehicleType,
-      bodyType: data.bodyType,
-      manufacturerId: data.manufacturerId,
-      modelId: data.modelId,
-      variantId: data.variantId,
-      year: data.year,
-      mileage: data.mileage,
-      payloadCapacity: data.payloadCapacity,
-      payloadUnit: data.payloadUnit,
-      axleCount: data.axleCount,
-      transmissionTypeId: data.transmissionTypeId,
-      fuelTypeId: data.fuelTypeId,
-      color: data.color,
-      hasInsurance: data.hasInsurance,
-      hasFitness: data.hasFitness,
-      hasPermit: data.hasPermit,
-      additionalFeatures: data.additionalFeatures || [],
-      seatingCapacity: data.seatingCapacity,
-    });
+    try {
+      // Create the main ad document
+      const ad = new this.adModel({
+        title,
+        description: data.description,
+        price: data.price,
+        images: data.images || [],
+        location: data.location,
+        postedBy: new Types.ObjectId(userId),
+        category: AdCategory.COMMERCIAL_VEHICLE,
+      });
 
-    await commercialVehicleAd.save();
+      console.log('💾 Saving main ad document...');
+      const savedAd = await ad.save({ session });
+      console.log('✅ Main ad saved with ID:', savedAd._id);
 
-    return this.findOne((savedAd._id as any).toString());
+      // Create the commercial vehicle-specific details
+      const commercialVehicleAd = new this.commercialVehicleAdModel({
+        ad: savedAd._id as Types.ObjectId,
+        commercialVehicleType: data.commercialVehicleType,
+        bodyType: data.bodyType,
+        manufacturerId: new Types.ObjectId(data.manufacturerId),
+        modelId: new Types.ObjectId(data.modelId),
+        variantId: data.variantId ? new Types.ObjectId(data.variantId) : undefined,
+        year: data.year,
+        mileage: data.mileage,
+        payloadCapacity: data.payloadCapacity,
+        payloadUnit: data.payloadUnit,
+        axleCount: data.axleCount,
+        transmissionTypeId: new Types.ObjectId(data.transmissionTypeId),
+        fuelTypeId: new Types.ObjectId(data.fuelTypeId),
+        color: data.color,
+        hasInsurance: data.hasInsurance || false,
+        hasFitness: data.hasFitness || false,
+        hasPermit: data.hasPermit || false,
+        additionalFeatures: data.additionalFeatures || [],
+        seatingCapacity: data.seatingCapacity,
+      });
+
+      console.log('💾 Saving commercial vehicle details...');
+      await commercialVehicleAd.save({ session });
+      console.log('✅ Commercial vehicle details saved');
+
+      // Commit the transaction
+      await session.commitTransaction();
+      console.log('✅ Transaction committed successfully');
+
+      // Verify the ad exists in the main collection
+      const verifyAd = await this.adModel.findById(savedAd._id);
+      if (!verifyAd) {
+        throw new Error('Ad was not properly saved to the main collection');
+      }
+      console.log('✅ Ad verified in main collection');
+
+      // Return the created ad
+      const result = await this.findOne((savedAd._id as Types.ObjectId).toString());
+      console.log('✅ Commercial vehicle ad creation completed successfully');
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error creating commercial vehicle ad:', error);
+      
+      // Rollback the transaction
+      await session.abortTransaction();
+      console.log('🔄 Transaction rolled back');
+      
+      throw error;
+    } finally {
+      session.endSession();
+      console.log('🔌 Session ended');
+    }
   }
 
   private async createTwoWheelerAdFromUnified(

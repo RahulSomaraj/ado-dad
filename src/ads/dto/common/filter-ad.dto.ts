@@ -248,21 +248,7 @@ export class FilterAdDto {
   @IsString()
   manufacturerId?: string;
 
-  @ApiPropertyOptional({
-    description: 'Array of Manufacturer IDs filter (MongoDB ObjectIds)',
-    type: [String],
-    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
-  })
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.split(',').map(id => id.trim());
-    }
-    return value;
-  })
-  @IsArray()
-  @IsString({ each: true })
-  manufacturerIds?: string[];
+
 
   @ApiPropertyOptional({
     description: 'Model ID filter (MongoDB ObjectId)',
@@ -321,6 +307,8 @@ export class FilterAdDto {
   @IsString()
   transmissionTypeId?: string;
 
+
+
   @ApiPropertyOptional({
     description: 'Fuel type ID filter (MongoDB ObjectId)',
     example: '507f1f77bcf86cd799439015',
@@ -328,6 +316,8 @@ export class FilterAdDto {
   @IsOptional()
   @IsString()
   fuelTypeId?: string;
+
+
 
   @ApiPropertyOptional({
     description: 'Vehicle color filter (partial match)',
@@ -457,4 +447,51 @@ export class FilterAdDto {
   @IsNumber()
   @Min(1)
   maxSeatingCapacity?: number;
+}
+
+export class FilterVehicleModelsDto {
+  @ApiPropertyOptional({
+    description: 'Filter by manufacturer ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsOptional()
+  @IsString()
+  manufacturerId?: string;
+}
+
+export class FilterVehicleVariantsDto {
+  @ApiPropertyOptional({
+    description: 'Filter by model ID',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @IsOptional()
+  @IsString()
+  modelId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by fuel type ID',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @IsOptional()
+  @IsString()
+  fuelTypeId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by transmission type ID',
+    example: '507f1f77bcf86cd799439014',
+  })
+  @IsOptional()
+  @IsString()
+  transmissionTypeId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by maximum price',
+    minimum: 0,
+    example: 1000000,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
 }

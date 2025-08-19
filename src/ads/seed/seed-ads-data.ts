@@ -692,7 +692,7 @@ export class AdsSeedService {
 
       const commercialVehicleAd = new this.commercialVehicleAdModel({
         ad: savedAd._id,
-        vehicleType: getRandomElement(vehicleTypes),
+        commercialVehicleType: getRandomElement(vehicleTypes),
         bodyType: getRandomElement(bodyTypes),
         manufacturerId: getRandomElement(manufacturerIds),
         modelId: getRandomElement(modelIds),

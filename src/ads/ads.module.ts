@@ -7,6 +7,7 @@ import { LookupController } from './controllers/lookup.controller';
 
 // Services
 import { AdsService } from './services/ads.service';
+import { DataValidationService } from './services/data-validation.service';
 import { LookupService } from './services/lookup.service';
 import { AdsSeedService } from './seed/seed-ads-data';
 import { CommercialVehicleDetectionService } from './services/commercial-vehicle-detection.service';
@@ -45,6 +46,7 @@ import { RedisService } from '../shared/redis.service';
   controllers: [AdsController, LookupController],
   providers: [
     AdsService,
+    DataValidationService,
     LookupService,
     AdsSeedService,
     CommercialVehicleDetectionService,

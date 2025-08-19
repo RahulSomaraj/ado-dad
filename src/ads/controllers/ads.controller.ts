@@ -6,7 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  Query,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
@@ -23,11 +22,11 @@ import {
   ApiConsumes,
   ApiBody,
   ApiParam,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AdsService } from '../services/ads.service';
-import { FilterAdDto } from '../dto/common/filter-ad.dto';
+import { DataValidationService } from '../services/data-validation.service';
+import { FilterAdDto, FilterVehicleModelsDto, FilterVehicleVariantsDto } from '../dto/common/filter-ad.dto';
 import { CreatePropertyAdDto } from '../dto/property/create-property-ad.dto';
 import { CreateVehicleAdDto } from '../dto/vehicle/create-vehicle-ad.dto';
 import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-commercial-vehicle-ad.dto';
@@ -52,11 +51,12 @@ import { LoggingInterceptor } from '../../interceptors/logging.interceptors';
 export class AdsController {
   constructor(
     private readonly adsService: AdsService,
+    private readonly dataValidationService: DataValidationService,
     private readonly s3Service: S3Service,
     private readonly vehicleInventoryService: VehicleInventoryService,
   ) {}
 
-  @Get()
+  @Post('filter')
   @ApiOperation({
     summary: 'Get all advertisements with advanced filtering',
     description: `
@@ -81,9 +81,98 @@ export class AdsController {
       - Pagination metadata
     `,
   })
-  // ===== BASIC FILTERS =====
-
-  // ===== RESPONSES =====
+  @ApiBody({
+    type: FilterAdDto,
+    description: 'Filter criteria for advertisements',
+    examples: {
+      basic_filter: {
+        summary: 'Basic Filter',
+        description: 'Simple filter with category and price range',
+        value: {
+          category: 'property',
+          minPrice: 100000,
+          maxPrice: 5000000,
+          location: 'Mumbai',
+          page: 1,
+          limit: 20
+        }
+      },
+      vehicle_filter: {
+        summary: 'Vehicle Filter',
+        description: 'Advanced vehicle filtering with manufacturer and model',
+        value: {
+          category: 'private_vehicle',
+          vehicleType: 'four_wheeler',
+          manufacturerId: '507f1f77bcf86cd799439011',
+          modelId: '507f1f77bcf86cd799439012',
+          minYear: 2018,
+          maxYear: 2023,
+          maxMileage: 50000,
+          minPrice: 500000,
+          maxPrice: 2000000,
+          page: 1,
+          limit: 20
+        }
+      },
+      property_filter: {
+        summary: 'Property Filter',
+        description: 'Property-specific filtering with bedrooms and area',
+        value: {
+          category: 'property',
+          propertyType: 'apartment',
+          minBedrooms: 2,
+          maxBedrooms: 3,
+          minBathrooms: 2,
+          minArea: 1000,
+          maxArea: 2000,
+          isFurnished: true,
+          hasParking: true,
+          minPrice: 5000000,
+          maxPrice: 15000000,
+          page: 1,
+          limit: 20
+        }
+      },
+      commercial_vehicle_filter: {
+        summary: 'Commercial Vehicle Filter',
+        description: 'Commercial vehicle filtering with payload and permits',
+        value: {
+          category: 'commercial_vehicle',
+          commercialVehicleType: 'bus',
+          bodyType: 'refrigerated',
+          manufacturerId: '686fb37cab966c7e18f26417',
+          modelId: '686fb37dab966c7e18f2643a',
+          minYear: 2025,
+          maxYear: 2025,
+          maxMileage: 234,
+          minPayloadCapacity: 3,
+          maxPayloadCapacity: 3,
+          axleCount: 2,
+          transmissionTypeId: '6860308d54670f22cc8de119',
+          fuelTypeId: '6860308c54670f22cc8de0f9',
+          color: 'fdvdbd',
+          hasInsurance: true,
+          hasFitness: false,
+          hasPermit: true,
+          minSeatingCapacity: 3,
+          maxSeatingCapacity: 3
+        }
+      },
+      two_wheeler_filter: {
+        summary: 'Two Wheeler Filter',
+        description: 'Two-wheeler filtering with manufacturer, model, and features',
+        value: {
+          category: 'two_wheeler',
+          manufacturerId: '686fb37cab966c7e18f26417',
+          modelId: '686fb37dab966c7e18f2643c',
+          minYear: 2025,
+          maxYear: 2025,
+          maxMileage: 545,
+          color: 'vxfg'
+        }
+      }
+    }
+  })
   @ApiResponse({
     status: 200,
     description: 'Advertisements retrieved successfully',
@@ -98,7 +187,7 @@ export class AdsController {
     description: 'Internal server error',
   })
   async getAllAds(
-    @Query() filterDto: FilterAdDto,
+    @Body() filterDto: FilterAdDto,
   ): Promise<PaginatedDetailedAdResponseDto> {
     return this.adsService.findAll(filterDto);
   }
@@ -537,19 +626,32 @@ export class AdsController {
     return this.vehicleInventoryService.findManufacturerById(id);
   }
 
-  @Get('lookup/vehicle-models')
+  @Post('lookup/vehicle-models')
   @ApiOperation({ summary: 'Get all vehicle models' })
+  @ApiBody({
+    type: FilterVehicleModelsDto,
+    description: 'Filter criteria for vehicle models',
+    examples: {
+      all_models: {
+        summary: 'All Models',
+        description: 'Get all vehicle models without filtering',
+        value: {}
+      },
+      manufacturer_filter: {
+        summary: 'Filter by Manufacturer',
+        description: 'Get vehicle models for a specific manufacturer',
+        value: {
+          manufacturerId: '507f1f77bcf86cd799439011'
+        }
+      }
+    }
+  })
   @ApiResponse({
     status: 200,
     description: 'Vehicle models retrieved successfully',
   })
-  @ApiQuery({
-    name: 'manufacturerId',
-    required: false,
-    description: 'Filter by manufacturer ID',
-  })
-  async getVehicleModels(@Query('manufacturerId') manufacturerId?: string) {
-    return this.vehicleInventoryService.findAllVehicleModels(manufacturerId);
+  async getVehicleModels(@Body() filterDto: FilterVehicleModelsDto) {
+    return this.vehicleInventoryService.findAllVehicleModels(filterDto.manufacturerId);
   }
 
   @Get('lookup/vehicle-models/:id')
@@ -563,43 +665,46 @@ export class AdsController {
     return this.vehicleInventoryService.findVehicleModelById(id);
   }
 
-  @Get('lookup/vehicle-variants')
+  @Post('lookup/vehicle-variants')
   @ApiOperation({ summary: 'Get all vehicle variants' })
+  @ApiBody({
+    type: FilterVehicleVariantsDto,
+    description: 'Filter criteria for vehicle variants',
+    examples: {
+      all_variants: {
+        summary: 'All Variants',
+        description: 'Get all vehicle variants without filtering',
+        value: {}
+      },
+      model_filter: {
+        summary: 'Filter by Model',
+        description: 'Get vehicle variants for a specific model',
+        value: {
+          modelId: '507f1f77bcf86cd799439012'
+        }
+      },
+      advanced_filter: {
+        summary: 'Advanced Filter',
+        description: 'Get vehicle variants with multiple filters',
+        value: {
+          modelId: '507f1f77bcf86cd799439012',
+          fuelTypeId: '507f1f77bcf86cd799439013',
+          transmissionTypeId: '507f1f77bcf86cd799439014',
+          maxPrice: 1000000
+        }
+      }
+    }
+  })
   @ApiResponse({
     status: 200,
     description: 'Vehicle variants retrieved successfully',
   })
-  @ApiQuery({
-    name: 'modelId',
-    required: false,
-    description: 'Filter by model ID',
-  })
-  @ApiQuery({
-    name: 'fuelTypeId',
-    required: false,
-    description: 'Filter by fuel type ID',
-  })
-  @ApiQuery({
-    name: 'transmissionTypeId',
-    required: false,
-    description: 'Filter by transmission type ID',
-  })
-  @ApiQuery({
-    name: 'maxPrice',
-    required: false,
-    description: 'Filter by maximum price',
-  })
-  async getVehicleVariants(
-    @Query('modelId') modelId?: string,
-    @Query('fuelTypeId') fuelTypeId?: string,
-    @Query('transmissionTypeId') transmissionTypeId?: string,
-    @Query('maxPrice') maxPrice?: number,
-  ) {
+  async getVehicleVariants(@Body() filterDto: FilterVehicleVariantsDto) {
     return this.vehicleInventoryService.findAllVehicleVariants(
-      modelId,
-      fuelTypeId,
-      transmissionTypeId,
-      maxPrice,
+      filterDto.modelId,
+      filterDto.fuelTypeId,
+      filterDto.transmissionTypeId,
+      filterDto.maxPrice,
     );
   }
 
@@ -630,5 +735,57 @@ export class AdsController {
   async warmUpCache() {
     await this.adsService.warmUpCache();
     return { message: 'Cache warmed up successfully' };
+  }
+
+  // Data Validation Endpoints
+  @Get('validation/consistency')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Check data consistency',
+    description: 'Validate that all ads have proper detailed records',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data consistency report generated',
+  })
+  @ApiBearerAuth()
+  async checkDataConsistency() {
+    const validation = await this.dataValidationService.validateDataConsistency();
+    return validation;
+  }
+
+  @Get('validation/report')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Generate consistency report',
+    description: 'Generate a detailed data consistency report',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Consistency report generated',
+  })
+  @ApiBearerAuth()
+  async generateConsistencyReport() {
+    const report = await this.dataValidationService.generateConsistencyReport();
+    return { report };
+  }
+
+  @Post('validation/cleanup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Clean up orphaned ads',
+    description: 'Remove ads that are missing their detailed records',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cleanup completed',
+  })
+  @ApiBearerAuth()
+  async cleanupOrphanedAds() {
+    const result = await this.dataValidationService.cleanupOrphanedAds();
+    return result;
   }
 }

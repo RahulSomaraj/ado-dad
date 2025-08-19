@@ -40,7 +40,11 @@
     "debug:vehicle-models": "ts-node src/vehicle-inventory/seed/debug-vehicle-models.ts",
     "debug:vehicle-variants": "ts-node src/vehicle-inventory/seed/debug-vehicle-variants.ts",
     "clean:variants": "ts-node src/vehicle-inventory/seed/clean-and-reseed-variants.ts",
-    "add:superadmin": "ts-node src/users/seed/add-super-admin.ts"
+    "add:superadmin": "ts-node src/users/seed/add-super-admin.ts",
+    "fix:commercial-vehicle-data": "ts-node src/ads/scripts/fix-commercial-vehicle-data.ts",
+    "validate:data": "ts-node -e \"import('./src/ads/scripts/fix-commercial-vehicle-data.ts').then(m => m.fixCommercialVehicleData())\"",
+    "data:consistency-check": "curl -X GET \"http://localhost:5001/ads/validation/consistency\" -H \"Authorization: Bearer YOUR_TOKEN\"",
+    "data:cleanup": "curl -X POST \"http://localhost:5001/ads/validation/cleanup\" -H \"Authorization: Bearer YOUR_TOKEN\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.744.0",
