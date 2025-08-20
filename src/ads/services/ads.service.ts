@@ -236,19 +236,27 @@ export class AdsService {
     // 🔀 Cross-category identity filters (manufacturer/model/variant) when no category is specified
     const identityMatchObj: any = {};
     const identityMatchStr: any = {};
-    if (filters.manufacturerId) {
-      identityMatchStr.manufacturerId = filters.manufacturerId;
-      try {
-        identityMatchObj.manufacturerId = new Types.ObjectId(
-          filters.manufacturerId,
-        );
-      } catch (_) {}
+    if (filters.manufacturerId && filters.manufacturerId.length > 0) {
+      identityMatchStr.manufacturerId = {
+        $in: filters.manufacturerId,
+      };
+      const objIds: Types.ObjectId[] = [];
+      for (const id of filters.manufacturerId) {
+        try {
+          objIds.push(new Types.ObjectId(id));
+        } catch (_) {}
+      }
+      if (objIds.length > 0) identityMatchObj.manufacturerId = { $in: objIds };
     }
-    if (filters.modelId) {
-      identityMatchStr.modelId = filters.modelId;
-      try {
-        identityMatchObj.modelId = new Types.ObjectId(filters.modelId);
-      } catch (_) {}
+    if (filters.modelId && filters.modelId.length > 0) {
+      identityMatchStr.modelId = { $in: filters.modelId };
+      const objIds: Types.ObjectId[] = [];
+      for (const id of filters.modelId) {
+        try {
+          objIds.push(new Types.ObjectId(id));
+        } catch (_) {}
+      }
+      if (objIds.length > 0) identityMatchObj.modelId = { $in: objIds };
     }
     if (filters.variantId) {
       identityMatchStr.variantId = filters.variantId;
@@ -347,11 +355,29 @@ export class AdsService {
       const vehicleMatch: any = {};
       if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
       if (filters.manufacturerId && !appliedCrossCategoryIdentityFilter)
-        vehicleMatch.manufacturerId = new Types.ObjectId(
-          filters.manufacturerId,
-        );
+        vehicleMatch.manufacturerId = {
+          $in: filters.manufacturerId
+            .map((id) => {
+              try {
+                return new Types.ObjectId(id);
+              } catch (_) {
+                return null;
+              }
+            })
+            .filter(Boolean),
+        };
       if (filters.modelId && !appliedCrossCategoryIdentityFilter)
-        vehicleMatch.modelId = new Types.ObjectId(filters.modelId);
+        vehicleMatch.modelId = {
+          $in: filters.modelId
+            .map((id) => {
+              try {
+                return new Types.ObjectId(id);
+              } catch (_) {
+                return null;
+              }
+            })
+            .filter(Boolean),
+        };
       if (filters.variantId && !appliedCrossCategoryIdentityFilter)
         vehicleMatch.variantId = new Types.ObjectId(filters.variantId);
       if (filters.transmissionTypeId)
@@ -428,11 +454,29 @@ export class AdsService {
           commercialMatch.commercialVehicleType = filters.commercialVehicleType;
         if (filters.bodyType) commercialMatch.bodyType = filters.bodyType;
         if (filters.manufacturerId && !appliedCrossCategoryIdentityFilter)
-          commercialMatch.manufacturerId = new Types.ObjectId(
-            filters.manufacturerId,
-          );
+          commercialMatch.manufacturerId = {
+            $in: filters.manufacturerId
+              .map((id) => {
+                try {
+                  return new Types.ObjectId(id);
+                } catch (_) {
+                  return null;
+                }
+              })
+              .filter(Boolean),
+          };
         if (filters.modelId && !appliedCrossCategoryIdentityFilter)
-          commercialMatch.modelId = new Types.ObjectId(filters.modelId);
+          commercialMatch.modelId = {
+            $in: filters.modelId
+              .map((id) => {
+                try {
+                  return new Types.ObjectId(id);
+                } catch (_) {
+                  return null;
+                }
+              })
+              .filter(Boolean),
+          };
         if (filters.variantId && !appliedCrossCategoryIdentityFilter)
           commercialMatch.variantId = new Types.ObjectId(filters.variantId);
         if (filters.transmissionTypeId)

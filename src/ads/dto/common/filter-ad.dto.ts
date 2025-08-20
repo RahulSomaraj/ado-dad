@@ -241,22 +241,28 @@ export class FilterAdDto {
   vehicleType?: VehicleTypeEnum;
 
   @ApiPropertyOptional({
-    description: 'Manufacturer ID filter (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439011',
+    description: 'Manufacturer IDs filter (MongoDB ObjectIds)',
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439034'],
   })
   @IsOptional()
-  @IsString()
-  manufacturerId?: string;
-
-
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value !== undefined ? [value] : undefined,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  manufacturerId?: string[];
 
   @ApiPropertyOptional({
-    description: 'Model ID filter (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439012',
+    description: 'Model IDs filter (MongoDB ObjectIds)',
+    example: ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439045'],
   })
   @IsOptional()
-  @IsString()
-  modelId?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value !== undefined ? [value] : undefined,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  modelId?: string[];
 
   @ApiPropertyOptional({
     description: 'Variant ID filter (MongoDB ObjectId)',
@@ -307,8 +313,6 @@ export class FilterAdDto {
   @IsString()
   transmissionTypeId?: string;
 
-
-
   @ApiPropertyOptional({
     description: 'Fuel type ID filter (MongoDB ObjectId)',
     example: '507f1f77bcf86cd799439015',
@@ -316,8 +320,6 @@ export class FilterAdDto {
   @IsOptional()
   @IsString()
   fuelTypeId?: string;
-
-
 
   @ApiPropertyOptional({
     description: 'Vehicle color filter (partial match)',
