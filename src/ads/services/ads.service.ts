@@ -139,16 +139,19 @@ export class AdsService {
       sortOrder = 'DESC',
       search,
     } = filters;
-  
-    console.log('🔍 DEBUG: findAll called with filters:', JSON.stringify(filters, null, 2));
-  
+
+    console.log(
+      '🔍 DEBUG: findAll called with filters:',
+      JSON.stringify(filters, null, 2),
+    );
+
     const pipeline: any[] = [];
-  
+
     // 🔍 Text Search
     if (search) {
       pipeline.push({ $match: { $text: { $search: search } } });
     }
-  
+
     // 🧾 Basic filters
     const matchStage: any = { isActive: filters.isActive ?? true };
     if (filters.category) matchStage.category = filters.category;
@@ -157,16 +160,21 @@ export class AdsService {
     }
     if (filters.minPrice || filters.maxPrice) {
       matchStage.price = {};
-      if (filters.minPrice !== undefined) matchStage.price.$gte = filters.minPrice;
-      if (filters.maxPrice !== undefined) matchStage.price.$lte = filters.maxPrice;
+      if (filters.minPrice !== undefined)
+        matchStage.price.$gte = filters.minPrice;
+      if (filters.maxPrice !== undefined)
+        matchStage.price.$lte = filters.maxPrice;
     }
     if (filters.postedBy) {
       matchStage.postedBy = new Types.ObjectId(filters.postedBy);
     }
-  
-    console.log('🔍 DEBUG: Initial matchStage:', JSON.stringify(matchStage, null, 2));
+
+    console.log(
+      '🔍 DEBUG: Initial matchStage:',
+      JSON.stringify(matchStage, null, 2),
+    );
     pipeline.push({ $match: matchStage });
-  
+
     // 👤 User lookup
     pipeline.push(
       {
@@ -185,7 +193,7 @@ export class AdsService {
         },
       },
     );
-  
+
     // 🏠 Property lookup
     pipeline.push({
       $lookup: {
@@ -195,7 +203,7 @@ export class AdsService {
         as: 'propertyDetails',
       },
     });
-  
+
     // 🚗 Vehicle lookup
     pipeline.push({
       $lookup: {
@@ -205,7 +213,7 @@ export class AdsService {
         as: 'vehicleDetails',
       },
     });
-  
+
     // 🚛 Commercial vehicle lookup
     pipeline.push({
       $lookup: {
@@ -220,36 +228,96 @@ export class AdsService {
     if (filters.category === 'commercial_vehicle') {
       pipeline.push({
         $match: {
-          commercialVehicleDetails: { $ne: [] }
-        }
+          commercialVehicleDetails: { $ne: [] },
+        },
       });
     }
 
+    // 🔀 Cross-category identity filters (manufacturer/model/variant) when no category is specified
+    const identityMatchObj: any = {};
+    const identityMatchStr: any = {};
+    if (filters.manufacturerId) {
+      identityMatchStr.manufacturerId = filters.manufacturerId;
+      try {
+        identityMatchObj.manufacturerId = new Types.ObjectId(
+          filters.manufacturerId,
+        );
+      } catch (_) {}
+    }
+    if (filters.modelId) {
+      identityMatchStr.modelId = filters.modelId;
+      try {
+        identityMatchObj.modelId = new Types.ObjectId(filters.modelId);
+      } catch (_) {}
+    }
+    if (filters.variantId) {
+      identityMatchStr.variantId = filters.variantId;
+      try {
+        identityMatchObj.variantId = new Types.ObjectId(filters.variantId);
+      } catch (_) {}
+    }
+    const appliedCrossCategoryIdentityFilter =
+      !filters.category &&
+      (Object.keys(identityMatchObj).length > 0 ||
+        Object.keys(identityMatchStr).length > 0);
+    if (appliedCrossCategoryIdentityFilter) {
+      const orConditions: any[] = [];
+      if (Object.keys(identityMatchObj).length > 0) {
+        orConditions.push(
+          { vehicleDetails: { $elemMatch: identityMatchObj } },
+          { commercialVehicleDetails: { $elemMatch: identityMatchObj } },
+        );
+      }
+      if (Object.keys(identityMatchStr).length > 0) {
+        orConditions.push(
+          { vehicleDetails: { $elemMatch: identityMatchStr } },
+          { commercialVehicleDetails: { $elemMatch: identityMatchStr } },
+        );
+      }
+      pipeline.push({ $match: { $or: orConditions } });
+    }
+
     // 🏠 Property filters (only apply if property filters are provided)
-    if (filters.propertyType || filters.minBedrooms || filters.maxBedrooms || 
-        filters.minBathrooms || filters.maxBathrooms || filters.minArea || filters.maxArea ||
-        filters.isFurnished !== undefined || filters.hasParking !== undefined || filters.hasGarden !== undefined) {
-      
+    if (
+      filters.propertyType ||
+      filters.minBedrooms ||
+      filters.maxBedrooms ||
+      filters.minBathrooms ||
+      filters.maxBathrooms ||
+      filters.minArea ||
+      filters.maxArea ||
+      filters.isFurnished !== undefined ||
+      filters.hasParking !== undefined ||
+      filters.hasGarden !== undefined
+    ) {
       const propertyMatch: any = {};
-      if (filters.propertyType) propertyMatch.propertyType = filters.propertyType;
+      if (filters.propertyType)
+        propertyMatch.propertyType = filters.propertyType;
       if (filters.minBedrooms || filters.maxBedrooms) {
         propertyMatch.bedrooms = {};
-        if (filters.minBedrooms) propertyMatch.bedrooms.$gte = filters.minBedrooms;
-        if (filters.maxBedrooms) propertyMatch.bedrooms.$lte = filters.maxBedrooms;
+        if (filters.minBedrooms)
+          propertyMatch.bedrooms.$gte = filters.minBedrooms;
+        if (filters.maxBedrooms)
+          propertyMatch.bedrooms.$lte = filters.maxBedrooms;
       }
       if (filters.minBathrooms || filters.maxBathrooms) {
         propertyMatch.bathrooms = {};
-        if (filters.minBathrooms) propertyMatch.bathrooms.$gte = filters.minBathrooms;
-        if (filters.maxBathrooms) propertyMatch.bathrooms.$lte = filters.maxBathrooms;
+        if (filters.minBathrooms)
+          propertyMatch.bathrooms.$gte = filters.minBathrooms;
+        if (filters.maxBathrooms)
+          propertyMatch.bathrooms.$lte = filters.maxBathrooms;
       }
       if (filters.minArea || filters.maxArea) {
         propertyMatch.areaSqft = {};
         if (filters.minArea) propertyMatch.areaSqft.$gte = filters.minArea;
         if (filters.maxArea) propertyMatch.areaSqft.$lte = filters.maxArea;
       }
-      if (filters.isFurnished !== undefined) propertyMatch.isFurnished = filters.isFurnished;
-      if (filters.hasParking !== undefined) propertyMatch.hasParking = filters.hasParking;
-      if (filters.hasGarden !== undefined) propertyMatch.hasGarden = filters.hasGarden;
+      if (filters.isFurnished !== undefined)
+        propertyMatch.isFurnished = filters.isFurnished;
+      if (filters.hasParking !== undefined)
+        propertyMatch.hasParking = filters.hasParking;
+      if (filters.hasGarden !== undefined)
+        propertyMatch.hasGarden = filters.hasGarden;
 
       pipeline.push({
         $match: {
@@ -257,27 +325,52 @@ export class AdsService {
         },
       });
     }
-  
+
     // 🚗 Vehicle filters (only apply if vehicle filters are provided AND category is not commercial_vehicle)
-    if ((filters.vehicleType || filters.manufacturerId || filters.modelId || filters.variantId ||
-        filters.transmissionTypeId || filters.fuelTypeId || 
-        filters.color || filters.maxMileage !== undefined ||
-        filters.isFirstOwner !== undefined || filters.hasInsurance !== undefined || filters.hasRcBook !== undefined ||
-        filters.minYear || filters.maxYear) && filters.category !== 'commercial_vehicle') {
-      
+    if (
+      (filters.vehicleType ||
+        filters.manufacturerId ||
+        filters.modelId ||
+        filters.variantId ||
+        filters.transmissionTypeId ||
+        filters.fuelTypeId ||
+        filters.color ||
+        filters.maxMileage !== undefined ||
+        filters.isFirstOwner !== undefined ||
+        filters.hasInsurance !== undefined ||
+        filters.hasRcBook !== undefined ||
+        filters.minYear ||
+        filters.maxYear) &&
+      filters.category !== 'commercial_vehicle' &&
+      !appliedCrossCategoryIdentityFilter
+    ) {
       const vehicleMatch: any = {};
       if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
-      if (filters.manufacturerId) vehicleMatch.manufacturerId = filters.manufacturerId;
-      if (filters.modelId) vehicleMatch.modelId = filters.modelId;
-      if (filters.variantId) vehicleMatch.variantId = filters.variantId;
-      if (filters.transmissionTypeId) vehicleMatch.transmissionTypeId = new Types.ObjectId(filters.transmissionTypeId);
-      if (filters.fuelTypeId) vehicleMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
-      if (filters.color) vehicleMatch.color = { $regex: filters.color, $options: 'i' };
-      if (filters.maxMileage !== undefined) vehicleMatch.mileage = { $lte: filters.maxMileage };
-      if (filters.isFirstOwner !== undefined) vehicleMatch.isFirstOwner = filters.isFirstOwner;
-      if (filters.hasInsurance !== undefined) vehicleMatch.hasInsurance = filters.hasInsurance;
-      if (filters.hasRcBook !== undefined) vehicleMatch.hasRcBook = filters.hasRcBook;
-      
+      if (filters.manufacturerId && !appliedCrossCategoryIdentityFilter)
+        vehicleMatch.manufacturerId = new Types.ObjectId(
+          filters.manufacturerId,
+        );
+      if (filters.modelId && !appliedCrossCategoryIdentityFilter)
+        vehicleMatch.modelId = new Types.ObjectId(filters.modelId);
+      if (filters.variantId && !appliedCrossCategoryIdentityFilter)
+        vehicleMatch.variantId = new Types.ObjectId(filters.variantId);
+      if (filters.transmissionTypeId)
+        vehicleMatch.transmissionTypeId = new Types.ObjectId(
+          filters.transmissionTypeId,
+        );
+      if (filters.fuelTypeId)
+        vehicleMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
+      if (filters.color)
+        vehicleMatch.color = { $regex: filters.color, $options: 'i' };
+      if (filters.maxMileage !== undefined)
+        vehicleMatch.mileage = { $lte: filters.maxMileage };
+      if (filters.isFirstOwner !== undefined)
+        vehicleMatch.isFirstOwner = filters.isFirstOwner;
+      if (filters.hasInsurance !== undefined)
+        vehicleMatch.hasInsurance = filters.hasInsurance;
+      if (filters.hasRcBook !== undefined)
+        vehicleMatch.hasRcBook = filters.hasRcBook;
+
       // Year filter
       if (filters.minYear || filters.maxYear) {
         vehicleMatch.year = {};
@@ -301,79 +394,126 @@ export class AdsService {
       variantId: filters.variantId,
       transmissionTypeId: filters.transmissionTypeId,
       fuelTypeId: filters.fuelTypeId,
-      color: filters.color
+      color: filters.color,
     });
-    
-    if (filters.commercialVehicleType || filters.bodyType || filters.minPayloadCapacity || filters.maxPayloadCapacity ||
-        filters.axleCount || filters.hasFitness !== undefined || filters.hasPermit !== undefined ||
-        filters.minSeatingCapacity || filters.maxSeatingCapacity || filters.manufacturerId ||
-        filters.modelId || filters.variantId || filters.transmissionTypeId || 
-        filters.fuelTypeId || filters.color ||
-        filters.minYear || filters.maxYear || filters.maxMileage !== undefined) {
-      
-      console.log('🔍 DEBUG: Commercial vehicle filter condition triggered');
-      
-      const commercialMatch: any = {};
-      if (filters.commercialVehicleType) commercialMatch.commercialVehicleType = filters.commercialVehicleType;
-      if (filters.bodyType) commercialMatch.bodyType = filters.bodyType;
-      if (filters.manufacturerId) commercialMatch.manufacturerId = filters.manufacturerId;
-      if (filters.modelId) commercialMatch.modelId = filters.modelId;
-      if (filters.variantId) commercialMatch.variantId = filters.variantId;
-      if (filters.transmissionTypeId) commercialMatch.transmissionTypeId = filters.transmissionTypeId;
-      if (filters.fuelTypeId) commercialMatch.fuelTypeId = filters.fuelTypeId;
-      if (filters.color) commercialMatch.color = { $regex: filters.color, $options: 'i' };
-      if (filters.maxMileage !== undefined) commercialMatch.mileage = { $lte: filters.maxMileage };
-      if (filters.minPayloadCapacity || filters.maxPayloadCapacity) {
-        commercialMatch.payloadCapacity = {};
-        if (filters.minPayloadCapacity) commercialMatch.payloadCapacity.$gte = filters.minPayloadCapacity;
-        if (filters.maxPayloadCapacity) commercialMatch.payloadCapacity.$lte = filters.maxPayloadCapacity;
-      }
-      if (filters.axleCount) commercialMatch.axleCount = filters.axleCount;
-      if (filters.hasFitness !== undefined) commercialMatch.hasFitness = filters.hasFitness;
-      if (filters.hasPermit !== undefined) commercialMatch.hasPermit = filters.hasPermit;
-      if (filters.minSeatingCapacity || filters.maxSeatingCapacity) {
-        commercialMatch.seatingCapacity = {};
-        if (filters.minSeatingCapacity) commercialMatch.seatingCapacity.$gte = filters.minSeatingCapacity;
-        if (filters.maxSeatingCapacity) commercialMatch.seatingCapacity.$lte = filters.maxSeatingCapacity;
-      }
-      
-      // Year filter
-      if (filters.minYear || filters.maxYear) {
-        commercialMatch.year = {};
-        if (filters.minYear) commercialMatch.year.$gte = Number(filters.minYear);
-        if (filters.maxYear) commercialMatch.year.$lte = Number(filters.maxYear);
-      }
 
-      console.log('🔍 DEBUG: Commercial vehicle match object:', commercialMatch);
-      pipeline.push({
-        $match: {
-          commercialVehicleDetails: { $elemMatch: commercialMatch },
-        },
-      });
-      console.log('🔍 DEBUG: Commercial vehicle filter added to pipeline');
+    if (
+      filters.commercialVehicleType ||
+      filters.bodyType ||
+      filters.minPayloadCapacity ||
+      filters.maxPayloadCapacity ||
+      filters.axleCount ||
+      filters.hasFitness !== undefined ||
+      filters.hasPermit !== undefined ||
+      filters.minSeatingCapacity ||
+      filters.maxSeatingCapacity ||
+      filters.manufacturerId ||
+      filters.modelId ||
+      filters.variantId ||
+      filters.transmissionTypeId ||
+      filters.fuelTypeId ||
+      filters.color ||
+      filters.minYear ||
+      filters.maxYear ||
+      filters.maxMileage !== undefined
+    ) {
+      if (appliedCrossCategoryIdentityFilter) {
+        // When cross-category identity filter is applied, skip pushing
+        // a commercial-only $match to avoid AND-ing with vehicle-only ads.
+      } else {
+        console.log('🔍 DEBUG: Commercial vehicle filter condition triggered');
+
+        const commercialMatch: any = {};
+        if (filters.commercialVehicleType)
+          commercialMatch.commercialVehicleType = filters.commercialVehicleType;
+        if (filters.bodyType) commercialMatch.bodyType = filters.bodyType;
+        if (filters.manufacturerId && !appliedCrossCategoryIdentityFilter)
+          commercialMatch.manufacturerId = new Types.ObjectId(
+            filters.manufacturerId,
+          );
+        if (filters.modelId && !appliedCrossCategoryIdentityFilter)
+          commercialMatch.modelId = new Types.ObjectId(filters.modelId);
+        if (filters.variantId && !appliedCrossCategoryIdentityFilter)
+          commercialMatch.variantId = new Types.ObjectId(filters.variantId);
+        if (filters.transmissionTypeId)
+          commercialMatch.transmissionTypeId = new Types.ObjectId(
+            filters.transmissionTypeId,
+          );
+        if (filters.fuelTypeId)
+          commercialMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
+        if (filters.color)
+          commercialMatch.color = { $regex: filters.color, $options: 'i' };
+        if (filters.maxMileage !== undefined)
+          commercialMatch.mileage = { $lte: filters.maxMileage };
+        if (filters.minPayloadCapacity || filters.maxPayloadCapacity) {
+          commercialMatch.payloadCapacity = {};
+          if (filters.minPayloadCapacity)
+            commercialMatch.payloadCapacity.$gte = filters.minPayloadCapacity;
+          if (filters.maxPayloadCapacity)
+            commercialMatch.payloadCapacity.$lte = filters.maxPayloadCapacity;
+        }
+        if (filters.axleCount) commercialMatch.axleCount = filters.axleCount;
+        if (filters.hasFitness !== undefined)
+          commercialMatch.hasFitness = filters.hasFitness;
+        if (filters.hasPermit !== undefined)
+          commercialMatch.hasPermit = filters.hasPermit;
+        if (filters.minSeatingCapacity || filters.maxSeatingCapacity) {
+          commercialMatch.seatingCapacity = {};
+          if (filters.minSeatingCapacity)
+            commercialMatch.seatingCapacity.$gte = filters.minSeatingCapacity;
+          if (filters.maxSeatingCapacity)
+            commercialMatch.seatingCapacity.$lte = filters.maxSeatingCapacity;
+        }
+
+        // Year filter
+        if (filters.minYear || filters.maxYear) {
+          commercialMatch.year = {};
+          if (filters.minYear)
+            commercialMatch.year.$gte = Number(filters.minYear);
+          if (filters.maxYear)
+            commercialMatch.year.$lte = Number(filters.maxYear);
+        }
+
+        console.log(
+          '🔍 DEBUG: Commercial vehicle match object:',
+          commercialMatch,
+        );
+        pipeline.push({
+          $match: {
+            commercialVehicleDetails: { $elemMatch: commercialMatch },
+          },
+        });
+        console.log('🔍 DEBUG: Commercial vehicle filter added to pipeline');
+      }
     }
-  
+
     // 📊 Count total
     const countPipeline = [...pipeline, { $count: 'total' }];
-    console.log('🔍 DEBUG: Count pipeline:', JSON.stringify(countPipeline, null, 2));
+    console.log(
+      '🔍 DEBUG: Count pipeline:',
+      JSON.stringify(countPipeline, null, 2),
+    );
     const countResult = await this.adModel.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
     console.log('🔍 DEBUG: Total count result:', total);
-  
+
     // 📦 Pagination & sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
-  
+
     console.log('🔍 DEBUG: Final pipeline length:', pipeline.length);
     console.log('🔍 DEBUG: Final pipeline:', JSON.stringify(pipeline, null, 2));
-  
+
     // 🚀 Fetch ads
     const ads = await this.adModel.aggregate(pipeline);
     console.log('🔍 DEBUG: Raw ads result length:', ads.length);
-    console.log('🔍 DEBUG: First ad sample:', ads.length > 0 ? JSON.stringify(ads[0], null, 2) : 'No ads found');
-  
+    console.log(
+      '🔍 DEBUG: First ad sample:',
+      ads.length > 0 ? JSON.stringify(ads[0], null, 2) : 'No ads found',
+    );
+
     return {
       data: ads.map((ad) => {
         const dto = this.mapToResponseDto(ad);
@@ -391,7 +531,6 @@ export class AdsService {
       hasPrev: page > 1,
     };
   }
-  
 
   async findOne(id: string): Promise<AdResponseDto> {
     try {
@@ -448,11 +587,12 @@ export class AdsService {
 
       const ad = results[0];
       const dto = this.mapToResponseDto(ad);
-      
+
       // Add year from vehicle details if available
-      dto.year = ad.vehicleDetails?.[0]?.year || 
-                 ad.commercialVehicleDetails?.[0]?.year || 
-                 null;
+      dto.year =
+        ad.vehicleDetails?.[0]?.year ||
+        ad.commercialVehicleDetails?.[0]?.year ||
+        null;
 
       return dto;
     } catch (error) {
@@ -1161,7 +1301,9 @@ export class AdsService {
         vehicleType: data.vehicleType,
         manufacturerId: new Types.ObjectId(data.manufacturerId),
         modelId: new Types.ObjectId(data.modelId),
-        variantId: data.variantId ? new Types.ObjectId(data.variantId) : undefined,
+        variantId: data.variantId
+          ? new Types.ObjectId(data.variantId)
+          : undefined,
         year: data.year,
         mileage: data.mileage,
         transmissionTypeId: new Types.ObjectId(data.transmissionTypeId),
@@ -1185,10 +1327,11 @@ export class AdsService {
       console.log('✅ Ad verified in main collection');
 
       // Return the created ad
-      const result = await this.findOne((savedAd._id as Types.ObjectId).toString());
+      const result = await this.findOne(
+        (savedAd._id as Types.ObjectId).toString(),
+      );
       console.log('✅ Ad creation completed successfully');
       return result;
-
     } catch (error) {
       console.error('❌ Error creating vehicle ad:', error);
       throw error;
@@ -1200,10 +1343,10 @@ export class AdsService {
     userId: string,
   ): Promise<AdResponseDto> {
     console.log('🚛 Starting commercial vehicle ad creation...');
-    
+
     // Validate vehicle inventory references first
     await this.validateVehicleInventoryReferences(data);
-    
+
     // Fetch model name for title
     const model = await this.vehicleInventoryService.findVehicleModelById(
       data.modelId,
@@ -1241,7 +1384,9 @@ export class AdsService {
         bodyType: data.bodyType,
         manufacturerId: new Types.ObjectId(data.manufacturerId),
         modelId: new Types.ObjectId(data.modelId),
-        variantId: data.variantId ? new Types.ObjectId(data.variantId) : undefined,
+        variantId: data.variantId
+          ? new Types.ObjectId(data.variantId)
+          : undefined,
         year: data.year,
         mileage: data.mileage,
         payloadCapacity: data.payloadCapacity,
@@ -1273,17 +1418,18 @@ export class AdsService {
       console.log('✅ Ad verified in main collection');
 
       // Return the created ad
-      const result = await this.findOne((savedAd._id as Types.ObjectId).toString());
+      const result = await this.findOne(
+        (savedAd._id as Types.ObjectId).toString(),
+      );
       console.log('✅ Commercial vehicle ad creation completed successfully');
       return result;
-
     } catch (error) {
       console.error('❌ Error creating commercial vehicle ad:', error);
-      
+
       // Rollback the transaction
       await session.abortTransaction();
       console.log('🔄 Transaction rolled back');
-      
+
       throw error;
     } finally {
       session.endSession();

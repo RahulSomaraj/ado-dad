@@ -26,7 +26,11 @@ import {
 } from '@nestjs/swagger';
 import { AdsService } from '../services/ads.service';
 import { DataValidationService } from '../services/data-validation.service';
-import { FilterAdDto, FilterVehicleModelsDto, FilterVehicleVariantsDto } from '../dto/common/filter-ad.dto';
+import {
+  FilterAdDto,
+  FilterVehicleModelsDto,
+  FilterVehicleVariantsDto,
+} from '../dto/common/filter-ad.dto';
 import { CreatePropertyAdDto } from '../dto/property/create-property-ad.dto';
 import { CreateVehicleAdDto } from '../dto/vehicle/create-vehicle-ad.dto';
 import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-commercial-vehicle-ad.dto';
@@ -56,7 +60,7 @@ export class AdsController {
     private readonly vehicleInventoryService: VehicleInventoryService,
   ) {}
 
-  @Post('filter')
+  @Post('list')
   @ApiOperation({
     summary: 'Get all advertisements with advanced filtering',
     description: `
@@ -94,8 +98,8 @@ export class AdsController {
           maxPrice: 5000000,
           location: 'Mumbai',
           page: 1,
-          limit: 20
-        }
+          limit: 20,
+        },
       },
       vehicle_filter: {
         summary: 'Vehicle Filter',
@@ -111,8 +115,8 @@ export class AdsController {
           minPrice: 500000,
           maxPrice: 2000000,
           page: 1,
-          limit: 20
-        }
+          limit: 20,
+        },
       },
       property_filter: {
         summary: 'Property Filter',
@@ -130,8 +134,8 @@ export class AdsController {
           minPrice: 5000000,
           maxPrice: 15000000,
           page: 1,
-          limit: 20
-        }
+          limit: 20,
+        },
       },
       commercial_vehicle_filter: {
         summary: 'Commercial Vehicle Filter',
@@ -155,12 +159,13 @@ export class AdsController {
           hasFitness: false,
           hasPermit: true,
           minSeatingCapacity: 3,
-          maxSeatingCapacity: 3
-        }
+          maxSeatingCapacity: 3,
+        },
       },
       two_wheeler_filter: {
         summary: 'Two Wheeler Filter',
-        description: 'Two-wheeler filtering with manufacturer, model, and features',
+        description:
+          'Two-wheeler filtering with manufacturer, model, and features',
         value: {
           category: 'two_wheeler',
           manufacturerId: '686fb37cab966c7e18f26417',
@@ -168,10 +173,10 @@ export class AdsController {
           minYear: 2025,
           maxYear: 2025,
           maxMileage: 545,
-          color: 'vxfg'
-        }
-      }
-    }
+          color: 'vxfg',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -635,23 +640,25 @@ export class AdsController {
       all_models: {
         summary: 'All Models',
         description: 'Get all vehicle models without filtering',
-        value: {}
+        value: {},
       },
       manufacturer_filter: {
         summary: 'Filter by Manufacturer',
         description: 'Get vehicle models for a specific manufacturer',
         value: {
-          manufacturerId: '507f1f77bcf86cd799439011'
-        }
-      }
-    }
+          manufacturerId: '507f1f77bcf86cd799439011',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
     description: 'Vehicle models retrieved successfully',
   })
   async getVehicleModels(@Body() filterDto: FilterVehicleModelsDto) {
-    return this.vehicleInventoryService.findAllVehicleModels(filterDto.manufacturerId);
+    return this.vehicleInventoryService.findAllVehicleModels(
+      filterDto.manufacturerId,
+    );
   }
 
   @Get('lookup/vehicle-models/:id')
@@ -674,14 +681,14 @@ export class AdsController {
       all_variants: {
         summary: 'All Variants',
         description: 'Get all vehicle variants without filtering',
-        value: {}
+        value: {},
       },
       model_filter: {
         summary: 'Filter by Model',
         description: 'Get vehicle variants for a specific model',
         value: {
-          modelId: '507f1f77bcf86cd799439012'
-        }
+          modelId: '507f1f77bcf86cd799439012',
+        },
       },
       advanced_filter: {
         summary: 'Advanced Filter',
@@ -690,10 +697,10 @@ export class AdsController {
           modelId: '507f1f77bcf86cd799439012',
           fuelTypeId: '507f1f77bcf86cd799439013',
           transmissionTypeId: '507f1f77bcf86cd799439014',
-          maxPrice: 1000000
-        }
-      }
-    }
+          maxPrice: 1000000,
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -751,7 +758,8 @@ export class AdsController {
   })
   @ApiBearerAuth()
   async checkDataConsistency() {
-    const validation = await this.dataValidationService.validateDataConsistency();
+    const validation =
+      await this.dataValidationService.validateDataConsistency();
     return validation;
   }
 
