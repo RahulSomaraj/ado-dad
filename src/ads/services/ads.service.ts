@@ -17,14 +17,10 @@ import {
 import { FilterAdDto } from '../dto/common/filter-ad.dto';
 import {
   AdResponseDto,
-  PaginatedAdResponseDto,
   DetailedAdResponseDto,
   PaginatedDetailedAdResponseDto,
 } from '../dto/common/ad-response.dto';
 
-import { CreatePropertyAdDto } from '../dto/property/create-property-ad.dto';
-import { CreateVehicleAdDto } from '../dto/vehicle/create-vehicle-ad.dto';
-import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-commercial-vehicle-ad.dto';
 import { CreateAdDto } from '../dto/common/create-ad.dto';
 
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
@@ -45,58 +41,7 @@ export class AdsService {
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
-  ) {
-    // Fire-and-forget; logs on failure
-    this.createIndexes();
-  }
-
-  /** ---------- INDEXES ---------- */
-  private async createIndexes(): Promise<void> {
-    try {
-      // Main ads collection
-      await this.adModel.collection.createIndex(
-        { isActive: 1, category: 1, createdAt: -1 },
-        { background: true },
-      );
-      await this.adModel.collection.createIndex(
-        { isActive: 1, location: 1, price: 1 },
-        { background: true },
-      );
-      await this.adModel.collection.createIndex(
-        { postedBy: 1, isActive: 1 },
-        { background: true },
-      );
-      await this.adModel.collection.createIndex(
-        { title: 'text', description: 'text' },
-        { background: true },
-      );
-
-      // Property subdocs
-      await this.propertyAdModel.collection.createIndex(
-        { ad: 1, propertyType: 1, bedrooms: 1, bathrooms: 1 },
-        { background: true },
-      );
-
-      // Vehicle subdocs
-      await this.vehicleAdModel.collection.createIndex(
-        { ad: 1, vehicleType: 1, manufacturerId: 1, modelId: 1 },
-        { background: true },
-      );
-
-      // Commercial vehicle subdocs
-      await this.commercialVehicleAdModel.collection.createIndex(
-        { ad: 1, manufacturerId: 1, modelId: 1, year: 1 },
-        { background: true },
-      );
-
-      // Nice ✨
-      // eslint-disable-next-line no-console
-      console.log('✅ Database indexes created successfully');
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('❌ Error creating indexes:', error);
-    }
-  }
+  ) {}
 
   /** ---------- HELPERS ---------- */
   private toObjectId(id?: string) {

@@ -58,3 +58,8 @@ PropertyAdSchema.index({ areaSqft: 1 });
 PropertyAdSchema.index({ isFurnished: 1 });
 PropertyAdSchema.index({ hasParking: 1 });
 PropertyAdSchema.index({ hasGarden: 1 });
+// Compound common query pattern
+PropertyAdSchema.index(
+  { ad: 1, propertyType: 1, bedrooms: 1, bathrooms: 1 },
+  { background: true },
+);

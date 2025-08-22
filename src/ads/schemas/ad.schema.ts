@@ -42,3 +42,11 @@ AdSchema.index({ location: 1 });
 AdSchema.index({ postedBy: 1 });
 AdSchema.index({ isActive: 1 });
 AdSchema.index({ price: 1 });
+// Compound indexes moved from service
+AdSchema.index(
+  { isActive: 1, category: 1, createdAt: -1 },
+  { background: true },
+);
+AdSchema.index({ isActive: 1, location: 1, price: 1 }, { background: true });
+AdSchema.index({ postedBy: 1, isActive: 1 }, { background: true });
+AdSchema.index({ title: 'text', description: 'text' }, { background: true });

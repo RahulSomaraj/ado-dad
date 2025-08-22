@@ -74,3 +74,8 @@ VehicleAdSchema.index({ color: 1 });
 VehicleAdSchema.index({ isFirstOwner: 1 });
 VehicleAdSchema.index({ hasInsurance: 1 });
 VehicleAdSchema.index({ hasRcBook: 1 });
+// Compound common query pattern
+VehicleAdSchema.index(
+  { ad: 1, vehicleType: 1, manufacturerId: 1, modelId: 1 },
+  { background: true },
+);

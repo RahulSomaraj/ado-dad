@@ -109,3 +109,8 @@ CommercialVehicleAdSchema.index({ hasInsurance: 1 });
 CommercialVehicleAdSchema.index({ hasFitness: 1 });
 CommercialVehicleAdSchema.index({ hasPermit: 1 });
 CommercialVehicleAdSchema.index({ seatingCapacity: 1 });
+// Compound common query pattern
+CommercialVehicleAdSchema.index(
+  { ad: 1, manufacturerId: 1, modelId: 1, year: 1 },
+  { background: true },
+);
