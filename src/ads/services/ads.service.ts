@@ -151,12 +151,10 @@ export class AdsService {
     const doVehicleLookup =
       category === AdCategory.PRIVATE_VEHICLE ||
       category === AdCategory.TWO_WHEELER ||
-      (!category && (hasVehicleishFilter || hasCommercialishFilter));
+      !category;
     const doCommercialLookup =
-      category === AdCategory.COMMERCIAL_VEHICLE ||
-      (!category && (hasVehicleishFilter || hasCommercialishFilter));
-    const doPropertyLookup =
-      category === AdCategory.PROPERTY || (!category && needsProperty);
+      category === AdCategory.COMMERCIAL_VEHICLE || !category;
+    const doPropertyLookup = category === AdCategory.PROPERTY || !category;
 
     // 3) Identity filters (cross-category)
     const manufacturerIdsObj = this.toObjectIdArray(filters.manufacturerId);
