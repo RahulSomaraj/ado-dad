@@ -80,7 +80,10 @@ export class AdsService {
 
     // ------- Pipeline -------
     const pipeline: any[] = [];
-    // Filters ignored: no $match stages
+    // Optional category filter
+    if (filters.category) {
+      pipeline.push({ $match: { category: filters.category } });
+    }
 
     // user
     pipeline.push(
@@ -168,6 +171,84 @@ export class AdsService {
       },
       { $project: { _cvehA: 0, _cvehB: 0 } },
     );
+
+    // Optional vehicle filters (applies to vehicle subdocs only)
+    const vehMatch: any = {};
+    if (filters.vehicleType) vehMatch.vehicleType = filters.vehicleType;
+    if (filters.manufacturerId) {
+      const ids = Array.isArray(filters.manufacturerId)
+        ? filters.manufacturerId
+        : [filters.manufacturerId];
+      const objIds = ids
+        .map((id) => {
+          try {
+            return new Types.ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (objIds.length) vehMatch.manufacturerId = { $in: objIds };
+    }
+    if (filters.modelId) {
+      const ids = Array.isArray(filters.modelId)
+        ? filters.modelId
+        : [filters.modelId];
+      const objIds = ids
+        .map((id) => {
+          try {
+            return new Types.ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (objIds.length) vehMatch.modelId = { $in: objIds };
+    }
+    if (filters.variantId) {
+      const ids = Array.isArray(filters.variantId)
+        ? filters.variantId
+        : [filters.variantId];
+      const objIds = ids
+        .map((id) => {
+          try {
+            return new Types.ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (objIds.length) vehMatch.variantId = { $in: objIds };
+    }
+    if (filters.transmissionTypeId) {
+      try {
+        vehMatch.transmissionTypeId = new Types.ObjectId(
+          filters.transmissionTypeId,
+        );
+      } catch {}
+    }
+    if (filters.fuelTypeId) {
+      try {
+        vehMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
+      } catch {}
+    }
+    if (filters.color)
+      vehMatch.color = { $regex: filters.color, $options: 'i' };
+    if (filters.maxMileage != null)
+      vehMatch.mileage = { $lte: filters.maxMileage };
+    if (filters.isFirstOwner != null)
+      vehMatch.isFirstOwner = filters.isFirstOwner;
+    if (filters.hasInsurance != null)
+      vehMatch.hasInsurance = filters.hasInsurance;
+    if (filters.hasRcBook != null) vehMatch.hasRcBook = filters.hasRcBook;
+    if (filters.minYear != null || filters.maxYear != null) {
+      vehMatch.year = {};
+      if (filters.minYear != null) vehMatch.year.$gte = Number(filters.minYear);
+      if (filters.maxYear != null) vehMatch.year.$lte = Number(filters.maxYear);
+    }
+    if (Object.keys(vehMatch).length) {
+      pipeline.push({ $match: { vehicleDetails: { $elemMatch: vehMatch } } });
+    }
 
     // ----- Pagination-only response (no filters) -----
     pipeline.push({
