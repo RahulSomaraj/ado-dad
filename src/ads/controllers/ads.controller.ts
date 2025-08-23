@@ -477,6 +477,33 @@ export class AdsController {
     }
   }
 
+  @Put('v2/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update an existing advertisement (v2)' })
+  @ApiBody({
+    description:
+      'Pass only fields you want to update. Category-specific rules applied server-side.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement updated',
+    type: AdResponseDto,
+  })
+  async updateAdV2(
+    @Param('id') id: string,
+    @Body() updateDto: any,
+    @Request() req: any,
+  ): Promise<AdResponseDto> {
+    // Delegate to service update which applies category-specific logic
+    return this.adsService.update(
+      id,
+      updateDto,
+      req.user._id.toString(),
+      req.user.userType,
+    );
+  }
+
   @Post('upload-images')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.ADMIN)

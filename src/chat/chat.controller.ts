@@ -66,6 +66,36 @@ export class ChatController {
     return { success: true, message };
   }
 
+  @Post(':chatId/block/:targetUserId')
+  async block(
+    @Param('chatId') chatId: string,
+    @Param('targetUserId') targetUserId: string,
+    @Request() req,
+  ) {
+    const blockerId = req.user.id;
+    const chat = await this.chatService.blockUser(
+      chatId,
+      blockerId,
+      targetUserId,
+    );
+    return { success: true, chat };
+  }
+
+  @Post(':chatId/unblock/:targetUserId')
+  async unblock(
+    @Param('chatId') chatId: string,
+    @Param('targetUserId') targetUserId: string,
+    @Request() req,
+  ) {
+    const blockerId = req.user.id;
+    const chat = await this.chatService.unblockUser(
+      chatId,
+      blockerId,
+      targetUserId,
+    );
+    return { success: true, chat };
+  }
+
   @Post(':chatId/read')
   async markAsRead(@Param('chatId') chatId: string, @Request() req) {
     const userId = req.user.id;

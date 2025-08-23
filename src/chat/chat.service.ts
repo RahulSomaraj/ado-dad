@@ -17,8 +17,14 @@ export class ChatService {
     participants: Types.ObjectId[],
     contextType: string,
     contextId: string,
+    postId?: string,
   ) {
-    const chat = new this.chatModel({ participants, contextType, contextId });
+    const chat = new this.chatModel({
+      participants,
+      contextType,
+      contextId,
+      postId,
+    });
     return chat.save();
   }
 
@@ -26,6 +32,7 @@ export class ChatService {
     participants: Types.ObjectId[],
     contextType: string,
     contextId: string,
+    postId?: string,
   ) {
     let chat = await this.chatModel.findOne({
       participants: { $all: participants, $size: 2 },
@@ -33,7 +40,12 @@ export class ChatService {
       contextId,
     });
     if (!chat) {
-      chat = await this.createChat(participants, contextType, contextId);
+      chat = await this.createChat(
+        participants,
+        contextType,
+        contextId,
+        postId,
+      );
     }
     return chat;
   }
@@ -43,15 +55,69 @@ export class ChatService {
       new Types.ObjectId(adPosterId),
       new Types.ObjectId(viewerId),
     ];
-    return this.findOrCreateChat(participants, 'ad', adId);
+    return this.findOrCreateChat(participants, 'ad', adId, adId);
+  }
+
+  private isBlockedPair(
+    chat: any,
+    blocker: Types.ObjectId,
+    blocked: Types.ObjectId,
+  ): boolean {
+    return (
+      Array.isArray((chat as any).blocks) &&
+      (chat as any).blocks.some(
+        (b: any) =>
+          b.blocker?.toString() === blocker.toString() &&
+          b.blocked?.toString() === blocked.toString(),
+      )
+    );
+  }
+
+  async blockUser(chatId: string, blockerId: string, blockedId: string) {
+    const chat = await this.chatModel.findById(chatId);
+    if (!chat) return null;
+    const blocker = new Types.ObjectId(blockerId);
+    const blocked = new Types.ObjectId(blockedId);
+    if (!this.isBlockedPair(chat, blocker, blocked)) {
+      (chat as any).blocks.push({ blocker, blocked, at: new Date() });
+      await chat.save();
+    }
+    return chat;
+  }
+
+  async unblockUser(chatId: string, blockerId: string, blockedId: string) {
+    const chat = await this.chatModel.findById(chatId);
+    if (!chat) return null;
+    const blocker = new Types.ObjectId(blockerId);
+    const blocked = new Types.ObjectId(blockedId);
+    (chat as any).blocks = (chat as any).blocks?.filter(
+      (b: any) =>
+        !(
+          b.blocker?.toString() === blocker.toString() &&
+          b.blocked?.toString() === blocked.toString()
+        ),
+    );
+    await chat.save();
+    return chat;
   }
 
   async sendMessage(chatId: string, senderId: string, content: string) {
-    const message = new this.messageModel({
-      chat: chatId,
-      sender: senderId,
-      content,
-    });
+    const chat = await this.chatModel.findById(chatId);
+    if (!chat) return null;
+    const sender = new Types.ObjectId(senderId);
+    const other = (
+      chat.participants[0].toString() === sender.toString()
+        ? chat.participants[1]
+        : chat.participants[0]
+    ) as Types.ObjectId;
+    // Block enforcement
+    if (
+      this.isBlockedPair(chat, other, sender) ||
+      this.isBlockedPair(chat, sender, other)
+    ) {
+      throw new Error('Messaging blocked between users');
+    }
+    const message = new this.messageModel({ chat: chat._id, sender, content });
     return message.save();
   }
 

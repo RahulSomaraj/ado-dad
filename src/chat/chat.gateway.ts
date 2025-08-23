@@ -89,13 +89,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.content,
       );
 
+      if (!message) {
+        this.logger.warn(`sendMessage returned null for chat ${data.chatId}`);
+        return { error: 'Failed to send message' };
+      }
+
+      // Ensure sender is in the room (idempotent)
+      client.join(data.chatId);
+
       // Emit to all users in the chat room
       this.server.to(data.chatId).emit('newMessage', {
-        id: message._id,
-        chat: message.chat,
-        sender: message.sender,
+        id: (message as any)._id?.toString?.() ?? (message as any)._id,
+        chat: (message as any).chat?.toString?.() ?? (message as any).chat,
+        sender:
+          (message as any).sender?.toString?.() ?? (message as any).sender,
         content: message.content,
-        createdAt: (message as any).createdAt,
+        createdAt: (message as any).createdAt ?? new Date(),
         read: message.read,
       });
 

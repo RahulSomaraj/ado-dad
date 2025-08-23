@@ -197,11 +197,11 @@ export class MyGateway
 
       this.logger.log(`✅ ==========================================`);
       this.logger.log(`✅ MESSAGE SAVED SUCCESSFULLY!`);
-      this.logger.log(`✅ Message ID: ${savedMessage._id}`);
+      this.logger.log(`✅ Message ID: ${savedMessage?._id ?? 'N/A'}`);
       this.logger.log(`✅ Chat ID: ${chatId}`);
       this.logger.log(`✅ Sender ID: ${senderId}`);
       this.logger.log(
-        `✅ Content: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+        `✅ Content: ${typeof content === 'string' ? content.substring(0, 50) + (content.length > 50 ? '...' : '') : ''}`,
       );
       this.logger.log(`✅ Timestamp: ${timestamp}`);
       this.logger.log(`✅ ==========================================`);
@@ -211,8 +211,8 @@ export class MyGateway
 
       // Send confirmation to sender
       client.emit('messageSent', {
-        messageId: savedMessage._id,
-        status: 'sent',
+        messageId: savedMessage?._id ?? null,
+        status: savedMessage ? 'sent' : 'error',
         timestamp: timestamp,
         clientId: client.id,
       });

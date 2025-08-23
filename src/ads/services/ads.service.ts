@@ -808,16 +808,35 @@ export class AdsService {
     id: string,
     updateDto: any,
     userId: string,
+    userType?: string,
   ): Promise<AdResponseDto> {
-    const ad = await this.adModel.findOne({ _id: id, postedBy: userId });
+    // Allow if owner or Super Admin
+    const ad = await this.adModel.findById(id);
     if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+    const isOwner = (ad.postedBy as any)?.toString?.() === userId;
+    const isSuperAdmin = userType === 'SA';
+    if (!isOwner && !isSuperAdmin) {
       throw new NotFoundException(
         `Advertisement with ID ${id} not found or you don't have permission to update it`,
       );
     }
 
-    Object.assign(ad, updateDto);
-    await ad.save();
+    // 1) Update top-level ad fields (only allowed ones)
+    const adUpdate: any = {};
+    if (typeof updateDto.description === 'string')
+      adUpdate.description = updateDto.description;
+    if (typeof updateDto.price === 'number') adUpdate.price = updateDto.price;
+    if (Array.isArray(updateDto.images)) adUpdate.images = updateDto.images;
+    if (typeof updateDto.location === 'string')
+      adUpdate.location = updateDto.location;
+    if (typeof updateDto.isActive === 'boolean')
+      adUpdate.isActive = updateDto.isActive;
+    if (Object.keys(adUpdate).length) {
+      Object.assign(ad, adUpdate);
+      await ad.save();
+    }
 
     switch (ad.category) {
       case AdCategory.PROPERTY:
@@ -825,10 +844,10 @@ export class AdsService {
         break;
       case AdCategory.PRIVATE_VEHICLE:
       case AdCategory.TWO_WHEELER:
-        await this.updateVehicleAd(id, updateDto);
+        await this.updateVehicleAdValidated(id, updateDto, ad);
         break;
       case AdCategory.COMMERCIAL_VEHICLE:
-        await this.updateCommercialVehicleAd(id, updateDto);
+        await this.updateCommercialVehicleAdValidated(id, updateDto, ad);
         break;
     }
 
@@ -1096,27 +1115,173 @@ export class AdsService {
   private async updatePropertyAd(id: string, updateDto: any): Promise<void> {
     const doc = await this.propertyAdModel.findOne({ ad: id });
     if (doc) {
-      Object.assign(doc, updateDto);
+      const allowed: any = {};
+      if (updateDto.propertyType) allowed.propertyType = updateDto.propertyType;
+      if (typeof updateDto.bedrooms === 'number')
+        allowed.bedrooms = updateDto.bedrooms;
+      if (typeof updateDto.bathrooms === 'number')
+        allowed.bathrooms = updateDto.bathrooms;
+      if (typeof updateDto.areaSqft === 'number')
+        allowed.areaSqft = updateDto.areaSqft;
+      if (typeof updateDto.floor === 'number') allowed.floor = updateDto.floor;
+      if (typeof updateDto.isFurnished === 'boolean')
+        allowed.isFurnished = updateDto.isFurnished;
+      if (typeof updateDto.hasParking === 'boolean')
+        allowed.hasParking = updateDto.hasParking;
+      if (typeof updateDto.hasGarden === 'boolean')
+        allowed.hasGarden = updateDto.hasGarden;
+      if (Array.isArray(updateDto.amenities))
+        allowed.amenities = updateDto.amenities;
+      Object.assign(doc, allowed);
       await doc.save();
     }
   }
 
-  private async updateVehicleAd(id: string, updateDto: any): Promise<void> {
-    const doc = await this.vehicleAdModel.findOne({ ad: id });
-    if (doc) {
-      Object.assign(doc, updateDto);
-      await doc.save();
-    }
-  }
-
-  private async updateCommercialVehicleAd(
+  private async updateVehicleAdValidated(
     id: string,
     updateDto: any,
+    ad: AdDocument,
+  ): Promise<void> {
+    const doc = await this.vehicleAdModel.findOne({ ad: id });
+    if (!doc) return;
+
+    const update: any = {};
+    if (updateDto.vehicleType) update.vehicleType = updateDto.vehicleType;
+    if (updateDto.manufacturerId) {
+      await this.vehicleInventoryService.findManufacturerById(
+        updateDto.manufacturerId,
+      );
+      update.manufacturerId = new Types.ObjectId(updateDto.manufacturerId);
+    }
+    if (updateDto.modelId) {
+      await this.vehicleInventoryService.findVehicleModelById(
+        updateDto.modelId,
+      );
+      update.modelId = new Types.ObjectId(updateDto.modelId);
+    }
+    if (updateDto.variantId)
+      update.variantId = new Types.ObjectId(updateDto.variantId);
+    if (typeof updateDto.year === 'number') update.year = updateDto.year;
+    if (typeof updateDto.mileage === 'number')
+      update.mileage = updateDto.mileage;
+    if (updateDto.transmissionTypeId) {
+      await this.vehicleInventoryService.findTransmissionTypeById(
+        updateDto.transmissionTypeId,
+      );
+      update.transmissionTypeId = new Types.ObjectId(
+        updateDto.transmissionTypeId,
+      );
+    }
+    if (updateDto.fuelTypeId) {
+      await this.vehicleInventoryService.findFuelTypeById(updateDto.fuelTypeId);
+      update.fuelTypeId = new Types.ObjectId(updateDto.fuelTypeId);
+    }
+    if (typeof updateDto.color === 'string') update.color = updateDto.color;
+    if (typeof updateDto.isFirstOwner === 'boolean')
+      update.isFirstOwner = updateDto.isFirstOwner;
+    if (typeof updateDto.hasInsurance === 'boolean')
+      update.hasInsurance = updateDto.hasInsurance;
+    if (typeof updateDto.hasRcBook === 'boolean')
+      update.hasRcBook = updateDto.hasRcBook;
+    if (Array.isArray(updateDto.additionalFeatures))
+      update.additionalFeatures = updateDto.additionalFeatures;
+
+    Object.assign(doc, update);
+    await doc.save();
+
+    // Update ad title if model/year changed
+    if (updateDto.modelId || updateDto.year) {
+      const modelId = updateDto.modelId
+        ? updateDto.modelId
+        : (doc.modelId as any)?.toString?.();
+      if (modelId) {
+        const model =
+          await this.vehicleInventoryService.findVehicleModelById(modelId);
+        const modelName =
+          (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+        const year = updateDto.year ?? doc.year ?? '';
+        const title = `${modelName} ${year}`.trim();
+        await this.adModel.updateOne({ _id: ad._id }, { title });
+      }
+    }
+  }
+
+  private async updateCommercialVehicleAdValidated(
+    id: string,
+    updateDto: any,
+    ad: AdDocument,
   ): Promise<void> {
     const doc = await this.commercialVehicleAdModel.findOne({ ad: id });
-    if (doc) {
-      Object.assign(doc, updateDto);
-      await doc.save();
+    if (!doc) return;
+
+    const update: any = {};
+    if (updateDto.commercialVehicleType)
+      update.commercialVehicleType = updateDto.commercialVehicleType;
+    if (updateDto.bodyType) update.bodyType = updateDto.bodyType;
+    if (updateDto.manufacturerId) {
+      await this.vehicleInventoryService.findManufacturerById(
+        updateDto.manufacturerId,
+      );
+      update.manufacturerId = new Types.ObjectId(updateDto.manufacturerId);
+    }
+    if (updateDto.modelId) {
+      await this.vehicleInventoryService.findVehicleModelById(
+        updateDto.modelId,
+      );
+      update.modelId = new Types.ObjectId(updateDto.modelId);
+    }
+    if (updateDto.variantId)
+      update.variantId = new Types.ObjectId(updateDto.variantId);
+    if (typeof updateDto.year === 'number') update.year = updateDto.year;
+    if (typeof updateDto.mileage === 'number')
+      update.mileage = updateDto.mileage;
+    if (typeof updateDto.payloadCapacity === 'number')
+      update.payloadCapacity = updateDto.payloadCapacity;
+    if (typeof updateDto.payloadUnit === 'string')
+      update.payloadUnit = updateDto.payloadUnit;
+    if (typeof updateDto.axleCount === 'number')
+      update.axleCount = updateDto.axleCount;
+    if (updateDto.transmissionTypeId) {
+      await this.vehicleInventoryService.findTransmissionTypeById(
+        updateDto.transmissionTypeId,
+      );
+      update.transmissionTypeId = new Types.ObjectId(
+        updateDto.transmissionTypeId,
+      );
+    }
+    if (updateDto.fuelTypeId) {
+      await this.vehicleInventoryService.findFuelTypeById(updateDto.fuelTypeId);
+      update.fuelTypeId = new Types.ObjectId(updateDto.fuelTypeId);
+    }
+    if (typeof updateDto.color === 'string') update.color = updateDto.color;
+    if (typeof updateDto.hasInsurance === 'boolean')
+      update.hasInsurance = updateDto.hasInsurance;
+    if (typeof updateDto.hasFitness === 'boolean')
+      update.hasFitness = updateDto.hasFitness;
+    if (typeof updateDto.hasPermit === 'boolean')
+      update.hasPermit = updateDto.hasPermit;
+    if (Array.isArray(updateDto.additionalFeatures))
+      update.additionalFeatures = updateDto.additionalFeatures;
+    if (typeof updateDto.seatingCapacity === 'number')
+      update.seatingCapacity = updateDto.seatingCapacity;
+
+    Object.assign(doc, update);
+    await doc.save();
+
+    // Update ad title if model/year changed
+    if (updateDto.modelId || updateDto.year) {
+      const modelId = updateDto.modelId
+        ? updateDto.modelId
+        : (doc.modelId as any)?.toString?.();
+      if (modelId) {
+        const model =
+          await this.vehicleInventoryService.findVehicleModelById(modelId);
+        const modelName =
+          (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+        const year = updateDto.year ?? doc.year ?? '';
+        const title = `${modelName} ${year}`.trim();
+        await this.adModel.updateOne({ _id: ad._id }, { title });
+      }
     }
   }
 
