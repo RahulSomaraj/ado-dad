@@ -64,7 +64,7 @@ export class AdsService {
     return obj && Object.keys(obj).length > 0 ? obj : undefined;
   }
 
-  /** ---------- FIND ALL (OPTIMIZED) ---------- */
+  /** ---------- FIND ALL (robust lookups + neutral defaults, all filters, all lists, all categories) ---------- */
   async findAll(filters: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
     const {
       page = 1,
@@ -76,329 +76,103 @@ export class AdsService {
 
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
 
-    // 1) Root match
-    const rootMatch: any = { isActive: filters.isActive ?? true };
-    if (filters.category) rootMatch.category = filters.category;
-    if (filters.location) {
-      rootMatch.location = { $regex: filters.location, $options: 'i' };
-    }
-    if (filters.minPrice != null || filters.maxPrice != null) {
-      rootMatch.price = {};
-      if (filters.minPrice != null) rootMatch.price.$gte = filters.minPrice;
-      if (filters.maxPrice != null) rootMatch.price.$lte = filters.maxPrice;
-    }
-    if (filters.postedBy) {
-      const postedBy = this.toObjectId(filters.postedBy);
-      if (postedBy) rootMatch.postedBy = postedBy;
-    }
+    // Filters ignored: remove identity helpers and match builders
 
-    const textMatch = search ? { $text: { $search: search } } : undefined;
-
-    // 2) Which lookups are needed?
-    const needsUser = true;
-
-    const needsProperty = !!(
-      filters.propertyType ||
-      filters.minBedrooms != null ||
-      filters.maxBedrooms != null ||
-      filters.minBathrooms != null ||
-      filters.maxBathrooms != null ||
-      filters.minArea != null ||
-      filters.maxArea != null ||
-      filters.isFurnished !== undefined ||
-      filters.hasParking !== undefined ||
-      filters.hasGarden !== undefined
-    );
-
-    const hasVehicleishFilter = !!(
-      filters.vehicleType ||
-      filters.manufacturerId ||
-      filters.modelId ||
-      filters.variantId ||
-      filters.transmissionTypeId ||
-      filters.fuelTypeId ||
-      filters.color ||
-      filters.maxMileage !== undefined ||
-      filters.isFirstOwner !== undefined ||
-      filters.hasInsurance !== undefined ||
-      filters.hasRcBook !== undefined ||
-      filters.minYear != null ||
-      filters.maxYear != null
-    );
-
-    const hasCommercialishFilter = !!(
-      filters.commercialVehicleType ||
-      filters.bodyType ||
-      filters.minPayloadCapacity != null ||
-      filters.maxPayloadCapacity != null ||
-      filters.axleCount != null ||
-      filters.hasFitness !== undefined ||
-      filters.hasPermit !== undefined ||
-      filters.minSeatingCapacity != null ||
-      filters.maxSeatingCapacity != null ||
-      filters.manufacturerId ||
-      filters.modelId ||
-      filters.variantId ||
-      filters.transmissionTypeId ||
-      filters.fuelTypeId ||
-      filters.color ||
-      filters.minYear != null ||
-      filters.maxYear != null ||
-      filters.maxMileage !== undefined
-    );
-
-    const category = filters.category;
-    const doVehicleLookup =
-      category === AdCategory.PRIVATE_VEHICLE ||
-      category === AdCategory.TWO_WHEELER ||
-      !category;
-    const doCommercialLookup =
-      category === AdCategory.COMMERCIAL_VEHICLE || !category;
-    const doPropertyLookup = category === AdCategory.PROPERTY || !category;
-
-    // 3) Identity filters (cross-category)
-    const manufacturerIdsObj = this.toObjectIdArray(filters.manufacturerId);
-    const modelIdsObj = this.toObjectIdArray(filters.modelId);
-    const variantIdObj = this.toObjectId(filters.variantId);
-
-    const identityObj: any = {};
-    if (manufacturerIdsObj)
-      identityObj.manufacturerId = { $in: manufacturerIdsObj };
-    if (modelIdsObj) identityObj.modelId = { $in: modelIdsObj };
-    if (variantIdObj) identityObj.variantId = variantIdObj;
-
-    const hasIdentityFilter = !!this.nonEmpty(identityObj);
-    const appliedCrossCategoryIdentityFilter = !category && hasIdentityFilter;
-
-    // 4) Subdoc matchers
-    const vehicleMatch: any = {};
-    if (filters.vehicleType) vehicleMatch.vehicleType = filters.vehicleType;
-    if (!appliedCrossCategoryIdentityFilter) {
-      if (manufacturerIdsObj)
-        vehicleMatch.manufacturerId = { $in: manufacturerIdsObj };
-      if (modelIdsObj) vehicleMatch.modelId = { $in: modelIdsObj };
-      if (variantIdObj) vehicleMatch.variantId = variantIdObj;
-    }
-    if (filters.transmissionTypeId) {
-      const t = this.toObjectId(filters.transmissionTypeId);
-      if (t) vehicleMatch.transmissionTypeId = t;
-    }
-    if (filters.fuelTypeId) {
-      const f = this.toObjectId(filters.fuelTypeId);
-      if (f) vehicleMatch.fuelTypeId = f;
-    }
-    if (filters.color)
-      vehicleMatch.color = { $regex: filters.color, $options: 'i' };
-    if (filters.maxMileage != null)
-      vehicleMatch.mileage = { $lte: filters.maxMileage };
-    if (filters.isFirstOwner != null)
-      vehicleMatch.isFirstOwner = filters.isFirstOwner;
-    if (filters.hasInsurance != null)
-      vehicleMatch.hasInsurance = filters.hasInsurance;
-    if (filters.hasRcBook != null) vehicleMatch.hasRcBook = filters.hasRcBook;
-    if (filters.minYear != null || filters.maxYear != null) {
-      vehicleMatch.year = {};
-      if (filters.minYear != null)
-        vehicleMatch.year.$gte = Number(filters.minYear);
-      if (filters.maxYear != null)
-        vehicleMatch.year.$lte = Number(filters.maxYear);
-    }
-
-    const commercialMatch: any = {};
-    if (filters.commercialVehicleType)
-      commercialMatch.commercialVehicleType = filters.commercialVehicleType;
-    if (filters.bodyType) commercialMatch.bodyType = filters.bodyType;
-    if (!appliedCrossCategoryIdentityFilter) {
-      if (manufacturerIdsObj)
-        commercialMatch.manufacturerId = { $in: manufacturerIdsObj };
-      if (modelIdsObj) commercialMatch.modelId = { $in: modelIdsObj };
-      if (variantIdObj) commercialMatch.variantId = variantIdObj;
-    }
-    if (filters.transmissionTypeId) {
-      const t = this.toObjectId(filters.transmissionTypeId);
-      if (t) commercialMatch.transmissionTypeId = t;
-    }
-    if (filters.fuelTypeId) {
-      const f = this.toObjectId(filters.fuelTypeId);
-      if (f) commercialMatch.fuelTypeId = f;
-    }
-    if (filters.color)
-      commercialMatch.color = { $regex: filters.color, $options: 'i' };
-    if (filters.maxMileage != null)
-      commercialMatch.mileage = { $lte: filters.maxMileage };
-    if (
-      filters.minPayloadCapacity != null ||
-      filters.maxPayloadCapacity != null
-    ) {
-      commercialMatch.payloadCapacity = {};
-      if (filters.minPayloadCapacity != null)
-        commercialMatch.payloadCapacity.$gte = filters.minPayloadCapacity;
-      if (filters.maxPayloadCapacity != null)
-        commercialMatch.payloadCapacity.$lte = filters.maxPayloadCapacity;
-    }
-    if (filters.axleCount != null)
-      commercialMatch.axleCount = filters.axleCount;
-    if (filters.hasFitness != null)
-      commercialMatch.hasFitness = filters.hasFitness;
-    if (filters.hasPermit != null)
-      commercialMatch.hasPermit = filters.hasPermit;
-    if (
-      filters.minSeatingCapacity != null ||
-      filters.maxSeatingCapacity != null
-    ) {
-      commercialMatch.seatingCapacity = {};
-      if (filters.minSeatingCapacity != null)
-        commercialMatch.seatingCapacity.$gte = filters.minSeatingCapacity;
-      if (filters.maxSeatingCapacity != null)
-        commercialMatch.seatingCapacity.$lte = filters.maxSeatingCapacity;
-    }
-    if (filters.minYear != null || filters.maxYear != null) {
-      commercialMatch.year = {};
-      if (filters.minYear != null)
-        commercialMatch.year.$gte = Number(filters.minYear);
-      if (filters.maxYear != null)
-        commercialMatch.year.$lte = Number(filters.maxYear);
-    }
-
-    const propertyMatch: any = {};
-    if (filters.propertyType) propertyMatch.propertyType = filters.propertyType;
-    if (filters.minBedrooms != null || filters.maxBedrooms != null) {
-      propertyMatch.bedrooms = {};
-      if (filters.minBedrooms != null)
-        propertyMatch.bedrooms.$gte = filters.minBedrooms;
-      if (filters.maxBedrooms != null)
-        propertyMatch.bedrooms.$lte = filters.maxBedrooms;
-    }
-    if (filters.minBathrooms != null || filters.maxBathrooms != null) {
-      propertyMatch.bathrooms = {};
-      if (filters.minBathrooms != null)
-        propertyMatch.bathrooms.$gte = filters.minBathrooms;
-      if (filters.maxBathrooms != null)
-        propertyMatch.bathrooms.$lte = filters.maxBathrooms;
-    }
-    if (filters.minArea != null || filters.maxArea != null) {
-      propertyMatch.areaSqft = {};
-      if (filters.minArea != null)
-        propertyMatch.areaSqft.$gte = filters.minArea;
-      if (filters.maxArea != null)
-        propertyMatch.areaSqft.$lte = filters.maxArea;
-    }
-    if (filters.isFurnished != null)
-      propertyMatch.isFurnished = filters.isFurnished;
-    if (filters.hasParking != null)
-      propertyMatch.hasParking = filters.hasParking;
-    if (filters.hasGarden != null) propertyMatch.hasGarden = filters.hasGarden;
-
-    // 5) Pipeline
+    // ------- Pipeline -------
     const pipeline: any[] = [];
-    if (textMatch) pipeline.push({ $match: textMatch });
-    pipeline.push({ $match: rootMatch });
+    // Filters ignored: no $match stages
 
-    if (needsUser) {
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'postedBy',
-            foreignField: '_id',
-            as: 'user',
-            pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
-          },
+    // user
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-      );
-    }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
 
-    if (doPropertyLookup) {
-      pipeline.push({
+    // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
+    // Property
+    pipeline.push(
+      {
         $lookup: {
           from: 'propertyads',
           localField: '_id',
           foreignField: 'ad',
-          as: 'propertyDetails',
+          as: '_propA',
         },
-      });
-    }
+      },
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: '_propB',
+        },
+      },
+      {
+        $addFields: { propertyDetails: { $setUnion: ['$_propA', '$_propB'] } },
+      },
+      { $project: { _propA: 0, _propB: 0 } },
+    );
 
-    if (doVehicleLookup) {
-      pipeline.push({
+    // Vehicle
+    pipeline.push(
+      {
         $lookup: {
           from: 'vehicleads',
           localField: '_id',
           foreignField: 'ad',
-          as: 'vehicleDetails',
+          as: '_vehA',
         },
-      });
-    }
+      },
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: '_vehB',
+        },
+      },
+      { $addFields: { vehicleDetails: { $setUnion: ['$_vehA', '$_vehB'] } } },
+      { $project: { _vehA: 0, _vehB: 0 } },
+    );
 
-    if (doCommercialLookup) {
-      pipeline.push({
+    // Commercial vehicle
+    pipeline.push(
+      {
         $lookup: {
           from: 'commercialvehicleads',
           localField: '_id',
           foreignField: 'ad',
-          as: 'commercialVehicleDetails',
+          as: '_cvehA',
         },
-      });
-    }
+      },
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: '_cvehB',
+        },
+      },
+      {
+        $addFields: {
+          commercialVehicleDetails: { $setUnion: ['$_cvehA', '$_cvehB'] },
+        },
+      },
+      { $project: { _cvehA: 0, _cvehB: 0 } },
+    );
 
-    if (category === AdCategory.COMMERCIAL_VEHICLE) {
-      pipeline.push({ $match: { commercialVehicleDetails: { $ne: [] } } });
-    }
-
-    if (appliedCrossCategoryIdentityFilter) {
-      const orConditions: any[] = [];
-      if (doVehicleLookup)
-        orConditions.push({ vehicleDetails: { $elemMatch: identityObj } });
-      if (doCommercialLookup)
-        orConditions.push({
-          commercialVehicleDetails: { $elemMatch: identityObj },
-        });
-      if (orConditions.length) pipeline.push({ $match: { $or: orConditions } });
-    }
-
-    if (
-      !appliedCrossCategoryIdentityFilter &&
-      this.nonEmpty(vehicleMatch) &&
-      doVehicleLookup
-    ) {
-      pipeline.push({
-        $match: { vehicleDetails: { $elemMatch: vehicleMatch } },
-      });
-    }
-
-    if (
-      !appliedCrossCategoryIdentityFilter &&
-      this.nonEmpty(commercialMatch) &&
-      doCommercialLookup
-    ) {
-      pipeline.push({
-        $match: { commercialVehicleDetails: { $elemMatch: commercialMatch } },
-      });
-    }
-
-    if (this.nonEmpty(propertyMatch) && doPropertyLookup) {
-      pipeline.push({
-        $match: { propertyDetails: { $elemMatch: propertyMatch } },
-      });
-    }
-
-    // Sorting + pagination (+ optional text score)
-    if (search && sortBy === 'textScore') {
-      pipeline.push({ $addFields: { score: { $meta: 'textScore' } } });
-    }
-    const sortStage =
-      search && sortBy === 'textScore'
-        ? { score: { $meta: 'textScore' } }
-        : { [sortBy]: sortDirection };
-
+    // ----- Pagination-only response (no filters) -----
     pipeline.push({
       $facet: {
-        data: [
-          { $sort: sortStage },
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-        ],
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
         total: [{ $count: 'count' }],
       },
     });

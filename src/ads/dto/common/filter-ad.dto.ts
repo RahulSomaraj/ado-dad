@@ -265,12 +265,16 @@ export class FilterAdDto {
   modelId?: string[];
 
   @ApiPropertyOptional({
-    description: 'Variant ID filter (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439013',
+    description: 'Variant IDs filter (MongoDB ObjectIds)',
+    example: ['507f1f77bcf86cd799439013'],
   })
   @IsOptional()
-  @IsString()
-  variantId?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value !== undefined ? [value] : undefined,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  variantId?: string[];
 
   @ApiPropertyOptional({
     description: 'Minimum manufacturing year',
