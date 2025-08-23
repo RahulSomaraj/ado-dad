@@ -221,16 +221,34 @@ export class AdsService {
       if (objIds.length) vehMatch.variantId = { $in: objIds };
     }
     if (filters.transmissionTypeId) {
-      try {
-        vehMatch.transmissionTypeId = new Types.ObjectId(
-          filters.transmissionTypeId,
-        );
-      } catch {}
+      const ids = Array.isArray(filters.transmissionTypeId)
+        ? filters.transmissionTypeId
+        : [filters.transmissionTypeId];
+      const objIds = ids
+        .map((id) => {
+          try {
+            return new Types.ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (objIds.length) vehMatch.transmissionTypeId = { $in: objIds };
     }
     if (filters.fuelTypeId) {
-      try {
-        vehMatch.fuelTypeId = new Types.ObjectId(filters.fuelTypeId);
-      } catch {}
+      const ids = Array.isArray(filters.fuelTypeId)
+        ? filters.fuelTypeId
+        : [filters.fuelTypeId];
+      const objIds = ids
+        .map((id) => {
+          try {
+            return new Types.ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (objIds.length) vehMatch.fuelTypeId = { $in: objIds };
     }
     if (filters.color)
       vehMatch.color = { $regex: filters.color, $options: 'i' };

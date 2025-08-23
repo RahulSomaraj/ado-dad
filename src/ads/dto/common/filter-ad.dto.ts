@@ -314,16 +314,24 @@ export class FilterAdDto {
     example: '507f1f77bcf86cd799439014',
   })
   @IsOptional()
-  @IsString()
-  transmissionTypeId?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value !== undefined ? [value] : undefined,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  transmissionTypeId?: string[];
 
   @ApiPropertyOptional({
     description: 'Fuel type ID filter (MongoDB ObjectId)',
     example: '507f1f77bcf86cd799439015',
   })
   @IsOptional()
-  @IsString()
-  fuelTypeId?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value !== undefined ? [value] : undefined,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  fuelTypeId?: string[];
 
   @ApiPropertyOptional({
     description: 'Vehicle color filter (partial match)',
