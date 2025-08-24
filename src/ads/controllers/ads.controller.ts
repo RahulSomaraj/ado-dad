@@ -13,7 +13,9 @@ import {
   MaxFileSizeValidator,
   FileTypeValidator,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -495,6 +497,9 @@ export class AdsController {
     @Body() updateDto: any,
     @Request() req: any,
   ): Promise<AdResponseDto> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid ad id');
+    }
     // Delegate to service update which applies category-specific logic
     return this.adsService.update(
       id,
@@ -506,7 +511,7 @@ export class AdsController {
 
   @Post('upload-images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
@@ -555,7 +560,7 @@ export class AdsController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update advertisement by ID',
