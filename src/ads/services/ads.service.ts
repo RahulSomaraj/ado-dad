@@ -812,6 +812,8 @@ export class AdsService {
   ): Promise<AdResponseDto> {
     // Allow if owner or Super Admin
     const ad = await this.adModel.findById(id);
+    console.log('id', id);
+    console.log('ad', ad);
     if (!ad) {
       throw new NotFoundException(`Advertisement with ID ${id} not found`);
     }

@@ -100,6 +100,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transformOptions: { enableImplicitConversion: true },
+      skipMissingProperties: true,
     }),
   );
   app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));

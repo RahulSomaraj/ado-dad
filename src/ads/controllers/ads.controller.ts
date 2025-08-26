@@ -37,6 +37,7 @@ import { CreatePropertyAdDto } from '../dto/property/create-property-ad.dto';
 import { CreateVehicleAdDto } from '../dto/vehicle/create-vehicle-ad.dto';
 import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-commercial-vehicle-ad.dto';
 import { CreateAdDto } from '../dto/common/create-ad.dto';
+import { EditAdDto } from '../dto/common/edit-ad.dto';
 import {
   AdResponseDto,
   PaginatedAdResponseDto,
@@ -220,7 +221,25 @@ export class AdsController {
     description: 'Advertisement not found',
   })
   async getAdById(@Param('id') id: string): Promise<DetailedAdResponseDto> {
-    return this.adsService.getAdById(id);
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+
+      return await this.adsService.getAdById(id);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+      throw error;
+    }
   }
 
   @Post()
@@ -484,6 +503,7 @@ export class AdsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing advertisement (v2)' })
   @ApiBody({
+    type: EditAdDto,
     description:
       'Pass only fields you want to update. Category-specific rules applied server-side.',
   })
@@ -494,19 +514,34 @@ export class AdsController {
   })
   async updateAdV2(
     @Param('id') id: string,
-    @Body() updateDto: any,
+    @Body() updateDto: EditAdDto,
     @Request() req: any,
   ): Promise<AdResponseDto> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ad id');
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+
+      // Delegate to service update which applies category-specific logic
+      return await this.adsService.update(
+        id,
+        updateDto,
+        req.user._id.toString(),
+        req.user.userType,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+      throw error;
     }
-    // Delegate to service update which applies category-specific logic
-    return this.adsService.update(
-      id,
-      updateDto,
-      req.user._id.toString(),
-      req.user.userType,
-    );
   }
 
   @Post('upload-images')
@@ -568,7 +603,7 @@ export class AdsController {
       'Update an existing advertisement. Only the advertisement owner or admin can update it.',
   })
   @ApiParam({ name: 'id', description: 'Advertisement ID (MongoDB ObjectId)' })
-  @ApiBody({ type: CreateAdDto })
+  @ApiBody({ type: EditAdDto })
   @ApiResponse({
     status: 200,
     description: 'Advertisement updated successfully',
@@ -592,10 +627,33 @@ export class AdsController {
   })
   async updateAd(
     @Param('id') id: string,
-    @Body() updateAdDto: CreateAdDto,
+    @Body() updateAdDto: EditAdDto,
     @Request() req: any,
   ): Promise<AdResponseDto> {
-    return this.adsService.update(id, updateAdDto, req.user.id);
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+
+      return await this.adsService.update(
+        id,
+        updateAdDto,
+        req.user.id,
+        req.user.userType,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+      throw error;
+    }
   }
 
   @Delete(':id')
@@ -637,8 +695,26 @@ export class AdsController {
     @Param('id') id: string,
     @Request() req: any,
   ): Promise<{ message: string }> {
-    await this.adsService.delete(id, req.user.id);
-    return { message: 'Advertisement deleted successfully' };
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+
+      await this.adsService.delete(id, req.user.id);
+      return { message: 'Advertisement deleted successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+      throw error;
+    }
   }
 
   // Vehicle Inventory endpoints for lookup data
