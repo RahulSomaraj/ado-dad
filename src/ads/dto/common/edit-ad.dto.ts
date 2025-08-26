@@ -7,6 +7,7 @@ import {
   IsArray,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -390,7 +391,8 @@ export class EditAdDto {
     },
   })
   @IsOptional()
-  @ValidateNested()
+  @ValidateIf((o) => o.data && Object.keys(o.data).length > 0)
+  @ValidateNested({ each: false })
   @Type(() => EditAdDataDto)
   data?: EditAdDataDto;
 }

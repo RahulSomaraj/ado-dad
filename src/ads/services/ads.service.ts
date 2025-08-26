@@ -827,14 +827,23 @@ export class AdsService {
 
     // 1) Update top-level ad fields (only allowed ones)
     const adUpdate: any = {};
-    if (typeof updateDto.description === 'string')
-      adUpdate.description = updateDto.description;
-    if (typeof updateDto.price === 'number') adUpdate.price = updateDto.price;
-    if (Array.isArray(updateDto.images)) adUpdate.images = updateDto.images;
-    if (typeof updateDto.location === 'string')
-      adUpdate.location = updateDto.location;
-    if (typeof updateDto.isActive === 'boolean')
-      adUpdate.isActive = updateDto.isActive;
+
+    // Handle both old format (direct properties) and new format (nested in data)
+    const updateData = updateDto.data || updateDto;
+
+    // If data is empty object, treat it as no updates
+    if (updateDto.data && Object.keys(updateDto.data).length === 0) {
+      console.log('Empty data object provided, no updates to apply');
+    }
+
+    if (typeof updateData.description === 'string')
+      adUpdate.description = updateData.description;
+    if (typeof updateData.price === 'number') adUpdate.price = updateData.price;
+    if (Array.isArray(updateData.images)) adUpdate.images = updateData.images;
+    if (typeof updateData.location === 'string')
+      adUpdate.location = updateData.location;
+    if (typeof updateData.isActive === 'boolean')
+      adUpdate.isActive = updateData.isActive;
     if (Object.keys(adUpdate).length) {
       Object.assign(ad, adUpdate);
       await ad.save();
@@ -842,14 +851,14 @@ export class AdsService {
 
     switch (ad.category) {
       case AdCategory.PROPERTY:
-        await this.updatePropertyAd(id, updateDto);
+        await this.updatePropertyAd(id, updateData);
         break;
       case AdCategory.PRIVATE_VEHICLE:
       case AdCategory.TWO_WHEELER:
-        await this.updateVehicleAdValidated(id, updateDto, ad);
+        await this.updateVehicleAdValidated(id, updateData, ad);
         break;
       case AdCategory.COMMERCIAL_VEHICLE:
-        await this.updateCommercialVehicleAdValidated(id, updateDto, ad);
+        await this.updateCommercialVehicleAdValidated(id, updateData, ad);
         break;
     }
 
