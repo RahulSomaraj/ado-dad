@@ -50,12 +50,35 @@ export class ChatService {
     return chat;
   }
 
-  async createAdChat(adId: string, adPosterId: string, viewerId: string) {
+  async createAdChat(adId: string, viewerId: string) {
+    // Get the ad to find the poster ID
+    const ad = await this.getAdById(adId);
+    if (!ad) {
+      throw new Error('Ad not found');
+    }
+
+    const adPosterId = ad.postedBy.toString();
     const participants = [
       new Types.ObjectId(adPosterId),
       new Types.ObjectId(viewerId),
     ];
-    return this.findOrCreateChat(participants, 'ad', adId, adId);
+
+    const chat = await this.findOrCreateChat(participants, 'ad', adId, adId);
+
+    // Return chat with participant information
+    return {
+      chat,
+      adPosterId,
+      viewerId,
+      isNewChat: chat.createdAt.getTime() === chat.updatedAt.getTime(), // Rough check if it's a new chat
+    };
+  }
+
+  private async getAdById(adId: string) {
+    // Import the Ad model dynamically to avoid circular dependencies
+    const { Ad } = await import('../ads/schemas/ad.schema');
+    const adModel = this.chatModel.db.model(Ad.name);
+    return adModel.findById(adId);
   }
 
   private isBlockedPair(
@@ -130,11 +153,33 @@ export class ChatService {
   }
 
   async getUserChats(userId: string) {
-    return this.chatModel
+    const chats = await this.chatModel
       .find({ participants: userId })
       .populate('participants', 'name email')
       .sort({ updatedAt: -1 })
       .exec();
+
+    // Format chats with better information
+    return chats.map(chat => {
+      const otherParticipant = chat.participants.find(
+        (participant: any) => participant._id.toString() !== userId
+      );
+      
+      return {
+        _id: chat._id,
+        contextType: chat.contextType,
+        contextId: chat.contextId,
+        participants: chat.participants,
+        otherUser: otherParticipant ? {
+          id: otherParticipant._id,
+          name: otherParticipant.name || 'Unknown User',
+          email: otherParticipant.email || 'No email'
+        } : null,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+        lastMessage: null // Will be populated separately if needed
+      };
+    });
   }
 
   async getAdChats(adId: string) {
@@ -177,5 +222,35 @@ export class ChatService {
       { chat: chatId, sender: { $ne: userId }, read: { $ne: true } },
       { read: true },
     );
+  }
+
+  async getUserChatsWithLastMessage(userId: string) {
+    const chats = await this.getUserChats(userId);
+    
+    // Get last message for each chat
+    const chatsWithLastMessage = await Promise.all(
+      chats.map(async (chat) => {
+        const lastMessage = await this.messageModel
+          .findOne({ chat: chat._id })
+          .populate('sender', 'name email')
+          .sort({ createdAt: -1 })
+          .exec();
+        
+        return {
+          ...chat,
+          lastMessage: lastMessage ? {
+            id: lastMessage._id,
+            content: lastMessage.content,
+            sender: {
+              id: lastMessage.sender._id,
+              name: lastMessage.sender.name || 'Unknown User'
+            },
+            createdAt: lastMessage.createdAt
+          } : null
+        };
+      })
+    );
+    
+    return chatsWithLastMessage;
   }
 }

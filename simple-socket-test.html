@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.7.3/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        font-weight: bold;
+      }
+      .connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .connecting {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .log {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 10px;
+        height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      input,
+      button {
+        padding: 8px 12px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Simple Socket.IO Connection Test</h1>
+
+      <div id="status" class="status disconnected">Disconnected</div>
+
+      <div>
+        <label>Server URL:</label>
+        <input
+          type="text"
+          id="serverUrl"
+          value="http://localhost:5000"
+          style="width: 300px"
+        />
+      </div>
+
+      <div>
+        <label>User ID:</label>
+        <input
+          type="text"
+          id="userId"
+          value="507f1f77bcf86cd799439011"
+          style="width: 300px"
+        />
+      </div>
+
+      <div>
+        <button onclick="connect()" id="connectBtn">Connect</button>
+        <button onclick="disconnect()" id="disconnectBtn" disabled>
+          Disconnect
+        </button>
+        <button onclick="clearLog()">Clear Log</button>
+      </div>
+
+      <h3>Connection Log:</h3>
+      <div id="log" class="log"></div>
+
+      <h3>Test Messages:</h3>
+      <div>
+        <button onclick="testGetUserChats()" id="testChatsBtn" disabled>
+          Get User Chats
+        </button>
+        <button onclick="testCreateChat()" id="testCreateBtn" disabled>
+          Create Test Chat
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+
+      function log(message) {
+        const logDiv = document.getElementById('log');
+        const timestamp = new Date().toLocaleTimeString();
+        logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+        console.log(message);
+      }
+
+      function updateStatus(status, className) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.textContent = status;
+        statusDiv.className = `status ${className}`;
+      }
+
+      function updateButtons(connected) {
+        document.getElementById('connectBtn').disabled = connected;
+        document.getElementById('disconnectBtn').disabled = !connected;
+        document.getElementById('testChatsBtn').disabled = !connected;
+        document.getElementById('testCreateBtn').disabled = !connected;
+      }
+
+      function connect() {
+        const serverUrl = document.getElementById('serverUrl').value;
+        const userId = document.getElementById('userId').value;
+
+        if (!serverUrl || !userId) {
+          alert('Please enter server URL and user ID');
+          return;
+        }
+
+        log(`Attempting to connect to ${serverUrl}/chat`);
+        updateStatus('Connecting...', 'connecting');
+
+        try {
+          socket = io(serverUrl + '/chat', {
+            auth: {
+              userId: userId,
+            },
+            query: {
+              userId: userId,
+            },
+            transports: ['websocket', 'polling'],
+            timeout: 10000,
+          });
+
+          socket.on('connect', () => {
+            log('✅ Connected to server successfully!');
+            log(`Socket ID: ${socket.id}`);
+            updateStatus('Connected', 'connected');
+            updateButtons(true);
+          });
+
+          socket.on('disconnect', (reason) => {
+            log(`❌ Disconnected: ${reason}`);
+            updateStatus('Disconnected', 'disconnected');
+            updateButtons(false);
+          });
+
+          socket.on('connect_error', (error) => {
+            log(`❌ Connection error: ${error.message}`);
+            log(`Error details: ${JSON.stringify(error)}`);
+            updateStatus('Connection Failed', 'disconnected');
+            updateButtons(false);
+          });
+
+          socket.on('error', (error) => {
+            log(`❌ Socket error: ${error}`);
+          });
+
+          // Test if we can emit and receive basic events
+          socket.on('pong', (data) => {
+            log(`🏓 Received pong: ${JSON.stringify(data)}`);
+          });
+
+          socket.on('newChatCreated', (data) => {
+            log(`🎉 New chat created: ${data.message}`);
+            log(`Chat ID: ${data.chatId}, Ad ID: ${data.adId}`);
+          });
+        } catch (error) {
+          log(`❌ Error creating socket: ${error.message}`);
+          updateStatus('Connection Failed', 'disconnected');
+        }
+      }
+
+      function disconnect() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+          log('Disconnected manually');
+          updateStatus('Disconnected', 'disconnected');
+          updateButtons(false);
+        }
+      }
+
+      function clearLog() {
+        document.getElementById('log').innerHTML = '';
+      }
+
+      function testGetUserChats() {
+        if (!socket) {
+          log('❌ Not connected');
+          return;
+        }
+
+        log('📤 Emitting getUserChats...');
+        socket.emit('getUserChats', {}, (response) => {
+          if (response && response.success) {
+            log(`✅ Got ${response.chats ? response.chats.length : 0} chats`);
+            log(`Chats: ${JSON.stringify(response.chats)}`);
+          } else {
+            log(
+              `❌ Error getting chats: ${response ? response.error : 'No response'}`,
+            );
+          }
+        });
+      }
+
+      function testCreateChat() {
+        if (!socket) {
+          log('❌ Not connected');
+          return;
+        }
+
+        const testData = {
+          adId: '507f1f77bcf86cd799439021',
+        };
+
+        log(`📤 Emitting createAdChat with data: ${JSON.stringify(testData)}`);
+        socket.emit('createAdChat', testData, (response) => {
+          if (response && response.success) {
+            log(`✅ Chat created successfully: ${response.chat._id}`);
+          } else {
+            log(
+              `❌ Error creating chat: ${response ? response.error : 'No response'}`,
+            );
+          }
+        });
+      }
+
+      // Auto-connect on page load
+      window.onload = function () {
+        log('🚀 Page loaded. Ready to test Socket.IO connection.');
+        log('Click "Connect" to start testing.');
+      };
+    </script>
+  </body>
+</html>

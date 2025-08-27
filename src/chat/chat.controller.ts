@@ -20,16 +20,13 @@ export class ChatController {
   @Post('ad/:adId')
   async createAdChat(@Param('adId') adId: string, @Request() req) {
     const userId = req.user.id;
-    // For now, we'll need to get the adPosterId from the ad
-    // This should be enhanced to get the actual ad poster ID
-    const adPosterId = req.body.adPosterId; // This should come from the ad lookup
 
-    if (!adPosterId) {
-      return { error: 'Ad poster ID is required' };
+    try {
+      const chat = await this.chatService.createAdChat(adId, userId);
+      return { success: true, chat };
+    } catch (error) {
+      return { error: error.message || 'Failed to create chat' };
     }
-
-    const chat = await this.chatService.createAdChat(adId, adPosterId, userId);
-    return { success: true, chat };
   }
 
   @Get('user')

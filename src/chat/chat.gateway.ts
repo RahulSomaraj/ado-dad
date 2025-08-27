@@ -118,7 +118,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('createAdChat')
   async handleCreateAdChat(
-    @MessageBody() data: { adId: string; adPosterId: string },
+    @MessageBody() data: { adId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.connectedUsers.get(client.id);
@@ -129,23 +129,60 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       this.logger.log(
-        `Creating ad chat for ad ${data.adId} between ${data.adPosterId} and ${userId}`,
+        `Creating ad chat for ad ${data.adId} with user ${userId}`,
       );
 
-      const chat = await this.chatService.createAdChat(
-        data.adId,
-        data.adPosterId,
-        userId,
-      );
+      const result = await this.chatService.createAdChat(data.adId, userId);
+      const { chat, adPosterId, viewerId, isNewChat } = result;
 
       // Join the chat room
       client.join((chat._id as any).toString());
 
       this.logger.log(`Ad chat created successfully: ${chat._id}`);
+
+      // If this is a new chat, notify the other participant
+      if (isNewChat) {
+        const otherUserId = userId === adPosterId ? viewerId : adPosterId;
+        this.notifyNewChat(otherUserId, chat, data.adId);
+      }
+
       return { success: true, chat };
     } catch (error) {
       this.logger.error(`Error creating ad chat: ${error.message}`);
-      return { error: 'Failed to create chat' };
+      return { error: error.message || 'Failed to create chat' };
+    }
+  }
+
+  private notifyNewChat(otherUserId: string, chat: any, adId: string) {
+    // Find the socket connection for the other user
+    let otherUserSocketId: string | null = null;
+    for (const [socketId, userId] of this.connectedUsers.entries()) {
+      if (userId === otherUserId) {
+        otherUserSocketId = socketId;
+        break;
+      }
+    }
+
+    if (otherUserSocketId) {
+      // Automatically join the other user to the chat room
+      this.server.sockets.sockets
+        .get(otherUserSocketId)
+        ?.join((chat._id as any).toString());
+
+      // Notify the other user about the new chat
+      this.server.to(otherUserSocketId).emit('newChatCreated', {
+        chatId: chat._id,
+        adId: adId,
+        message: 'Someone is interested in your ad!',
+      });
+
+      this.logger.log(
+        `Notified user ${otherUserId} about new chat ${chat._id} and joined them to the room`,
+      );
+    } else {
+      this.logger.log(
+        `User ${otherUserId} is not currently online, chat will appear when they connect`,
+      );
     }
   }
 
