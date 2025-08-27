@@ -195,7 +195,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const chats = await this.chatService.getUserChats(userId);
+      const chats = await this.chatService.getUserChatsWithLastMessage(userId);
       this.logger.log(`Retrieved ${chats.length} chats for user ${userId}`);
       return { success: true, chats };
     } catch (error) {

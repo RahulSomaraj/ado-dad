@@ -227,7 +227,20 @@
         socket.emit('getUserChats', {}, (response) => {
           if (response && response.success) {
             log(`✅ Got ${response.chats ? response.chats.length : 0} chats`);
-            log(`Chats: ${JSON.stringify(response.chats)}`);
+
+            if (response.chats && response.chats.length > 0) {
+              response.chats.forEach((chat, index) => {
+                const otherUser = chat.otherUser
+                  ? chat.otherUser.name
+                  : 'Unknown User';
+                const lastMessage = chat.lastMessage
+                  ? chat.lastMessage.content.substring(0, 30) + '...'
+                  : 'No messages';
+                log(`Chat ${index + 1}: ${otherUser} - "${lastMessage}"`);
+              });
+            } else {
+              log('No chats found');
+            }
           } else {
             log(
               `❌ Error getting chats: ${response ? response.error : 'No response'}`,

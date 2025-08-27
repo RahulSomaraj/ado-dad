@@ -42,9 +42,6 @@ import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-respon
 @ApiTags('Vehicle Inventory')
 @Controller('vehicle-inventory')
 @UseFilters(new HttpExceptionFilter('Vehicle Inventory'))
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
 export class VehicleInventoryController {
   constructor(
     private readonly vehicleInventoryService: VehicleInventoryService,
@@ -52,7 +49,9 @@ export class VehicleInventoryController {
 
   // Manufacturer endpoints
   @Post('manufacturers')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new manufacturer' })
   @ApiResponse({
     status: 201,
@@ -209,7 +208,9 @@ export class VehicleInventoryController {
   }
 
   @Put('manufacturers/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a manufacturer' })
   @ApiParam({ name: 'id', description: 'Manufacturer ID' })
   @ApiResponse({
@@ -231,7 +232,9 @@ export class VehicleInventoryController {
   }
 
   @Delete('manufacturers/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a manufacturer' })
   @ApiParam({ name: 'id', description: 'Manufacturer ID' })
   @ApiResponse({
@@ -247,7 +250,9 @@ export class VehicleInventoryController {
 
   // Vehicle Model endpoints
   @Post('models')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new vehicle model' })
   @ApiResponse({
     status: 201,
@@ -522,7 +527,9 @@ export class VehicleInventoryController {
   }
 
   @Put('models/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a vehicle model' })
   @ApiParam({ name: 'id', description: 'Vehicle model ID' })
   @ApiResponse({
@@ -545,7 +552,9 @@ export class VehicleInventoryController {
 
   // Vehicle Variant endpoints
   @Post('variants')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new vehicle variant' })
   @ApiResponse({
     status: 201,

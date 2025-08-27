@@ -36,6 +36,13 @@ export class ChatController {
     return { success: true, chats };
   }
 
+  @Get('user/with-messages')
+  async getUserChatsWithMessages(@Request() req) {
+    const userId = req.user.id;
+    const chats = await this.chatService.getUserChatsWithLastMessage(userId);
+    return { success: true, chats };
+  }
+
   @Get('ad/:adId')
   async getAdChats(@Param('adId') adId: string) {
     const chats = await this.chatService.getAdChats(adId);

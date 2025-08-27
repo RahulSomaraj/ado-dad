@@ -6,10 +6,21 @@ import {
   Delete,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { LookupService } from '../services/lookup.service';
 import { PropertyType } from '../schemas/property-type.schema';
+import { JwtAuthGuard } from '../../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../../auth/guard/roles.guards';
+import { Roles } from '../../auth/guard/roles.decorator';
+import { UserType } from '../../users/enums/user.types';
 
 @ApiTags('Lookup')
 @Controller('lookup')
@@ -24,6 +35,9 @@ export class LookupController {
   }
 
   @Post('property-types')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new property type' })
   @ApiResponse({
     status: 201,
@@ -35,6 +49,9 @@ export class LookupController {
   }
 
   @Put('property-types/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a property type' })
   @ApiResponse({
     status: 200,
@@ -49,6 +66,9 @@ export class LookupController {
   }
 
   @Delete('property-types/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a property type' })
   @ApiResponse({
     status: 200,

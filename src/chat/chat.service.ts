@@ -25,7 +25,9 @@ export class ChatService {
       contextId,
       postId,
     });
-    return chat.save();
+    const savedChat = await chat.save();
+    console.log('✅ Chat saved to database:', savedChat._id);
+    return savedChat;
   }
 
   async findOrCreateChat(
@@ -34,18 +36,26 @@ export class ChatService {
     contextId: string,
     postId?: string,
   ) {
+    console.log(
+      '🔍 Looking for existing chat with participants:',
+      participants.map((p) => p.toString()),
+    );
     let chat = await this.chatModel.findOne({
       participants: { $all: participants, $size: 2 },
       contextType,
       contextId,
     });
+
     if (!chat) {
+      console.log('📝 Creating new chat...');
       chat = await this.createChat(
         participants,
         contextType,
         contextId,
         postId,
       );
+    } else {
+      console.log('✅ Found existing chat:', chat._id);
     }
     return chat;
   }
@@ -70,7 +80,11 @@ export class ChatService {
       chat,
       adPosterId,
       viewerId,
-      isNewChat: chat.createdAt.getTime() === chat.updatedAt.getTime(), // Rough check if it's a new chat
+      isNewChat:
+        (chat as any).createdAt && (chat as any).updatedAt
+          ? (chat as any).createdAt.getTime() ===
+            (chat as any).updatedAt.getTime()
+          : true, // If timestamps are missing, assume it's a new chat
     };
   }
 
@@ -160,24 +174,26 @@ export class ChatService {
       .exec();
 
     // Format chats with better information
-    return chats.map(chat => {
+    return chats.map((chat) => {
       const otherParticipant = chat.participants.find(
-        (participant: any) => participant._id.toString() !== userId
+        (participant: any) => participant._id.toString() !== userId,
       );
-      
+
       return {
         _id: chat._id,
         contextType: chat.contextType,
         contextId: chat.contextId,
         participants: chat.participants,
-        otherUser: otherParticipant ? {
-          id: otherParticipant._id,
-          name: otherParticipant.name || 'Unknown User',
-          email: otherParticipant.email || 'No email'
-        } : null,
-        createdAt: chat.createdAt,
-        updatedAt: chat.updatedAt,
-        lastMessage: null // Will be populated separately if needed
+        otherUser: otherParticipant
+          ? {
+              id: otherParticipant._id,
+              name: (otherParticipant as any).name || 'Unknown User',
+              email: (otherParticipant as any).email || 'No email',
+            }
+          : null,
+        createdAt: (chat as any).createdAt || new Date(),
+        updatedAt: (chat as any).updatedAt || new Date(),
+        lastMessage: null, // Will be populated separately if needed
       };
     });
   }
@@ -226,7 +242,7 @@ export class ChatService {
 
   async getUserChatsWithLastMessage(userId: string) {
     const chats = await this.getUserChats(userId);
-    
+
     // Get last message for each chat
     const chatsWithLastMessage = await Promise.all(
       chats.map(async (chat) => {
@@ -235,22 +251,24 @@ export class ChatService {
           .populate('sender', 'name email')
           .sort({ createdAt: -1 })
           .exec();
-        
+
         return {
           ...chat,
-          lastMessage: lastMessage ? {
-            id: lastMessage._id,
-            content: lastMessage.content,
-            sender: {
-              id: lastMessage.sender._id,
-              name: lastMessage.sender.name || 'Unknown User'
-            },
-            createdAt: lastMessage.createdAt
-          } : null
+          lastMessage: lastMessage
+            ? {
+                id: lastMessage._id,
+                content: lastMessage.content,
+                sender: {
+                  id: lastMessage.sender._id,
+                  name: (lastMessage.sender as any).name || 'Unknown User',
+                },
+                createdAt: (lastMessage as any).createdAt || new Date(),
+              }
+            : null,
         };
-      })
+      }),
     );
-    
+
     return chatsWithLastMessage;
   }
 }

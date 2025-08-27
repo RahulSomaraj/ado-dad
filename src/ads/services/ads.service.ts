@@ -26,6 +26,7 @@ import { CreateAdDto } from '../dto/common/create-ad.dto';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { RedisService } from '../../shared/redis.service';
 import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
+import { UserType } from '../../users/enums/user.types';
 
 @Injectable()
 export class AdsService {
@@ -267,6 +268,9 @@ export class AdsService {
     if (Object.keys(vehMatch).length) {
       pipeline.push({ $match: { vehicleDetails: { $elemMatch: vehMatch } } });
     }
+
+    // ----- Sorting -----
+    pipeline.push({ $sort: { [sortBy]: sortDirection } });
 
     // ----- Pagination-only response (no filters) -----
     pipeline.push({
@@ -866,13 +870,28 @@ export class AdsService {
     return this.findOne(id);
   }
 
-  async delete(id: string, userId: string): Promise<void> {
-    const ad = await this.adModel.findOne({ _id: id, postedBy: userId });
+  async delete(id: string, userId: string, userType?: string): Promise<void> {
+    // First, find the ad to check if it exists
+    const ad = await this.adModel.findById(id);
     if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    // Check if user is admin or super admin (they can delete any ad)
+    if (userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN) {
+      await this.adModel.findByIdAndDelete(id);
+      await this.invalidateAdCache(id);
+      return;
+    }
+
+    // For regular users, check if they are the owner of the ad
+    if (ad.postedBy.toString() !== userId) {
       throw new NotFoundException(
-        `Advertisement with ID ${id} not found or you don't have permission to delete it`,
+        `You don't have permission to delete this advertisement. Only the owner, admin, or super admin can delete it.`,
       );
     }
+
+    // User is the owner, proceed with deletion
     await this.adModel.findByIdAndDelete(id);
     await this.invalidateAdCache(id);
   }

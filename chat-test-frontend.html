@@ -311,6 +311,18 @@
               Create Ad Chat
             </button>
 
+            <div class="form-group" style="margin-top: 20px">
+              <button class="btn btn-secondary" onclick="loadUserChats()">
+                Load Chats (WebSocket)
+              </button>
+              <button
+                class="btn btn-secondary"
+                onclick="loadUserChatsViaRest()"
+              >
+                Load Chats (REST API)
+              </button>
+            </div>
+
             <div class="log-area" id="setupLog"></div>
           </div>
 
@@ -483,11 +495,6 @@
       }
 
       function createAdChat() {
-        if (!socket) {
-          alert('Please connect first');
-          return;
-        }
-
         const adId = document.getElementById('adId').value;
 
         if (!adId) {
@@ -495,26 +502,72 @@
           return;
         }
 
-        socket.emit('createAdChat', { adId }, (response) => {
-          if (response.success) {
-            log(`Chat created successfully: ${response.chat._id}`, 'setup');
+        if (socket) {
+          // Try WebSocket first
+          socket.emit('createAdChat', { adId }, (response) => {
+            if (response.success) {
+              log(
+                `Chat created successfully via WebSocket: ${response.chat._id}`,
+                'setup',
+              );
+              handleChatCreated(response.chat);
+            } else {
+              log(`WebSocket failed, trying REST API...`, 'setup');
+              createAdChatViaRest(adId);
+            }
+          });
+        } else {
+          // Use REST API directly
+          createAdChatViaRest(adId);
+        }
+      }
 
-            // Automatically select the newly created chat
-            currentChatId = response.chat._id;
-            document.getElementById('currentChatTitle').textContent =
-              `Chat: ${response.chat._id}`;
+      function createAdChatViaRest(adId) {
+        const serverUrl = document.getElementById('serverUrl').value;
+        const jwtToken = document.getElementById('jwtToken').value;
 
-            // Load user chats and then automatically select the new chat
-            loadUserChats(() => {
-              // After loading chats, automatically select the newly created one
-              selectChat(response.chat._id);
+        if (!serverUrl || !jwtToken) {
+          log('Missing server URL or JWT token for REST API', 'setup');
+          return;
+        }
 
-              // Switch to chats tab to show the new chat
-              switchTab('chats');
-            });
-          } else {
-            log(`Error creating chat: ${response.error}`, 'setup');
-          }
+        fetch(`${serverUrl}/chat/ad/${adId}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${jwtToken}`,
+            'Content-Type': 'application/json',
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              log(
+                `Chat created successfully via REST API: ${data.chat._id}`,
+                'setup',
+              );
+              handleChatCreated(data.chat);
+            } else {
+              log(`REST API error: ${data.error || 'Unknown error'}`, 'setup');
+            }
+          })
+          .catch((error) => {
+            log(`REST API request failed: ${error.message}`, 'setup');
+          });
+      }
+
+      function handleChatCreated(chat) {
+        // Automatically select the newly created chat
+        currentChatId = chat._id;
+        document.getElementById('currentChatTitle').textContent =
+          `Chat: ${chat._id}`;
+
+        // Load user chats and then automatically select the new chat
+        loadUserChats(() => {
+          // After loading chats, automatically select the newly created one
+          selectChat(chat._id);
+
+          // Switch to chats tab to show the new chat
+          switchTab('chats');
         });
       }
 
@@ -524,19 +577,56 @@
           return;
         }
 
+        // Try WebSocket first, fallback to REST API
         socket.emit('getUserChats', {}, (response) => {
           if (response.success) {
             displayChats(response.chats);
-            log(`Loaded ${response.chats.length} chats`, 'setup');
+            log(`Loaded ${response.chats.length} chats via WebSocket`, 'setup');
 
             // Execute callback if provided
             if (callback && typeof callback === 'function') {
               callback();
             }
           } else {
-            log(`Error loading chats: ${response.error}`, 'setup');
+            log(`WebSocket failed, trying REST API...`, 'setup');
+            loadUserChatsViaRest(callback);
           }
         });
+      }
+
+      function loadUserChatsViaRest(callback) {
+        const serverUrl = document.getElementById('serverUrl').value;
+        const jwtToken = document.getElementById('jwtToken').value;
+
+        if (!serverUrl || !jwtToken) {
+          log('Missing server URL or JWT token for REST API', 'setup');
+          return;
+        }
+
+        fetch(`${serverUrl}/chat/user/with-messages`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${jwtToken}`,
+            'Content-Type': 'application/json',
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              displayChats(data.chats);
+              log(`Loaded ${data.chats.length} chats via REST API`, 'setup');
+
+              // Execute callback if provided
+              if (callback && typeof callback === 'function') {
+                callback();
+              }
+            } else {
+              log(`REST API error: ${data.error || 'Unknown error'}`, 'setup');
+            }
+          })
+          .catch((error) => {
+            log(`REST API request failed: ${error.message}`, 'setup');
+          });
       }
 
       function displayChats(chats) {
@@ -546,7 +636,30 @@
         chats.forEach((chat) => {
           const li = document.createElement('li');
           li.className = 'chat-item';
-          li.textContent = `Chat: ${chat._id} (${chat.contextType}: ${chat.contextId})`;
+
+          // Create chat display with user names and last message
+          let chatDisplay = '';
+
+          if (chat.otherUser) {
+            chatDisplay += `<strong>${chat.otherUser.name}</strong>`;
+          } else {
+            chatDisplay += '<strong>Unknown User</strong>';
+          }
+
+          if (chat.contextType === 'ad') {
+            chatDisplay += ` <span style="color: #666; font-size: 0.9em;">(Ad: ${chat.contextId})</span>`;
+          }
+
+          if (chat.lastMessage) {
+            const time = new Date(
+              chat.lastMessage.createdAt,
+            ).toLocaleTimeString();
+            chatDisplay += `<br><small style="color: #888;">${chat.lastMessage.content.substring(0, 50)}${chat.lastMessage.content.length > 50 ? '...' : ''} - ${time}</small>`;
+          } else {
+            chatDisplay += `<br><small style="color: #888;">No messages yet</small>`;
+          }
+
+          li.innerHTML = chatDisplay;
           li.onclick = (event) => selectChat(chat._id, event);
           chatList.appendChild(li);
         });
@@ -554,8 +667,19 @@
 
       function selectChat(chatId, event = null) {
         currentChatId = chatId;
-        document.getElementById('currentChatTitle').textContent =
-          `Chat: ${chatId}`;
+
+        // Find the chat to get the other user's name
+        const chatItem = event ? event.target.closest('.chat-item') : null;
+        let chatTitle = `Chat: ${chatId}`;
+
+        if (chatItem) {
+          const userName = chatItem.querySelector('strong');
+          if (userName) {
+            chatTitle = `Chat with ${userName.textContent}`;
+          }
+        }
+
+        document.getElementById('currentChatTitle').textContent = chatTitle;
 
         // Update active chat in list
         document.querySelectorAll('.chat-item').forEach((item) => {
@@ -602,7 +726,11 @@
         chatMessages.innerHTML = '';
 
         messages.forEach((message) => {
-          addMessageToChat(message, message.sender === currentUserId);
+          const senderId =
+            message.sender && message.sender._id
+              ? message.sender._id
+              : message.sender;
+          addMessageToChat(message, senderId === currentUserId);
         });
       }
 
@@ -612,10 +740,17 @@
         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
 
         const timestamp = new Date(message.createdAt).toLocaleTimeString();
+        const senderName =
+          message.sender && message.sender.name
+            ? message.sender.name
+            : isSent
+              ? 'You'
+              : 'Other';
+
         messageDiv.innerHTML = `
-                <div class="message-header">${isSent ? 'You' : 'Other'} - ${timestamp}</div>
-                <div>${message.content}</div>
-            `;
+                 <div class="message-header">${senderName} - ${timestamp}</div>
+                 <div>${message.content}</div>
+             `;
 
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;

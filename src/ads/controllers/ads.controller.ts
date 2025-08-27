@@ -658,12 +658,12 @@ export class AdsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Delete advertisement by ID',
     description:
-      'Delete an advertisement. Only the advertisement owner or admin can delete it.',
+      'Delete an advertisement. Only the advertisement owner, admin, or super admin can delete it.',
   })
   @ApiParam({ name: 'id', description: 'Advertisement ID (MongoDB ObjectId)' })
   @ApiResponse({
@@ -702,7 +702,7 @@ export class AdsController {
         );
       }
 
-      await this.adsService.delete(id, req.user.id);
+      await this.adsService.delete(id, req.user.id, req.user.userType);
       return { message: 'Advertisement deleted successfully' };
     } catch (error) {
       if (error instanceof BadRequestException) {
