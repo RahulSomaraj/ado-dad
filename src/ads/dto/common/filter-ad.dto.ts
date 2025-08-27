@@ -88,11 +88,11 @@ export class FilterAdDto {
   @ApiPropertyOptional({
     description: 'Sort by field',
     enum: ['price', 'postedAt', 'createdAt', 'updatedAt'],
-    example: 'postedAt',
+    example: 'createdAt',
   })
   @IsOptional()
   @IsString()
-  sortBy?: string = 'postedAt';
+  sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({
     description: 'Sort order',
