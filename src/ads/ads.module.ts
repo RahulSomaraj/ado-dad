@@ -25,6 +25,11 @@ import {
   PropertyTypeSchema,
 } from './schemas/property-type.schema';
 
+// Related schemas for comprehensive ad details
+import { Favorite, FavoriteSchema } from '../favorites/schemas/schema.favorite';
+import { Chat, ChatSchema } from '../chat/schemas/chat.schema';
+import { Message, MessageSchema } from '../chat/schemas/message.schema';
+
 // External modules and services
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { S3Service } from '../shared/s3.service';
@@ -39,6 +44,9 @@ import { RedisService } from '../shared/redis.service';
       { name: VehicleAd.name, schema: VehicleAdSchema },
       { name: CommercialVehicleAd.name, schema: CommercialVehicleAdSchema },
       { name: PropertyType.name, schema: PropertyTypeSchema },
+      { name: Favorite.name, schema: FavoriteSchema },
+      { name: Chat.name, schema: ChatSchema },
+      { name: Message.name, schema: MessageSchema },
     ]),
     // External modules
     VehicleInventoryModule,

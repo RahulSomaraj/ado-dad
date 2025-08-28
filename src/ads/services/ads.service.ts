@@ -13,6 +13,12 @@ import {
   CommercialVehicleAd,
   CommercialVehicleAdDocument,
 } from '../schemas/commercial-vehicle-ad.schema';
+import {
+  Favorite,
+  FavoriteDocument,
+} from '../../favorites/schemas/schema.favorite';
+import { Chat } from '../../chat/schemas/chat.schema';
+import { Message } from '../../chat/schemas/message.schema';
 
 import { FilterAdDto } from '../dto/common/filter-ad.dto';
 import {
@@ -39,6 +45,12 @@ export class AdsService {
     private readonly vehicleAdModel: Model<VehicleAdDocument>,
     @InjectModel(CommercialVehicleAd.name)
     private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
+    @InjectModel(Favorite.name)
+    private readonly favoriteModel: Model<FavoriteDocument>,
+    @InjectModel(Chat.name)
+    private readonly chatModel: Model<Chat>,
+    @InjectModel(Message.name)
+    private readonly messageModel: Model<Message>,
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
@@ -401,14 +413,16 @@ export class AdsService {
   }
 
   /** ---------- GET BY ID (detailed + cache) ---------- */
-  async getAdById(id: string): Promise<DetailedAdResponseDto> {
-    const cacheKey = `ads:getById:${id}`;
+  async getAdById(id: string, userId?: string): Promise<DetailedAdResponseDto> {
+    const cacheKey = `ads:getById:${id}:${userId || 'anonymous'}`;
     const cached =
       await this.redisService.cacheGet<DetailedAdResponseDto>(cacheKey);
     if (cached) return cached;
 
+    // Basic pipeline with core lookups
     const pipeline = [
       { $match: { _id: new Types.ObjectId(id) } },
+      // User information
       {
         $lookup: {
           from: 'users',
@@ -418,6 +432,7 @@ export class AdsService {
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      // Property details
       {
         $lookup: {
           from: 'propertyads',
@@ -426,6 +441,7 @@ export class AdsService {
           as: 'propertyDetails',
         },
       },
+      // Vehicle details
       {
         $lookup: {
           from: 'vehicleads',
@@ -434,6 +450,7 @@ export class AdsService {
           as: 'vehicleDetails',
         },
       },
+      // Commercial vehicle details
       {
         $lookup: {
           from: 'commercialvehicleads',
@@ -452,12 +469,73 @@ export class AdsService {
     const ad = results[0];
     const detailed = this.mapToDetailedResponseDto(ad);
 
+    // Populate vehicle inventory details with sub-relations
     if (
       ad.category === AdCategory.PRIVATE_VEHICLE ||
       ad.category === AdCategory.TWO_WHEELER ||
       ad.category === AdCategory.COMMERCIAL_VEHICLE
     ) {
       await this.populateVehicleInventoryDetails(detailed);
+    }
+
+    // Get favorites count
+    const favoritesCount = await this.favoriteModel.countDocuments({
+      itemId: new Types.ObjectId(id),
+      itemType: 'ad',
+    });
+    detailed.favoritesCount = favoritesCount;
+
+    // Check if current user has favorited this ad
+    if (userId) {
+      const userFavorite = await this.favoriteModel.findOne({
+        userId: new Types.ObjectId(userId),
+        itemId: new Types.ObjectId(id),
+        itemType: 'ad',
+      });
+      detailed.isFavorited = !!userFavorite;
+    }
+
+    // Get related chats
+    const chats = await this.chatModel
+      .find({
+        contextType: 'ad',
+        contextId: id,
+      })
+      .populate('participants', 'name email');
+
+    detailed.chatsCount = chats.length;
+    detailed.chats = await Promise.all(
+      chats.map(async (chat: any) => {
+        const lastMessage = await this.messageModel
+          .findOne({ chat: chat._id })
+          .sort({ createdAt: -1 })
+          .populate('sender', 'name');
+
+        return {
+          id: chat._id.toString(),
+          participants: chat.participants.map((participant: any) => ({
+            id: participant._id.toString(),
+            name: participant.name,
+            email: participant.email,
+          })),
+          lastMessage: lastMessage
+            ? {
+                content: lastMessage.content,
+                createdAt: (lastMessage as any).createdAt,
+                sender: (lastMessage.sender as any)?.name || 'Unknown',
+              }
+            : undefined,
+          createdAt: (chat as any).createdAt,
+        };
+      }),
+    );
+
+    // Get ratings and reviews (if rating system exists for ads)
+    const ratings = await this.getAdRatings(id);
+    if (ratings) {
+      detailed.averageRating = ratings.averageRating;
+      detailed.ratingsCount = ratings.ratingsCount;
+      detailed.reviews = ratings.reviews;
     }
 
     await this.redisService.cacheSet(cacheKey, detailed, 900);
@@ -1312,6 +1390,34 @@ export class AdsService {
         const title = `${modelName} ${year}`.trim();
         await this.adModel.updateOne({ _id: ad._id }, { title });
       }
+    }
+  }
+
+  /** ---------- RATINGS AND REVIEWS ---------- */
+  private async getAdRatings(adId: string): Promise<{
+    averageRating: number;
+    ratingsCount: number;
+    reviews: Array<{
+      id: string;
+      rating: number;
+      review: string;
+      user: {
+        id: string;
+        name: string;
+      };
+      createdAt: Date;
+    }>;
+  } | null> {
+    try {
+      // Note: This is a placeholder implementation since the rating system
+      // currently only supports products, not ads. You would need to extend
+      // the rating system to support ads or create a separate ad rating system.
+
+      // For now, return null to indicate no ratings available
+      return null;
+    } catch (error) {
+      console.error('Error fetching ad ratings:', error);
+      return null;
     }
   }
 

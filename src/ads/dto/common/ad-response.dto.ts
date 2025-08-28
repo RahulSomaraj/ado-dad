@@ -249,6 +249,49 @@ export class DetailedAdResponseDto extends AdResponseDto {
 
   @ApiPropertyOptional({ description: 'Commercial vehicle-specific details' })
   commercialVehicleDetails?: CommercialVehicleDetailsDto;
+
+  @ApiPropertyOptional({ description: 'Favorites count' })
+  favoritesCount?: number;
+
+  @ApiPropertyOptional({ description: 'Is favorited by current user' })
+  isFavorited?: boolean;
+
+  @ApiPropertyOptional({ description: 'Chats count' })
+  chatsCount?: number;
+
+  @ApiPropertyOptional({ description: 'Related chats' })
+  chats?: Array<{
+    id: string;
+    participants: Array<{
+      id: string;
+      name: string;
+      email: string;
+    }>;
+    lastMessage?: {
+      content: string;
+      createdAt: Date;
+      sender: string;
+    };
+    createdAt: Date;
+  }>;
+
+  @ApiPropertyOptional({ description: 'Average rating' })
+  averageRating?: number;
+
+  @ApiPropertyOptional({ description: 'Total ratings count' })
+  ratingsCount?: number;
+
+  @ApiPropertyOptional({ description: 'Recent reviews' })
+  reviews?: Array<{
+    id: string;
+    rating: number;
+    review: string;
+    user: {
+      id: string;
+      name: string;
+    };
+    createdAt: Date;
+  }>;
 }
 
 export class PaginatedAdResponseDto {

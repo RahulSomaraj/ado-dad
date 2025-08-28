@@ -202,9 +202,9 @@ export class AdsController {
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Get advertisement by ID with complete details',
+    summary: 'Get advertisement by ID with complete details and all relations',
     description:
-      'Retrieve a single advertisement with all its details including category-specific information and vehicle inventory data (for vehicle ads). This endpoint provides comprehensive information about the advertisement including user details, property details, vehicle details, or commercial vehicle details based on the category.',
+      'Retrieve a single advertisement with all its details including category-specific information, vehicle inventory data (for vehicle ads), favorites count, related chats, and ratings. This endpoint provides comprehensive information about the advertisement including user details, property details, vehicle details, commercial vehicle details, manufacturer information, model details, and all related documents.',
   })
   @ApiParam({
     name: 'id',
@@ -213,14 +213,17 @@ export class AdsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Advertisement retrieved successfully',
+    description: 'Advertisement retrieved successfully with all relations',
     type: DetailedAdResponseDto,
   })
   @ApiResponse({
     status: 404,
     description: 'Advertisement not found',
   })
-  async getAdById(@Param('id') id: string): Promise<DetailedAdResponseDto> {
+  async getAdById(
+    @Param('id') id: string,
+    @Request() req?: any,
+  ): Promise<DetailedAdResponseDto> {
     try {
       if (!Types.ObjectId.isValid(id)) {
         throw new BadRequestException(
@@ -228,7 +231,8 @@ export class AdsController {
         );
       }
 
-      return await this.adsService.getAdById(id);
+      const userId = req?.user?.id;
+      return await this.adsService.getAdById(id, userId);
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
