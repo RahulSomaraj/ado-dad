@@ -112,6 +112,26 @@ export class AdsService {
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
     );
 
+    // manufacturer lookup for premium filtering
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'manufacturers',
+          localField: 'vehicleDetails.manufacturerId',
+          foreignField: '_id',
+          as: 'manufacturerInfo',
+        },
+      },
+      {
+        $lookup: {
+          from: 'manufacturers',
+          localField: 'commercialVehicleDetails.manufacturerId',
+          foreignField: '_id',
+          as: 'commercialManufacturerInfo',
+        },
+      },
+    );
+
     // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
     // Property
     pipeline.push(
@@ -281,8 +301,45 @@ export class AdsService {
       pipeline.push({ $match: { vehicleDetails: { $elemMatch: vehMatch } } });
     }
 
+    // Premium manufacturer filtering
+    if (filters.isPremiumManufacturer !== undefined) {
+      pipeline.push({
+        $match: {
+          $or: [
+            // For vehicle ads
+            {
+              $and: [
+                { vehicleDetails: { $exists: true, $ne: [] } },
+                {
+                  'manufacturerInfo.isPremium': filters.isPremiumManufacturer,
+                },
+              ],
+            },
+            // For commercial vehicle ads
+            {
+              $and: [
+                { commercialVehicleDetails: { $exists: true, $ne: [] } },
+                {
+                  'commercialManufacturerInfo.isPremium':
+                    filters.isPremiumManufacturer,
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }
+
     // ----- Sorting -----
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
+
+    // Clean up manufacturer lookup arrays from output
+    pipeline.push({
+      $project: {
+        manufacturerInfo: 0,
+        commercialManufacturerInfo: 0,
+      },
+    });
 
     // ----- Pagination-only response (no filters) -----
     pipeline.push({

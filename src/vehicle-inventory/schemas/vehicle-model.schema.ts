@@ -58,6 +58,13 @@ export class VehicleModel {
   @Prop({ required: false })
   defaultSeatingCapacity?: number;
 
+  // Multi-value fields for fuel types and transmission types
+  @Prop({ type: [String], required: false })
+  fuelTypes?: string[];
+
+  @Prop({ type: [String], required: false })
+  transmissionTypes?: string[];
+
   @Prop({ default: true })
   isActive: boolean;
 

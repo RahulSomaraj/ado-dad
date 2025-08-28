@@ -63,6 +63,12 @@ export class ManufacturerResponseDto {
   isActive: boolean;
 
   @ApiProperty({
+    description: 'Whether the manufacturer is premium',
+    example: false,
+  })
+  isPremium: boolean;
+
+  @ApiProperty({
     description: 'Creation timestamp',
     example: '2025-06-28T16:00:48.971Z',
   })

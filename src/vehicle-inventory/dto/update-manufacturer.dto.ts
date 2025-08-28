@@ -79,4 +79,12 @@ export class UpdateManufacturerDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether the manufacturer is premium.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPremium?: boolean;
 }

@@ -695,6 +695,9 @@ export class VehicleInventoryService {
         },
         availableFuelTypes: { $setUnion: '$fuelTypes.name' },
         availableTransmissionTypes: { $setUnion: '$transmissionTypes.name' },
+        // Include model-level fuel types and transmission types
+        fuelTypes: { $ifNull: ['$fuelTypes', []] },
+        transmissionTypes: { $ifNull: ['$transmissionTypes', []] },
       },
     });
 
@@ -747,8 +750,10 @@ export class VehicleInventoryService {
     pipeline.push({
       $project: {
         variants: 0, // Remove variants array from final output
-        fuelTypes: 0, // Remove fuel types array from final output
-        transmissionTypes: 0, // Remove transmission types array from final output
+        // Keep the computed fuelTypes and transmissionTypes fields
+        // Remove the lookup fuelTypes and transmissionTypes arrays
+        'fuelTypes.name': 0,
+        'transmissionTypes.name': 0,
       },
     });
 

@@ -180,4 +180,24 @@ export class CreateVehicleModelDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Array of available fuel types for this model.',
+    example: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fuelTypes?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Array of available transmission types for this model.',
+    example: ['Manual', 'Automatic', 'CVT', 'DCT'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  transmissionTypes?: string[];
 }

@@ -84,6 +84,15 @@ export class FilterAdDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Filter by premium manufacturer status',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  isPremiumManufacturer?: boolean;
+
   // ===== PAGINATION AND SORTING =====
   @ApiPropertyOptional({
     description: 'Sort by field',

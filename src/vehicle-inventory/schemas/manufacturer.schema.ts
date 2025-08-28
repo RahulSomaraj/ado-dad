@@ -36,6 +36,9 @@ export class Manufacturer {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  isPremium: boolean;
+
   // Soft delete fields
   @Prop({ default: false })
   isDeleted: boolean;

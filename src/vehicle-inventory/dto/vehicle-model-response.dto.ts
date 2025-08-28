@@ -111,6 +111,18 @@ export class VehicleModelDto {
     required: false,
   })
   availableTransmissionTypes?: string[];
+
+  @ApiProperty({
+    description: 'Fuel types available for this model',
+    required: false,
+  })
+  fuelTypes?: string[];
+
+  @ApiProperty({
+    description: 'Transmission types available for this model',
+    required: false,
+  })
+  transmissionTypes?: string[];
 }
 
 export class PaginatedVehicleModelResponseDto {
