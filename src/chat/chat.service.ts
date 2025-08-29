@@ -271,6 +271,12 @@ export class ChatService {
 
     return chatsWithLastMessage;
   }
+
+  async isParticipant(chatId: string, userId: string): Promise<boolean> {
+    const chat = await this.chatModel.findById(chatId).select('participants');
+    if (!chat) return false;
+    return (chat.participants || []).some(
+      (p: any) => p?.toString?.() === userId.toString(),
+    );
+  }
 }
-
-
