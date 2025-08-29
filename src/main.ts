@@ -7,7 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import * as morgan from 'morgan';
 import helmet from 'helmet';
-import compression from 'compression';
+import * as compression from 'compression';
+import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -48,7 +49,7 @@ async function bootstrap() {
   app.use(
     compression({
       threshold: 1024, // compress payloads > 1KB
-    }),
+    }) as any,
   );
 
   // (c) Set up Swagger **before** any “catch-all” static mount
@@ -112,8 +113,8 @@ async function bootstrap() {
     }),
   );
   // Limit JSON and urlencoded body sizes
-  app.useBodyParser('json', { limit: '1mb' } as any);
-  app.useBodyParser('urlencoded', { limit: '1mb', extended: true } as any);
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ limit: '1mb', extended: true }));
   app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   await app.listen(PORT, '0.0.0.0', () => {
