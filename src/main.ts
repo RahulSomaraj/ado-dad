@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import * as morgan from 'morgan';
 import helmet from 'helmet';
+import compression from 'compression';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -40,6 +41,13 @@ async function bootstrap() {
     helmet({
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: false /* …etc… */,
+    }),
+  );
+
+  // (b.1) Compression for responses
+  app.use(
+    compression({
+      threshold: 1024, // compress payloads > 1KB
     }),
   );
 
@@ -103,6 +111,9 @@ async function bootstrap() {
       skipMissingProperties: true,
     }),
   );
+  // Limit JSON and urlencoded body sizes
+  app.useBodyParser('json', { limit: '1mb' } as any);
+  app.useBodyParser('urlencoded', { limit: '1mb', extended: true } as any);
   app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   await app.listen(PORT, '0.0.0.0', () => {
