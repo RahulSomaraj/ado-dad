@@ -1,0 +1,61 @@
+*** a/src/chat/chat.gateway.ts
+--- b/src/chat/chat.gateway.ts
+@@
+-import { UseGuards, Logger } from '@nestjs/common';
+-import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
++import { UseGuards, Logger, ForbiddenException } from '@nestjs/common';
++import { WsJwtGuard } from '../auth/guard/ws-guard';
+@@
+-@WebSocketGateway({
+-  cors: true,
++@WebSocketGateway({
++  cors: { origin: process.env.FRONTEND_URL || true, credentials: true },
+ })
+ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+   @WebSocketServer()
+   server: Server;
+   private readonly logger = new Logger('ChatGateway');
+@@
+-  @UseGuards(JwtAuthGuard)
++  @UseGuards(WsJwtGuard)
+   @SubscribeMessage('joinChat')
+   async handleJoinChat(
+     @MessageBody() data: { chatId: string },
+     @ConnectedSocket() client: Socket,
+   ) {
+@@
+-    client.join(data.chatId);
++    // authorize membership (sender must be a participant)
++    const isMember = await this.chatService.isParticipant(data.chatId, userId);
++    if (!isMember) throw new ForbiddenException('Not a chat participant');
++
++    client.join(data.chatId); // idempotent
+     this.logger.log(`User ${userId} joined chat ${data.chatId}`);
+     return { success: true };
+   }
+@@
+-  @UseGuards(JwtAuthGuard)
++  @UseGuards(WsJwtGuard)
+   @SubscribeMessage('sendMessage')
+   async handleSendMessage(
+     @MessageBody()
+     data: { chatId: string; content: string },
+     @ConnectedSocket() client: Socket,
+   ) {
+@@
+-      // Emit to all users in the chat room
+-      this.server.to(data.chatId).emit('message', {
++      // Emit to all users in the chat room
++      this.server.to(data.chatId).emit('message', {
+         chatId: data.chatId,
+         message,
+       });
+@@
+-  @UseGuards(JwtAuthGuard)
++  @UseGuards(WsJwtGuard)
+   @SubscribeMessage('markRead')
+   async handleMarkRead(
+     @MessageBody() data: { chatId: string },
+     @ConnectedSocket() client: Socket,
+   ) {
+

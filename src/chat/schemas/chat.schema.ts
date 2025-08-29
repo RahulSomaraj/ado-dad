@@ -32,3 +32,33 @@ export class Chat extends Document {
 }
 
 export const ChatSchema = SchemaFactory.createForClass(Chat);
+
+// Ensure only two participants for 1:1 chats
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+ChatSchema.path('participants').validate(function (value: Types.ObjectId[]) {
+  return Array.isArray(value) && value.length === 2;
+}, '1:1 chats must have exactly two participants');
+
+// Normalize participant ordering to keep indexes consistent
+ChatSchema.pre('save', function (next) {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  if (this.participants) {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    this.participants = this.participants
+      .map((id: any) => id.toString())
+      .sort()
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      .map((id: string) => new Types.ObjectId(id));
+  }
+  next();
+});
+
+// Unique index to prevent duplicate chats per pair + context
+ChatSchema.index(
+  { participants: 1, contextType: 1, contextId: 1 },
+  { unique: true, name: 'uniq_pair_context' },
+);

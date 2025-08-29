@@ -9,11 +9,14 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
-import { UseGuards, Logger } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { UseGuards, Logger, ForbiddenException } from '@nestjs/common';
+import { WsJwtGuard } from '../auth/guard/ws-guard';
 
 @WebSocketGateway({
-  cors: true,
+  cors: {
+    origin: (process.env as any).FRONTEND_URL || true,
+    credentials: true,
+  },
   namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -44,16 +47,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.connectedUsers.delete(client.id);
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('joinChat')
   async handleJoinChat(
     @MessageBody('chatId') chatId: string,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to join chat ${chatId}`);
       return { error: 'Unauthorized' };
     }
+
+    // authorize membership (sender must be a participant)
+    const isMember = await this.chatService.isParticipant(chatId, userId);
+    if (!isMember) throw new ForbiddenException('Not a chat participant');
 
     this.logger.log(`User ${userId} joining chat ${chatId}`);
     client.join(chatId);
@@ -64,12 +73,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: true, chatId };
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
     @MessageBody() data: { chatId: string; content: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to send message`);
       return { error: 'Unauthorized' };
@@ -97,8 +108,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Ensure sender is in the room (idempotent)
       client.join(data.chatId);
 
-      // Emit to all users in the chat room
-      this.server.to(data.chatId).emit('newMessage', {
+      // Emit to all users in the chat room (compat: newMessage and message)
+      const payload = {
         id: (message as any)._id?.toString?.() ?? (message as any)._id,
         chat: (message as any).chat?.toString?.() ?? (message as any).chat,
         sender:
@@ -106,7 +117,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         content: message.content,
         createdAt: (message as any).createdAt ?? new Date(),
         read: message.read,
-      });
+      } as any;
+      this.server.to(data.chatId).emit('newMessage', payload);
+      this.server
+        .to(data.chatId)
+        .emit('message', { chatId: data.chatId, message: payload });
 
       this.logger.log(`Message sent successfully by user ${userId}`);
       return { success: true, message };
@@ -186,9 +201,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('getUserChats')
   async handleGetUserChats(@ConnectedSocket() client: Socket) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to get user chats`);
       return { error: 'Unauthorized' };
@@ -204,12 +221,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('getChatMessages')
   async handleGetChatMessages(
     @MessageBody('chatId') chatId: string,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to get chat messages`);
       return { error: 'Unauthorized' };
@@ -227,12 +246,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('markAsRead')
   async handleMarkAsRead(
     @MessageBody('chatId') chatId: string,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to mark messages as read`);
       return { error: 'Unauthorized' };
