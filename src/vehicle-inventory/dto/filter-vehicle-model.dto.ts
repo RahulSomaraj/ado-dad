@@ -1359,18 +1359,18 @@ export class FilterVehicleModelDto {
       'createdAt',
       'updatedAt',
     ],
-    example: 'displayName',
+    example: 'createdAt',
   })
   @IsOptional()
   @IsString()
-  sortBy?: string = 'displayName';
+  sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({
     description: 'Sort order',
     enum: ['ASC', 'DESC'],
-    example: 'ASC',
+    example: 'DESC',
   })
   @IsOptional()
   @IsString()
-  sortOrder?: 'ASC' | 'DESC' = 'ASC';
+  sortOrder?: 'ASC' | 'DESC' = 'DESC';
 }

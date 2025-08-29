@@ -382,11 +382,16 @@ export class VehicleInventoryService {
       filter.manufacturer = manufacturerId;
     }
 
-    return this.vehicleModelModel
+    console.log('🔍 Simple findAllVehicleModels filter:', filter);
+
+    const models = await this.vehicleModelModel
       .find(filter)
       .populate('manufacturer', 'name displayName logo')
       .sort({ displayName: 1 })
       .exec();
+
+    console.log('🔍 Simple findAllVehicleModels result count:', models.length);
+    return models;
   }
 
   async findVehicleModelById(id: string): Promise<VehicleModel> {
@@ -450,8 +455,8 @@ export class VehicleInventoryService {
     const {
       page = 1,
       limit = 20,
-      sortBy = 'displayName',
-      sortOrder = 'ASC',
+      sortBy = 'createdAt', // Changed default to createdAt for newest first
+      sortOrder = 'DESC', // DESC for newest first
     } = filters;
 
     // Convert string parameters to numbers
@@ -462,7 +467,7 @@ export class VehicleInventoryService {
     const pipeline: any[] = [];
 
     // Handle text search first (must be the first stage if present)
-    if (filters.search) {
+    if (filters.search && filters.search.trim()) {
       pipeline.push({
         $match: {
           $text: { $search: filters.search },
@@ -481,11 +486,11 @@ export class VehicleInventoryService {
       matchStage.vehicleType = filters.vehicleType;
     }
 
-    if (filters.segment) {
+    if (filters.segment && filters.segment.trim() !== '') {
       matchStage.segment = { $regex: filters.segment, $options: 'i' };
     }
 
-    if (filters.bodyType) {
+    if (filters.bodyType && filters.bodyType.trim() !== '') {
       matchStage.bodyType = { $regex: filters.bodyType, $options: 'i' };
     }
 
@@ -520,23 +525,23 @@ export class VehicleInventoryService {
     });
 
     pipeline.push({
-      $unwind: '$manufacturer',
+      $unwind: { path: '$manufacturer', preserveNullAndEmptyArrays: true },
     });
 
     // Add manufacturer filters
-    const manufacturerMatchStage: any = {
-      'manufacturer.isActive': true,
-      'manufacturer.isDeleted': false,
-    };
+    const manufacturerMatchStage: any = {};
 
-    if (filters.manufacturerName) {
+    if (filters.manufacturerName && filters.manufacturerName.trim() !== '') {
       manufacturerMatchStage['manufacturer.name'] = {
         $regex: filters.manufacturerName,
         $options: 'i',
       };
     }
 
-    if (filters.manufacturerCountry) {
+    if (
+      filters.manufacturerCountry &&
+      filters.manufacturerCountry.trim() !== ''
+    ) {
       manufacturerMatchStage['manufacturer.originCountry'] = {
         $regex: filters.manufacturerCountry,
         $options: 'i',
@@ -565,7 +570,9 @@ export class VehicleInventoryService {
       }
     }
 
-    pipeline.push({ $match: manufacturerMatchStage });
+    if (Object.keys(manufacturerMatchStage).length > 0) {
+      pipeline.push({ $match: manufacturerMatchStage });
+    }
 
     // Add variant lookup for advanced filtering
     pipeline.push({
@@ -597,8 +604,9 @@ export class VehicleInventoryService {
       },
     });
 
-    // Add variant-based filters
+    // Add variant-based filters ONLY if there are actual filters to apply
     const variantMatchStage: any = {};
+    let hasVariantFilters = false;
 
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
       variantMatchStage['variants.price'] = {};
@@ -608,24 +616,28 @@ export class VehicleInventoryService {
       if (filters.maxPrice !== undefined) {
         variantMatchStage['variants.price'].$lte = filters.maxPrice;
       }
+      hasVariantFilters = true;
     }
 
-    if (filters.fuelType) {
+    if (filters.fuelType && filters.fuelType.trim() !== '') {
       variantMatchStage['fuelTypes.name'] = {
         $regex: filters.fuelType,
         $options: 'i',
       };
+      hasVariantFilters = true;
     }
 
-    if (filters.transmissionType) {
+    if (filters.transmissionType && filters.transmissionType.trim() !== '') {
       variantMatchStage['transmissionTypes.name'] = {
         $regex: filters.transmissionType,
         $options: 'i',
       };
+      hasVariantFilters = true;
     }
 
-    if (filters.featurePackage) {
+    if (filters.featurePackage && filters.featurePackage.trim() !== '') {
       variantMatchStage['variants.featurePackage'] = filters.featurePackage;
+      hasVariantFilters = true;
     }
 
     if (
@@ -641,6 +653,7 @@ export class VehicleInventoryService {
         variantMatchStage['variants.seatingCapacity'].$lte =
           filters.maxSeatingCapacity;
       }
+      hasVariantFilters = true;
     }
 
     if (
@@ -656,6 +669,7 @@ export class VehicleInventoryService {
         variantMatchStage['variants.engineSpecs.capacity'].$lte =
           filters.maxEngineCapacity;
       }
+      hasVariantFilters = true;
     }
 
     if (filters.minMileage !== undefined || filters.maxMileage !== undefined) {
@@ -668,20 +682,24 @@ export class VehicleInventoryService {
         variantMatchStage['variants.performanceSpecs.mileage'].$lte =
           filters.maxMileage;
       }
+      hasVariantFilters = true;
     }
 
     if (filters.turbocharged !== undefined) {
       variantMatchStage['variants.engineSpecs.turbocharged'] =
         filters.turbocharged;
+      hasVariantFilters = true;
     }
 
     // Add feature-based filters
     const featureFilters = this.getFeatureFilters(filters);
     if (Object.keys(featureFilters).length > 0) {
       Object.assign(variantMatchStage, featureFilters);
+      hasVariantFilters = true;
     }
 
-    if (Object.keys(variantMatchStage).length > 0) {
+    // Only apply variant match stage if we have actual filters
+    if (hasVariantFilters) {
       pipeline.push({ $match: variantMatchStage });
     }
 
@@ -701,28 +719,36 @@ export class VehicleInventoryService {
       },
     });
 
-    // Filter out models with no variants if any variant filters are applied
-    const hasVariantFilters =
-      filters.minPrice !== undefined ||
-      filters.maxPrice !== undefined ||
-      filters.fuelType ||
-      filters.transmissionType ||
-      filters.featurePackage ||
-      filters.minSeatingCapacity !== undefined ||
-      filters.maxSeatingCapacity !== undefined ||
-      filters.minEngineCapacity !== undefined ||
-      filters.maxEngineCapacity !== undefined ||
-      filters.minMileage !== undefined ||
-      filters.maxMileage !== undefined ||
-      filters.turbocharged !== undefined ||
-      Object.keys(this.getFeatureFilters(filters)).length > 0;
+    console.log('🔍 Variant filter check:', {
+      hasVariantFilters,
+      filters: {
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        fuelType: filters.fuelType,
+        transmissionType: filters.transmissionType,
+        featurePackage: filters.featurePackage,
+        minSeatingCapacity: filters.minSeatingCapacity,
+        maxSeatingCapacity: filters.maxSeatingCapacity,
+        minEngineCapacity: filters.minEngineCapacity,
+        maxEngineCapacity: filters.maxEngineCapacity,
+        minMileage: filters.minMileage,
+        maxMileage: filters.maxMileage,
+        turbocharged: filters.turbocharged,
+        featureFiltersCount: Object.keys(this.getFeatureFilters(filters))
+          .length,
+      },
+    });
 
+    // Only apply variant filter if we have actual variant-based filters
     if (hasVariantFilters) {
+      console.log('🔍 Applying variant filter: variantCount > 0');
       pipeline.push({
         $match: {
           variantCount: { $gt: 0 },
         },
       });
+    } else {
+      console.log('🔍 No variant filters applied, including all models');
     }
 
     // Get total count before pagination

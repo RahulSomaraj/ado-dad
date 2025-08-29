@@ -500,6 +500,8 @@ export class VehicleInventoryController {
     );
 
     if (hasFilters) {
+      console.log(hasFilters);
+      console.log(filters);
       return this.vehicleInventoryService.findVehicleModelsWithFilters(filters);
     } else {
       // Return simple list if no filters
@@ -515,6 +517,52 @@ export class VehicleInventoryController {
         hasPrev: false,
       };
     }
+  }
+
+  @Get('models/debug')
+  @ApiOperation({
+    summary: 'Debug endpoint to check vehicle models data',
+    description:
+      'Simple endpoint to verify vehicle models are being created and retrieved correctly',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Debug information retrieved successfully',
+  })
+  async debugVehicleModels() {
+    // Get all models without any filters
+    const allModels = await this.vehicleInventoryService.findAllVehicleModels();
+
+    // Get models with aggregation pipeline
+    const aggregatedModels =
+      await this.vehicleInventoryService.findVehicleModelsWithFilters({});
+
+    return {
+      debug: {
+        simpleQuery: {
+          count: allModels.length,
+          models: allModels.map((m) => ({
+            id: (m as any)._id,
+            name: m.name,
+            displayName: m.displayName,
+            manufacturer: m.manufacturer,
+            isActive: m.isActive,
+          })),
+        },
+        aggregatedQuery: {
+          count: aggregatedModels.data.length,
+          total: aggregatedModels.total,
+          models: aggregatedModels.data.map((m) => ({
+            id: (m as any)._id,
+            name: m.name,
+            displayName: m.displayName,
+            manufacturer: m.manufacturer,
+            isActive: m.isActive,
+          })),
+        },
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 
   @Get('models/:id')
