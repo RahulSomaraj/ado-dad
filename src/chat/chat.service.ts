@@ -138,32 +138,47 @@ export class ChatService {
     return chat;
   }
 
-  async sendMessage(chatId: string, senderId: string, content: string) {
-    const chat = await this.chatModel.findById(chatId);
-    if (!chat) return null;
-    const sender = new Types.ObjectId(senderId);
-    const other = (
-      chat.participants[0].toString() === sender.toString()
-        ? chat.participants[1]
-        : chat.participants[0]
-    ) as Types.ObjectId;
-    // Block enforcement
-    if (
-      this.isBlockedPair(chat, other, sender) ||
-      this.isBlockedPair(chat, sender, other)
-    ) {
-      throw new Error('Messaging blocked between users');
-    }
-    const message = new this.messageModel({ chat: chat._id, sender, content });
-    return message.save();
+  async sendMessage(chatId: string, userId: string, content: string) {
+    // Ensure sender is participant and not blocked
+    const chat = await this.chatModel.findById(chatId).lean();
+    if (!chat) throw new Error('Chat not found');
+    const isParticipant = (chat as any).participants
+      .map((id: any) => id.toString())
+      .includes(userId.toString());
+    if (!isParticipant) throw new Error('Not a chat participant');
+
+    // Check if either user blocked the other
+    const [a, b] = (chat as any).participants.map((id: any) => id.toString());
+    const blocked = ((chat as any).blocks || []).some(
+      (blk: any) =>
+        (blk.blocker.toString() === a && blk.blocked.toString() === b) ||
+        (blk.blocker.toString() === b && blk.blocked.toString() === a),
+    );
+    if (blocked) throw new Error('Messaging is blocked in this chat');
+
+    const message = new this.messageModel({
+      chat: new Types.ObjectId(chatId),
+      sender: new Types.ObjectId(userId),
+      content,
+    });
+    const savedMessage = await message.save();
+    return await savedMessage.populate('sender', 'name email');
   }
 
-  async getMessages(chatId: string) {
-    return this.messageModel
-      .find({ chat: chatId })
-      .populate('sender', 'name email')
+  async getMessages(
+    chatId: string,
+    page = 1,
+    limit = 50,
+  ): Promise<Array<Message & { _id: Types.ObjectId }>> {
+    const skip = Math.max(0, (page - 1) * limit);
+    const docs = await this.messageModel
+      .find({ chat: new Types.ObjectId(chatId) })
       .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('sender', 'name email')
       .exec();
+    return docs as unknown as Array<Message & { _id: Types.ObjectId }>;
   }
 
   async getUserChats(userId: string) {
