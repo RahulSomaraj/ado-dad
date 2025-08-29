@@ -14,8 +14,8 @@ import { WsJwtGuard } from '../auth/guard/ws-guard';
 
 @WebSocketGateway({
   cors: {
-    origin: (process.env as any).FRONTEND_URL || true,
-    credentials: true,
+    origin: '*',
+    credentials: false,
   },
   namespace: '/chat',
 })
