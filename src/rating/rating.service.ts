@@ -26,8 +26,8 @@ export class RatingService {
     const newRating = new this.ratingModel(createRatingDto);
     const savedRating = await newRating.save();
 
-    // Invalidate cache for this product's ratings
-    await this.redisService.del(`ratings:product:${createRatingDto.product}`);
+    // Invalidate caches for this product's ratings and aggregates
+    await this.invalidateProductRatingCaches(createRatingDto.product as any);
 
     // Cache the new rating
     await this.redisService.cacheSet(
@@ -50,8 +50,8 @@ export class RatingService {
       throw new Error('Rating not found');
     }
 
-    // Invalidate cache for this product's ratings
-    await this.redisService.del(`ratings:product:${rating.product}`);
+    // Invalidate caches for this product's ratings and aggregates
+    await this.invalidateProductRatingCaches((rating as any).product);
 
     // Update cache for this specific rating
     await this.redisService.cacheSet(
@@ -118,11 +118,9 @@ export class RatingService {
       throw new Error('Rating not found');
     }
 
-    // Remove from cache
+    // Remove from cache and invalidate product-related caches
     await this.redisService.cacheDel(this.getRatingCacheKeyById(ratingId));
-
-    // Invalidate cache for this product's ratings
-    await this.redisService.del(`ratings:product:${rating.product}`);
+    await this.invalidateProductRatingCaches((rating as any).product);
 
     return { message: 'Rating deleted successfully' };
   }
@@ -191,12 +189,15 @@ export class RatingService {
     return ratingStats;
   }
 
-  async clearProductRatingCache(productId: string) {
-    // Clear all cache entries related to this product
-    const pattern = `*product:${productId}*`;
-    // Note: Redis doesn't support pattern deletion directly, so we'll use a different approach
-    await this.redisService.del(`ratings:product:${productId}`);
-    await this.redisService.del(`avg_rating:product:${productId}`);
-    await this.redisService.del(`rating_stats:product:${productId}`);
+  private async invalidateProductRatingCaches(productId: string) {
+    // Delete list caches for any query permutations
+    const pattern = `ratings:product:${productId}:*`;
+    const keys = await this.redisService.keys(pattern);
+    if (keys && keys.length) {
+      await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+    }
+    // Delete aggregates
+    await this.redisService.cacheDel(`avg_rating:product:${productId}`);
+    await this.redisService.cacheDel(`rating_stats:product:${productId}`);
   }
 }

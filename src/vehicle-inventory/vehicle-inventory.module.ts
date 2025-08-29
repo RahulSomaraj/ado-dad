@@ -23,6 +23,7 @@ import {
   TransmissionType,
   TransmissionTypeSchema,
 } from './schemas/transmission-type.schema';
+import { RedisService } from '../shared/redis.service';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import {
   controllers: [VehicleInventoryController],
   providers: [
     VehicleInventoryService,
+    RedisService,
     SeedDataService,
     ManufacturerSeedService,
     VehicleModelSeedService,

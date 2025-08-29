@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ShowroomController } from './showroom.controller';
 import { ShowroomService } from './showroom.service';
 import { Showroom, ShowroomSchema } from './schemas/showroom.schema';
+import { RedisService } from '../shared/redis.service';
 
 @Module({
   imports: [
@@ -11,6 +12,6 @@ import { Showroom, ShowroomSchema } from './schemas/showroom.schema';
     ]),
   ],
   controllers: [ShowroomController],
-  providers: [ShowroomService],
+  providers: [ShowroomService, RedisService],
 })
 export class ShowroomModule {}

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Favorite, FavoriteDocument } from './schemas/schema.favorite';
+import { RedisService } from '../shared/redis.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 
@@ -9,6 +10,7 @@ import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 export class FavoriteService {
   constructor(
     @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
+    private readonly redisService: RedisService,
   ) {}
 
   async addFavorite(
@@ -19,13 +21,18 @@ export class FavoriteService {
       throw new Error('Only ads can be favorited');
     }
     const favorite = new this.favoriteModel({ userId, ...createFavoriteDto });
-    return await favorite.save();
+    const saved = await favorite.save();
+    await this.invalidateFavoritesCache(userId);
+    return saved;
   }
 
   async getUserFavorites(
     userId: string,
     query: { itemId?: string; itemType?: string },
   ): Promise<Favorite[]> {
+    const cacheKey = `fav:list:${userId}:${JSON.stringify(query || {})}`;
+    const cached = await this.redisService.cacheGet<Favorite[]>(cacheKey);
+    if (cached) return cached as any;
     const filter: any = { userId };
 
     if (query.itemId) {
@@ -37,7 +44,9 @@ export class FavoriteService {
     }
 
     // Always populate ad details
-    return await this.favoriteModel.find(filter).populate('itemId');
+    const data = await this.favoriteModel.find(filter).populate('itemId');
+    await this.redisService.cacheSet(cacheKey, data as any, 120);
+    return data as any;
   }
 
   async getFavoriteById(userId: string, favoriteId: string): Promise<Favorite> {
@@ -63,6 +72,7 @@ export class FavoriteService {
     if (!favorite) {
       throw new NotFoundException('Favorite not found');
     }
+    await this.invalidateFavoritesCache(userId);
     return favorite;
   }
 
@@ -77,6 +87,16 @@ export class FavoriteService {
     if (!favorite) {
       throw new NotFoundException('Favorite not found');
     }
+    await this.invalidateFavoritesCache(userId);
     return { message: 'Item removed from favorites' };
+  }
+
+  private async invalidateFavoritesCache(userId: string): Promise<void> {
+    try {
+      const keys = await this.redisService.keys(`fav:list:${userId}:*`);
+      if (keys?.length) {
+        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      }
+    } catch {}
   }
 }

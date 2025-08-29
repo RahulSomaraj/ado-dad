@@ -31,6 +31,7 @@ import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
 import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
+import { RedisService } from '../shared/redis.service';
 import { PaginatedVehicleModelResponseDto } from './dto/vehicle-model-response.dto';
 import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
 
@@ -47,6 +48,7 @@ export class VehicleInventoryService {
     private readonly fuelTypeModel: Model<FuelTypeDocument>,
     @InjectModel(TransmissionType.name)
     private readonly transmissionTypeModel: Model<TransmissionTypeDocument>,
+    private readonly redisService: RedisService,
   ) {}
 
   // Manufacturer methods
@@ -78,10 +80,17 @@ export class VehicleInventoryService {
   }
 
   async findAllManufacturers(): Promise<Manufacturer[]> {
-    return this.manufacturerModel
+    const cacheKey = 'vi:manufacturers:all:v1';
+    const cached = await this.redisService.cacheGet<Manufacturer[]>(cacheKey);
+    if (cached) return cached;
+
+    const data = await this.manufacturerModel
       .find({ isActive: true, isDeleted: false })
       .sort({ name: 1 })
       .exec();
+
+    await this.redisService.cacheSet(cacheKey, data, 600);
+    return data;
   }
 
   async findManufacturerById(id: string): Promise<Manufacturer> {
@@ -162,6 +171,25 @@ export class VehicleInventoryService {
   async findManufacturersWithFilters(
     filters: FilterManufacturerDto,
   ): Promise<PaginatedManufacturerResponseDto> {
+    // cache key based on normalized filters
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+    const cacheKey = `vi:manufacturers:list:${JSON.stringify(normalize(filters))}`;
+    const cached =
+      await this.redisService.cacheGet<PaginatedManufacturerResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
     const {
       page = 1,
       limit = 20,
@@ -265,7 +293,7 @@ export class VehicleInventoryService {
     const hasNext = pageNum < totalPages;
     const hasPrev = pageNum > 1;
 
-    return {
+    const response: PaginatedManufacturerResponseDto = {
       data: manufacturers,
       total,
       page: pageNum,
@@ -274,6 +302,9 @@ export class VehicleInventoryService {
       hasNext,
       hasPrev,
     };
+
+    await this.redisService.cacheSet(cacheKey, response, 300);
+    return response;
   }
 
   private getCategoryFilter(category: string): any[] {
@@ -384,6 +415,10 @@ export class VehicleInventoryService {
 
     console.log('🔍 Simple findAllVehicleModels filter:', filter);
 
+    const cacheKey = `vi:models:simple:${manufacturerId || 'all'}`;
+    const cached = await this.redisService.cacheGet<VehicleModel[]>(cacheKey);
+    if (cached) return cached;
+
     const models = await this.vehicleModelModel
       .find(filter)
       .populate('manufacturer', 'name displayName logo')
@@ -391,6 +426,7 @@ export class VehicleInventoryService {
       .exec();
 
     console.log('🔍 Simple findAllVehicleModels result count:', models.length);
+    await this.redisService.cacheSet(cacheKey, models, 300);
     return models;
   }
 
@@ -452,6 +488,25 @@ export class VehicleInventoryService {
   async findVehicleModelsWithFilters(
     filters: FilterVehicleModelDto,
   ): Promise<PaginatedVehicleModelResponseDto> {
+    // cache
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+    const cacheKey = `vi:models:list:${JSON.stringify(normalize(filters))}`;
+    const cached =
+      await this.redisService.cacheGet<PaginatedVehicleModelResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
     const {
       page = 1,
       limit = 20,
@@ -553,9 +608,18 @@ export class VehicleInventoryService {
         filters.manufacturerCategory,
       );
       if (categoryFilters.length > 0) {
-        manufacturerMatchStage.$or = categoryFilters.map((filter) => ({
-          'manufacturer.name': filter.name.$in[0],
-        }));
+        const names = Array.from(
+          new Set(
+            categoryFilters.flatMap((filter: any) =>
+              filter?.name?.$in && Array.isArray(filter.name.$in)
+                ? filter.name.$in
+                : [],
+            ),
+          ),
+        );
+        if (names.length > 0) {
+          manufacturerMatchStage['manufacturer.name'] = { $in: names };
+        }
       }
     }
 
@@ -791,7 +855,7 @@ export class VehicleInventoryService {
     const hasNext = pageNum < totalPages;
     const hasPrev = pageNum > 1;
 
-    return {
+    const response: PaginatedVehicleModelResponseDto = {
       data: vehicleModels,
       total,
       page: pageNum,
@@ -800,6 +864,25 @@ export class VehicleInventoryService {
       hasNext,
       hasPrev,
     };
+
+    await this.redisService.cacheSet(cacheKey, response, 180);
+    return response;
+  }
+
+  // ===== Cache invalidation helpers =====
+  private async invalidateVehicleInventoryCache(): Promise<void> {
+    try {
+      const patterns = ['vi:models:*', 'vi:manufacturers:*'];
+      for (const p of patterns) {
+        const keys = await this.redisService.keys(p);
+        if (keys?.length) {
+          await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+        }
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Error invalidating vehicle inventory cache:', e);
+    }
   }
 
   private getFeatureFilters(filters: FilterVehicleModelDto): any {

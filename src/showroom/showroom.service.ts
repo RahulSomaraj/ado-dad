@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Showroom, ShowroomDocument } from './schemas/showroom.schema';
+import { RedisService } from '../shared/redis.service';
 import { CreateShowroomDto } from './dto/create-showroom.dto';
 import { UpdateShowroomDto } from './dto/update-showroom.dto';
 
@@ -10,6 +11,7 @@ export class ShowroomService {
   constructor(
     @InjectModel(Showroom.name)
     private readonly showroomModel: Model<ShowroomDocument>,
+    private readonly redisService: RedisService,
   ) {}
 
   // Get all showrooms
@@ -19,15 +21,25 @@ export class ShowroomService {
     pagination: { page: number; limit: number };
     sortOptions: any;
   }): Promise<ShowroomDocument[]> {
-    return this.showroomModel.find().exec();
+    const cacheKey = `showroom:list:${JSON.stringify(p0)}`;
+    const cached =
+      await this.redisService.cacheGet<ShowroomDocument[]>(cacheKey);
+    if (cached) return cached as any;
+    const data = await this.showroomModel.find().exec();
+    await this.redisService.cacheSet(cacheKey, data, 300);
+    return data;
   }
 
   // Get showroom by ID
   async getShowroomById(id: string): Promise<ShowroomDocument> {
+    const key = `showroom:get:${id}`;
+    const cached = await this.redisService.cacheGet<ShowroomDocument>(key);
+    if (cached) return cached as any;
     const showroom = await this.showroomModel.findById(id).exec();
     if (!showroom) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);
     }
+    await this.redisService.cacheSet(key, showroom, 900);
     return showroom;
   }
 
@@ -37,7 +49,9 @@ export class ShowroomService {
     user: any,
   ): Promise<ShowroomDocument> {
     const newShowroom = new this.showroomModel(createShowroomDto);
-    return newShowroom.save();
+    const saved = await newShowroom.save();
+    await this.invalidateShowroomCache((saved._id as any).toString());
+    return saved;
   }
 
   // Update a showroom
@@ -55,6 +69,7 @@ export class ShowroomService {
     if (!updatedShowroom) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);
     }
+    await this.invalidateShowroomCache(id);
     return updatedShowroom;
   }
 
@@ -64,5 +79,18 @@ export class ShowroomService {
     if (!result) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);
     }
+    await this.invalidateShowroomCache(id);
+  }
+
+  private async invalidateShowroomCache(id?: string): Promise<void> {
+    try {
+      const keys = await this.redisService.keys('showroom:list:*');
+      if (keys?.length) {
+        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      }
+      if (id) {
+        await this.redisService.cacheDel(`showroom:get:${id}`);
+      }
+    } catch {}
   }
 }

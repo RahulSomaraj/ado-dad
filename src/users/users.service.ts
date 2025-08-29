@@ -18,6 +18,7 @@ import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserType } from './enums/user.types';
+import { RedisService } from '../shared/redis.service';
 
 interface PaginatedUsersResponse {
   users: Partial<User>[];
@@ -36,6 +37,7 @@ export class UsersService {
     @InjectModel('User') private readonly userModel: Model<User>,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -46,6 +48,10 @@ export class UsersService {
     currentUser: User,
   ): Promise<PaginatedUsersResponse> {
     try {
+      const cacheKey = `users:list:${JSON.stringify({ getUsersDto, uid: currentUser?._id || currentUser?.id })}`;
+      const cached =
+        await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
+      if (cached) return cached;
       const { page = 1, limit = 10, search, type, sort } = getUsersDto;
 
       // Validate pagination parameters
@@ -101,7 +107,7 @@ export class UsersService {
         `Retrieved ${users.length} users out of ${totalUsers} total`,
       );
 
-      return {
+      const response: PaginatedUsersResponse = {
         users,
         totalPages,
         currentPage: validatedPage,
@@ -109,6 +115,8 @@ export class UsersService {
         hasNext: validatedPage < totalPages,
         hasPrev: validatedPage > 1,
       };
+      await this.redisService.cacheSet(cacheKey, response, 300);
+      return response;
     } catch (error) {
       this.logger.error('Failed to get users:', error);
       throw new HttpException(
@@ -126,6 +134,9 @@ export class UsersService {
    */
   async getUserById(id: string): Promise<Partial<User>> {
     try {
+      const cacheKey = `users:byId:${id}`;
+      const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
+      if (cached) return cached;
       if (!this.isValidObjectId(id)) {
         throw new BadRequestException('Invalid user ID format');
       }
@@ -140,6 +151,7 @@ export class UsersService {
         throw new NotFoundException('User not found or deleted');
       }
 
+      await this.redisService.cacheSet(cacheKey, user, 600);
       return user;
     } catch (error) {
       if (
@@ -190,6 +202,7 @@ export class UsersService {
         profilePic: userResponse.profilePic,
         isDeleted: userResponse.isDeleted,
       };
+      await this.invalidateUsersListCaches();
       return response;
     } catch (error) {
       this.logger.error(`Failed to create user ${userData.email}:`, error);
@@ -250,6 +263,8 @@ export class UsersService {
 
       this.logger.log(`User updated successfully: ${updatedUser.email}`);
 
+      await this.redisService.cacheDel(`users:byId:${id}`);
+      await this.invalidateUsersListCaches();
       return updatedUser;
     } catch (error) {
       if (
@@ -294,6 +309,8 @@ export class UsersService {
 
       this.logger.log(`User soft deleted successfully: ${user.email}`);
 
+      await this.redisService.cacheDel(`users:byId:${id}`);
+      await this.invalidateUsersListCaches();
       return { message: 'User deleted successfully' };
     } catch (error) {
       if (
@@ -343,6 +360,7 @@ export class UsersService {
 
       this.logger.log(`OTP sent successfully to: ${email}`);
 
+      await this.invalidateUsersListCaches();
       return { message: 'OTP sent successfully' };
     } catch (error) {
       this.logger.error(`Failed to send OTP to ${email}:`, error);
@@ -387,6 +405,7 @@ export class UsersService {
 
       this.logger.log(`OTP verified successfully for: ${email}`);
 
+      await this.invalidateUsersListCaches();
       return { message: 'OTP verified successfully' };
     } catch (error) {
       this.logger.error(`Failed to verify OTP for ${email}:`, error);
@@ -522,6 +541,17 @@ export class UsersService {
           HttpStatus.BAD_REQUEST,
         );
       }
+    }
+  }
+
+  private async invalidateUsersListCaches(): Promise<void> {
+    try {
+      const keys = await this.redisService.keys('users:list:*');
+      if (keys?.length) {
+        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      }
+    } catch (e) {
+      this.logger.warn('Failed to invalidate users list caches', e as any);
     }
   }
 }

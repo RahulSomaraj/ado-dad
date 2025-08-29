@@ -10,10 +10,12 @@ import { Category } from './schemas/category.schema';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { FindAllCategoriesDto } from './dto/get-category.dto';
+import { RedisService } from '../shared/redis.service';
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectModel(Category.name) private categoryModel: Model<Category>,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(
@@ -53,7 +55,9 @@ export class CategoryService {
     }
 
     const newCategory = new this.categoryModel(createCategoryDto);
-    return newCategory.save();
+    const saved = await newCategory.save();
+    await this.invalidateCategoryCache();
+    return saved;
   }
 
   async findAll(query: FindAllCategoriesDto): Promise<{
@@ -64,6 +68,28 @@ export class CategoryService {
     totalPages: number;
   }> {
     const { name, parent, limit = 10, page = 1 } = query;
+
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+    const cacheKey = `cat:list:${JSON.stringify(normalize(query))}`;
+    const cached = await this.redisService.cacheGet<{
+      data: Category[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+    if (cached) return cached;
 
     // Build filter: only include categories that have not been soft-deleted.
     const filter: any = { deletedAt: null };
@@ -101,16 +127,22 @@ export class CategoryService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const response = {
       data: categories,
       total,
       page,
       limit,
       totalPages,
     };
+    await this.redisService.cacheSet(cacheKey, response, 600);
+    return response;
   }
 
   async findById(id: string): Promise<Category> {
+    const cacheKeyGet = `cat:get:${id}`;
+    const cachedGet = await this.redisService.cacheGet<Category>(cacheKeyGet);
+    if (cachedGet) return cachedGet;
+
     const category = await this.categoryModel.findById(id);
     if (!category)
       throw new HttpException(
@@ -120,6 +152,7 @@ export class CategoryService {
         },
         HttpStatus.BAD_REQUEST,
       );
+    await this.redisService.cacheSet(cacheKeyGet, category, 900);
     return category;
   }
 
@@ -193,6 +226,7 @@ export class CategoryService {
     if (!updatedCategory) {
       throw new NotFoundException('Category not found');
     }
+    await this.invalidateCategoryCache(id);
     return updatedCategory;
   }
 
@@ -205,5 +239,18 @@ export class CategoryService {
     if (!updatedCategory) {
       throw new NotFoundException('Category not found');
     }
+    await this.invalidateCategoryCache(id);
+  }
+
+  private async invalidateCategoryCache(id?: string): Promise<void> {
+    try {
+      const keys = await this.redisService.keys('cat:list:*');
+      if (keys?.length) {
+        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      }
+      if (id) {
+        await this.redisService.cacheDel(`cat:get:${id}`);
+      }
+    } catch {}
   }
 }
