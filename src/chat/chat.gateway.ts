@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
 import { UseGuards, Logger, ForbiddenException } from '@nestjs/common';
 import { WsJwtGuard } from '../auth/guard/ws-guard';
+import * as jwt from 'jsonwebtoken';
 
 @WebSocketGateway({
   cors: {
@@ -19,6 +20,7 @@ import { WsJwtGuard } from '../auth/guard/ws-guard';
   },
   namespace: '/chat',
 })
+@UseGuards(WsJwtGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -31,15 +33,80 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
 
-    // Extract user ID from auth token or query params
-    const userId =
-      client.handshake.auth.userId || client.handshake.query.userId;
-    if (userId) {
-      this.connectedUsers.set(client.id, userId);
-      this.logger.log(`User ${userId} connected with socket ${client.id}`);
-    } else {
-      this.logger.warn(`Client ${client.id} connected without user ID`);
+    // Try to authenticate on connect and map user → socket
+    try {
+      const rawAuth = (
+        (client.handshake.auth?.token as string) ||
+        (client.handshake.headers['authorization'] as string) ||
+        ''
+      ).toString();
+      const bearer = rawAuth.replace(/^Bearer\s+/i, '').trim();
+      // Debug masked token for WS connect
+      const masked = bearer
+        ? `${bearer.slice(0, 10)}...${bearer.slice(-6)} (len:${bearer.length})`
+        : '(empty)';
+      this.logger.log(`WS connect token: ${masked}`);
+      if (!bearer) {
+        this.logger.warn(`Client ${client.id} connected without token`);
+        return;
+      }
+
+      // Detect alg from header to choose verification
+      const decoded: any = jwt.decode(bearer, { complete: true });
+      const alg = decoded?.header?.alg as string | undefined;
+      let key: string | undefined;
+      let opts: jwt.VerifyOptions;
+      if (alg && alg.startsWith('HS')) {
+        key =
+          process.env.TOKEN_KEY || 'default-secret-key-change-in-production';
+        opts = { algorithms: ['HS256'] };
+      } else {
+        key = process.env.JWT_PUBLIC_KEY;
+        opts = { algorithms: ['RS256'] } as any;
+      }
+      if (!key) {
+        this.logger.warn(`JWT key not configured for alg ${alg || 'unknown'}`);
+        return;
+      }
+
+      const payload = jwt.verify(bearer, key, opts) as any;
+      const userId = payload?.id || payload?.sub;
+      console.log('userId', userId);
+      if (userId) {
+        (client as any).user = { id: userId, roles: payload?.roles };
+        this.connectedUsers.set(client.id, userId);
+        this.logger.log(`User ${userId} mapped to socket ${client.id}`);
+      } else {
+        this.logger.warn(`Client ${client.id} token missing id/sub`);
+      }
+    } catch (e) {
+      this.logger.warn(
+        `Client ${client.id} provided invalid token: ${(e as any)?.message || e}`,
+      );
     }
+
+    // Log all incoming events for this client for debugging
+    try {
+      client.onAny((event, ...args) => {
+        let preview = '';
+        try {
+          preview = JSON.stringify(args, (k, v) => {
+            if (typeof v === 'string' && v.length > 200)
+              return v.slice(0, 200) + '…';
+            return v;
+          });
+          if (preview.length > 1000) preview = preview.slice(0, 1000) + '…';
+        } catch {
+          preview = '[unserializable]';
+        }
+        this.logger.log(`WS <- ${event} from ${client.id}: ${preview}`);
+      });
+      client.on('error', (err: any) => {
+        this.logger.warn(
+          `WS error from ${client.id}: ${(err && err.message) || err}`,
+        );
+      });
+    } catch {}
   }
 
   handleDisconnect(client: Socket) {
@@ -131,12 +198,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('createAdChat')
   async handleCreateAdChat(
     @MessageBody() data: { adId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.connectedUsers.get(client.id);
+    const userId =
+      (client as any).user?.id || this.connectedUsers.get(client.id);
     if (!userId) {
       this.logger.warn(`Unauthorized attempt to create ad chat`);
       return { error: 'Unauthorized' };
@@ -180,9 +249,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (otherUserSocketId) {
       // Automatically join the other user to the chat room
-      this.server.sockets.sockets
-        .get(otherUserSocketId)
-        ?.join((chat._id as any).toString());
+      // Robust: join by socket id without relying on internal maps
+      this.server
+        .in(otherUserSocketId)
+        .socketsJoin((chat._id as any).toString());
 
       // Notify the other user about the new chat
       this.server.to(otherUserSocketId).emit('newChatCreated', {

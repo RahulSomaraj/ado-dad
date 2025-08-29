@@ -40,23 +40,38 @@ export class ChatService {
       '🔍 Looking for existing chat with participants:',
       participants.map((p) => p.toString()),
     );
-    let chat = await this.chatModel.findOne({
-      participants: { $all: participants, $size: 2 },
+
+    // Normalize and sort participants deterministically for unique index
+    const participantsSorted = participants
+      .map((p) => p.toString())
+      .sort()
+      .map((id) => new Types.ObjectId(id));
+
+    const filter: any = {
+      participants: participantsSorted,
       contextType,
       contextId,
-    });
+    };
 
-    if (!chat) {
-      console.log('📝 Creating new chat...');
-      chat = await this.createChat(
-        participants,
+    const update: any = {
+      $setOnInsert: {
+        participants: participantsSorted,
         contextType,
         contextId,
-        postId,
-      );
-    } else {
-      console.log('✅ Found existing chat:', chat._id);
-    }
+        postId: postId ?? undefined,
+      },
+    };
+
+    const options = {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    } as const;
+
+    const chat = await this.chatModel
+      .findOneAndUpdate(filter, update, options)
+      .exec();
+    console.log('✅ Upserted chat:', (chat as any)?._id);
     return chat;
   }
 
