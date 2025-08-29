@@ -79,6 +79,30 @@ export class AdsService {
 
   /** ---------- FIND ALL (robust lookups + neutral defaults, all filters, all lists, all categories) ---------- */
   async findAll(filters: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
+    // Build deterministic cache key
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+
+    const safeFilters = normalize(filters);
+    const cacheKey = `ads:findAll:${JSON.stringify(safeFilters)}`;
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
     const {
       page = 1,
       limit = 20,
@@ -362,7 +386,7 @@ export class AdsService {
       return dto;
     });
 
-    return {
+    const response: PaginatedDetailedAdResponseDto = {
       data: dtoData,
       total,
       page,
@@ -371,6 +395,10 @@ export class AdsService {
       hasNext: page * limit < total,
       hasPrev: page > 1,
     };
+
+    // Cache for 120 seconds
+    await this.redisService.cacheSet(cacheKey, response, 120);
+    return response;
   }
 
   /** ---------- FIND ONE ---------- */
