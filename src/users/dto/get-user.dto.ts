@@ -52,6 +52,9 @@ export class GetUsersDto {
 
 // DTO for safe user API responses
 export class UserResponseDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  _id: string;
+
   @ApiProperty({ example: 'John Doe' })
   name: string;
 

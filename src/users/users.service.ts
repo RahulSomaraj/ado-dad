@@ -82,9 +82,16 @@ export class UsersService {
 
       // Apply role-based filtering
       if (currentUser.type === UserType.SUPER_ADMIN) {
+        // Super admin can see all user types
+        // No filtering needed - show all users
+      } else if (currentUser.type === UserType.ADMIN) {
+        // Admin can see all user types except SUPER_ADMIN
         query.type = {
           $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
         };
+      } else {
+        // Regular users can only see other regular users
+        query.type = UserType.USER;
       }
 
       // Apply type filter if provided
@@ -210,6 +217,7 @@ export class UsersService {
         savedUser.toObject();
       // Map to UserResponseDto
       const response: UserResponseDto = {
+        _id: (savedUser as any)._id.toString(),
         name: userResponse.name,
         email: userResponse.email,
         phoneNumber: userResponse.phoneNumber,

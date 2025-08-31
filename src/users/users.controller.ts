@@ -92,7 +92,8 @@ export class UsersController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
           // Validate MIME types explicitly
-          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/i }),
+          // Validate by MIME type
+          new FileTypeValidator({ fileType: /^image\//i }),
         ],
         fileIsRequired: false,
       }),
@@ -276,7 +277,7 @@ export class UsersController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/i }),
+          new FileTypeValidator({ fileType: /^image\//i }),
         ],
         fileIsRequired: true,
       }),
