@@ -17,8 +17,6 @@ import {
   Favorite,
   FavoriteDocument,
 } from '../../favorites/schemas/schema.favorite';
-import { Chat } from '../../chat/schemas/chat.schema';
-import { Message } from '../../chat/schemas/message.schema';
 
 import { FilterAdDto } from '../dto/common/filter-ad.dto';
 import {
@@ -47,10 +45,6 @@ export class AdsService {
     private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
-    @InjectModel(Chat.name)
-    private readonly chatModel: Model<Chat>,
-    @InjectModel(Message.name)
-    private readonly messageModel: Model<Message>,
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
@@ -579,41 +573,6 @@ export class AdsService {
       });
       detailed.isFavorited = !!userFavorite;
     }
-
-    // Get related chats
-    const chats = await this.chatModel
-      .find({
-        contextType: 'ad',
-        contextId: id,
-      })
-      .populate('participants', 'name email');
-
-    detailed.chatsCount = chats.length;
-    detailed.chats = await Promise.all(
-      chats.map(async (chat: any) => {
-        const lastMessage = await this.messageModel
-          .findOne({ chat: chat._id })
-          .sort({ createdAt: -1 })
-          .populate('sender', 'name');
-
-        return {
-          id: chat._id.toString(),
-          participants: chat.participants.map((participant: any) => ({
-            id: participant._id.toString(),
-            name: participant.name,
-            email: participant.email,
-          })),
-          lastMessage: lastMessage
-            ? {
-                content: lastMessage.content,
-                createdAt: (lastMessage as any).createdAt,
-                sender: (lastMessage.sender as any)?.name || 'Unknown',
-              }
-            : undefined,
-          createdAt: (chat as any).createdAt,
-        };
-      }),
-    );
 
     // Get ratings and reviews (if rating system exists for ads)
     const ratings = await this.getAdRatings(id);

@@ -19,7 +19,9 @@ import { AdsModule } from './ads/ads.module';
 import { BannerModule } from './banner/banner.module';
 import { CartModule } from './cart/cart.module';
 import { CategoryModule } from './category/category.module';
+import { ChatModule } from './chat/chat.module';
 import { FavoriteModule } from './favorites/favorite.module';
+import { GatewayModule } from './gateway/gateway.module';
 import { ProductModule } from './product/product.module';
 import { RatingModule } from './rating/rating.module';
 import { ShowroomModule } from './showroom/showroom.module';
@@ -106,7 +108,9 @@ import { configService } from './config/mongo.config';
     BannerModule,
     CartModule,
     CategoryModule,
+    ChatModule,
     FavoriteModule,
+    GatewayModule,
     ProductModule,
     RatingModule,
     ShowroomModule,
