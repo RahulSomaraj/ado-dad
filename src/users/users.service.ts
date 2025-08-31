@@ -7,14 +7,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { ConfigService } from '@nestjs/config';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
-import { EncryptionUtil } from '../common/encryption.util';
 import { AuthTokens } from '../auth/schemas/schema.refresh-token';
 import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -36,7 +34,7 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
   // Cache TTL constants (in seconds)
-  private readonly CACHE_TTL = {
+  private static readonly CACHE_TTL = {
     USER_BY_ID: 300, // 5 minutes for individual user
     USER_LIST: 300, // 5 minutes for user lists
     OTP_RATE_LIMIT: 300, // 5 minutes for OTP rate limiting
@@ -48,11 +46,23 @@ export class UsersService {
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
     private readonly emailService: EmailService,
-    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     @InjectModel(AuthTokens.name)
     private readonly authTokenModel: Model<AuthTokens>,
   ) {}
+
+  // Reusable field sets
+  private static readonly BASE_PROJECTION =
+    '_id name email type phoneNumber profilePic createdAt updatedAt';
+
+  // Deterministic cache key helper
+  private key(obj: Record<string, unknown>): string {
+    const parts = Object.keys(obj)
+      .sort()
+      .map((k) => `${k}=${JSON.stringify(obj[k])}`)
+      .join('&');
+    return `v${this.cacheVersion}:${parts}`;
+  }
 
   /**
    * Get all users with pagination, filtering, and sorting
@@ -62,7 +72,17 @@ export class UsersService {
     currentUser: User,
   ): Promise<PaginatedUsersResponse> {
     try {
-      const cacheKey = `users:list:v${this.cacheVersion}:${JSON.stringify({ getUsersDto, uid: currentUser?._id || currentUser?.id })}`;
+      const cacheKey = `users:list:${this.key({
+        page: getUsersDto.page ?? 1,
+        limit: getUsersDto.limit ?? 10,
+        search: (getUsersDto.search || '').trim(),
+        type: getUsersDto.type || 'any',
+        sort: getUsersDto.sort || 'createdAt:desc',
+        uid:
+          (currentUser as any)?._id?.toString?.() ||
+          (currentUser as any)?.id ||
+          'na',
+      })}`;
       const cached =
         await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
       if (cached) return cached;
@@ -80,22 +100,26 @@ export class UsersService {
         query.$text = { $search: search.trim() } as any;
       }
 
-      // Apply role-based filtering
-      if (currentUser.type === UserType.SUPER_ADMIN) {
-        // Super admin can see all user types
-        // No filtering needed - show all users
-      } else if (currentUser.type === UserType.ADMIN) {
-        // Admin can see all user types except SUPER_ADMIN
-        query.type = {
-          $in: [UserType.ADMIN, UserType.USER, UserType.SHOWROOM],
-        };
+      // Role-based visibility (compose with explicit `type` filter if present)
+      let allowedTypes: UserType[] | undefined;
+      if (currentUser?.type === UserType.SUPER_ADMIN) {
+        allowedTypes = undefined; // see all
+      } else if (currentUser?.type === UserType.ADMIN) {
+        allowedTypes = [UserType.ADMIN, UserType.USER, UserType.SHOWROOM];
       } else {
-        // Regular users can only see other regular users
-        query.type = UserType.USER;
+        allowedTypes = [UserType.USER];
       }
-
-      // Apply type filter if provided
-      if (type) {
+      if (type && allowedTypes) {
+        // both role and explicit type → intersection
+        if (allowedTypes.includes(type as UserType)) {
+          query.type = type;
+        } else {
+          // empty set → force no results cheaply
+          query.type = { $in: [] };
+        }
+      } else if (!type && allowedTypes) {
+        query.type = { $in: allowedTypes };
+      } else if (type && !allowedTypes) {
         query.type = type;
       }
 
@@ -109,7 +133,7 @@ export class UsersService {
           .sort(sortOptions)
           .skip((validatedPage - 1) * validatedLimit)
           .limit(validatedLimit)
-          .select('_id name email type phoneNumber profilePic createdAt')
+          .select(UsersService.BASE_PROJECTION)
           .lean()
           .exec(),
         this.userModel.countDocuments(query).exec(),
@@ -132,7 +156,7 @@ export class UsersService {
       await this.redisService.cacheSet(
         cacheKey,
         response,
-        this.CACHE_TTL.USER_LIST,
+        UsersService.CACHE_TTL.USER_LIST,
       );
       return response;
     } catch (error) {
@@ -152,27 +176,28 @@ export class UsersService {
    */
   async getUserById(id: string): Promise<Partial<User>> {
     try {
-      const cacheKey = `users:byId:v${this.cacheVersion}:${id}`;
+      const cacheKey = `users:byId:${this.key({ id })}`;
       const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
       if (cached) return cached;
       if (!this.isValidObjectId(id)) {
         throw new BadRequestException('Invalid user ID format');
       }
 
+      // Ensure deleted users are excluded at query-time (bug fix)
       const user = await this.userModel
-        .findById(id)
-        .select('_id name email type phoneNumber profilePic createdAt')
+        .findOne({ _id: id, isDeleted: { $ne: true } })
+        .select(UsersService.BASE_PROJECTION)
         .lean()
         .exec();
 
-      if (!user || user.isDeleted) {
+      if (!user) {
         throw new NotFoundException('User not found or deleted');
       }
 
       await this.redisService.cacheSet(
         cacheKey,
         user,
-        this.CACHE_TTL.USER_BY_ID,
+        UsersService.CACHE_TTL.USER_BY_ID,
       );
       return user;
     } catch (error) {
@@ -228,9 +253,9 @@ export class UsersService {
 
       // Cache the newly created user and invalidate list caches
       await this.redisService.cacheSet(
-        `users:byId:v${this.cacheVersion}:${savedUser._id}`,
+        `users:byId:${this.key({ id: (savedUser as any)._id.toString() })}`,
         response,
-        this.CACHE_TTL.USER_BY_ID,
+        UsersService.CACHE_TTL.USER_BY_ID,
       );
       await this.invalidateUsersListCaches();
       return response;
@@ -293,9 +318,7 @@ export class UsersService {
 
       this.logger.log(`User updated successfully: ${updatedUser.email}`);
 
-      await this.redisService.cacheDel(
-        `users:byId:v${this.cacheVersion}:${id}`,
-      );
+      await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
       await this.invalidateUsersListCaches();
       return updatedUser;
     } catch (error) {
@@ -341,9 +364,7 @@ export class UsersService {
 
       this.logger.log(`User soft deleted successfully: ${user.email}`);
 
-      await this.redisService.cacheDel(
-        `users:byId:v${this.cacheVersion}:${id}`,
-      );
+      await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
       await this.invalidateUsersListCaches();
       return { message: 'User deleted successfully' };
     } catch (error) {
@@ -374,7 +395,7 @@ export class UsersService {
       try {
         const count = await this.redisService.incrementRateLimit(
           `send_otp:${email.toLowerCase()}`,
-          this.CACHE_TTL.OTP_RATE_LIMIT,
+          UsersService.CACHE_TTL.OTP_RATE_LIMIT,
         );
         if (count > 5) {
           throw new BadRequestException(
@@ -495,7 +516,7 @@ export class UsersService {
   }
 
   private isValidObjectId(id: string): boolean {
-    return /^[0-9a-fA-F]{24}$/.test(id);
+    return Types.ObjectId.isValid(id);
   }
 
   private async validateUserData(userData: CreateUserDto): Promise<void> {
@@ -563,11 +584,10 @@ export class UsersService {
       isDeleted: { $ne: true },
     };
 
-    if (email || phoneNumber) {
-      query.$or = [];
-      if (email) query.$or.push({ email: email.toLowerCase() });
-      if (phoneNumber) query.$or.push({ phoneNumber });
-    }
+    const ors: any[] = [];
+    if (email) ors.push({ email: email.toLowerCase() });
+    if (phoneNumber) ors.push({ phoneNumber });
+    if (ors.length > 0) query.$or = ors;
 
     const existingUser = await this.userModel.findOne(query).exec();
 
@@ -674,7 +694,7 @@ export class UsersService {
         e as any,
       );
     }
-    await this.redisService.cacheDel(`users:byId:v${this.cacheVersion}:${id}`);
+    await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
     await this.invalidateUsersListCaches();
     return { message: 'Password changed successfully' };
   }
@@ -710,7 +730,7 @@ export class UsersService {
           isDeleted: { $ne: true },
           createdAt: { $gte: thirtyDaysAgo },
         })
-        .select('_id name email type phoneNumber profilePic createdAt')
+        .select(UsersService.BASE_PROJECTION)
         .limit(50) // Limit to prevent overwhelming the cache
         .lean()
         .exec();
@@ -721,9 +741,9 @@ export class UsersService {
       for (const user of recentUsers) {
         try {
           await this.redisService.cacheSet(
-            `users:byId:v${this.cacheVersion}:${user._id}`,
+            `users:byId:${this.key({ id: (user as any)._id.toString() })}`,
             user,
-            this.CACHE_TTL.USER_BY_ID,
+            UsersService.CACHE_TTL.USER_BY_ID,
           );
           warmedCount++;
         } catch (error) {
@@ -733,10 +753,9 @@ export class UsersService {
 
       // Cache default user list (first page)
       try {
-        const defaultListResponse = await this.getAllUsers(
-          { page: 1, limit: 10 },
-          { type: 'SA' } as User, // Super admin context
-        );
+        await this.getAllUsers({ page: 1, limit: 10 }, {
+          type: UserType.SUPER_ADMIN,
+        } as unknown as User);
         warmedCount++;
       } catch (error) {
         this.logger.warn('Failed to warm default user list cache:', error);

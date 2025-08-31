@@ -1,0 +1,430 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import type { PipelineStage, SortOrder } from 'mongoose';
+import {
+  Manufacturer,
+  ManufacturerDocument,
+} from './schemas/manufacturer.schema';
+import { CreateManufacturerDto } from './dto/create-manufacturer.dto';
+import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
+import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
+import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
+import { RedisService } from '../shared/redis.service';
+
+@Injectable()
+export class ManufacturersService {
+  private static readonly CACHE_TTL = {
+    LIST_SHORT: 180, // 3 minutes (frequent UI queries)
+    LIST_MED: 300, // 5 minutes
+    LOOKUPS: 600, // 10 minutes
+  } as const;
+
+  private cacheVersion = 1; // bump to invalidate broadly
+
+  constructor(
+    @InjectModel(Manufacturer.name)
+    private readonly manufacturerModel: Model<ManufacturerDocument>,
+    private readonly redisService: RedisService,
+  ) {}
+
+  // ---- helpers ------------------------------------------------------------
+  private key(parts: Record<string, unknown>): string {
+    const norm = Object.keys(parts)
+      .filter(
+        (k) => parts[k] !== undefined && parts[k] !== null && parts[k] !== '',
+      )
+      .sort()
+      .map((k) => `${k}=${JSON.stringify(parts[k])}`)
+      .join('&');
+    return `v${this.cacheVersion}:${norm}`;
+  }
+
+  private normalize(obj: any): any {
+    if (obj == null) return obj;
+    if (Array.isArray(obj)) return obj.map((v) => this.normalize(v));
+    if (typeof obj === 'object') {
+      const entries = Object.entries(obj)
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, this.normalize(v)]);
+      return Object.fromEntries(entries);
+    }
+    return obj;
+  }
+
+  private oid(id: string): Types.ObjectId {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+    return new Types.ObjectId(id);
+  }
+
+  private async invalidateManufacturerCaches(): Promise<void> {
+    try {
+      this.cacheVersion++; // coarse global bust
+      const patterns = ['vi:manufacturers:*'];
+      for (const p of patterns) {
+        const keys = await this.redisService.keys(p);
+        if (keys?.length)
+          await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      }
+    } catch {
+      // non-fatal
+    }
+  }
+
+  // Manufacturer CRUD methods
+  async createManufacturer(
+    createManufacturerDto: CreateManufacturerDto,
+  ): Promise<Manufacturer> {
+    try {
+      const manufacturer = new this.manufacturerModel(createManufacturerDto);
+      const savedManufacturer = await manufacturer.save();
+
+      // Invalidate caches after creation
+      await this.invalidateManufacturerCaches();
+
+      return savedManufacturer;
+    } catch (error) {
+      if (error.code === 11000) {
+        // Duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new BadRequestException(
+          `Manufacturer with ${field} '${error.keyValue[field]}' already exists`,
+        );
+      }
+      if (error.name === 'ValidationError') {
+        // Mongoose validation error
+        const validationErrors = Object.values(error.errors).map(
+          (err: any) => err.message,
+        );
+        throw new BadRequestException(
+          `Validation failed: ${validationErrors.join(', ')}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async findAllManufacturers(): Promise<Manufacturer[]> {
+    const cacheKey = this.key({ type: 'all' });
+    const cached = await this.redisService.cacheGet<Manufacturer[]>(cacheKey);
+    if (cached) return cached;
+
+    const data = await this.manufacturerModel
+      .find({ isActive: true, isDeleted: false })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+
+    await this.redisService.cacheSet(
+      cacheKey,
+      data,
+      ManufacturersService.CACHE_TTL.LOOKUPS,
+    );
+    return data;
+  }
+
+  async findManufacturerById(id: string): Promise<Manufacturer> {
+    const cacheKey = this.key({ type: 'byId', id });
+    const cached = await this.redisService.cacheGet<Manufacturer>(cacheKey);
+    if (cached) return cached;
+
+    const manufacturer = await this.manufacturerModel
+      .findOne({ _id: this.oid(id), isActive: true, isDeleted: false })
+      .lean()
+      .exec();
+
+    if (!manufacturer) {
+      throw new NotFoundException(`Manufacturer with id ${id} not found`);
+    }
+
+    await this.redisService.cacheSet(
+      cacheKey,
+      manufacturer,
+      ManufacturersService.CACHE_TTL.LOOKUPS,
+    );
+    return manufacturer;
+  }
+
+  async updateManufacturer(
+    id: string,
+    updateManufacturerDto: UpdateManufacturerDto,
+  ): Promise<Manufacturer> {
+    try {
+      const manufacturer = await this.manufacturerModel
+        .findOneAndUpdate(
+          { _id: this.oid(id), isActive: true, isDeleted: false },
+          { $set: updateManufacturerDto },
+          { new: true, runValidators: true },
+        )
+        .lean()
+        .exec();
+
+      if (!manufacturer) {
+        throw new NotFoundException(`Manufacturer with id ${id} not found`);
+      }
+
+      // Invalidate caches after update
+      await this.invalidateManufacturerCaches();
+
+      return manufacturer;
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new BadRequestException(
+          'Manufacturer with this name already exists',
+        );
+      }
+      if (error.name === 'ValidationError') {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  async deleteManufacturer(id: string): Promise<{ message: string }> {
+    const manufacturer = await this.manufacturerModel
+      .findOneAndUpdate(
+        { _id: this.oid(id), isActive: true, isDeleted: false },
+        { $set: { isDeleted: true, isActive: false } },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!manufacturer) {
+      throw new NotFoundException(`Manufacturer with id ${id} not found`);
+    }
+
+    // Invalidate caches after deletion
+    await this.invalidateManufacturerCaches();
+
+    return { message: 'Manufacturer deleted successfully' };
+  }
+
+  async findManufacturersWithFilters(
+    filters: FilterManufacturerDto,
+  ): Promise<PaginatedManufacturerResponseDto> {
+    const cacheKey = this.key({ type: 'filtered', ...this.normalize(filters) });
+    const cached =
+      await this.redisService.cacheGet<PaginatedManufacturerResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'name',
+      sortOrder = 'ASC',
+    } = filters;
+
+    // Convert string parameters to numbers
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
+    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
+
+    // Build the aggregation pipeline
+    const pipeline: PipelineStage[] = [];
+
+    // Handle text search first (must be the first stage if present)
+    if (filters.search && filters.search.trim()) {
+      pipeline.push({
+        $match: {
+          $text: { $search: filters.search },
+        },
+      });
+    }
+
+    // Add basic filters
+    const matchStage: any = { isActive: true, isDeleted: false };
+
+    if (filters.originCountry) {
+      matchStage.originCountry = {
+        $regex: filters.originCountry,
+        $options: 'i',
+      };
+    }
+
+    if (filters.minFoundedYear !== undefined) {
+      const minYear =
+        typeof filters.minFoundedYear === 'string'
+          ? parseInt(filters.minFoundedYear, 10)
+          : filters.minFoundedYear;
+      matchStage.foundedYear = {
+        ...matchStage.foundedYear,
+        $gte: minYear,
+      };
+    }
+
+    if (filters.maxFoundedYear !== undefined) {
+      const maxYear =
+        typeof filters.maxFoundedYear === 'string'
+          ? parseInt(filters.maxFoundedYear, 10)
+          : filters.maxFoundedYear;
+      matchStage.foundedYear = {
+        ...matchStage.foundedYear,
+        $lte: maxYear,
+      };
+    }
+
+    if (filters.headquarters) {
+      matchStage.headquarters = { $regex: filters.headquarters, $options: 'i' };
+    }
+
+    if (filters.isActive !== undefined) {
+      matchStage.isActive = filters.isActive;
+    }
+
+    // Add category filtering based on manufacturer characteristics
+    if (filters.category) {
+      const categoryFilters = this.getCategoryFilter(filters.category);
+      if (categoryFilters.length > 0) {
+        matchStage.$or = categoryFilters;
+      }
+    }
+
+    // Add region filtering
+    if (filters.region) {
+      const regionCountries = this.getRegionCountries(filters.region);
+      if (regionCountries.length > 0) {
+        matchStage.originCountry = { $in: regionCountries };
+      }
+    }
+
+    pipeline.push({ $match: matchStage });
+
+    // Use $facet to get both data and total in a single aggregation
+    const facetPipeline: PipelineStage[] = [
+      {
+        $facet: {
+          data: [
+            { $sort: { [sortBy]: sortOrder === 'ASC' ? 1 : -1 } },
+            { $skip: (pageNum - 1) * limitNum },
+            { $limit: limitNum },
+          ],
+          total: [{ $count: 'count' }],
+        },
+      },
+    ];
+
+    // Execute the aggregation
+    const [result] = await this.manufacturerModel.aggregate([
+      ...pipeline,
+      ...facetPipeline,
+    ]);
+
+    const manufacturers = result.data || [];
+    const total = result.total?.[0]?.count || 0;
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limitNum);
+    const hasNext = pageNum < totalPages;
+    const hasPrev = pageNum > 1;
+
+    const response: PaginatedManufacturerResponseDto = {
+      data: manufacturers,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+      hasNext,
+      hasPrev,
+    };
+
+    await this.redisService.cacheSet(
+      cacheKey,
+      response,
+      ManufacturersService.CACHE_TTL.LIST_MED,
+    );
+    return response;
+  }
+
+  // Helper methods for filtering
+  private getCategoryFilter(category: string): any[] {
+    const categoryMappings = {
+      passenger_car: [
+        {
+          name: {
+            $in: [
+              'maruti_suzuki',
+              'tata_motors',
+              'honda',
+              'toyota',
+              'hyundai',
+              'kia',
+              'volkswagen',
+              'ford',
+              'chevrolet',
+              'skoda',
+              'mg_motor',
+              'haval',
+            ],
+          },
+        },
+      ],
+      two_wheeler: [
+        {
+          name: {
+            $in: [
+              'hero_moto',
+              'bajaj_auto',
+              'tvs_motor',
+              'honda',
+              'yamaha',
+              'kawasaki',
+              'suzuki',
+            ],
+          },
+        },
+      ],
+      commercial_vehicle: [
+        {
+          name: {
+            $in: [
+              'ashok_leyland',
+              'eicher_motors',
+              'force_motors',
+              'bharat_benz',
+              'tata_daewoo',
+              'tata_motors',
+              'mahindra',
+            ],
+          },
+        },
+      ],
+      luxury: [{ name: { $in: ['bmw', 'mercedes_benz', 'audi', 'volvo'] } }],
+      suv: [{ name: { $in: ['mahindra', 'jeep', 'haval', 'mg_motor'] } }],
+    };
+
+    return categoryMappings[category] || [];
+  }
+
+  private getRegionCountries(region: string): string[] {
+    const regionMappings = {
+      Asia: ['India', 'Japan', 'South Korea', 'China'],
+      Europe: ['Germany', 'Sweden', 'Czech Republic'],
+      'North America': ['United States'],
+      'South America': [],
+      Africa: [],
+      Oceania: [],
+    };
+
+    return regionMappings[region] || [];
+  }
+
+  // Cache management methods
+  async getCacheVersion(): Promise<number> {
+    return this.cacheVersion;
+  }
+
+  async forceCacheInvalidation(): Promise<void> {
+    await this.invalidateManufacturerCaches();
+  }
+}

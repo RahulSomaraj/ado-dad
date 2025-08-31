@@ -274,19 +274,27 @@ header {
   font-size: 1rem;
   padding: 0 0.5rem;
 }
-</style></head><body><main class="jesthtml-content"><header><h1 id="title">E2E Test Report</h1></header><section id="metadata-container"><div id="timestamp">Started: 2025-08-31 16:15:16</div><div id="summary"><div id="suite-summary"><div class="summary-total">Suites (1)</div><div class="summary-passed  summary-empty">0 passed</div><div class="summary-failed ">1 failed</div><div class="summary-pending  summary-empty">0 pending</div></div><div id="test-summary"><div class="summary-total">Tests (17)</div><div class="summary-passed ">13 passed</div><div class="summary-failed ">4 failed</div><div class="summary-pending  summary-empty">0 pending</div></div></div></section><details id="suite-1" class="suite-container" open=""><summary class="suite-info"><div class="suite-path">C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts</div><div class="suite-time warn">48.776s</div></summary><div class="suite-tests"><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users (create)</div><div class="test-title">creates a user (201, response shape)</div><div class="test-status">passed</div><div class="test-duration">0.421s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users (create)</div><div class="test-title">validates email/phone/password (400)</div><div class="test-status">passed</div><div class="test-duration">0.021s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/with-profile-picture (multipart)</div><div class="test-title">accepts valid image upload</div><div class="test-status">failed</div><div class="test-duration">0.027s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
+</style></head><body><main class="jesthtml-content"><header><h1 id="title">E2E Test Report</h1></header><section id="metadata-container"><div id="timestamp">Started: 2025-08-31 23:31:01</div><div id="summary"><div id="suite-summary"><div class="summary-total">Suites (1)</div><div class="summary-passed  summary-empty">0 passed</div><div class="summary-failed ">1 failed</div><div class="summary-pending  summary-empty">0 pending</div></div><div id="test-summary"><div class="summary-total">Tests (18)</div><div class="summary-passed ">14 passed</div><div class="summary-failed ">4 failed</div><div class="summary-pending  summary-empty">0 pending</div></div></div></section><details id="suite-1" class="suite-container" open=""><summary class="suite-info"><div class="suite-path">C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts</div><div class="suite-time warn">8.207s</div></summary><div class="suite-tests"><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should get all manufacturers</div><div class="test-status">passed</div><div class="test-duration">0.032s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should filter manufacturers by search term</div><div class="test-status">passed</div><div class="test-duration">0.011s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should filter manufacturers by origin country</div><div class="test-status">passed</div><div class="test-duration">0.012s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should filter manufacturers by region</div><div class="test-status">failed</div><div class="test-duration">0.013s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toBeGreaterThan(expected)
 
-Expected value: 400
-Received array: [200, 201]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:157:26)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/with-profile-picture (multipart)</div><div class="test-title">rejects invalid file type/oversize</div><div class="test-status">passed</div><div class="test-duration">0.013s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">requires admin roles (401/403)</div><div class="test-status">passed</div><div class="test-duration">0.206s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">returns paginated list with filters/sort when admin</div><div class="test-status">passed</div><div class="test-duration">0.119s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">basic caching behavior (repeat same query)</div><div class="test-status">passed</div><div class="test-duration">0.17s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users/:id</div><div class="test-title">returns 200 for existing (admin) and 404 for missing</div><div class="test-status">passed</div><div class="test-duration">0.392s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users/:id</div><div class="test-title">cache invalidation after update</div><div class="test-status">passed</div><div class="test-duration">0.61s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PUT /users/:id (update)</div><div class="test-title">allows self-update for normal user</div><div class="test-status">passed</div><div class="test-duration">0.19s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PUT /users/:id (update)</div><div class="test-title">rejects unauthorized update to another user (403)</div><div class="test-status">passed</div><div class="test-duration">0.055s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PATCH /users/:id/password</div><div class="test-title">requires admin by decorator (normal user likely 403)</div><div class="test-status">passed</div><div class="test-duration">0.051s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PATCH /users/:id/password</div><div class="test-title">admin can change target user password</div><div class="test-status">passed</div><div class="test-duration">0.251s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; DELETE /users/:id</div><div class="test-title">soft-deletes user and invalidates caches</div><div class="test-status">passed</div><div class="test-duration">0.336s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; OTP endpoints</div><div class="test-title">send-otp works for admin and enforces rate limit</div><div class="test-status">failed</div><div class="test-duration">24.772s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
-
-Expected value: 500
-Received array: [200]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:342:12)
+Expected: &gt; 0
+Received:   0
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:83:10)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
 ----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:342:40
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:86:40
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
     at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
     at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
@@ -294,9 +302,78 @@ Received array: [200]
     at Object.onceWrapper (node:events:638:28)
     at Server.emit (node:events:536:35)
     at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; OTP endpoints</div><div class="test-title">verify-otp handles success/failure</div><div class="test-status">failed</div><div class="test-duration">2.521s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 200 "OK", got 500 "Internal Server Error"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:361:10)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should paginate manufacturers</div><div class="test-status">passed</div><div class="test-duration">0.012s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should sort manufacturers by name</div><div class="test-status">failed</div><div class="test-duration">0.009s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toBeGreaterThan(expected)
+
+Expected: &gt; 0
+Received:   0
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:107:10)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:110:40
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers</div><div class="test-title">should sort manufacturers by founded year</div><div class="test-status">failed</div><div class="test-duration">0.009s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toBeGreaterThan(expected)
+
+Expected: &gt; 0
+Received:   0
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:124:10)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:127:40
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers/:id</div><div class="test-title">should get manufacturer by ID successfully</div><div class="test-status">failed</div><div class="test-duration">0.021s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 200 "OK", got 404 "Not Found"
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:199:10)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
 ----
     at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
@@ -306,19 +383,4 @@ Received array: [200]
     at Object.onceWrapper (node:events:638:28)
     at Server.emit (node:events:536:35)
     at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/profile-picture</div><div class="test-title">updates profile picture for authenticated user</div><div class="test-status">failed</div><div class="test-duration">1.016s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
-
-Expected value: 400
-Received array: [200, 401, 403]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:412:10)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:412:48
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div></div></details></main></body></html>
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers/:id</div><div class="test-title">should return 404 for non-existent manufacturer</div><div class="test-status">passed</div><div class="test-duration">0.008s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/manufacturers/:id</div><div class="test-title">should return 400 for invalid ID format</div><div class="test-status">passed</div><div class="test-duration">0.005s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models</div><div class="test-title">should get all vehicle models</div><div class="test-status">passed</div><div class="test-duration">0.053s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models</div><div class="test-title">should filter vehicle models by manufacturer</div><div class="test-status">passed</div><div class="test-duration">0.024s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models</div><div class="test-title">should filter vehicle models by vehicle type</div><div class="test-status">passed</div><div class="test-duration">0.017s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models</div><div class="test-title">should search vehicle models by name</div><div class="test-status">passed</div><div class="test-duration">0.018s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models</div><div class="test-title">should paginate vehicle models</div><div class="test-status">passed</div><div class="test-duration">0.018s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models/:id</div><div class="test-title">should get vehicle model by ID successfully</div><div class="test-status">passed</div><div class="test-duration">0.004s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models/:id</div><div class="test-title">should return 404 for non-existent vehicle model</div><div class="test-status">passed</div><div class="test-duration">0.009s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Vehicle Inventory Manufacturers (Read-Only) &gt; GET /vehicle-inventory/models/:id</div><div class="test-title">should return 400 for invalid vehicle model ID format</div><div class="test-status">passed</div><div class="test-duration">0.006s</div></div></div></div></details></main></body></html>
