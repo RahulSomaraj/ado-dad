@@ -18,6 +18,7 @@ import { RedisService } from '../shared/redis.service';
 
 @Injectable()
 export class ManufacturersService {
+  private static readonly CACHE_PREFIX = 'vi:manufacturers:';
   private static readonly CACHE_TTL = {
     LIST_SHORT: 180, // 3 minutes (frequent UI queries)
     LIST_MED: 300, // 5 minutes
@@ -41,7 +42,7 @@ export class ManufacturersService {
       .sort()
       .map((k) => `${k}=${JSON.stringify(parts[k])}`)
       .join('&');
-    return `v${this.cacheVersion}:${norm}`;
+    return `${ManufacturersService.CACHE_PREFIX}v${this.cacheVersion}:${norm}`;
   }
 
   private normalize(obj: any): any {
@@ -69,7 +70,7 @@ export class ManufacturersService {
   private async invalidateManufacturerCaches(): Promise<void> {
     try {
       this.cacheVersion++; // coarse global bust
-      const patterns = ['vi:manufacturers:*'];
+      const patterns = [`${ManufacturersService.CACHE_PREFIX}*`];
       for (const p of patterns) {
         const keys = await this.redisService.keys(p);
         if (keys?.length)
@@ -78,6 +79,26 @@ export class ManufacturersService {
     } catch {
       // non-fatal
     }
+  }
+
+  private clamp(n: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  private coerceSort(
+    sortBy?: string,
+    sortOrder?: string,
+  ): { field: string; dir: 1 | -1 } {
+    const allowed: Record<string, 1> = {
+      name: 1,
+      foundedYear: 1,
+      originCountry: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const field = sortBy && allowed[sortBy] ? sortBy : 'name';
+    const dir: 1 | -1 = sortOrder === 'DESC' ? -1 : 1;
+    return { field, dir };
   }
 
   // Manufacturer CRUD methods
@@ -119,7 +140,9 @@ export class ManufacturersService {
     if (cached) return cached;
 
     const data = await this.manufacturerModel
-      .find({ isActive: true, isDeleted: false })
+      // show ALL non-deleted by default (inactive included)
+      .find({ isDeleted: false })
+      .collation({ locale: 'en', strength: 2 })
       .sort({ name: 1 })
       .lean()
       .exec();
@@ -138,7 +161,8 @@ export class ManufacturersService {
     if (cached) return cached;
 
     const manufacturer = await this.manufacturerModel
-      .findOne({ _id: this.oid(id), isActive: true, isDeleted: false })
+      // byId should return any non-deleted doc, even if inactive
+      .findOne({ _id: this.oid(id), isDeleted: false })
       .lean()
       .exec();
 
@@ -161,7 +185,7 @@ export class ManufacturersService {
     try {
       const manufacturer = await this.manufacturerModel
         .findOneAndUpdate(
-          { _id: this.oid(id), isActive: true, isDeleted: false },
+          { _id: this.oid(id), isDeleted: false },
           { $set: updateManufacturerDto },
           { new: true, runValidators: true },
         )
@@ -192,7 +216,7 @@ export class ManufacturersService {
   async deleteManufacturer(id: string): Promise<{ message: string }> {
     const manufacturer = await this.manufacturerModel
       .findOneAndUpdate(
-        { _id: this.oid(id), isActive: true, isDeleted: false },
+        { _id: this.oid(id), isDeleted: false },
         { $set: { isDeleted: true, isActive: false } },
         { new: true },
       )
@@ -219,16 +243,21 @@ export class ManufacturersService {
       );
     if (cached) return cached;
 
-    const {
-      page = 1,
-      limit = 20,
-      sortBy = 'name',
-      sortOrder = 'ASC',
-    } = filters;
-
-    // Convert string parameters to numbers
-    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
-    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
+    let { page = 1, limit = 20, sortBy = 'name', sortOrder = 'ASC' } = filters;
+    const { field: sortField, dir: sortDir } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    const pageNum = this.clamp(
+      typeof page === 'string' ? parseInt(page, 10) : page,
+      1,
+      1e9,
+    );
+    const limitNum = this.clamp(
+      typeof limit === 'string' ? parseInt(limit, 10) : limit,
+      1,
+      100,
+    );
 
     // Build the aggregation pipeline
     const pipeline: PipelineStage[] = [];
@@ -243,7 +272,7 @@ export class ManufacturersService {
     }
 
     // Add basic filters
-    const matchStage: any = { isActive: true, isDeleted: false };
+    const matchStage: any = { isDeleted: false };
 
     if (filters.originCountry) {
       matchStage.originCountry = {
@@ -294,7 +323,20 @@ export class ManufacturersService {
     if (filters.region) {
       const regionCountries = this.getRegionCountries(filters.region);
       if (regionCountries.length > 0) {
-        matchStage.originCountry = { $in: regionCountries };
+        // If originCountry regex also provided, intersect via $and
+        if (matchStage.originCountry) {
+          pipeline.push({
+            $match: {
+              $and: [
+                { originCountry: { $in: regionCountries } },
+                { originCountry: matchStage.originCountry },
+              ],
+            },
+          });
+          delete matchStage.originCountry;
+        } else {
+          matchStage.originCountry = { $in: regionCountries };
+        }
       }
     }
 
@@ -305,7 +347,7 @@ export class ManufacturersService {
       {
         $facet: {
           data: [
-            { $sort: { [sortBy]: sortOrder === 'ASC' ? 1 : -1 } },
+            { $sort: { [sortField]: sortDir } },
             { $skip: (pageNum - 1) * limitNum },
             { $limit: limitNum },
           ],
@@ -315,10 +357,9 @@ export class ManufacturersService {
     ];
 
     // Execute the aggregation
-    const [result] = await this.manufacturerModel.aggregate([
-      ...pipeline,
-      ...facetPipeline,
-    ]);
+    const [result] = await this.manufacturerModel
+      .aggregate([...pipeline, ...facetPipeline])
+      .collation({ locale: 'en', strength: 2 });
 
     const manufacturers = result.data || [];
     const total = result.total?.[0]?.count || 0;

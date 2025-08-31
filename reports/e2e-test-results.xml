@@ -1,154 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="18" failures="4" errors="0" time="8.323">
-  <testsuite name="Vehicle Inventory Manufacturers (Read-Only)" errors="0" failures="4" skipped="0" timestamp="2025-08-31T18:01:01" time="8.207" tests="18">
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers" time="0.032">
+<testsuites name="jest tests" tests="18" failures="0" errors="0" time="10.976">
+  <testsuite name="Vehicle Inventory Manufacturers (Read-Only)" errors="0" failures="0" skipped="17" timestamp="2025-08-31T18:21:58" time="10.87" tests="18">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should get all manufacturers" time="0.035">
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0.011">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by search term" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by origin country" time="0.012">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by origin country" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0.013">
-      <failure>Error: expect(received).toBeGreaterThan(expected)
-
-Expected: &gt; 0
-Received:   0
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:83:10)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:86:40
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by region" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0.012">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should paginate manufacturers" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should sort manufacturers by name" time="0.009">
-      <failure>Error: expect(received).toBeGreaterThan(expected)
-
-Expected: &gt; 0
-Received:   0
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:107:10)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:110:40
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should sort manufacturers by name" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should sort manufacturers by founded year" time="0.009">
-      <failure>Error: expect(received).toBeGreaterThan(expected)
-
-Expected: &gt; 0
-Received:   0
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:124:10)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:127:40
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers" name="should sort manufacturers by founded year" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0.021">
-      <failure>Error: expected 200 &quot;OK&quot;, got 404 &quot;Not Found&quot;
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\vehicle-inventory-manufacturers-readonly.e2e-spec.ts:199:10)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0.008">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should return 404 for non-existent manufacturer" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0.005">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/manufacturers/:id" name="should return 400 for invalid ID format" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should get all vehicle models" time="0.053">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should get all vehicle models" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should filter vehicle models by manufacturer" time="0.024">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should filter vehicle models by manufacturer" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should filter vehicle models by vehicle type" time="0.017">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should filter vehicle models by vehicle type" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should search vehicle models by name" time="0.018">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should search vehicle models by name" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should paginate vehicle models" time="0.018">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models" name="should paginate vehicle models" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should get vehicle model by ID successfully" time="0.004">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should get vehicle model by ID successfully" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should return 404 for non-existent vehicle model" time="0.009">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should return 404 for non-existent vehicle model" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should return 400 for invalid vehicle model ID format" time="0.006">
+    <testcase classname="Vehicle Inventory Manufacturers (Read-Only) › GET /vehicle-inventory/models/:id" name="should return 400 for invalid vehicle model ID format" time="0">
+      <skipped/>
     </testcase>
   </testsuite>
 </testsuites>
