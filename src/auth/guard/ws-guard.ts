@@ -14,18 +14,29 @@ export class WsJwtGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const client = ctx.switchToWs().getClient();
 
+    this.logger.log(
+      `WsJwtGuard: Processing connection for client ${client.id}`,
+    );
+
     // Get token from auth or headers
     const rawAuth = (
       client.handshake.auth?.token ||
       client.handshake.headers['authorization'] ||
       ''
     ).toString();
+
+    this.logger.log(
+      `WsJwtGuard: Raw auth received: ${rawAuth ? 'present' : 'missing'}`,
+    );
+
     const bearer = rawAuth.replace(/^Bearer\s+/i, '').trim();
 
     if (!bearer) {
       this.logger.warn(`WsJwtGuard: No token provided for client ${client.id}`);
       return false;
     }
+
+    this.logger.log(`WsJwtGuard: Token length: ${bearer.length}`);
 
     try {
       // Decode token header to detect algorithm
@@ -97,6 +108,9 @@ export class WsJwtGuard implements CanActivate {
       if (!userId) {
         this.logger.warn(
           `WsJwtGuard: Token missing id/sub for client ${client.id}`,
+        );
+        this.logger.warn(
+          `WsJwtGuard: Payload keys: ${Object.keys(payload || {}).join(', ')}`,
         );
         return false;
       }

@@ -26,6 +26,7 @@ import { ShowroomModule } from './showroom/showroom.module';
 import { UploadModule } from './shared/upload.module';
 import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.module';
 import { VehicleModule } from './vehicles/vehicle.module';
+import { ChatModule } from './chat/chat.module';
 
 // Services
 import { EmailService } from './utils/email.service';
@@ -106,6 +107,7 @@ import { configService } from './config/mongo.config';
     BannerModule,
     CartModule,
     CategoryModule,
+    ChatModule,
     FavoriteModule,
     ProductModule,
     RatingModule,

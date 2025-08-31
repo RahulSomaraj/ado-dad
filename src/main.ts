@@ -11,12 +11,16 @@ import * as compression from 'compression';
 import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
   const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
   const NODE_ENV = configService.get('NODE_ENV') || 'development';
+
+  // Configure WebSocket adapter
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // (a) Enable CORS globally via Nest
   app.enableCors({

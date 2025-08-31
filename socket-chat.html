@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Basic Socket Connection Test</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .panel {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .log {
+        background: #f5f5f5;
+        padding: 10px;
+        height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      input,
+      button {
+        margin: 5px;
+        padding: 8px;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .info {
+        color: blue;
+      }
+      .status {
+        font-weight: bold;
+      }
+      .status.connected {
+        color: green;
+      }
+      .status.disconnected {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Basic Socket Connection Test</h1>
+
+      <div class="panel">
+        <h3>Configuration</h3>
+        <input
+          type="text"
+          id="serverUrl"
+          placeholder="Server URL"
+          value="http://localhost:5000"
+          style="width: 300px"
+        />
+        <input
+          type="text"
+          id="token"
+          placeholder="JWT Token"
+          style="width: 400px"
+        />
+        <button onclick="getToken()">Get Token</button>
+      </div>
+
+      <div class="panel">
+        <h3>Connection</h3>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="ping()">Ping</button>
+        <div id="connectionStatus" class="status disconnected">
+          Disconnected
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Log</h3>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+
+      function log(message, type = 'info') {
+        const logDiv = document.getElementById('log');
+        const timestamp = new Date().toLocaleTimeString();
+        const className =
+          type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+        logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function clearLog() {
+        document.getElementById('log').innerHTML = '';
+      }
+
+      async function getToken() {
+        try {
+          const serverUrl = document.getElementById('serverUrl').value;
+          const username = 'user@example.com';
+          const password = '123456';
+
+          log('Getting token...');
+
+          const response = await fetch(`${serverUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const token = data.token || data.access_token || data.accessToken;
+            document.getElementById('token').value = token;
+            log('Token obtained successfully', 'success');
+          } else {
+            log(`Failed to get token: ${data.message}`, 'error');
+          }
+        } catch (error) {
+          log(`Error getting token: ${error.message}`, 'error');
+        }
+      }
+
+      function connect() {
+        const serverUrl = document.getElementById('serverUrl').value;
+        const token = document.getElementById('token').value;
+
+        if (!token) {
+          log('Please get a token first', 'error');
+          return;
+        }
+
+        log('Connecting to socket...');
+
+        socket = io(`${serverUrl}/chat`, {
+          transports: ['websocket'],
+          auth: { token: token },
+          autoConnect: false,
+        });
+
+        socket.on('connect', () => {
+          document.getElementById('connectionStatus').textContent = 'Connected';
+          document.getElementById('connectionStatus').className =
+            'status connected';
+          log('Socket connected successfully', 'success');
+        });
+
+        socket.on('disconnect', (reason) => {
+          document.getElementById('connectionStatus').textContent =
+            'Disconnected';
+          document.getElementById('connectionStatus').className =
+            'status disconnected';
+          log(`Socket disconnected: ${reason}`, 'info');
+        });
+
+        socket.on('connect_error', (error) => {
+          document.getElementById('connectionStatus').textContent =
+            'Connection Failed';
+          document.getElementById('connectionStatus').className =
+            'status disconnected';
+          log(`Connection error: ${error.message}`, 'error');
+        });
+
+        socket.on('connected', (data) => {
+          log(`Connection confirmed: ${JSON.stringify(data)}`, 'success');
+        });
+
+        socket.on('pong', (data) => {
+          log(`Pong received: ${JSON.stringify(data)}`, 'info');
+        });
+
+        socket.connect();
+      }
+
+      function disconnect() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+          document.getElementById('connectionStatus').textContent =
+            'Disconnected';
+          document.getElementById('connectionStatus').className =
+            'status disconnected';
+          log('Socket disconnected manually', 'info');
+        }
+      }
+
+      function ping() {
+        if (!socket || !socket.connected) {
+          log('Please connect first', 'error');
+          return;
+        }
+        socket.emit('ping');
+        log('Ping sent', 'info');
+      }
+
+      // Auto-get token when page loads
+      window.onload = function () {
+        setTimeout(() => {
+          getToken();
+        }, 1000);
+      };
+    </script>
+  </body>
+</html>
