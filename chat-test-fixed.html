@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>Two-User Localhost Chat Tester (NestJS + Flutter Backend) - FIXED</title>
+    <link
+      rel="preconnect"
+      href="https://cdn.socket.io"
+      crossorigin
+    />
+    <script
+      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+      integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+      crossorigin="anonymous"
+    ></script>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: #111a2b;
+        --text: #e6eefc;
+        --muted: #a9b1c6;
+        --accent: #4f8cff;
+        --ok: #2ecc71;
+        --bad: #e74c3c;
+        --warn: #f39c12;
+        --border: #22314d;
+        --btn: #1a2640;
+        --btn2: #16233f;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", sans-serif;
+        margin: 0;
+      }
+      header {
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: #0a101c;
+      }
+      header h1 {
+        margin: 0 0 6px 0;
+        font-size: 20px;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      main {
+        padding: 16px;
+      }
+      .row {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      h2 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      h3 {
+        margin: 14px 0 8px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 4px;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      textarea,
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0c1525;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .rowline {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      button {
+        background: linear-gradient(180deg, var(--btn), var(--btn2));
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      button.ok {
+        background: linear-gradient(180deg, #1d3a2c, #152d21);
+        border-color: #1f4b34;
+      }
+      button.warn {
+        background: linear-gradient(180deg, #3a301d, #2d2515);
+        border-color: #4b3d1f;
+      }
+      button.bad {
+        background: linear-gradient(180deg, #3a1d1d, #2d1515);
+        border-color: #4b1f1f;
+      }
+      .status {
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      .status.ok {
+        color: var(--ok);
+      }
+      .status.bad {
+        color: var(--bad);
+      }
+      .log {
+        background: #0a1120;
+        border: 1px dashed var(--border);
+        padding: 10px;
+        border-radius: 8px;
+        height: 220px;
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 12px 0;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: #0f1d36;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      @media (min-width: 980px) {
+        .row.grid-2 {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Two-User Localhost Chat Tester - FIXED VERSION</h1>
+      <p>Fixed authentication issues for NestJS Socket.IO chat backend. Open this file in a browser, fill the URLs, login two users, then connect/join/send/block.</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Config (shared)</h2>
+        <div class="rowline">
+          <div>
+            <label>HTTP Base URL (e.g. <code>http://localhost:5000</code> or <code>http://10.0.2.2:5000</code> on Android emulator)</label>
+            <input
+              id="httpUrl"
+              type="text"
+              placeholder="http://localhost:5000"
+            />
+          </div>
+          <div>
+            <label>WebSocket URL (same host; <code>ws://</code> or <code>http://</code> is fine with Socket.IO)</label>
+            <input
+              id="wsUrl"
+              type="text"
+              placeholder="http://localhost:5000"
+            />
+          </div>
+        </div>
+        <div class="rowline">
+          <div>
+            <label>Chat ID (existing room)</label>
+            <input
+              id="chatId"
+              type="text"
+              placeholder="64f1..."
+            />
+          </div>
+          <div>
+            <label>Other User ID (for block/unblock)</label>
+            <input
+              id="otherUserId"
+              type="text"
+              placeholder="userB-id (optional)"
+            />
+          </div>
+        </div>
+        <div class="rowline">
+          <div>
+            <label>Ad ID</label>
+            <input
+              id="adId"
+              type="text"
+              placeholder="adId to start chat with"
+            />
+          </div>
+        </div>
+        <div class="btns">
+          <button onclick="saveConfig()">Save Config</button>
+          <button onclick="clearLogs()">Clear Logs</button>
+          <button onclick="getRealAdId()" class="ok">Get Real Ad ID</button>
+          <span class="status muted">Tips: Serve this file via <code>npx serve</code> or <code>python -m http.server</code> to avoid CORS-from-file issues.</span>
+        </div>
+        <div class="divider"></div>
+        <div class="small muted">
+          <strong>Events mapping:</strong> joinChat, sendMessage, message, markRead, blockUser, unblockUser, createAdChat.<br />
+          <strong>HTTP routes:</strong> /auth/login, /chat, /chat/ad/:adId, /chat/:id/messages, /chat/:id/read, /chat/:id/block/:targetUserId, /chat/:id/unblock/:targetUserId.<br />
+          <div>Change in <code>window.ROUTES</code> or <code>window.EVENTS</code> below if your backend differs.</div>
+        </div>
+      </section>
+
+      <section class="row grid-2">
+        <div
+          class="panel"
+          id="panelA"
+        >
+          <h2>
+            User A
+            <span
+              id="statusA"
+              class="status"
+              >● disconnected</span
+            >
+          </h2>
+          <div class="rowline">
+            <div>
+              <label>Username</label
+              ><input
+                id="emailA"
+                type="text"
+                placeholder="userA"
+                value="user@example.com"
+              />
+            </div>
+            <div>
+              <label>Password</label
+              ><input
+                id="passA"
+                type="password"
+                placeholder="••••••••"
+                value="123456"
+              />
+            </div>
+          </div>
+          <div class="rowline">
+            <div>
+              <label>Access Token (paste or will be set by Login)</label
+              ><textarea
+                id="tokenA"
+                placeholder="eyJhbGciOi..."
+              ></textarea>
+            </div>
+            <div>
+              <label>Refresh Token (optional)</label
+              ><textarea
+                id="refreshA"
+                placeholder=""
+              ></textarea>
+            </div>
+          </div>
+          <div class="btns">
+            <button onclick="login('A')">Login (HTTP)</button>
+            <button
+              onclick="connectWS('A')"
+              class="ok"
+            >
+              Connect WS
+            </button>
+            <button
+              onclick="disconnectWS('A')"
+              class="bad"
+            >
+              Disconnect
+            </button>
+            <button onclick="decodeJwt('A')">Decode JWT</button>
+          </div>
+          <div class="btns">
+            <button onclick="joinChat('A')">Join Chat</button>
+            <button onclick="createAdChat('A')">Create Ad Chat</button>
+            <input
+              id="msgA"
+              type="text"
+              placeholder="Type message..."
+            />
+            <button
+              onclick="sendMsg('A')"
+              class="ok"
+            >
+              Send
+            </button>
+          </div>
+          <div class="btns">
+            <button onclick="markRead('A')">Mark Read</button>
+            <button onclick="listChats('A')">List Chats</button>
+            <button onclick="loadMessages('A')">Load Messages</button>
+          </div>
+          <div class="btns">
+            <button
+              onclick="blockOther('A')"
+              class="warn"
+            >
+              Block Other
+            </button>
+            <button
+              onclick="unblockOther('A')"
+              class="warn"
+            >
+              Unblock Other
+            </button>
+          </div>
+          <h3>Log</h3>
+          <div
+            id="logA"
+            class="log"
+          ></div>
+        </div>
+
+        <div
+          class="panel"
+          id="panelB"
+        >
+          <h2>
+            User B
+            <span
+              id="statusB"
+              class="status"
+              >● disconnected</span
+            >
+          </h2>
+          <div class="rowline">
+            <div>
+              <label>Username</label
+              ><input
+                id="emailB"
+                type="text"
+                placeholder="userB"
+                value="user@example.com"
+              />
+            </div>
+            <div>
+              <label>Password</label
+              ><input
+                id="passB"
+                type="password"
+                placeholder="••••••••"
+                value="123456"
+              />
+            </div>
+          </div>
+          <div class="rowline">
+            <div>
+              <label>Access Token (paste or will be set by Login)</label
+              ><textarea
+                id="tokenB"
+                placeholder="eyJhbGciOi..."
+              ></textarea>
+            </div>
+            <div>
+              <label>Refresh Token (optional)</label
+              ><textarea
+                id="refreshB"
+                placeholder=""
+              ></textarea>
+            </div>
+          </div>
+          <div class="btns">
+            <button onclick="login('B')">Login (HTTP)</button>
+            <button
+              onclick="connectWS('B')"
+              class="ok"
+            >
+              Connect WS
+            </button>
+            <button
+              onclick="disconnectWS('B')"
+              class="bad"
+            >
+              Disconnect
+            </button>
+            <button onclick="decodeJwt('B')">Decode JWT</button>
+          </div>
+          <div class="btns">
+            <button onclick="joinChat('B')">Join Chat</button>
+            <button onclick="createAdChat('B')">Create Ad Chat</button>
+            <input
+              id="msgB"
+              type="text"
+              placeholder="Type message..."
+            />
+            <button
+              onclick="sendMsg('B')"
+              class="ok"
+            >
+              Send
+            </button>
+          </div>
+          <div class="btns">
+            <button onclick="markRead('B')">Mark Read</button>
+            <button onclick="listChats('B')">List Chats</button>
+            <button onclick="loadMessages('B')">Load Messages</button>
+          </div>
+          <div class="btns">
+            <button
+              onclick="blockOther('B')"
+              class="warn"
+            >
+              Block Other
+            </button>
+            <button
+              onclick="unblockOther('B')"
+              class="warn"
+            >
+              Unblock Other
+            </button>
+          </div>
+          <h3>Log</h3>
+          <div
+            id="logB"
+            class="log"
+          ></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // ====== Configurable routes & events (aligned to controller/gateway) ======
+      window.ROUTES = {
+        login: "/auth/login",
+        refresh: "/auth/refresh",
+        listChats: "/chat",
+        messages: (id) => `/chat/${id}/messages`,
+        markRead: (id) => `/chat/${id}/read`,
+        block: (id, targetUserId) => `/chat/${id}/block/${targetUserId}`,
+        unblock: (id, targetUserId) => `/chat/${id}/unblock/${targetUserId}`,
+        createAd: (adId) => `/chat/ad/${adId}`,
+        listAds: "/ads/list",
+      };
+      window.EVENTS = {
+        joinChat: "joinChat",
+        sendMessage: "sendMessage",
+        message: "message",
+        markRead: "markAsRead",
+        block: "blockUser",
+        unblock: "unblockUser",
+        createAdChat: "createAdChat",
+      };
+
+      // ====== State ======
+      const S = {
+        httpUrl: localStorage.getItem("httpUrl") || "http://localhost:5000",
+        wsUrl: localStorage.getItem("wsUrl") || "http://localhost:5000",
+        chatId: localStorage.getItem("chatId") || "",
+        otherUserId: localStorage.getItem("otherUserId") || "",
+        adId: localStorage.getItem("adId") || "",
+        A: { socket: null, autoCreateTried: false },
+        B: { socket: null, autoCreateTried: false },
+      };
+
+      // ====== Helpers ======
+      const el = (id) => document.getElementById(id);
+      function log(side, msg) {
+        const box = el(side === "A" ? "logA" : "logB");
+        const t = new Date().toLocaleTimeString();
+        box.textContent += `[${t}] ${msg}\n`;
+        box.scrollTop = box.scrollHeight;
+      }
+      function setStatus(side, ok, text) {
+        const s = el(side === "A" ? "statusA" : "statusB");
+        s.textContent = `● ${text}`;
+        s.className = "status " + (ok ? "ok" : "bad");
+      }
+      function saveConfig() {
+        S.httpUrl = el("httpUrl").value.trim() || S.httpUrl;
+        S.wsUrl = el("wsUrl").value.trim() || S.wsUrl;
+        S.chatId = el("chatId").value.trim() || S.chatId;
+        S.otherUserId = el("otherUserId").value.trim() || S.otherUserId;
+        S.adId = el("adId").value.trim() || S.adId;
+        localStorage.setItem("httpUrl", S.httpUrl);
+        localStorage.setItem("wsUrl", S.wsUrl);
+        localStorage.setItem("chatId", S.chatId);
+        localStorage.setItem("otherUserId", S.otherUserId);
+        localStorage.setItem("adId", S.adId);
+        alert("Saved config.");
+        runtimeWarnings();
+        maybeTryAutoCreate("A");
+        maybeTryAutoCreate("B");
+      }
+      function clearLogs() {
+        el("logA").textContent = "";
+        el("logB").textContent = "";
+      }
+      const bearer = (side) => "Bearer " + (side === "A" ? el("tokenA").value.trim() : el("tokenB").value.trim());
+      const getToken = (side) => (side === "A" ? el("tokenA").value.trim() : el("tokenB").value.trim());
+      const setToken = (side, v) => ((side === "A" ? el("tokenA") : el("tokenB")).value = v || "");
+      const setRefresh = (side, v) => ((side === "A" ? el("refreshA") : el("refreshB")).value = v || "");
+
+      function parseJwt(token) {
+        try {
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          );
+          return JSON.parse(jsonPayload);
+        } catch (e) {
+          return null;
+        }
+      }
+      function decodeJwt(side) {
+        const token = getToken(side);
+        const p = parseJwt(token);
+        log(side, p ? "JWT payload: " + JSON.stringify(p) : "Invalid token");
+      }
+
+      // ====== HTTP ======
+      async function login(side) {
+        const username = (side === "A" ? el("emailA") : el("emailB")).value.trim();
+        const password = (side === "A" ? el("passA") : el("passB")).value;
+        try {
+          if (!S.httpUrl) throw new Error("HTTP base URL empty");
+          const res = await fetch(S.httpUrl + window.ROUTES.login, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+          const raw = await res.text();
+          let data;
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch (_) {
+            data = { raw };
+          }
+          if (!res.ok) {
+            log(side, `Login failed HTTP ${res.status} ${res.statusText}: ${raw || "(empty body)"}`);
+            throw new Error(data?.message || "Login failed");
+          }
+          setToken(side, data.access_token || data.accessToken || data.token || "");
+          setRefresh(side, data.refreshToken || "");
+          log(side, "Logged in. Access token set. " + (data.refreshToken ? "(refresh set)" : ""));
+        } catch (e) {
+          log(side, "Login failed: " + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function getRealAdId() {
+        try {
+          if (!S.httpUrl) throw new Error("HTTP base URL empty");
+          const res = await fetch(S.httpUrl + window.ROUTES.listAds, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ page: 1, limit: 1 }),
+          });
+          const data = await res.json();
+          
+          let ads = [];
+          if (data.data) {
+            ads = data.data;
+          } else if (data.ads) {
+            ads = data.ads;
+          } else if (Array.isArray(data)) {
+            ads = data;
+          }
+          
+          if (ads.length > 0) {
+            const adId = ads[0]._id || ads[0].id;
+            el("adId").value = adId;
+            S.adId = adId;
+            localStorage.setItem("adId", S.adId);
+            log("A", `Got real ad ID: ${adId}`);
+            log("B", `Got real ad ID: ${adId}`);
+          } else {
+            log("A", "No ads found in database");
+            log("B", "No ads found in database");
+          }
+        } catch (e) {
+          log("A", "Failed to get ad ID: " + e);
+          log("B", "Failed to get ad ID: " + e);
+        }
+      }
+
+      async function listChats(side) {
+        try {
+          const res = await fetch(S.httpUrl + window.ROUTES.listChats, {
+            headers: { Authorization: bearer(side) },
+          });
+          const data = await res.json();
+          log(side, "Chats: " + JSON.stringify(data, null, 2));
+        } catch (e) {
+          log(side, "List chats failed: " + e);
+        }
+      }
+
+      async function loadMessages(side) {
+        const chatId = el("chatId").value.trim();
+        if (!chatId) return alert("Set Chat ID first.");
+        try {
+          const url = S.httpUrl + window.ROUTES.messages(chatId) + "?page=1&limit=50";
+          const res = await fetch(url, { headers: { Authorization: bearer(side) } });
+          const data = await res.json();
+          log(side, "Messages: " + JSON.stringify(data, null, 2));
+        } catch (e) {
+          log(side, "Load messages failed: " + e);
+        }
+      }
+
+      async function markRead(side) {
+        const chatId = el("chatId").value.trim();
+        if (!chatId) return alert("Set Chat ID first.");
+        try {
+          const url = S.httpUrl + window.ROUTES.markRead(chatId);
+          const res = await fetch(url, { method: "POST", headers: { Authorization: bearer(side) } });
+          const data = await res.json();
+          log(side, "Mark read: " + JSON.stringify(data));
+        } catch (e) {
+          log(side, "Mark read failed: " + e);
+        }
+      }
+
+      async function blockOther(side) {
+        const chatId = el("chatId").value.trim();
+        const otherId = el("otherUserId").value.trim();
+        if (!chatId || !otherId) return alert("Set Chat ID and Other User ID.");
+        const s = S[side].socket;
+        if (s && s.connected) {
+          s.emit(window.EVENTS.block, { chatId, userId: otherId }, (ack) => {
+            log(side, "WS block ack: " + JSON.stringify(ack));
+          });
+        } else {
+          try {
+            const res = await fetch(S.httpUrl + window.ROUTES.block(chatId, otherId), {
+              method: "POST",
+              headers: { Authorization: bearer(side) },
+            });
+            const data = await res.json();
+            log(side, "HTTP block: " + JSON.stringify(data));
+          } catch (e) {
+            log(side, "HTTP block failed: " + e);
+          }
+        }
+      }
+
+      async function unblockOther(side) {
+        const chatId = el("chatId").value.trim();
+        const otherId = el("otherUserId").value.trim();
+        if (!chatId || !otherId) return alert("Set Chat ID and Other User ID.");
+        const s = S[side].socket;
+        if (s && s.connected) {
+          s.emit(window.EVENTS.unblock, { chatId, userId: otherId }, (ack) => {
+            log(side, "WS unblock ack: " + JSON.stringify(ack));
+          });
+        } else {
+          try {
+            const res = await fetch(S.httpUrl + window.ROUTES.unblock(chatId, otherId), {
+              method: "POST",
+              headers: { Authorization: bearer(side) },
+            });
+            const data = await res.json();
+            log(side, "HTTP unblock: " + JSON.stringify(data));
+          } catch (e) {
+            log(side, "HTTP unblock failed: " + e);
+          }
+        }
+      }
+
+      // ====== WS ======
+      function connectWS(side) {
+        const token = getToken(side);
+        if (!token) return alert("Login or paste access token first.");
+        if (typeof window.io !== "function") {
+          setStatus(side, false, "socket.io not loaded");
+          log(side, "Socket.IO client script not loaded or blocked. Ensure CDN is reachable.");
+          return;
+        }
+        const url = `${S.wsUrl}/chat`;
+        
+        // FIXED: Send token without 'Bearer ' prefix for WebSocket
+        const socket = window.io(url, {
+          transports: ["websocket"],
+          auth: { token: token }, // Send raw token, not "Bearer token"
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+          autoConnect: false,
+        });
+        S[side].socket = socket;
+
+        // Log ALL inbound events for quick debugging
+        socket.onAny((event, ...args) => {
+          try {
+            log(side, `<< ${event}: ${JSON.stringify(args[0])}`);
+          } catch (_) {
+            log(side, `<< ${event} (non-serializable)`);
+          }
+        });
+
+        socket.on("connect", () => {
+          setStatus(side, true, "connected #" + socket.id);
+          log(side, "Connected " + socket.id);
+          maybeTryAutoCreate(side);
+        });
+        socket.on("connect_error", (err) => {
+          setStatus(side, false, "connect_error");
+          const details = { message: err?.message, description: err?.description, data: err?.data, type: err?.type };
+          log(side, "Connect error: " + JSON.stringify(details));
+        });
+        socket.on("disconnect", (reason) => {
+          setStatus(side, false, "disconnected (" + reason + ")");
+          log(side, "Disconnected: " + reason);
+        });
+        socket.on("reconnect_attempt", (n) => log(side, "Reconnect attempt #" + n));
+        socket.on("reconnect", (n) => log(side, "Reconnected after attempts: " + n));
+        socket.on("reconnect_error", (e) => log(side, "Reconnect error: " + (e?.message || e)));
+        socket.on("reconnect_failed", () => log(side, "Reconnect failed"));
+
+        socket.on(window.EVENTS.message, (payload) => {
+          log(side, "Incoming message: " + JSON.stringify(payload));
+        });
+
+        socket.on("newChatCreated", (evt) => {
+          log(side, "newChatCreated: " + JSON.stringify(evt));
+          if (evt?.chatId) {
+            el("chatId").value = evt.chatId;
+            S.chatId = evt.chatId;
+            localStorage.setItem("chatId", S.chatId);
+            joinChat(side);
+          }
+        });
+
+        socket.on("error", (e) => log(side, "WS error: " + JSON.stringify(e)));
+        socket.connect();
+      }
+
+      function disconnectWS(side) {
+        const s = S[side].socket;
+        if (s) {
+          s.disconnect();
+          S[side].socket = null;
+        }
+        setStatus(side, false, "disconnected");
+        log(side, "Disconnected");
+      }
+
+      function joinChat(side) {
+        const chatId = el("chatId").value.trim();
+        if (!chatId) return alert("Set Chat ID first.");
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert("Connect WS first.");
+        s.emit(window.EVENTS.joinChat, { chatId }, (ack) => {
+          log(side, "Join ack: " + JSON.stringify(ack));
+        });
+      }
+
+      function sendMsg(side) {
+        const chatId = el("chatId").value.trim();
+        if (!chatId) return alert("Set Chat ID first.");
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert("Connect WS first.");
+        const inputId = side === "A" ? "msgA" : "msgB";
+        const content = el(inputId).value.trim();
+        if (!content) return;
+        s.emit(window.EVENTS.sendMessage, { chatId, content }, (ack) => {
+          log(side, "Send ack: " + JSON.stringify(ack || { ok: true }));
+        });
+        el(inputId).value = "";
+      }
+
+      function createAdChat(side) {
+        const adIdFromInput = el("adId").value.trim();
+        const adId = adIdFromInput || S.adId;
+        log(side, `createAdChat: side=${side}, adId=${adId || "(none)"}`);
+        if (!adId) return alert("Set Ad ID first.");
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert("Connect WS first.");
+
+        // Persist Ad ID if provided now
+        if (adIdFromInput && adIdFromInput !== S.adId) {
+          S.adId = adIdFromInput;
+          localStorage.setItem("adId", S.adId);
+        }
+
+        log(side, `Emitting createAdChat for adId=${adId}`);
+        let acked = false;
+        const t = setTimeout(() => {
+          if (!acked) {
+            log(side, "Create Ad Chat: no ack within 8s → trying HTTP fallback");
+            createAdChatHTTP(side, adId);
+          }
+        }, 8000);
+
+        s.emit(window.EVENTS.createAdChat, { adId }, (resp) => {
+          acked = true;
+          clearTimeout(t);
+          if (!resp || resp.success === false) {
+            const msg = (resp && (resp.error || resp.message)) || "WS handler refused";
+            log(side, `Create Ad Chat failed (WS): ${msg} → trying HTTP fallback`);
+            createAdChatHTTP(side, adId);
+            return;
+          }
+          const chatId = resp.chat && (resp.chat._id || resp.chat.id || resp.chatId || resp.id);
+          if (!chatId) {
+            log(side, "Create Ad Chat (WS) success but no chatId returned; waiting for newChatCreated…");
+            return;
+          }
+          log(side, `Create Ad Chat (WS) success. Chat ID: ${chatId}`);
+          el("chatId").value = chatId;
+          S.chatId = chatId;
+          localStorage.setItem("chatId", S.chatId);
+          s.emit(window.EVENTS.joinChat, { chatId }, (ack) => {
+            log(side, "Join after WS create ack: " + JSON.stringify(ack));
+          });
+        });
+      }
+
+      async function createAdChatHTTP(side, adId) {
+        try {
+          const url = S.httpUrl + window.ROUTES.createAd(adId);
+          const res = await fetch(url, { 
+            method: "POST", 
+            headers: { 
+              Authorization: bearer(side), // FIXED: Use Bearer token for HTTP
+              "Content-Type": "application/json"
+            } 
+          });
+          const data = await res.json();
+          log(side, "HTTP create ad chat: " + JSON.stringify(data));
+          const chatId = data?.chat?._id || data?.chat?.id || data?.chatId || data?.id;
+          if (chatId) {
+            el("chatId").value = chatId;
+            S.chatId = chatId;
+            localStorage.setItem("chatId", S.chatId);
+            const s = S[side].socket;
+            if (s && s.connected) {
+              s.emit(window.EVENTS.joinChat, { chatId }, (ack) => {
+                log(side, "Join (after HTTP) ack: " + JSON.stringify(ack));
+              });
+            }
+          } else {
+            alert("HTTP create ad chat did not return a chatId");
+          }
+        } catch (e) {
+          log(side, "HTTP create ad chat failed: " + e);
+        }
+      }
+
+      function maybeTryAutoCreate(side) {
+        try {
+          const adId = el("adId").value.trim() || S.adId;
+          if (!adId) return;
+          const s = S[side].socket;
+          if (!s || !s.connected) return;
+          if (S[side].autoCreateTried) return;
+          S[side].autoCreateTried = true;
+          log(side, `Auto-creating chat for Ad ID ${adId} after connect/config`);
+          createAdChat(side);
+        } catch (_) {}
+      }
+
+      // ====== Init UI from localStorage ======
+      function init() {
+        el("httpUrl").value = S.httpUrl;
+        el("wsUrl").value = S.wsUrl;
+        el("chatId").value = S.chatId;
+        el("otherUserId").value = S.otherUserId;
+        el("adId").value = S.adId;
+        runtimeWarnings();
+      }
+      init();
+
+      // ====== Environment diagnostics / iOS warnings ======
+      function isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      }
+      function warnAll(msg) {
+        log("A", "WARN: " + msg);
+        log("B", "WARN: " + msg);
+      }
+      function runtimeWarnings() {
+        const pageIsHttps = location.protocol === "https:";
+        const httpUrl = S.httpUrl || el("httpUrl").value.trim();
+        const wsUrl = S.wsUrl || el("wsUrl").value.trim();
+        if (!httpUrl || !wsUrl) return;
+        if (pageIsHttps) {
+          if (httpUrl.startsWith("http://")) warnAll("Page is HTTPS but HTTP Base URL is http:// (mixed content will be blocked). Use https:// or open this page over http://");
+          if (wsUrl.startsWith("ws://") || wsUrl.startsWith("http://")) warnAll("Page is HTTPS but WebSocket URL is insecure (ws:// or http://). Use wss:// or serve this page over http://");
+        }
+        if (isIOS()) {
+          if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(httpUrl) || /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(wsUrl)) {
+            warnAll('On iOS, "localhost" refers to the phone itself. Use your computer\'s LAN IP (e.g., http://192.168.x.x:5000) for both URLs.');
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

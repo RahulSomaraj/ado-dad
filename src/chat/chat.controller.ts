@@ -6,6 +6,8 @@ import {
   Body,
   Request,
   UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
@@ -22,11 +24,44 @@ export class ChatController {
     const userId = req.user.id;
 
     try {
-      const chat = await this.chatService.createAdChat(adId, userId);
-      return { success: true, chat };
+      const result = await this.chatService.createAdChat(adId, userId);
+      return { success: true, ...result };
     } catch (error) {
+      // Handle duplicate key error gracefully
+      if (error.message && error.message.includes('duplicate key error')) {
+        // Try to find the existing chat
+        try {
+          const ad = await this.chatService.getAdById(adId);
+          if (ad) {
+            const adPosterId = ad.postedBy.toString();
+            const participants = [adPosterId, userId].sort();
+            const existingChat = await this.chatService.findChatByParticipants(participants, 'ad', adId);
+            if (existingChat) {
+              return { 
+                success: true, 
+                chat: existingChat, 
+                isNewChat: false,
+                adPosterId,
+                viewerId: userId,
+                message: 'Chat already exists'
+              };
+            }
+          }
+        } catch (findError) {
+          console.log('Error finding existing chat:', findError.message);
+        }
+      }
+      
       return { error: error.message || 'Failed to create chat' };
     }
+  }
+
+  // Add backward compatibility endpoint
+  @Get()
+  async getAllChats(@Request() req) {
+    const userId = req.user.id;
+    const chats = await this.chatService.getUserChatsWithLastMessage(userId);
+    return { success: true, chats };
   }
 
   @Get('user')

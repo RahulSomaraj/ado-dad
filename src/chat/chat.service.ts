@@ -5,12 +5,14 @@ import { Model, Types } from 'mongoose';
 import { Chat } from './schemas/chat.schema';
 import { Message } from './schemas/message.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { Ad } from '../ads/schemas/ad.schema';
 
 @Injectable()
 export class ChatService {
   constructor(
     @InjectModel(Chat.name) private chatModel: Model<Chat>,
     @InjectModel(Message.name) private messageModel: Model<Message>,
+    @InjectModel(Ad.name) private adModel: Model<Ad>,
   ) {}
 
   async createChat(
@@ -76,19 +78,37 @@ export class ChatService {
   }
 
   async createAdChat(adId: string, viewerId: string) {
+    console.log(`🔍 Creating ad chat for adId: ${adId}, viewerId: ${viewerId}`);
+
     // Get the ad to find the poster ID
     const ad = await this.getAdById(adId);
+    console.log(
+      `🔍 Ad lookup result:`,
+      ad ? `Found ad with postedBy: ${ad.postedBy}` : 'Ad not found',
+    );
+
     if (!ad) {
       throw new Error('Ad not found');
     }
 
     const adPosterId = ad.postedBy.toString();
+    console.log(`🔍 Ad poster ID: ${adPosterId}, Viewer ID: ${viewerId}`);
+
     const participants = [
       new Types.ObjectId(adPosterId),
       new Types.ObjectId(viewerId),
     ];
 
+    console.log(
+      `🔍 Creating chat with participants:`,
+      participants.map((p) => p.toString()),
+    );
+
     const chat = await this.findOrCreateChat(participants, 'ad', adId, adId);
+    console.log(
+      `🔍 Chat created/found:`,
+      chat ? `Chat ID: ${(chat as any)._id}` : 'Chat creation failed',
+    );
 
     // Return chat with participant information
     return {
@@ -104,10 +124,18 @@ export class ChatService {
   }
 
   private async getAdById(adId: string) {
-    // Import the Ad model dynamically to avoid circular dependencies
-    const { Ad } = await import('../ads/schemas/ad.schema');
-    const adModel = this.chatModel.db.model(Ad.name);
-    return adModel.findById(adId);
+    console.log(`🔍 Looking up ad with ID: ${adId}`);
+    try {
+      const ad = await this.adModel.findById(adId);
+      console.log(
+        `🔍 Ad lookup result:`,
+        ad ? `Found ad with ID: ${ad._id}` : 'Ad not found',
+      );
+      return ad;
+    } catch (error) {
+      console.error(`🔍 Error in getAdById:`, error);
+      throw error;
+    }
   }
 
   private isBlockedPair(
@@ -308,5 +336,20 @@ export class ChatService {
     return (chat.participants || []).some(
       (p: any) => p?.toString?.() === userId.toString(),
     );
+  }
+
+  async findChatByParticipants(participants: string[], contextType: string, contextId: string) {
+    const participantIds = participants.map(p => new Types.ObjectId(p));
+    
+    const chat = await this.chatModel
+      .findOne({
+        participants: { $all: participantIds },
+        contextType,
+        contextId
+      })
+      .populate('participants', 'name email')
+      .exec();
+    
+    return chat;
   }
 }

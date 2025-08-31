@@ -51,25 +51,68 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      // Detect alg from header to choose verification
-      const decoded: any = jwt.decode(bearer, { complete: true });
-      const alg = decoded?.header?.alg as string | undefined;
-      let key: string | undefined;
-      let opts: jwt.VerifyOptions;
-      if (alg && alg.startsWith('HS')) {
-        key =
-          process.env.TOKEN_KEY || 'default-secret-key-change-in-production';
-        opts = { algorithms: ['HS256'] };
-      } else {
-        key = process.env.JWT_PUBLIC_KEY;
-        opts = { algorithms: ['RS256'] } as any;
-      }
-      if (!key) {
-        this.logger.warn(`JWT key not configured for alg ${alg || 'unknown'}`);
-        return;
-      }
+      // Prefer token header alg; fallback try HS then RS if unknown
+      const decodedHdr: any = jwt.decode(bearer, { complete: true });
+      const alg: string | undefined = decodedHdr?.header?.alg;
+      let payload: any | null = null;
 
-      const payload = jwt.verify(bearer, key, opts) as any;
+      this.logger.log(
+        `JWT alg detected: ${alg || 'unknown'}, TOKEN_KEY: ${!!process.env.TOKEN_KEY}, JWT_PUBLIC_KEY: ${!!process.env.JWT_PUBLIC_KEY}`,
+      );
+
+      if (alg?.startsWith('HS')) {
+        const hsKey =
+          process.env.TOKEN_KEY || 'default-secret-key-change-in-production';
+        try {
+          payload = jwt.verify(bearer, hsKey, { algorithms: ['HS256'] });
+          this.logger.log(`HS256 verification successful`);
+        } catch (e) {
+          this.logger.warn(`HS256 verification failed: ${(e as any)?.message}`);
+        }
+      } else if (alg?.startsWith('RS')) {
+        const rsKey = process.env.JWT_PUBLIC_KEY;
+        if (!rsKey) {
+          this.logger.warn('JWT_PUBLIC_KEY not set for RS token');
+          return;
+        }
+        try {
+          payload = jwt.verify(bearer, rsKey, { algorithms: ['RS256'] });
+          this.logger.log(`RS256 verification successful`);
+        } catch (e) {
+          this.logger.warn(`RS256 verification failed: ${(e as any)?.message}`);
+        }
+      } else {
+        // Unknown alg; attempt HS then RS
+        this.logger.log(`Unknown alg ${alg}, attempting fallback verification`);
+        const hsKey = process.env.TOKEN_KEY;
+        const rsKey = process.env.JWT_PUBLIC_KEY;
+        if (hsKey) {
+          try {
+            payload = jwt.verify(bearer, hsKey, { algorithms: ['HS256'] });
+            this.logger.log(`Fallback HS256 verification successful`);
+          } catch (e) {
+            this.logger.warn(
+              `Fallback HS256 verification failed: ${(e as any)?.message}`,
+            );
+          }
+        }
+        if (!payload && rsKey) {
+          try {
+            payload = jwt.verify(bearer, rsKey, { algorithms: ['RS256'] });
+            this.logger.log(`Fallback RS256 verification successful`);
+          } catch (e) {
+            this.logger.warn(
+              `Fallback RS256 verification failed: ${(e as any)?.message}`,
+            );
+          }
+        }
+        if (!payload) {
+          this.logger.warn(
+            `JWT key not configured or verification failed (alg: ${alg || 'unknown'})`,
+          );
+          return;
+        }
+      }
       const userId = payload?.id || payload?.sub;
       console.log('userId', userId);
       if (userId) {
