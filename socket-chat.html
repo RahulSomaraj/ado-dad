@@ -1,122 +1,463 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Basic Socket Connection Test</title>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat Room Tester (NestJS Socket.IO Backend)</title>
+    <link rel="preconnect" href="https://cdn.socket.io" crossorigin />
+    <script
+      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+      integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+      crossorigin="anonymous"
+    ></script>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
+      :root {
+        --bg: #0b1220;
+        --panel: #111a2b;
+        --text: #e6eefc;
+        --muted: #a9b1c6;
+        --accent: #4f8cff;
+        --ok: #2ecc71;
+        --bad: #e74c3c;
+        --warn: #f39c12;
+        --border: #22314d;
+        --btn: #1a2640;
+        --btn2: #16233f;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          'Liberation Mono', monospace;
       }
-      .container {
-        max-width: 600px;
-        margin: 0 auto;
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          'Noto Sans',
+          sans-serif;
+        margin: 0;
+      }
+      header {
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: #0a101c;
+      }
+      header h1 {
+        margin: 0 0 6px 0;
+        font-size: 20px;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      main {
+        padding: 16px;
+      }
+      .row {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
       }
       .panel {
-        border: 1px solid #ccc;
-        padding: 15px;
-        margin: 10px 0;
-        border-radius: 5px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
       }
-      .log {
-        background: #f5f5f5;
-        padding: 10px;
-        height: 300px;
-        overflow-y: auto;
-        font-family: monospace;
+      h2 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      h3 {
+        margin: 14px 0 8px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 4px;
+      }
+      input[type='text'],
+      input[type='password'],
+      input[type='number'],
+      textarea,
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0c1525;
+        color: var(--text);
+        font-family: var(--mono);
         font-size: 12px;
       }
-      input,
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .rowline {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
       button {
-        margin: 5px;
-        padding: 8px;
+        background: linear-gradient(180deg, var(--btn), var(--btn2));
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+        font-size: 12px;
       }
-      .success {
-        color: green;
+      button.ok {
+        background: linear-gradient(180deg, #1d3a2c, #152d21);
+        border-color: #1f4b34;
       }
-      .error {
-        color: red;
+      button.warn {
+        background: linear-gradient(180deg, #3a301d, #2d2515);
+        border-color: #4b3d1f;
       }
-      .info {
-        color: blue;
+      button.bad {
+        background: linear-gradient(180deg, #3a1d1d, #2d1515);
+        border-color: #4b1f1f;
       }
       .status {
-        font-weight: bold;
+        font-size: 12px;
+        margin-left: 8px;
       }
-      .status.connected {
-        color: green;
+      .status.ok {
+        color: var(--ok);
       }
-      .status.disconnected {
-        color: red;
+      .status.bad {
+        color: var(--bad);
+      }
+      .log {
+        background: #0a1120;
+        border: 1px dashed var(--border);
+        padding: 10px;
+        border-radius: 8px;
+        height: 220px;
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 12px 0;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: #0f1d36;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      @media (min-width: 980px) {
+        .row.grid-2 {
+          grid-template-columns: 1fr 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>Basic Socket Connection Test</h1>
+    <header>
+      <h1>Chat Room Tester</h1>
+      <p>
+        For NestJS Socket.IO chat backend. Test chat room creation, joining, and
+        management.
+      </p>
+    </header>
 
-      <div class="panel">
-        <h3>Configuration</h3>
-        <input
-          type="text"
-          id="serverUrl"
-          placeholder="Server URL"
-          value="http://localhost:5000"
-          style="width: 300px"
-        />
-        <input
-          type="text"
-          id="token"
-          placeholder="JWT Token"
-          style="width: 400px"
-        />
-        <button onclick="getToken()">Get Token</button>
-      </div>
-
-      <div class="panel">
-        <h3>Connection</h3>
-        <button onclick="connect()">Connect</button>
-        <button onclick="disconnect()">Disconnect</button>
-        <button onclick="ping()">Ping</button>
-        <div id="connectionStatus" class="status disconnected">
-          Disconnected
+    <main>
+      <section class="panel">
+        <h2>Config (shared)</h2>
+        <div class="rowline">
+          <div>
+            <label
+              >HTTP Base URL (e.g. <code>http://localhost:5000</code>)</label
+            >
+            <input
+              id="httpUrl"
+              type="text"
+              placeholder="http://localhost:5000"
+            />
+          </div>
+          <div>
+            <label>WebSocket URL (same host)</label>
+            <input id="wsUrl" type="text" placeholder="http://localhost:5000" />
+          </div>
         </div>
-      </div>
+        <div class="rowline">
+          <div>
+            <label>Ad ID (must be 24-character MongoDB ObjectId)</label>
+            <input
+              id="adId"
+              type="text"
+              placeholder="507f1f77bcf86cd799439011"
+              value="507f1f77bcf86cd799439011"
+            />
+          </div>
+          <div>
+            <label>Room ID (auto-filled after creation)</label>
+            <input
+              id="roomId"
+              type="text"
+              placeholder="chat_user123_ad456"
+              readonly
+            />
+          </div>
+        </div>
+        <div class="btns">
+          <button onclick="saveConfig()">Save Config</button>
+          <button onclick="clearLogs()">Clear Logs</button>
+          <span class="status muted"
+            >Tips: Serve this file via <code>npx serve</code> to avoid CORS
+            issues.</span
+          >
+        </div>
+        <div class="divider"></div>
+        <div class="small muted">
+          <strong>Available Events:</strong> createChatRoom, joinChatRoom,
+          leaveChatRoom, getUserChatRooms, ping<br />
+          <strong>Features:</strong> Chat room creation, joining, user
+          management, real-time notifications
+        </div>
+      </section>
 
-      <div class="panel">
-        <h3>Log</h3>
-        <div id="log" class="log"></div>
-        <button onclick="clearLog()">Clear Log</button>
-      </div>
-    </div>
+      <section class="row grid-2">
+        <div class="panel" id="panelA">
+          <h2>
+            User A
+            <span id="statusA" class="status">● disconnected</span>
+          </h2>
+          <div class="rowline">
+            <div>
+              <label>Username/Email</label>
+              <input
+                id="emailA"
+                type="text"
+                placeholder="user@example.com"
+                value="user@example.com"
+              />
+            </div>
+            <div>
+              <label>Password</label>
+              <input
+                id="passA"
+                type="password"
+                placeholder="••••••••"
+                value="123456"
+              />
+            </div>
+          </div>
+          <div class="rowline">
+            <div>
+              <label>Access Token (auto-filled after login)</label>
+              <textarea
+                id="tokenA"
+                placeholder="eyJhbGciOi..."
+                readonly
+              ></textarea>
+            </div>
+            <div>
+              <label>User ID (from token)</label>
+              <input
+                id="userIdA"
+                type="text"
+                placeholder="507f1f77bcf86cd799439011"
+                readonly
+              />
+            </div>
+          </div>
+          <div class="btns">
+            <button onclick="login('A')" class="ok">Login</button>
+            <button onclick="logout('A')" class="bad">Logout</button>
+            <button onclick="decodeJwt('A')">Decode Token</button>
+          </div>
+          <div class="btns">
+            <button onclick="connectWS('A')" class="ok">Connect WS</button>
+            <button onclick="disconnectWS('A')" class="bad">Disconnect</button>
+            <button onclick="ping('A')">Ping</button>
+          </div>
+          <div class="btns">
+            <button onclick="createChatRoom('A')" class="ok">
+              Create Chat Room
+            </button>
+            <button onclick="joinChatRoom('A')">Join Room</button>
+            <button onclick="leaveChatRoom('A')">Leave Room</button>
+          </div>
+          <div class="btns">
+            <button onclick="getUserChatRooms('A')">Get My Chat Rooms</button>
+            <button onclick="getCurrentRoomInfo('A')">Room Info</button>
+          </div>
+          <h3>Log</h3>
+          <div id="logA" class="log"></div>
+        </div>
+
+        <div class="panel" id="panelB">
+          <h2>
+            User B
+            <span id="statusB" class="status">● disconnected</span>
+          </h2>
+          <div class="rowline">
+            <div>
+              <label>User ID (must be 24-character MongoDB ObjectId)</label>
+              <input
+                id="userIdB"
+                type="text"
+                placeholder="507f1f77bcf86cd799439012"
+                value="507f1f77bcf86cd799439012"
+              />
+            </div>
+            <div>
+              <label>Role</label>
+              <select id="roleB">
+                <option value="receiver">Receiver</option>
+                <option value="initiator">Initiator</option>
+              </select>
+            </div>
+          </div>
+          <div class="btns">
+            <button onclick="connectWS('B')" class="ok">Connect WS</button>
+            <button onclick="disconnectWS('B')" class="bad">Disconnect</button>
+            <button onclick="ping('B')">Ping</button>
+          </div>
+          <div class="btns">
+            <button onclick="createChatRoom('B')" class="ok">
+              Create Chat Room
+            </button>
+            <button onclick="joinChatRoom('B')">Join Room</button>
+            <button onclick="leaveChatRoom('B')">Leave Room</button>
+          </div>
+          <div class="btns">
+            <button onclick="getUserChatRooms('B')">Get My Chat Rooms</button>
+            <button onclick="getCurrentRoomInfo('B')">Room Info</button>
+          </div>
+          <h3>Log</h3>
+          <div id="logB" class="log"></div>
+        </div>
+      </section>
+    </main>
 
     <script>
-      let socket = null;
+      // ====== Configurable events ======
+      window.EVENTS = {
+        createChatRoom: 'createChatRoom',
+        joinChatRoom: 'joinChatRoom',
+        leaveChatRoom: 'leaveChatRoom',
+        getUserChatRooms: 'getUserChatRooms',
+        ping: 'ping',
+      };
 
-      function log(message, type = 'info') {
-        const logDiv = document.getElementById('log');
-        const timestamp = new Date().toLocaleTimeString();
-        const className =
-          type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
-        logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
-        logDiv.scrollTop = logDiv.scrollHeight;
+      // ====== State ======
+      const S = {
+        httpUrl: localStorage.getItem('httpUrl') || 'http://localhost:5000',
+        wsUrl: localStorage.getItem('wsUrl') || 'http://localhost:5000',
+        adId: localStorage.getItem('adId') || '',
+        roomId: localStorage.getItem('roomId') || '',
+        A: { socket: null, currentRoom: null },
+        B: { socket: null, currentRoom: null },
+      };
+
+      // ====== Helpers ======
+      function el(id) {
+        return document.getElementById(id);
       }
-
-      function clearLog() {
-        document.getElementById('log').innerHTML = '';
+      function log(side, msg) {
+        const box = el(side === 'A' ? 'logA' : 'logB');
+        const t = new Date().toLocaleTimeString();
+        box.textContent += `[${t}] ${msg}\n`;
+        box.scrollTop = box.scrollHeight;
       }
-
-      async function getToken() {
+      function setStatus(side, ok, text) {
+        const s = el(side === 'A' ? 'statusA' : 'statusB');
+        s.textContent = `● ${text}`;
+        s.className = 'status ' + (ok ? 'ok' : 'bad');
+      }
+      function saveConfig() {
+        S.httpUrl = el('httpUrl').value.trim() || S.httpUrl;
+        S.wsUrl = el('wsUrl').value.trim() || S.wsUrl;
+        S.adId = el('adId').value.trim() || S.adId;
+        S.roomId = el('roomId').value.trim() || S.roomId;
+        localStorage.setItem('httpUrl', S.httpUrl);
+        localStorage.setItem('wsUrl', S.wsUrl);
+        localStorage.setItem('adId', S.adId);
+        localStorage.setItem('roomId', S.roomId);
+        alert('Saved config.');
+        runtimeWarnings();
+      }
+      function clearLogs() {
+        el('logA').textContent = '';
+        el('logB').textContent = '';
+      }
+      function getUserId(side) {
+        return el(side === 'A' ? 'userIdA' : 'userIdB').value.trim();
+      }
+      function getToken(side) {
+        return el(side === 'A' ? 'tokenA' : 'tokenB').value.trim();
+      }
+      function setToken(side, token) {
+        el(side === 'A' ? 'tokenA' : 'tokenB').value = token || '';
+      }
+      function parseJwt(token) {
         try {
-          const serverUrl = document.getElementById('serverUrl').value;
-          const username = 'user@example.com';
-          const password = '123456';
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split('')
+              .map((c) => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join(''),
+          );
+          return JSON.parse(jsonPayload);
+        } catch (e) {
+          return null;
+        }
+      }
 
-          log('Getting token...');
+      // ====== Authentication Functions ======
+      async function login(side) {
+        const username = el(side === 'A' ? 'emailA' : 'emailB').value.trim();
+        const password = el(side === 'A' ? 'passA' : 'passB').value;
 
-          const response = await fetch(`${serverUrl}/auth/login`, {
+        if (!username || !password) {
+          log(side, 'Please enter username and password');
+          return;
+        }
+
+        try {
+          log(side, 'Logging in...');
+
+          const response = await fetch(`${S.httpUrl}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
@@ -125,95 +466,293 @@
           const data = await response.json();
 
           if (response.ok) {
-            const token = data.token || data.access_token || data.accessToken;
-            document.getElementById('token').value = token;
-            log('Token obtained successfully', 'success');
+            const token = data.access_token || data.token;
+            setToken(side, token);
+
+            // Extract user ID from token
+            const payload = parseJwt(token);
+            if (payload && payload.id) {
+              el(side === 'A' ? 'userIdA' : 'userIdB').value = payload.id;
+              log(side, `Login successful! User ID: ${payload.id}`);
+            } else {
+              log(
+                side,
+                'Login successful but could not extract user ID from token',
+              );
+            }
           } else {
-            log(`Failed to get token: ${data.message}`, 'error');
+            log(side, `Login failed: ${data.message || 'Unknown error'}`);
           }
         } catch (error) {
-          log(`Error getting token: ${error.message}`, 'error');
+          log(side, `Login error: ${error.message}`);
         }
       }
 
-      function connect() {
-        const serverUrl = document.getElementById('serverUrl').value;
-        const token = document.getElementById('token').value;
+      function logout(side) {
+        setToken(side, '');
+        el(side === 'A' ? 'userIdA' : 'userIdB').value = '';
+        log(side, 'Logged out');
 
+        // Disconnect socket if connected
+        const socket = S[side].socket;
+        if (socket && socket.connected) {
+          socket.disconnect();
+        }
+      }
+
+      function decodeJwt(side) {
+        const token = getToken(side);
         if (!token) {
-          log('Please get a token first', 'error');
+          log(side, 'No token to decode');
           return;
         }
 
-        log('Connecting to socket...');
+        const payload = parseJwt(token);
+        if (payload) {
+          log(side, `JWT Payload: ${JSON.stringify(payload, null, 2)}`);
+        } else {
+          log(side, 'Invalid token format');
+        }
+      }
 
-        socket = io(`${serverUrl}/chat`, {
+      // ====== WebSocket Functions ======
+      function connectWS(side) {
+        const token = getToken(side);
+        if (!token) {
+          alert('Please login first to get an access token.');
+          return;
+        }
+
+        if (typeof window.io !== 'function') {
+          setStatus(side, false, 'socket.io not loaded');
+          log(
+            side,
+            'Socket.IO client script not loaded or blocked. Ensure CDN is reachable.',
+          );
+          return;
+        }
+
+        const socket = window.io(`${S.wsUrl}/chat`, {
           transports: ['websocket'],
-          auth: { token: token },
+          auth: { token: `Bearer ${token}` },
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          timeout: 10000,
           autoConnect: false,
         });
+        S[side].socket = socket;
 
         socket.on('connect', () => {
-          document.getElementById('connectionStatus').textContent = 'Connected';
-          document.getElementById('connectionStatus').className =
-            'status connected';
-          log('Socket connected successfully', 'success');
+          setStatus(side, true, 'connected #' + socket.id);
+          log(side, 'Connected ' + socket.id);
+        });
+
+        socket.on('connect_error', (err) => {
+          setStatus(side, false, 'connect_error');
+          try {
+            const details = {
+              message: err?.message,
+              description: err?.description,
+              data: err?.data,
+              type: err?.type,
+            };
+            log(side, 'Connect error: ' + JSON.stringify(details));
+          } catch (_) {
+            log(
+              side,
+              'Connect error: ' +
+                (err && err.message ? err.message : String(err)),
+            );
+          }
         });
 
         socket.on('disconnect', (reason) => {
-          document.getElementById('connectionStatus').textContent =
-            'Disconnected';
-          document.getElementById('connectionStatus').className =
-            'status disconnected';
-          log(`Socket disconnected: ${reason}`, 'info');
+          setStatus(side, false, 'disconnected (' + reason + ')');
+          log(side, 'Disconnected: ' + reason);
         });
 
-        socket.on('connect_error', (error) => {
-          document.getElementById('connectionStatus').textContent =
-            'Connection Failed';
-          document.getElementById('connectionStatus').className =
-            'status disconnected';
-          log(`Connection error: ${error.message}`, 'error');
+        socket.on('reconnect_attempt', (n) =>
+          log(side, 'Reconnect attempt #' + n),
+        );
+        socket.on('reconnect', (n) =>
+          log(side, 'Reconnected after attempts: ' + n),
+        );
+        socket.on('reconnect_error', (e) =>
+          log(side, 'Reconnect error: ' + (e?.message || e)),
+        );
+        socket.on('reconnect_failed', () => log(side, 'Reconnect failed'));
+
+        // Chat room events
+        socket.on('createChatRoomResponse', (data) => {
+          log(side, 'Create chat room response: ' + JSON.stringify(data));
+          if (data.success && data.chatRoom) {
+            S[side].currentRoom = data.chatRoom;
+            el('roomId').value = data.chatRoom.roomId;
+            S.roomId = data.chatRoom.roomId;
+            localStorage.setItem('roomId', S.roomId);
+          }
+        });
+
+        socket.on('chatRoomCreated', (data) => {
+          log(side, 'Chat room created event: ' + JSON.stringify(data));
+        });
+
+        socket.on('joinChatRoomResponse', (data) => {
+          log(side, 'Join chat room response: ' + JSON.stringify(data));
+        });
+
+        socket.on('leaveChatRoomResponse', (data) => {
+          log(side, 'Leave chat room response: ' + JSON.stringify(data));
+        });
+
+        socket.on('userChatRooms', (data) => {
+          log(side, 'User chat rooms: ' + JSON.stringify(data));
+        });
+
+        socket.on('userJoinedRoom', (data) => {
+          log(side, 'User joined room: ' + JSON.stringify(data));
+        });
+
+        socket.on('userLeftRoom', (data) => {
+          log(side, 'User left room: ' + JSON.stringify(data));
         });
 
         socket.on('connected', (data) => {
-          log(`Connection confirmed: ${JSON.stringify(data)}`, 'success');
+          log(side, 'Connection confirmed: ' + JSON.stringify(data));
         });
 
         socket.on('pong', (data) => {
-          log(`Pong received: ${JSON.stringify(data)}`, 'info');
+          log(side, 'Pong received: ' + JSON.stringify(data));
         });
+
+        socket.on('error', (e) => log(side, 'WS error: ' + JSON.stringify(e)));
 
         socket.connect();
       }
 
-      function disconnect() {
-        if (socket) {
-          socket.disconnect();
-          socket = null;
-          document.getElementById('connectionStatus').textContent =
-            'Disconnected';
-          document.getElementById('connectionStatus').className =
-            'status disconnected';
-          log('Socket disconnected manually', 'info');
+      function disconnectWS(side) {
+        const s = S[side].socket;
+        if (s) {
+          s.disconnect();
+          S[side].socket = null;
+        }
+        setStatus(side, false, 'disconnected');
+        log(side, 'Disconnected');
+      }
+
+      function ping(side) {
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert('Connect WS first.');
+        s.emit(window.EVENTS.ping);
+        log(side, 'Ping sent');
+      }
+
+      function createChatRoom(side) {
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert('Connect WS first.');
+
+        const adId = el('adId').value.trim();
+
+        if (!adId) return alert('Please enter an Ad ID first.');
+
+        log(side, `Creating chat room for ad ${adId}`);
+        s.emit(window.EVENTS.createChatRoom, { adId: adId });
+      }
+
+      function joinChatRoom(side) {
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert('Connect WS first.');
+
+        const roomId = el('roomId').value.trim();
+
+        if (!roomId)
+          return alert('Please create a chat room first or enter a Room ID.');
+
+        log(side, `Joining chat room ${roomId}`);
+        s.emit(window.EVENTS.joinChatRoom, { roomId: roomId });
+      }
+
+      function leaveChatRoom(side) {
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert('Connect WS first.');
+
+        const roomId = el('roomId').value.trim();
+
+        if (!roomId) return alert('Please enter a Room ID first.');
+
+        log(side, `Leaving chat room ${roomId}`);
+        s.emit(window.EVENTS.leaveChatRoom, { roomId: roomId });
+      }
+
+      function getUserChatRooms(side) {
+        const s = S[side].socket;
+        if (!s || !s.connected) return alert('Connect WS first.');
+
+        log(side, 'Getting user chat rooms');
+        s.emit(window.EVENTS.getUserChatRooms);
+      }
+
+      function getCurrentRoomInfo(side) {
+        const room = S[side].currentRoom;
+        if (room) {
+          log(side, 'Current room info: ' + JSON.stringify(room, null, 2));
+        } else {
+          log(side, 'No current room info available');
         }
       }
 
-      function ping() {
-        if (!socket || !socket.connected) {
-          log('Please connect first', 'error');
-          return;
-        }
-        socket.emit('ping');
-        log('Ping sent', 'info');
+      // ====== Init UI from localStorage ======
+      function init() {
+        el('httpUrl').value = S.httpUrl;
+        el('wsUrl').value = S.wsUrl;
+        el('adId').value = S.adId;
+        el('roomId').value = S.roomId;
+        runtimeWarnings();
       }
+      init();
 
-      // Auto-get token when page loads
-      window.onload = function () {
-        setTimeout(() => {
-          getToken();
-        }, 1000);
-      };
+      // ====== Environment diagnostics ======
+      function isIOS() {
+        return (
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        );
+      }
+      function warnAll(msg) {
+        log('A', 'WARN: ' + msg);
+        log('B', 'WARN: ' + msg);
+      }
+      function runtimeWarnings() {
+        const pageIsHttps = location.protocol === 'https:';
+        const httpUrl = S.httpUrl || el('httpUrl').value.trim();
+        const wsUrl = S.wsUrl || el('wsUrl').value.trim();
+        if (!httpUrl || !wsUrl) return;
+
+        // Mixed content warnings
+        if (pageIsHttps) {
+          if (httpUrl.startsWith('http://'))
+            warnAll(
+              'Page is HTTPS but HTTP Base URL is http:// (mixed content will be blocked). Use https:// or open this page over http://',
+            );
+          if (wsUrl.startsWith('ws://') || wsUrl.startsWith('http://'))
+            warnAll(
+              'Page is HTTPS but WebSocket URL is insecure (ws:// or http://). Use wss:// or serve this page over http://',
+            );
+        }
+
+        // iOS device warnings
+        if (isIOS()) {
+          if (
+            /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(httpUrl) ||
+            /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(wsUrl)
+          ) {
+            warnAll(
+              'On iOS, "localhost" refers to the phone itself. Use your computer\'s LAN IP (e.g., http://192.168.x.x:5000) for both URLs.',
+            );
+          }
+        }
+      }
     </script>
   </body>
 </html>
