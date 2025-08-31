@@ -274,23 +274,33 @@ header {
   font-size: 1rem;
   padding: 0 0.5rem;
 }
-</style></head><body><main class="jesthtml-content"><header><h1 id="title">E2E Test Report</h1></header><section id="metadata-container"><div id="timestamp">Started: 2025-07-17 10:28:32</div><div id="summary"><div id="suite-summary"><div class="summary-total">Suites (1)</div><div class="summary-passed  summary-empty">0 passed</div><div class="summary-failed ">1 failed</div><div class="summary-pending  summary-empty">0 pending</div></div><div id="test-summary"><div class="summary-total">Tests (22)</div><div class="summary-passed ">14 passed</div><div class="summary-failed ">8 failed</div><div class="summary-pending  summary-empty">0 pending</div></div></div></section><details id="suite-1" class="suite-container" open=""><summary class="suite-info"><div class="suite-path">C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts</div><div class="suite-time warn">17.595s</div></summary><div class="suite-tests"><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Property Ads - Minimal Data Tests &gt; POST /ads - Property Category</div><div class="test-title">should create property ad with minimal required data</div><div class="test-status">passed</div><div class="test-duration">0.591s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Property Ads - Minimal Data Tests &gt; POST /ads - Property Category</div><div class="test-title">should create property ad with all optional fields</div><div class="test-status">passed</div><div class="test-duration">0.314s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Property Ads - Minimal Data Tests &gt; POST /ads - Property Category</div><div class="test-title">should fail to create property ad with missing required fields</div><div class="test-status">passed</div><div class="test-duration">0.298s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Property Ads - Minimal Data Tests &gt; POST /ads - Property Category</div><div class="test-title">should fail to create property ad with invalid property type</div><div class="test-status">failed</div><div class="test-duration">0.264s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 400 "Bad Request", got 500 "Internal Server Error"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:280:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+</style></head><body><main class="jesthtml-content"><header><h1 id="title">E2E Test Report</h1></header><section id="metadata-container"><div id="timestamp">Started: 2025-08-31 15:42:11</div><div id="summary"><div id="suite-summary"><div class="summary-total">Suites (1)</div><div class="summary-passed  summary-empty">0 passed</div><div class="summary-failed ">1 failed</div><div class="summary-pending  summary-empty">0 pending</div></div><div id="test-summary"><div class="summary-total">Tests (17)</div><div class="summary-passed ">12 passed</div><div class="summary-failed ">5 failed</div><div class="summary-pending  summary-empty">0 pending</div></div></div></section><details id="suite-1" class="suite-container" open=""><summary class="suite-info"><div class="suite-path">C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts</div><div class="suite-time warn">14.797s</div></summary><div class="suite-tests"><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users (create)</div><div class="test-title">creates a user (201, response shape)</div><div class="test-status">failed</div><div class="test-duration">1.285s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toBeDefined()
+
+Received: undefined
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:116:29)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users (create)</div><div class="test-title">validates email/phone/password (400)</div><div class="test-status">passed</div><div class="test-duration">0.022s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/with-profile-picture (multipart)</div><div class="test-title">accepts valid image upload</div><div class="test-status">failed</div><div class="test-duration">0.016s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 400
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:148:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/with-profile-picture (multipart)</div><div class="test-title">rejects invalid file type/oversize</div><div class="test-status">passed</div><div class="test-duration">0.008s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">requires admin roles (401/403)</div><div class="test-status">passed</div><div class="test-duration">0.061s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">returns paginated list with filters/sort when admin</div><div class="test-status">passed</div><div class="test-duration">0.057s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users (list)</div><div class="test-title">basic caching behavior (repeat same query)</div><div class="test-status">passed</div><div class="test-duration">0.103s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users/:id</div><div class="test-title">returns 200 for existing (admin) and 404 for missing</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; GET /users/:id</div><div class="test-title">cache invalidation after update</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PUT /users/:id (update)</div><div class="test-title">allows self-update for normal user</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PUT /users/:id (update)</div><div class="test-title">rejects unauthorized update to another user (403)</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PATCH /users/:id/password</div><div class="test-title">requires admin by decorator (normal user likely 403)</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; PATCH /users/:id/password</div><div class="test-title">admin can change target user password</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; DELETE /users/:id</div><div class="test-title">soft-deletes user and invalidates caches</div><div class="test-status">passed</div><div class="test-duration"> </div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; OTP endpoints</div><div class="test-title">send-otp works for admin and enforces rate limit</div><div class="test-status">failed</div><div class="test-duration">0.144s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 404
+Received array: [200]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:331:12)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:331:40
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
+    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; OTP endpoints</div><div class="test-title">verify-otp handles success/failure</div><div class="test-status">failed</div><div class="test-duration">0.143s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 200 "OK", got 404 "Not Found"
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:349:10)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ----
     at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
@@ -300,25 +310,14 @@ header {
     at Object.onceWrapper (node:events:638:28)
     at Server.emit (node:events:536:35)
     at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Private Vehicle Ads - Minimal Data Tests &gt; POST /ads - Private Vehicle Category</div><div class="test-title">should create private vehicle ad with minimal required data</div><div class="test-status">failed</div><div class="test-duration">0.285s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:324:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Users API (e2e) &gt; POST /users/profile-picture</div><div class="test-title">updates profile picture for authenticated user</div><div class="test-status">failed</div><div class="test-duration">0.435s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 400
+Received array: [200, 401, 403]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:399:10)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
 ----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:399:48
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
     at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
     at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
@@ -326,160 +325,4 @@ header {
     at Object.onceWrapper (node:events:638:28)
     at Server.emit (node:events:536:35)
     at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Private Vehicle Ads - Minimal Data Tests &gt; POST /ads - Private Vehicle Category</div><div class="test-title">should create private vehicle ad with all optional fields</div><div class="test-status">failed</div><div class="test-duration">0.279s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:373:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Private Vehicle Ads - Minimal Data Tests &gt; POST /ads - Private Vehicle Category</div><div class="test-title">should fail to create vehicle ad with missing required fields</div><div class="test-status">passed</div><div class="test-duration">0.27s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Private Vehicle Ads - Minimal Data Tests &gt; POST /ads - Private Vehicle Category</div><div class="test-title">should fail to create vehicle ad with invalid vehicle type</div><div class="test-status">passed</div><div class="test-duration">0.268s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Two Wheeler Ads - Minimal Data Tests &gt; POST /ads - Two Wheeler Category</div><div class="test-title">should create two wheeler ad with minimal required data</div><div class="test-status">failed</div><div class="test-duration">0.313s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:456:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Two Wheeler Ads - Minimal Data Tests &gt; POST /ads - Two Wheeler Category</div><div class="test-title">should create two wheeler ad with all optional fields</div><div class="test-status">failed</div><div class="test-duration">0.275s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:505:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Commercial Vehicle Ads - Minimal Data Tests &gt; POST /ads - Commercial Vehicle Category</div><div class="test-title">should create commercial vehicle ad with minimal required data</div><div class="test-status">failed</div><div class="test-duration">0.289s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:550:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Commercial Vehicle Ads - Minimal Data Tests &gt; POST /ads - Commercial Vehicle Category</div><div class="test-title">should create commercial vehicle ad with all optional fields</div><div class="test-status">failed</div><div class="test-duration">0.283s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 201 "Created", got 400 "Bad Request"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:601:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Commercial Vehicle Ads - Minimal Data Tests &gt; POST /ads - Commercial Vehicle Category</div><div class="test-title">should fail to create commercial vehicle ad with missing required fields</div><div class="test-status">passed</div><div class="test-duration">0.281s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Edge Cases and Validation Tests &gt; POST /ads - Edge Cases</div><div class="test-title">should fail to create ad without authentication</div><div class="test-status">passed</div><div class="test-duration">0.251s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Edge Cases and Validation Tests &gt; POST /ads - Edge Cases</div><div class="test-title">should fail to create ad with invalid category</div><div class="test-status">passed</div><div class="test-duration">0.266s</div></div></div><div class="test-result failed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Edge Cases and Validation Tests &gt; POST /ads - Edge Cases</div><div class="test-title">should fail to create ad with negative price</div><div class="test-status">failed</div><div class="test-duration">0.262s</div></div><div class="failureMessages"> <pre class="failureMsg">Error: expected 400 "Bad Request", got 500 "Internal Server Error"
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\ads-minimal-data.e2e-spec.ts:692:12)
-    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
-    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
-    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
-    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
-    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
-    at runTestInternal (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
-----
-    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
-    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
-    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
-    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
-    at Server.localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:120:14)
-    at Object.onceWrapper (node:events:638:28)
-    at Server.emit (node:events:536:35)
-    at emitCloseNT (node:net:2344:8)
-    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Edge Cases and Validation Tests &gt; POST /ads - Edge Cases</div><div class="test-title">should fail to create ad with empty description</div><div class="test-status">passed</div><div class="test-duration">0.26s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; Edge Cases and Validation Tests &gt; POST /ads - Edge Cases</div><div class="test-title">should fail to create ad with invalid manufacturer ID</div><div class="test-status">passed</div><div class="test-duration">0.239s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; GET /ads - Retrieval Tests</div><div class="test-title">should get all ads successfully</div><div class="test-status">passed</div><div class="test-duration">0.281s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; GET /ads - Retrieval Tests</div><div class="test-title">should filter ads by category</div><div class="test-status">passed</div><div class="test-duration">0.273s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; GET /ads - Retrieval Tests</div><div class="test-title">should filter ads by price range</div><div class="test-status">passed</div><div class="test-duration">0.347s</div></div></div><div class="test-result passed"><div class="test-info"><div class="test-suitename">Ads API - Minimal Data Test Cases (e2e) &gt; GET /ads - Retrieval Tests</div><div class="test-title">should search ads by description</div><div class="test-status">passed</div><div class="test-duration">0.291s</div></div></div></div></details></main></body></html>
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</pre></div></div></div></details></main></body></html>

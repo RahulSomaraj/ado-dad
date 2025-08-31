@@ -35,12 +35,23 @@ interface PaginatedUsersResponse {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
+  // Cache TTL constants (in seconds)
+  private readonly CACHE_TTL = {
+    USER_BY_ID: 300, // 5 minutes for individual user
+    USER_LIST: 300, // 5 minutes for user lists
+    OTP_RATE_LIMIT: 300, // 5 minutes for OTP rate limiting
+  };
+
+  // Cache version for better invalidation
+  private cacheVersion = 1;
+
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
-    @InjectModel(AuthTokens.name) private readonly authTokenModel: Model<AuthTokens>,
+    @InjectModel(AuthTokens.name)
+    private readonly authTokenModel: Model<AuthTokens>,
   ) {}
 
   /**
@@ -51,7 +62,7 @@ export class UsersService {
     currentUser: User,
   ): Promise<PaginatedUsersResponse> {
     try {
-      const cacheKey = `users:list:${JSON.stringify({ getUsersDto, uid: currentUser?._id || currentUser?.id })}`;
+      const cacheKey = `users:list:v${this.cacheVersion}:${JSON.stringify({ getUsersDto, uid: currentUser?._id || currentUser?.id })}`;
       const cached =
         await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
       if (cached) return cached;
@@ -68,7 +79,6 @@ export class UsersService {
       if (search?.trim()) {
         query.$text = { $search: search.trim() } as any;
       }
-
 
       // Apply role-based filtering
       if (currentUser.type === UserType.SUPER_ADMIN) {
@@ -112,7 +122,11 @@ export class UsersService {
         hasNext: validatedPage < totalPages,
         hasPrev: validatedPage > 1,
       };
-      await this.redisService.cacheSet(cacheKey, response, 300);
+      await this.redisService.cacheSet(
+        cacheKey,
+        response,
+        this.CACHE_TTL.USER_LIST,
+      );
       return response;
     } catch (error) {
       this.logger.error('Failed to get users:', error);
@@ -131,7 +145,7 @@ export class UsersService {
    */
   async getUserById(id: string): Promise<Partial<User>> {
     try {
-      const cacheKey = `users:byId:${id}`;
+      const cacheKey = `users:byId:v${this.cacheVersion}:${id}`;
       const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
       if (cached) return cached;
       if (!this.isValidObjectId(id)) {
@@ -148,7 +162,11 @@ export class UsersService {
         throw new NotFoundException('User not found or deleted');
       }
 
-      await this.redisService.cacheSet(cacheKey, user, 600);
+      await this.redisService.cacheSet(
+        cacheKey,
+        user,
+        this.CACHE_TTL.USER_BY_ID,
+      );
       return user;
     } catch (error) {
       if (
@@ -199,6 +217,13 @@ export class UsersService {
         profilePic: userResponse.profilePic,
         isDeleted: userResponse.isDeleted,
       };
+
+      // Cache the newly created user and invalidate list caches
+      await this.redisService.cacheSet(
+        `users:byId:v${this.cacheVersion}:${savedUser._id}`,
+        response,
+        this.CACHE_TTL.USER_BY_ID,
+      );
       await this.invalidateUsersListCaches();
       return response;
     } catch (error) {
@@ -260,7 +285,9 @@ export class UsersService {
 
       this.logger.log(`User updated successfully: ${updatedUser.email}`);
 
-      await this.redisService.cacheDel(`users:byId:${id}`);
+      await this.redisService.cacheDel(
+        `users:byId:v${this.cacheVersion}:${id}`,
+      );
       await this.invalidateUsersListCaches();
       return updatedUser;
     } catch (error) {
@@ -306,7 +333,9 @@ export class UsersService {
 
       this.logger.log(`User soft deleted successfully: ${user.email}`);
 
-      await this.redisService.cacheDel(`users:byId:${id}`);
+      await this.redisService.cacheDel(
+        `users:byId:v${this.cacheVersion}:${id}`,
+      );
       await this.invalidateUsersListCaches();
       return { message: 'User deleted successfully' };
     } catch (error) {
@@ -335,15 +364,19 @@ export class UsersService {
       this.logger.log(`Sending OTP to: ${email}`);
       // Throttle OTP sends per email (max 5 per 10 minutes)
       try {
-        const count = await this.redisService.incrementRateLimit(`send_otp:${email.toLowerCase()}`, 600);
+        const count = await this.redisService.incrementRateLimit(
+          `send_otp:${email.toLowerCase()}`,
+          this.CACHE_TTL.OTP_RATE_LIMIT,
+        );
         if (count > 5) {
-          throw new BadRequestException('Too many OTP requests. Please try again later.');
+          throw new BadRequestException(
+            'Too many OTP requests. Please try again later.',
+          );
         }
       } catch (e) {
         // If Redis unavailable, continue without rate limit
         this.logger.warn('Rate limit check failed (Redis down?)');
       }
-
 
       const user = await this.userModel
         .findOne({
@@ -554,6 +587,11 @@ export class UsersService {
 
   private async invalidateUsersListCaches(): Promise<void> {
     try {
+      // Increment cache version to invalidate all cached data
+      this.cacheVersion++;
+      this.logger.debug(`Cache version incremented to ${this.cacheVersion}`);
+
+      // Also clear existing keys for immediate invalidation
       const keys = await this.redisService.keys('users:list:*');
       if (keys?.length) {
         await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
@@ -563,11 +601,52 @@ export class UsersService {
     }
   }
 
+  /**
+   * Get current cache version
+   */
+  getCacheVersion(): number {
+    return this.cacheVersion;
+  }
+
+  /**
+   * Force cache invalidation by incrementing version
+   */
+  async forceCacheInvalidation(): Promise<{
+    message: string;
+    newVersion: number;
+  }> {
+    this.cacheVersion++;
+    this.logger.log(
+      `Forced cache invalidation. New version: ${this.cacheVersion}`,
+    );
+
+    // Clear all user-related caches
+    try {
+      const userKeys = await this.redisService.keys('users:*');
+      if (userKeys?.length) {
+        await Promise.all(userKeys.map((k) => this.redisService.cacheDel(k)));
+      }
+    } catch (e) {
+      this.logger.warn(
+        'Failed to clear user caches during forced invalidation',
+        e as any,
+      );
+    }
+
+    return {
+      message: 'Cache invalidation completed',
+      newVersion: this.cacheVersion,
+    };
+  }
 
   /**
    * Change user password.
    */
-  async changePassword(id: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async changePassword(
+    id: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const user = await this.userModel.findById(id).exec();
     if (!user || (user as any).isDeleted) {
       throw new NotFoundException('User not found or deleted');
@@ -582,23 +661,93 @@ export class UsersService {
     try {
       await this.authTokenModel.deleteMany({ userId: user._id }).exec();
     } catch (e) {
-      this.logger.warn('Failed to revoke refresh tokens after password change', e as any);
+      this.logger.warn(
+        'Failed to revoke refresh tokens after password change',
+        e as any,
+      );
     }
-    await this.redisService.cacheDel(`users:byId:${id}`);
+    await this.redisService.cacheDel(`users:byId:v${this.cacheVersion}:${id}`);
     await this.invalidateUsersListCaches();
     return { message: 'Password changed successfully' };
   }
 
   private assertStrongPassword(pw: string) {
     if (typeof pw !== 'string' || pw.length < 12) {
-      throw new BadRequestException('Password must be at least 12 characters long');
+      throw new BadRequestException(
+        'Password must be at least 12 characters long',
+      );
     }
     const hasUpper = /[A-Z]/.test(pw);
     const hasLower = /[a-z]/.test(pw);
     const hasDigit = /\d/.test(pw);
     const hasSpecial = /[^A-Za-z0-9]/.test(pw);
     if (!(hasUpper && hasLower && hasDigit && hasSpecial)) {
-      throw new BadRequestException('Password must include upper, lower, number, and special character');
+      throw new BadRequestException(
+        'Password must include upper, lower, number, and special character',
+      );
+    }
+  }
+
+  /**
+   * Cache warming method to pre-populate frequently accessed data
+   */
+  async warmCache(): Promise<{ message: string; warmedCount: number }> {
+    try {
+      this.logger.log('Starting cache warming for frequently accessed users');
+
+      // Get recent active users (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentUsers = await this.userModel
+        .find({
+          isDeleted: { $ne: true },
+          createdAt: { $gte: thirtyDaysAgo },
+        })
+        .select('_id name email type phoneNumber profilePic createdAt')
+        .limit(50) // Limit to prevent overwhelming the cache
+        .lean()
+        .exec();
+
+      let warmedCount = 0;
+
+      // Cache individual users
+      for (const user of recentUsers) {
+        try {
+          await this.redisService.cacheSet(
+            `users:byId:v${this.cacheVersion}:${user._id}`,
+            user,
+            this.CACHE_TTL.USER_BY_ID,
+          );
+          warmedCount++;
+        } catch (error) {
+          this.logger.warn(`Failed to warm cache for user ${user._id}:`, error);
+        }
+      }
+
+      // Cache default user list (first page)
+      try {
+        const defaultListResponse = await this.getAllUsers(
+          { page: 1, limit: 10 },
+          { type: 'SA' } as User, // Super admin context
+        );
+        warmedCount++;
+      } catch (error) {
+        this.logger.warn('Failed to warm default user list cache:', error);
+      }
+
+      this.logger.log(`Cache warming completed. Warmed ${warmedCount} items`);
+      return {
+        message: 'Cache warming completed successfully',
+        warmedCount,
+      };
+    } catch (error) {
+      this.logger.error('Cache warming failed:', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Cache warming failed',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

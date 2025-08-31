@@ -38,6 +38,31 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('health')
+  async getHealth() {
+    try {
+      // Check Redis health using ping method
+      const redisPing = await this.redisService.ping();
+
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        services: {
+          redis: redisPing === 'PONG' ? 'ok' : 'error',
+        },
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        services: {
+          redis: 'error',
+        },
+        error: error.message,
+      };
+    }
+  }
+
   @Get('cors-test')
   testCors() {
     // Synchronous response for better performance
@@ -46,6 +71,54 @@ export class AppController {
       timestamp: new Date().toISOString(),
       status: 'success',
     };
+  }
+
+  @Get('test-report')
+  getTestReport() {
+    try {
+      const reportPath = join(
+        __dirname,
+        '..',
+        '..',
+        'reports',
+        'e2e-test-summary.json',
+      );
+      if (!existsSync(reportPath)) {
+        return {
+          available: false,
+          message: 'Report not found. Run tests to generate.',
+        };
+      }
+      const json = readFileSync(reportPath, 'utf8');
+      return JSON.parse(json);
+    } catch (error) {
+      return { available: false, error: (error as any).message };
+    }
+  }
+
+  @Get('test-report/html')
+  getTestReportHtml(@Res() res: Response) {
+    try {
+      const htmlPath = join(
+        __dirname,
+        '..',
+        '..',
+        'reports',
+        'e2e-test-report.html',
+      );
+      if (!existsSync(htmlPath)) {
+        return res
+          .status(404)
+          .send(
+            '<html><body><h3>E2E HTML report not found. Run tests to generate.</h3></body></html>',
+          );
+      }
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      const html = readFileSync(htmlPath);
+      return res.send(html);
+    } catch (error) {
+      return res.status(500).send('Failed to load HTML report');
+    }
   }
 
   @Get('images/:filename')

@@ -1,8 +1,22 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ChatRoom, ChatRoomDocument, ChatRoomStatus, UserRole } from './schemas/chat-room.schema';
-import { ChatMessage, ChatMessageDocument, MessageType } from './schemas/chat-message.schema';
+import {
+  ChatRoom,
+  ChatRoomDocument,
+  ChatRoomStatus,
+  UserRole,
+} from './schemas/chat-room.schema';
+import {
+  ChatMessage,
+  ChatMessageDocument,
+  MessageType,
+} from './schemas/chat-message.schema';
 import { Ad, AdDocument } from '../ads/schemas/ad.schema';
 
 @Injectable()
@@ -11,7 +25,8 @@ export class ChatService {
 
   constructor(
     @InjectModel(ChatRoom.name) private chatRoomModel: Model<ChatRoomDocument>,
-    @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
+    @InjectModel(ChatMessage.name)
+    private chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Ad.name) private adModel: Model<AdDocument>,
   ) {}
 
@@ -22,11 +37,15 @@ export class ChatService {
     try {
       // Validate ObjectId format
       if (!Types.ObjectId.isValid(adId)) {
-        throw new BadRequestException(`Invalid Ad ID format: ${adId}. Must be a valid 24-character MongoDB ObjectId.`);
+        throw new BadRequestException(
+          `Invalid Ad ID format: ${adId}. Must be a valid 24-character MongoDB ObjectId.`,
+        );
       }
-      
+
       if (!Types.ObjectId.isValid(initiatorId)) {
-        throw new BadRequestException(`Invalid Initiator ID format: ${initiatorId}. Must be a valid 24-character MongoDB ObjectId.`);
+        throw new BadRequestException(
+          `Invalid Initiator ID format: ${initiatorId}. Must be a valid 24-character MongoDB ObjectId.`,
+        );
       }
 
       // Validate ad exists and is active
@@ -40,7 +59,7 @@ export class ChatService {
       }
 
       const adPosterId = ad.postedBy.toString();
-      
+
       // Check if chat room already exists for this initiator and ad
       const existingRoom = await this.chatRoomModel.findOne({
         initiatorId: new Types.ObjectId(initiatorId),
@@ -54,10 +73,10 @@ export class ChatService {
 
       // Create unique room ID
       const roomId = `chat_${initiatorId}_${adId}`;
-      
+
       // Create participants array
       const participants = [initiatorId, adPosterId];
-      
+
       // Create user roles mapping
       const userRoles = new Map<string, UserRole>();
       userRoles.set(initiatorId, UserRole.INITIATOR);
@@ -76,7 +95,7 @@ export class ChatService {
 
       const savedRoom = await chatRoom.save();
       this.logger.log(`Created chat room: ${savedRoom.roomId}`);
-      
+
       return savedRoom;
     } catch (error) {
       this.logger.error(`Error creating chat room: ${error.message}`);
@@ -98,7 +117,10 @@ export class ChatService {
   /**
    * Get chat room by initiator and ad
    */
-  async getChatRoomByInitiatorAndAd(initiatorId: string, adId: string): Promise<ChatRoom | null> {
+  async getChatRoomByInitiatorAndAd(
+    initiatorId: string,
+    adId: string,
+  ): Promise<ChatRoom | null> {
     return await this.chatRoomModel.findOne({
       initiatorId: new Types.ObjectId(initiatorId),
       adId: new Types.ObjectId(adId),
@@ -109,19 +131,26 @@ export class ChatService {
    * Get all chat rooms for a user (as initiator or ad poster)
    */
   async getUserChatRooms(userId: string): Promise<ChatRoom[]> {
-    return await this.chatRoomModel.find({
-      $or: [
-        { initiatorId: new Types.ObjectId(userId) },
-        { adPosterId: new Types.ObjectId(userId) },
-      ],
-      status: ChatRoomStatus.ACTIVE,
-    }).sort({ lastMessageAt: -1, createdAt: -1 });
+    return await this.chatRoomModel
+      .find({
+        $or: [
+          { initiatorId: new Types.ObjectId(userId) },
+          { adPosterId: new Types.ObjectId(userId) },
+        ],
+        status: ChatRoomStatus.ACTIVE,
+      })
+      .sort({ lastMessageAt: -1, createdAt: -1 });
   }
 
   /**
    * Send a message to a chat room
    */
-  async sendMessage(roomId: string, senderId: string, content: string, type: MessageType = MessageType.TEXT): Promise<ChatMessage> {
+  async sendMessage(
+    roomId: string,
+    senderId: string,
+    content: string,
+    type: MessageType = MessageType.TEXT,
+  ): Promise<ChatMessage> {
     // Verify chat room exists and is active
     const chatRoom = await this.getChatRoom(roomId);
     if (chatRoom.status !== ChatRoomStatus.ACTIVE) {
@@ -130,7 +159,9 @@ export class ChatService {
 
     // Verify sender is a participant
     if (!chatRoom.participants.includes(senderId)) {
-      throw new BadRequestException('User is not a participant in this chat room');
+      throw new BadRequestException(
+        'User is not a participant in this chat room',
+      );
     }
 
     // Create message
@@ -146,10 +177,10 @@ export class ChatService {
     // Update chat room
     await this.chatRoomModel.updateOne(
       { roomId },
-      { 
+      {
         lastMessageAt: new Date(),
-        $inc: { messageCount: 1 }
-      }
+        $inc: { messageCount: 1 },
+      },
     );
 
     this.logger.log(`Message sent in room ${roomId} by ${senderId}`);
@@ -159,8 +190,13 @@ export class ChatService {
   /**
    * Get messages for a chat room
    */
-  async getRoomMessages(roomId: string, limit: number = 50, offset: number = 0): Promise<ChatMessage[]> {
-    return await this.chatMessageModel.find({ roomId })
+  async getRoomMessages(
+    roomId: string,
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<ChatMessage[]> {
+    return await this.chatMessageModel
+      .find({ roomId })
       .sort({ createdAt: -1 })
       .skip(offset)
       .limit(limit)
@@ -172,16 +208,16 @@ export class ChatService {
    */
   async markMessagesAsRead(roomId: string, userId: string): Promise<void> {
     await this.chatMessageModel.updateMany(
-      { 
+      {
         roomId: new Types.ObjectId(roomId),
         senderId: { $ne: new Types.ObjectId(userId) },
-        isRead: false
+        isRead: false,
       },
-      { 
+      {
         isRead: true,
         readAt: new Date(),
-        readBy: new Types.ObjectId(userId)
-      }
+        readBy: new Types.ObjectId(userId),
+      },
     );
   }
 
@@ -191,7 +227,7 @@ export class ChatService {
   async deactivateChatRoom(adId: string): Promise<void> {
     await this.chatRoomModel.updateMany(
       { adId: new Types.ObjectId(adId) },
-      { status: ChatRoomStatus.INACTIVE }
+      { status: ChatRoomStatus.INACTIVE },
     );
     this.logger.log(`Deactivated chat rooms for ad: ${adId}`);
   }

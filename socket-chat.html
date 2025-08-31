@@ -328,21 +328,47 @@
           </h2>
           <div class="rowline">
             <div>
-              <label>User ID (must be 24-character MongoDB ObjectId)</label>
+              <label>Username/Email</label>
+              <input
+                id="emailB"
+                type="text"
+                placeholder="user2@example.com"
+                value="user2@example.com"
+              />
+            </div>
+            <div>
+              <label>Password</label>
+              <input
+                id="passB"
+                type="password"
+                placeholder="••••••••"
+                value="123456"
+              />
+            </div>
+          </div>
+          <div class="rowline">
+            <div>
+              <label>Access Token (auto-filled after login)</label>
+              <textarea
+                id="tokenB"
+                placeholder="eyJhbGciOi..."
+                readonly
+              ></textarea>
+            </div>
+            <div>
+              <label>User ID (from token)</label>
               <input
                 id="userIdB"
                 type="text"
                 placeholder="507f1f77bcf86cd799439012"
-                value="507f1f77bcf86cd799439012"
+                readonly
               />
             </div>
-            <div>
-              <label>Role</label>
-              <select id="roleB">
-                <option value="receiver">Receiver</option>
-                <option value="initiator">Initiator</option>
-              </select>
-            </div>
+          </div>
+          <div class="btns">
+            <button onclick="login('B')" class="ok">Login</button>
+            <button onclick="logout('B')" class="bad">Logout</button>
+            <button onclick="decodeJwt('B')">Decode Token</button>
           </div>
           <div class="btns">
             <button onclick="connectWS('B')" class="ok">Connect WS</button>
