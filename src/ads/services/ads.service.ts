@@ -34,6 +34,11 @@ import { UserType } from '../../users/enums/user.types';
 
 @Injectable()
 export class AdsService {
+  private static readonly CACHE_PREFIX = 'ads:';
+  private static readonly TTL = {
+    LIST: 120, // list queries
+    BY_ID: 900, // detailed ad cache
+  } as const;
   constructor(
     @InjectModel(Ad.name)
     private readonly adModel: Model<AdDocument>,
@@ -51,12 +56,12 @@ export class AdsService {
   ) {}
 
   /** ---------- HELPERS ---------- */
+  private isValidId(id?: string) {
+    return !!id && Types.ObjectId.isValid(id);
+  }
+
   private toObjectId(id?: string) {
-    try {
-      return id ? new Types.ObjectId(id) : undefined;
-    } catch {
-      return undefined;
-    }
+    return this.isValidId(id) ? new Types.ObjectId(id) : undefined;
   }
 
   private toObjectIdArray(ids?: string[]) {
@@ -69,6 +74,50 @@ export class AdsService {
 
   private nonEmpty<T extends object>(obj: T | undefined | null): T | undefined {
     return obj && Object.keys(obj).length > 0 ? obj : undefined;
+  }
+
+  private normalize(obj: any): any {
+    if (obj == null) return obj;
+    if (Array.isArray(obj)) return obj.map((v) => this.normalize(v));
+    if (typeof obj === 'object') {
+      const entries = Object.entries(obj)
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, this.normalize(v)]);
+      return Object.fromEntries(entries);
+    }
+    return obj;
+  }
+
+  private clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  private coerceSort(
+    sortBy?: string,
+    sortOrder?: string,
+  ): { field: string; dir: 1 | -1 } {
+    const allowed: Record<string, 1> = {
+      createdAt: 1,
+      updatedAt: 1,
+      price: 1,
+      title: 1,
+      category: 1,
+    };
+    const field = sortBy && allowed[sortBy] ? sortBy : 'createdAt';
+    const dir = sortOrder === 'ASC' ? 1 : -1;
+    return { field, dir };
+  }
+
+  private key(parts: Record<string, unknown>): string {
+    const norm = Object.keys(parts)
+      .filter(
+        (k) => parts[k] !== undefined && parts[k] !== null && parts[k] !== '',
+      )
+      .sort()
+      .map((k) => `${k}=${JSON.stringify(parts[k])}`)
+      .join('&');
+    return `${AdsService.CACHE_PREFIX}${norm}`;
   }
 
   /** ---------- FIND ALL (robust lookups + neutral defaults, all filters, all lists, all categories) ---------- */
@@ -87,8 +136,8 @@ export class AdsService {
       return obj;
     };
 
-    const safeFilters = normalize(filters);
-    const cacheKey = `ads:findAll:${JSON.stringify(safeFilters)}`;
+    const safeFilters = this.normalize(filters);
+    const cacheKey = this.key({ scope: 'findAll', ...safeFilters });
 
     // Try cache first
     const cached =
@@ -97,23 +146,34 @@ export class AdsService {
       );
     if (cached) return cached;
 
-    const {
+    let {
       page = 1,
       limit = 20,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
       search,
     } = filters;
-
-    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-
-    // Filters ignored: remove identity helpers and match builders
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
 
     // ------- Pipeline -------
     const pipeline: any[] = [];
+
+    // Base visibility: show everything when no filters (except soft-deleted)
+    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+
     // Optional category filter
     if (filters.category) {
       pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // Optional search: prefer $text if you have a text index; fallback could be regex
+    if (search && `${search}`.trim()) {
+      pipeline.push({ $match: { $text: { $search: `${search}`.trim() } } });
     }
 
     // user
@@ -349,7 +409,7 @@ export class AdsService {
     }
 
     // ----- Sorting -----
-    pipeline.push({ $sort: { [sortBy]: sortDirection } });
+    pipeline.push({ $sort: { [sortField]: sortDirection } });
 
     // Clean up manufacturer lookup arrays from output
     pipeline.push({
@@ -367,7 +427,9 @@ export class AdsService {
       },
     });
 
-    const result = await this.adModel.aggregate(pipeline);
+    const result = await this.adModel
+      .aggregate(pipeline)
+      .collation({ locale: 'en', strength: 2 });
     const data = result?.[0]?.data ?? [];
     const total = result?.[0]?.total?.[0]?.count ?? 0;
 
@@ -390,15 +452,18 @@ export class AdsService {
       hasPrev: page > 1,
     };
 
-    // Cache for 120 seconds
-    await this.redisService.cacheSet(cacheKey, response, 120);
+    // Cache list
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
     return response;
   }
 
   /** ---------- FIND ONE ---------- */
   async findOne(id: string): Promise<AdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
     const pipeline = [
-      { $match: { _id: new Types.ObjectId(id) } },
+      { $match: { _id: new Types.ObjectId(id), isDeleted: { $ne: true } } },
       {
         $lookup: {
           from: 'users',
@@ -454,14 +519,19 @@ export class AdsService {
   async findByIds(ids: string[]): Promise<AdResponseDto[]> {
     if (!ids || ids.length === 0) return [];
 
-    const cacheKeys = ids.map((id) => `ads:getById:${id}`);
+    const validIds = ids.filter((x) => this.isValidId(x));
+    if (validIds.length === 0) return [];
+
+    const cacheKeys = validIds.map(
+      (id) => `${AdsService.CACHE_PREFIX}getById:${id}:anonymous`,
+    );
     const cachedResults = await Promise.all(
       cacheKeys.map((key) =>
         this.redisService.cacheGet<DetailedAdResponseDto>(key),
       ),
     );
 
-    const uncachedIds = ids.filter((_, i) => !cachedResults[i]);
+    const uncachedIds = validIds.filter((_, i) => !cachedResults[i]);
     const cachedAds = cachedResults.filter(Boolean) as DetailedAdResponseDto[];
 
     if (uncachedIds.length === 0) {
@@ -470,14 +540,14 @@ export class AdsService {
 
     const objectIds = uncachedIds.map((x) => new Types.ObjectId(x));
     const uncachedAds = await this.adModel
-      .find({ _id: { $in: objectIds } })
+      .find({ _id: { $in: objectIds }, isDeleted: { $ne: true } })
       .populate('postedBy', 'name email phone')
       .exec();
 
     const adsToCache = uncachedAds.map((ad) => ({
-      key: `ads:getById:${ad._id}`,
+      key: `${AdsService.CACHE_PREFIX}getById:${ad._id}:anonymous`,
       data: this.mapToResponseDto(ad),
-      ttl: 900,
+      ttl: AdsService.TTL.BY_ID,
     }));
     await Promise.all(
       adsToCache.map(({ key, data, ttl }) =>
@@ -493,14 +563,17 @@ export class AdsService {
 
   /** ---------- GET BY ID (detailed + cache) ---------- */
   async getAdById(id: string, userId?: string): Promise<DetailedAdResponseDto> {
-    const cacheKey = `ads:getById:${id}:${userId || 'anonymous'}`;
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+    const cacheKey = `${AdsService.CACHE_PREFIX}getById:${id}:${userId || 'anonymous'}`;
     const cached =
       await this.redisService.cacheGet<DetailedAdResponseDto>(cacheKey);
     if (cached) return cached;
 
     // Basic pipeline with core lookups
     const pipeline = [
-      { $match: { _id: new Types.ObjectId(id) } },
+      { $match: { _id: new Types.ObjectId(id), isDeleted: { $ne: true } } },
       // User information
       {
         $lookup: {
@@ -582,7 +655,7 @@ export class AdsService {
       detailed.reviews = ratings.reviews;
     }
 
-    await this.redisService.cacheSet(cacheKey, detailed, 900);
+    await this.redisService.cacheSet(cacheKey, detailed, AdsService.TTL.BY_ID);
     return detailed;
   }
 
@@ -936,6 +1009,9 @@ export class AdsService {
     userId: string,
     userType?: string,
   ): Promise<AdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
     // Allow if owner or Super Admin
     const ad = await this.adModel.findById(id);
     console.log('id', id);
@@ -993,6 +1069,9 @@ export class AdsService {
   }
 
   async delete(id: string, userId: string, userType?: string): Promise<void> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
     // First, find the ad to check if it exists
     const ad = await this.adModel.findById(id);
     if (!ad) {
@@ -1021,12 +1100,20 @@ export class AdsService {
   /** ---------- REDIS / CACHING UTILS ---------- */
   private async invalidateAdCache(adId?: string): Promise<void> {
     try {
-      const keys = await this.redisService.keys('ads:findAll:*');
+      const keys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}findAll*`,
+      );
       if (keys.length > 0) {
         await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
       }
       if (adId) {
-        await this.redisService.cacheDel(`ads:getById:${adId}`);
+        // delete all per-user variants
+        const idKeys = await this.redisService.keys(
+          `${AdsService.CACHE_PREFIX}getById:${adId}:*`,
+        );
+        if (idKeys?.length) {
+          await Promise.all(idKeys.map((k) => this.redisService.cacheDel(k)));
+        }
       }
     } catch (err) {
       // eslint-disable-next-line no-console
