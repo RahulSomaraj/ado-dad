@@ -1,30 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="17" failures="5" errors="0" time="14.932">
-  <testsuite name="Users API (e2e)" errors="0" failures="5" skipped="0" timestamp="2025-08-31T10:12:11" time="14.797" tests="17">
-    <testcase classname="Users API (e2e) › POST /users (create)" name="creates a user (201, response shape)" time="1.285">
-      <failure>Error: expect(received).toBeDefined()
-
-Received: undefined
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:116:29)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="Users API (e2e) › POST /users (create)" name="validates email/phone/password (400)" time="0.022">
-    </testcase>
-    <testcase classname="Users API (e2e) › POST /users/with-profile-picture (multipart)" name="accepts valid image upload" time="0.016">
+<testsuites name="jest tests" tests="17" failures="5" errors="0" time="16.243">
+  <testsuite name="Users API (e2e)" errors="0" failures="5" skipped="0" timestamp="2025-08-31T10:16:06" time="16.088" tests="17">
+    <testcase classname="Users API (e2e) › POST /users (create)" name="creates a user (201, response shape)" time="0.067">
       <failure>Error: expect(received).toContain(expected) // indexOf
 
 Expected value: 400
 Received array: [200, 201]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:148:26)
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:104:26)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Users API (e2e) › POST /users/with-profile-picture (multipart)" name="rejects invalid file type/oversize" time="0.008">
+    <testcase classname="Users API (e2e) › POST /users (create)" name="validates email/phone/password (400)" time="0.014">
     </testcase>
-    <testcase classname="Users API (e2e) › GET /users (list)" name="requires admin roles (401/403)" time="0.061">
+    <testcase classname="Users API (e2e) › POST /users/with-profile-picture (multipart)" name="accepts valid image upload" time="0.02">
+      <failure>Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 400
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:155:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Users API (e2e) › GET /users (list)" name="returns paginated list with filters/sort when admin" time="0.057">
+    <testcase classname="Users API (e2e) › POST /users/with-profile-picture (multipart)" name="rejects invalid file type/oversize" time="0.014">
     </testcase>
-    <testcase classname="Users API (e2e) › GET /users (list)" name="basic caching behavior (repeat same query)" time="0.103">
+    <testcase classname="Users API (e2e) › GET /users (list)" name="requires admin roles (401/403)" time="0.072">
+    </testcase>
+    <testcase classname="Users API (e2e) › GET /users (list)" name="returns paginated list with filters/sort when admin" time="0.096">
+    </testcase>
+    <testcase classname="Users API (e2e) › GET /users (list)" name="basic caching behavior (repeat same query)" time="0.335">
     </testcase>
     <testcase classname="Users API (e2e) › GET /users/:id" name="returns 200 for existing (admin) and 404 for missing" time="0">
     </testcase>
@@ -32,23 +33,23 @@ Received array: [200, 201]
     </testcase>
     <testcase classname="Users API (e2e) › PUT /users/:id (update)" name="allows self-update for normal user" time="0">
     </testcase>
-    <testcase classname="Users API (e2e) › PUT /users/:id (update)" name="rejects unauthorized update to another user (403)" time="0">
+    <testcase classname="Users API (e2e) › PUT /users/:id (update)" name="rejects unauthorized update to another user (403)" time="0.001">
     </testcase>
     <testcase classname="Users API (e2e) › PATCH /users/:id/password" name="requires admin by decorator (normal user likely 403)" time="0">
     </testcase>
     <testcase classname="Users API (e2e) › PATCH /users/:id/password" name="admin can change target user password" time="0">
     </testcase>
-    <testcase classname="Users API (e2e) › DELETE /users/:id" name="soft-deletes user and invalidates caches" time="0">
+    <testcase classname="Users API (e2e) › DELETE /users/:id" name="soft-deletes user and invalidates caches" time="0.001">
     </testcase>
-    <testcase classname="Users API (e2e) › OTP endpoints" name="send-otp works for admin and enforces rate limit" time="0.144">
+    <testcase classname="Users API (e2e) › OTP endpoints" name="send-otp works for admin and enforces rate limit" time="0.286">
       <failure>Error: expect(received).toContain(expected) // indexOf
 
 Expected value: 404
 Received array: [200]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:331:12)
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:338:12)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:331:40
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:338:40
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
     at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
     at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)
@@ -58,9 +59,9 @@ Received array: [200]
     at emitCloseNT (node:net:2344:8)
     at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Users API (e2e) › OTP endpoints" name="verify-otp handles success/failure" time="0.143">
+    <testcase classname="Users API (e2e) › OTP endpoints" name="verify-otp handles success/failure" time="0.269">
       <failure>Error: expected 200 &quot;OK&quot;, got 404 &quot;Not Found&quot;
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:349:10)
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:356:10)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ----
     at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:252:14)
@@ -73,15 +74,15 @@ Received array: [200]
     at emitCloseNT (node:net:2344:8)
     at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Users API (e2e) › POST /users/profile-picture" name="updates profile picture for authenticated user" time="0.435">
+    <testcase classname="Users API (e2e) › POST /users/profile-picture" name="updates profile picture for authenticated user" time="0.212">
       <failure>Error: expect(received).toContain(expected) // indexOf
 
 Expected value: 400
 Received array: [200, 401, 403]
-    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:399:10)
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:406:10)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ----
-    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:399:48
+    at C:\personal\personal\ado-dad-repo\ado-dad\test\users.e2e-spec.ts:406:48
     at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:308:13
     at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:285:13)
     at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:164:23)

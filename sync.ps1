@@ -1,5 +1,5 @@
 # === sync.ps1 ===
-$source = "C:\personal\personal\ado-dad-repo\ado-dad\socket-chat.html"
+$source = "C:\personal\personal\ado-dad-repo\ado-dad\reports\e2e-test-report.html"
 $dest   = "D:\personal\personal\ado-dad-repo\ado-dad-chat\second.html"
 
 Write-Host "Watching $source ... syncing to $dest"
