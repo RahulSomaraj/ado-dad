@@ -11,7 +11,7 @@ export class User extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   phoneNumber: string;
 
   @Prop({ required: true })
@@ -49,6 +49,12 @@ export class User extends Document {
 
 // Create the schema for the User class
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Indexes for performance
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ phoneNumber: 1 }, { unique: true });
+UserSchema.index({ name: 'text', email: 'text', phoneNumber: 'text' });
+
 
 // Pre-save hook to hash password before saving
 UserSchema.pre('save', async function (next) {

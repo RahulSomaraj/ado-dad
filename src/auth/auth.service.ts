@@ -132,14 +132,6 @@ export class AuthService {
         console.log('✅ Password matches bcrypt hash');
         return true;
       }
-
-      // Check if password matches OTP (for temporary access)
-      if (user.otp && user.otp === password) {
-        console.log('✅ Password matches OTP');
-        this.logger.debug(`OTP used for user: ${user.email}`);
-        return true;
-      }
-
       console.log('❌ Password validation failed - no matches found');
       return false;
     } catch (error) {

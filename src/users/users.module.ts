@@ -6,12 +6,19 @@ import { User, UserSchema } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { S3Service } from '../shared/s3.service';
 import { RedisService } from '../shared/redis.service';
+import {
+  AuthTokens,
+  AuthTokensSchema,
+} from '../auth/schemas/schema.refresh-token';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'User', schema: UserSchema }]), // Register User schema here
+    MongooseModule.forFeature([
+      { name: 'User', schema: UserSchema },
+      { name: AuthTokens.name, schema: AuthTokensSchema },
+    ]),
   ],
-  providers: [UsersService, EmailService, S3Service, RedisService], // Add S3Service and Redis
+  providers: [UsersService, EmailService, S3Service, RedisService],
   controllers: [UsersController],
 })
 export class UsersModule {}

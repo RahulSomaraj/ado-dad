@@ -123,7 +123,7 @@ export class ChatService {
     };
   }
 
-  private async getAdById(adId: string) {
+  public async getAdById(adId: string) {
     console.log(`🔍 Looking up ad with ID: ${adId}`);
     try {
       const ad = await this.adModel.findById(adId);
@@ -338,18 +338,22 @@ export class ChatService {
     );
   }
 
-  async findChatByParticipants(participants: string[], contextType: string, contextId: string) {
-    const participantIds = participants.map(p => new Types.ObjectId(p));
-    
+  async findChatByParticipants(
+    participants: string[],
+    contextType: string,
+    contextId: string,
+  ) {
+    const participantIds = participants.map((p) => new Types.ObjectId(p));
+
     const chat = await this.chatModel
       .findOne({
         participants: { $all: participantIds },
         contextType,
-        contextId
+        contextId,
       })
       .populate('participants', 'name email')
       .exec();
-    
+
     return chat;
   }
 }

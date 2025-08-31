@@ -25,7 +25,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
       ignoreExpiration: false,
-      secretOrKey: process.env.TOKEN_KEY || 'default-secret', // Ensure environment variable is set
+      secretOrKey: (() => { const s = process.env.TOKEN_KEY; if (!s) { throw new Error('TOKEN_KEY is required for RefreshTokenStrategy'); } return s; })(),
     });
   }
 

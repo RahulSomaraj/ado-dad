@@ -9,11 +9,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
 
 import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
 import { EncryptionUtil } from '../common/encryption.util';
+import { AuthTokens } from '../auth/schemas/schema.refresh-token';
 import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -38,6 +40,7 @@ export class UsersService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    @InjectModel(AuthTokens.name) private readonly authTokenModel: Model<AuthTokens>,
   ) {}
 
   /**
@@ -63,15 +66,9 @@ export class UsersService {
 
       // Add search functionality
       if (search?.trim()) {
-        const escapedSearch = this.escapeRegex(search.trim());
-        const regexPattern = `.*${escapedSearch}.*`;
-
-        query.$or = [
-          { name: { $regex: regexPattern, $options: 'i' } },
-          { email: { $regex: regexPattern, $options: 'i' } },
-          { phoneNumber: { $regex: regexPattern, $options: 'i' } },
-        ];
+        query.$text = { $search: search.trim() } as any;
       }
+
 
       // Apply role-based filtering
       if (currentUser.type === UserType.SUPER_ADMIN) {
@@ -336,6 +333,17 @@ export class UsersService {
   async sendOTP(email: string): Promise<{ message: string }> {
     try {
       this.logger.log(`Sending OTP to: ${email}`);
+      // Throttle OTP sends per email (max 5 per 10 minutes)
+      try {
+        const count = await this.redisService.incrementRateLimit(`send_otp:${email.toLowerCase()}`, 600);
+        if (count > 5) {
+          throw new BadRequestException('Too many OTP requests. Please try again later.');
+        }
+      } catch (e) {
+        // If Redis unavailable, continue without rate limit
+        this.logger.warn('Rate limit check failed (Redis down?)');
+      }
+
 
       const user = await this.userModel
         .findOne({
@@ -552,6 +560,45 @@ export class UsersService {
       }
     } catch (e) {
       this.logger.warn('Failed to invalidate users list caches', e as any);
+    }
+  }
+
+
+  /**
+   * Change user password.
+   */
+  async changePassword(id: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user || (user as any).isDeleted) {
+      throw new NotFoundException('User not found or deleted');
+    }
+    const ok = await bcrypt.compare(currentPassword, (user as any).password);
+    if (!ok) {
+      throw new BadRequestException('Current password incorrect');
+    }
+    this.assertStrongPassword(newPassword);
+    (user as any).password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    try {
+      await this.authTokenModel.deleteMany({ userId: user._id }).exec();
+    } catch (e) {
+      this.logger.warn('Failed to revoke refresh tokens after password change', e as any);
+    }
+    await this.redisService.cacheDel(`users:byId:${id}`);
+    await this.invalidateUsersListCaches();
+    return { message: 'Password changed successfully' };
+  }
+
+  private assertStrongPassword(pw: string) {
+    if (typeof pw !== 'string' || pw.length < 12) {
+      throw new BadRequestException('Password must be at least 12 characters long');
+    }
+    const hasUpper = /[A-Z]/.test(pw);
+    const hasLower = /[a-z]/.test(pw);
+    const hasDigit = /\d/.test(pw);
+    const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+    if (!(hasUpper && hasLower && hasDigit && hasSpecial)) {
+      throw new BadRequestException('Password must include upper, lower, number, and special character');
     }
   }
 }

@@ -15,6 +15,8 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  ForbiddenException,
+  Patch,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -78,7 +80,10 @@ export class UsersController {
       required: ['name', 'phoneNumber', 'email', 'password', 'type'],
     },
   })
-  @ApiResponse({ status: 201, description: 'User created with profile picture' })
+  @ApiResponse({
+    status: 201,
+    description: 'User created with profile picture',
+  })
   @UseInterceptors(FileInterceptor('profilePic'))
   async createUserWithProfilePicture(
     @Body() userData: CreateUserWithFileDto,
@@ -99,16 +104,25 @@ export class UsersController {
       try {
         profilePicUrl = await this.s3Service.uploadFile(profilePic);
       } catch (error) {
-        console.log('S3 upload failed, falling back to local storage:', error.message);
+        console.log(
+          'S3 upload failed, falling back to local storage:',
+          error.message,
+        );
         // Fallback to local storage
-        const uploadsDir = require('path').join(__dirname, '..', '..', 'public', 'uploads');
+        const uploadsDir = require('path').join(
+          __dirname,
+          '..',
+          '..',
+          'public',
+          'uploads',
+        );
         const fs = require('fs');
         const { v4: uuidv4 } = require('uuid');
-        
+
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
-        
+
         const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
         const filePath = require('path').join(uploadsDir, uniqueFileName);
         fs.writeFileSync(filePath, profilePic.buffer);
@@ -155,13 +169,58 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async updateUser(@Param('id') id: string, @Body() updateData: UpdateUserDto) {
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateData: UpdateUserDto,
+    @Request() req,
+  ) {
+    const actor = req.user;
+    if (!actor) {
+      throw new ForbiddenException();
+    }
+    const isAdmin =
+      actor.type === UserType.SUPER_ADMIN || actor.type === UserType.ADMIN;
+    if (!isAdmin && actor.id !== id && actor._id !== id) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
     return this.usersService.updateUser(id, updateData);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Patch(':id/password')
+  @ApiBody({
+    description: 'Change password',
+    schema: {
+      type: 'object',
+      properties: {
+        currentPassword: { type: 'string' },
+        newPassword: { type: 'string' },
+      },
+      required: ['currentPassword', 'newPassword'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Password changed' })
+  async changePassword(
+    @Param('id') id: string,
+    @Body() body: { currentPassword: string; newPassword: string },
+    @Request() req,
+  ) {
+    const actor = req.user;
+    const isAdmin =
+      actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
+    if (!isAdmin && actor?.id !== id && actor?._id !== id) {
+      throw new ForbiddenException('You can only change your own password');
+    }
+    return this.usersService.changePassword(
+      id,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -228,16 +287,25 @@ export class UsersController {
     try {
       profilePicUrl = await this.s3Service.uploadFile(profilePic);
     } catch (error) {
-      console.log('S3 upload failed, falling back to local storage:', error.message);
+      console.log(
+        'S3 upload failed, falling back to local storage:',
+        error.message,
+      );
       // Fallback to local storage
-      const uploadsDir = require('path').join(__dirname, '..', '..', 'public', 'uploads');
+      const uploadsDir = require('path').join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        'uploads',
+      );
       const fs = require('fs');
       const { v4: uuidv4 } = require('uuid');
-      
+
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
-      
+
       const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
       const filePath = require('path').join(uploadsDir, uniqueFileName);
       fs.writeFileSync(filePath, profilePic.buffer);
@@ -245,6 +313,8 @@ export class UsersController {
     }
 
     // Update user profile picture
-    return this.usersService.updateUser(req.user.id, { profilePic: profilePicUrl });
+    return this.usersService.updateUser(req.user.id, {
+      profilePic: profilePicUrl,
+    });
   }
 }

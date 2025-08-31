@@ -9,13 +9,16 @@ import { User } from '../../users/schemas/user.schema';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {
+    const secret = process.env.TOKEN_KEY;
+    if (!secret) {
+      throw new Error('TOKEN_KEY is required for JWTStrategy');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        process.env.TOKEN_KEY || 'default-secret-key-change-in-production',
+      secretOrKey: secret,
     });
-  }
+}
 
   async validate(payload: any) {
     // 🔹 Check if user exists

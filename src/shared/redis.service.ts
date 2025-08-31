@@ -62,7 +62,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error);
-      throw error;
+      // Do not crash app if Redis is down; continue in degraded mode.
     }
   }
 
