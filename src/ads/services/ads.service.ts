@@ -457,6 +457,202 @@ export class AdsService {
     return response;
   }
 
+  /** ---------- GET USER ADS ---------- */
+  async getUserAds(
+    userId: string,
+    filters: { page?: number; limit?: number } = {},
+  ): Promise<PaginatedDetailedAdResponseDto> {
+    if (!this.isValidId(userId)) {
+      throw new BadRequestException(`Invalid user ID: ${userId}`);
+    }
+
+    // Build deterministic cache key
+    const safeFilters = this.normalize({ ...filters, userId });
+    const cacheKey = this.key({ scope: 'getUserAds', ...safeFilters });
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    let { page = 1, limit = 20 } = filters;
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // ------- Pipeline -------
+    const pipeline: any[] = [];
+
+    // Match user's ads only
+    pipeline.push({
+      $match: {
+        postedBy: new Types.ObjectId(userId),
+        isDeleted: { $ne: true },
+      },
+    });
+
+    // User lookup
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
+
+    // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
+    // Property
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'propertyDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          propertyDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$propertyDetails' }, 0] },
+              then: '$propertyDetails',
+              else: '$propertyDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Vehicle
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'vehicleDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          vehicleDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$vehicleDetails' }, 0] },
+              then: '$vehicleDetails',
+              else: '$vehicleDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Commercial Vehicle
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'commercialVehicleDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          commercialVehicleDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$commercialVehicleDetails' }, 0] },
+              then: '$commercialVehicleDetails',
+              else: '$commercialVehicleDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: {
+          path: '$commercialVehicleDetails',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    // ----- Sorting by createdAt DESC -----
+    pipeline.push({ $sort: { createdAt: -1 } });
+
+    // ----- Pagination -----
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const result = await this.adModel
+      .aggregate(pipeline)
+      .collation({ locale: 'en', strength: 2 });
+    const data = result?.[0]?.data ?? [];
+    const total = result?.[0]?.total?.[0]?.count ?? 0;
+
+    const dtoData = data.map((ad: any) => {
+      const dto = this.mapToResponseDto(ad);
+      dto.year =
+        ad.vehicleDetails?.[0]?.year ??
+        ad.commercialVehicleDetails?.[0]?.year ??
+        null;
+      return dto;
+    });
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNext: page * limit < total,
+      hasPrev: page > 1,
+    };
+
+    // Cache user ads list
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
+  }
+
   /** ---------- FIND ONE ---------- */
   async findOne(id: string): Promise<AdResponseDto> {
     if (!this.isValidId(id)) {

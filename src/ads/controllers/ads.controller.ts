@@ -908,4 +908,60 @@ export class AdsController {
     const result = await this.dataValidationService.cleanupOrphanedAds();
     return result;
   }
+
+  @Post('my-ads')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Get current user's advertisements",
+    description: `
+      Retrieve all advertisements posted by the currently authenticated user.
+      
+      **Features:**
+      - Returns all ads posted by the authenticated user
+      - Includes detailed ad information
+      - Supports pagination
+      - Can filter by category and status
+      - Includes user information and ad statistics
+      
+      **Response includes:**
+      - Advertisement details
+      - Category-specific information
+      - User information
+      - Pagination metadata
+    `,
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Page number (default: 1)',
+          minimum: 1,
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of items per page (default: 20, max: 100)',
+          minimum: 1,
+          maximum: 100,
+        },
+      },
+    },
+    description: 'Pagination parameters for user advertisements',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User advertisements retrieved successfully',
+    type: PaginatedDetailedAdResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User not authenticated',
+  })
+  @ApiBearerAuth()
+  async getMyAds(@Request() req, @Body() filterDto: FilterAdDto = {}) {
+    const userId = req.user._id.toString();
+    return this.adsService.getUserAds(userId, filterDto);
+  }
 }
