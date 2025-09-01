@@ -20,6 +20,9 @@ export class TransmissionType {
   @Prop({ required: false })
   abbreviation?: string; // e.g., "MT", "AT", "AMT"
 
+  @Prop({ required: false })
+  type?: string; // e.g., 'manual', 'automatic', 'cvt', 'dual_clutch'
+
   @Prop({ default: true })
   isActive: boolean;
 

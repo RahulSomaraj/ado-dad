@@ -163,17 +163,17 @@ export class AdsService {
     // ------- Pipeline -------
     const pipeline: any[] = [];
 
+    // Optional search: prefer $text if you have a text index; fallback could be regex
+    if (search && `${search}`.trim()) {
+      pipeline.push({ $match: { $text: { $search: `${search}`.trim() } } });
+    }
+
     // Base visibility: show everything when no filters (except soft-deleted)
     pipeline.push({ $match: { isDeleted: { $ne: true } } });
 
     // Optional category filter
     if (filters.category) {
       pipeline.push({ $match: { category: filters.category } });
-    }
-
-    // Optional search: prefer $text if you have a text index; fallback could be regex
-    if (search && `${search}`.trim()) {
-      pipeline.push({ $match: { $text: { $search: `${search}`.trim() } } });
     }
 
     // user

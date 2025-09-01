@@ -9,7 +9,8 @@ import { LookupController } from './controllers/lookup.controller';
 import { AdsService } from './services/ads.service';
 import { DataValidationService } from './services/data-validation.service';
 import { LookupService } from './services/lookup.service';
-import { AdsSeedService } from './seed/seed-ads-data';
+
+import { EnhancedAdsSeedService } from './seed/enhanced-seed-ads';
 import { CommercialVehicleDetectionService } from './services/commercial-vehicle-detection.service';
 
 // Schemas
@@ -52,7 +53,8 @@ import { RedisService } from '../shared/redis.service';
     AdsService,
     DataValidationService,
     LookupService,
-    AdsSeedService,
+
+    EnhancedAdsSeedService,
     CommercialVehicleDetectionService,
     S3Service,
     RedisService,

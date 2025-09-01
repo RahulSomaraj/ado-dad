@@ -4,6 +4,10 @@
   "testEnvironment": "node",
   "testTimeout": 30000,
   "testRegex": ".e2e-spec.ts$",
+  "maxWorkers": 1,
+  "forceExit": true,
+  "detectOpenHandles": true,
+  "setupFilesAfterEnv": ["<rootDir>/jest-e2e-setup.js"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
@@ -36,5 +40,15 @@
         "outputPath": "./reports/e2e-test-summary.json"
       }
     ]
-  ]
+  ],
+  "globals": {
+    "NODE_ENV": "test",
+    "MONGODB_URI": "mongodb://localhost:27017/adodad_test",
+    "REDIS_CONFIG": {
+      "host": "localhost",
+      "port": 6379,
+      "db": 1,
+      "keyPrefix": "adodad_test:"
+    }
+  }
 }

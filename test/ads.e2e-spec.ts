@@ -34,17 +34,53 @@ describe('Ads API (e2e)', () => {
   });
 
   beforeEach(async () => {
-    // Clear test data before each test
-    await mongoConnection.db.collection('refreshtokens').deleteMany({});
-    await mongoConnection.db.collection('manufacturers').deleteMany({});
-    await mongoConnection.db.collection('vehiclemodels').deleteMany({});
-    await mongoConnection.db.collection('vehiclevariants').deleteMany({});
-    await mongoConnection.db.collection('fueltypes').deleteMany({});
-    await mongoConnection.db.collection('transmissiontypes').deleteMany({});
-    await mongoConnection.db.collection('ads').deleteMany({});
-    await mongoConnection.db.collection('vehicleads').deleteMany({});
-    await mongoConnection.db.collection('propertyads').deleteMany({});
-    await mongoConnection.db.collection('commercialvehicleads').deleteMany({});
+    // Clear test data before each test - ONLY test data
+    if (mongoConnection.db) {
+      // Only delete data created by tests (with test-specific identifiers)
+      await mongoConnection.db.collection('refreshtokens').deleteMany({
+        $or: [{ phone: '1234567890' }, { email: 'test@example.com' }],
+      });
+
+      await mongoConnection.db.collection('manufacturers').deleteMany({
+        name: 'test-manufacturer',
+      });
+
+      await mongoConnection.db.collection('vehiclemodels').deleteMany({
+        name: 'test-model',
+      });
+
+      await mongoConnection.db.collection('vehiclevariants').deleteMany({
+        name: 'test-variant',
+      });
+
+      await mongoConnection.db.collection('fueltypes').deleteMany({
+        name: 'petrol',
+      });
+
+      await mongoConnection.db.collection('transmissiontypes').deleteMany({
+        name: 'manual',
+      });
+
+      // Only delete ads created by test user
+      await mongoConnection.db.collection('ads').deleteMany({
+        $or: [
+          { title: { $regex: /^Test.*Ad$/ } },
+          { seller: { $exists: true } }, // This will be set to test user ID
+        ],
+      });
+
+      await mongoConnection.db.collection('vehicleads').deleteMany({
+        title: { $regex: /^Test.*Ad$/ },
+      });
+
+      await mongoConnection.db.collection('propertyads').deleteMany({
+        title: { $regex: /^Test.*Ad$/ },
+      });
+
+      await mongoConnection.db.collection('commercialvehicleads').deleteMany({
+        title: { $regex: /^Test.*Ad$/ },
+      });
+    }
 
     // Create a test user and login for authenticated tests
     const userData = {
@@ -60,12 +96,12 @@ describe('Ads API (e2e)', () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        phone: '1234567890',
+        username: '1234567890',
         password: 'testPassword123',
       });
 
-    authToken = loginResponse.body.access_token;
-    userId = loginResponse.body.user._id;
+    authToken = loginResponse.body.token;
+    userId = loginResponse.body.id;
 
     // Create required inventory data
     const manufacturerData = {

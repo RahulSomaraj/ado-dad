@@ -27,8 +27,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async connect() {
+    // If already connected, don't connect again
+    if (this.redisClient?.isReady) {
+      return;
+    }
+    await this._connect();
+  }
+
+  private async _connect() {
     try {
       const redisConfig = this.configService.get('REDIS_CONFIG');
+      const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID;
 
       this.redisClient = createClient({
         socket: {
@@ -45,21 +54,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.redisClient.on('connect', () => {
-        this.logger.log('Redis Client Connected');
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Connected');
+        }
       });
 
       this.redisClient.on('ready', () => {
-        this.logger.log('Redis Client Ready');
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Ready');
+        }
       });
 
       this.redisClient.on('end', () => {
-        this.logger.log('Redis Client Disconnected');
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Disconnected');
+        }
       });
 
       await this.redisClient.connect();
-      this.logger.log(
-        `Connected to Redis at ${redisConfig.host}:${redisConfig.port}`,
-      );
+      if (!isTestEnvironment) {
+        this.logger.log(
+          `Connected to Redis at ${redisConfig.host}:${redisConfig.port}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error);
       // Do not crash app if Redis is down; continue in degraded mode.

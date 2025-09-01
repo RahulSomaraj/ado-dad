@@ -20,6 +20,9 @@ export class FuelType {
   @Prop({ required: false })
   color?: string; // Hex color for UI representation
 
+  @Prop({ required: false })
+  category?: string; // e.g., 'liquid', 'gas', 'electric', 'hybrid'
+
   @Prop({ default: true })
   isActive: boolean;
 

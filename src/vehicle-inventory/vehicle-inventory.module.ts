@@ -3,7 +3,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { VehicleInventoryService } from './vehicle-inventory.service';
 import { VehicleInventoryController } from './vehicle-inventory.controller';
 import { ManufacturersController } from './manufacturers.controller';
-import { SeedDataService } from './seed/seed-data';
+
+import { SafeFuelTypeSeedService } from './seed/safe-seed-fuel-types';
+import { SafeTransmissionTypeSeedService } from './seed/safe-seed-transmission-types';
 import {
   VehicleModel,
   VehicleModelSchema,
@@ -19,6 +21,7 @@ import {
 } from './schemas/transmission-type.schema';
 import { RedisService } from '../shared/redis.service';
 import { ManufacturersModule } from './manufacturers.module';
+import { TestDataSafetyModule } from '../common/test-data-safety.module';
 
 @Module({
   imports: [
@@ -29,9 +32,19 @@ import { ManufacturersModule } from './manufacturers.module';
       { name: TransmissionType.name, schema: TransmissionTypeSchema },
     ]),
     ManufacturersModule,
+    TestDataSafetyModule,
   ],
   controllers: [VehicleInventoryController, ManufacturersController],
-  providers: [VehicleInventoryService, RedisService, SeedDataService],
-  exports: [VehicleInventoryService, SeedDataService],
+  providers: [
+    VehicleInventoryService,
+    RedisService,
+    SafeFuelTypeSeedService,
+    SafeTransmissionTypeSeedService,
+  ],
+  exports: [
+    VehicleInventoryService,
+    SafeFuelTypeSeedService,
+    SafeTransmissionTypeSeedService,
+  ],
 })
 export class VehicleInventoryModule {}
