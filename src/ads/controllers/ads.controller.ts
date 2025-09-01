@@ -945,9 +945,24 @@ export class AdsController {
           minimum: 1,
           maximum: 100,
         },
+        search: {
+          type: 'string',
+          description:
+            'Search term for title, manufacturer, model, or variant names',
+        },
+        sortBy: {
+          type: 'string',
+          description: 'Sort field (default: createdAt)',
+          enum: ['createdAt', 'title', 'price', 'updatedAt'],
+        },
+        sortOrder: {
+          type: 'string',
+          description: 'Sort order (default: DESC)',
+          enum: ['ASC', 'DESC'],
+        },
       },
     },
-    description: 'Pagination parameters for user advertisements',
+    description: 'Filter and pagination parameters for user advertisements',
     required: false,
   })
   @ApiResponse({
@@ -960,7 +975,17 @@ export class AdsController {
     description: 'Unauthorized - User not authenticated',
   })
   @ApiBearerAuth()
-  async getMyAds(@Request() req, @Body() filterDto: FilterAdDto = {}) {
+  async getMyAds(
+    @Request() req,
+    @Body()
+    filterDto: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
+  ) {
     const userId = req.user._id.toString();
     return this.adsService.getUserAds(userId, filterDto);
   }

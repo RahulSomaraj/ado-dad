@@ -460,7 +460,13 @@ export class AdsService {
   /** ---------- GET USER ADS ---------- */
   async getUserAds(
     userId: string,
-    filters: { page?: number; limit?: number } = {},
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
   ): Promise<PaginatedDetailedAdResponseDto> {
     if (!this.isValidId(userId)) {
       throw new BadRequestException(`Invalid user ID: ${userId}`);
@@ -477,7 +483,13 @@ export class AdsService {
       );
     if (cached) return cached;
 
-    let { page = 1, limit = 20 } = filters;
+    let {
+      page = 1,
+      limit = 20,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+    } = filters;
     page = this.clamp(Number(page) || 1, 1, 1e9);
     limit = this.clamp(Number(limit) || 20, 1, 100);
 
@@ -504,6 +516,46 @@ export class AdsService {
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
+
+    // Manufacturer lookup for search
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'manufacturers',
+          localField: 'vehicleDetails.manufacturerId',
+          foreignField: '_id',
+          as: 'manufacturerInfo',
+        },
+      },
+      {
+        $lookup: {
+          from: 'manufacturers',
+          localField: 'commercialVehicleDetails.manufacturerId',
+          foreignField: '_id',
+          as: 'commercialManufacturerInfo',
+        },
+      },
+    );
+
+    // Vehicle model and variant lookup for search
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehiclemodels',
+          localField: 'vehicleDetails.modelId',
+          foreignField: '_id',
+          as: 'vehicleModelInfo',
+        },
+      },
+      {
+        $lookup: {
+          from: 'vehiclevariants',
+          localField: 'vehicleDetails.variantId',
+          foreignField: '_id',
+          as: 'vehicleVariantInfo',
+        },
+      },
     );
 
     // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
@@ -612,8 +664,73 @@ export class AdsService {
       },
     );
 
-    // ----- Sorting by createdAt DESC -----
-    pipeline.push({ $sort: { createdAt: -1 } });
+    // ----- Search functionality -----
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      pipeline.push({
+        $match: {
+          $or: [
+            // Search in ad title
+            { title: { $regex: searchTerm, $options: 'i' } },
+            // Search in manufacturer names
+            { 'manufacturerInfo.name': { $regex: searchTerm, $options: 'i' } },
+            {
+              'manufacturerInfo.displayName': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialManufacturerInfo.name': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialManufacturerInfo.displayName': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in vehicle model names
+            { 'vehicleModelInfo.name': { $regex: searchTerm, $options: 'i' } },
+            {
+              'vehicleModelInfo.displayName': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in vehicle variant names
+            {
+              'vehicleVariantInfo.name': { $regex: searchTerm, $options: 'i' },
+            },
+            {
+              'vehicleVariantInfo.displayName': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // ----- Sorting -----
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+    // Clean up lookup arrays from output
+    pipeline.push({
+      $project: {
+        manufacturerInfo: 0,
+        commercialManufacturerInfo: 0,
+        vehicleModelInfo: 0,
+        vehicleVariantInfo: 0,
+      },
+    });
 
     // ----- Pagination -----
     pipeline.push({
