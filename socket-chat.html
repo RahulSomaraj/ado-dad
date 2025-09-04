@@ -1,15 +1,14 @@
+<!-- file: chat-system-tester.html -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chat Room Tester (NestJS Socket.IO Backend)</title>
-    <link rel="preconnect" href="https://cdn.socket.io" crossorigin />
-    <script
-      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
-      integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
-      crossorigin="anonymous"
-    ></script>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Complete Chat System Tester - NestJS Socket.IO (Pro)</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
       :root {
         --bg: #0b1220;
@@ -22,9 +21,9 @@
         --warn: #f39c12;
         --border: #22314d;
         --btn: #1a2640;
-        --btn2: #16233f;
-        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          'Liberation Mono', monospace;
+        --chat-bg: #0a0f1a;
+        --msg-sent: #1a3a2c;
+        --msg-received: #1a1a2e;
       }
       * {
         box-sizing: border-box;
@@ -38,9 +37,10 @@
           Segoe UI,
           Roboto,
           Arial,
-          'Noto Sans',
           sans-serif;
         margin: 0;
+        height: 100vh;
+        overflow: hidden;
       }
       header {
         padding: 18px 22px;
@@ -57,54 +57,22 @@
         font-size: 13px;
       }
       main {
-        padding: 16px;
-      }
-      .row {
         display: grid;
-        gap: 16px;
-        grid-template-columns: 1fr;
+        grid-template-columns: 420px 1fr;
+        height: calc(100vh - 92px);
       }
-      .grid-2 {
-        grid-template-columns: 1fr 1fr;
+      .sidebar {
+        width: 100%;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        overflow-y: auto;
       }
       .panel {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 10px;
         padding: 14px;
-      }
-      h2 {
-        margin: 0 0 10px 0;
-        font-size: 16px;
-      }
-      h3 {
-        margin: 14px 0 8px;
-        font-size: 14px;
-        color: var(--muted);
-      }
-      label {
-        display: block;
-        font-size: 12px;
-        color: var(--muted);
-        margin: 8px 0 4px;
-      }
-      input[type='text'],
-      input[type='password'],
-      input[type='number'],
-      textarea,
-      select {
-        width: 100%;
-        padding: 8px 10px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: #0c1525;
-        color: var(--text);
-        font-family: var(--mono);
-        font-size: 12px;
-      }
-      textarea {
-        min-height: 80px;
-        resize: vertical;
+        margin: 10px;
       }
       .rowline {
         display: grid;
@@ -118,7 +86,7 @@
         margin-top: 8px;
       }
       button {
-        background: linear-gradient(180deg, var(--btn), var(--btn2));
+        background: linear-gradient(180deg, var(--btn), #16233f);
         color: var(--text);
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -130,655 +98,1207 @@
         background: linear-gradient(180deg, #1d3a2c, #152d21);
         border-color: #1f4b34;
       }
-      button.warn {
-        background: linear-gradient(180deg, #3a301d, #2d2515);
-        border-color: #4b3d1f;
-      }
       button.bad {
         background: linear-gradient(180deg, #3a1d1d, #2d1515);
         border-color: #4b1f1f;
       }
-      .status {
+      input[type='text'],
+      input[type='password'],
+      input[type='number'] {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0c1525;
+        color: var(--text);
         font-size: 12px;
-        margin-left: 8px;
       }
-      .status.ok {
-        color: var(--ok);
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: var(--btn);
+        border-radius: 6px;
+        margin-bottom: 8px;
       }
-      .status.bad {
-        color: var(--bad);
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #fff;
+        font-size: 14px;
+      }
+      .user-details {
+        flex: 1;
+      }
+      .user-name {
+        font-weight: 500;
+        font-size: 13px;
+      }
+      .user-status {
+        font-size: 11px;
+        color: var(--muted);
       }
       .log {
         background: #0a1120;
         border: 1px dashed var(--border);
         padding: 10px;
         border-radius: 8px;
-        height: 220px;
+        height: 180px;
         overflow: auto;
-        font-family: var(--mono);
-        font-size: 12px;
+        font-family: monospace;
+        font-size: 11px;
         white-space: pre-wrap;
       }
-      .muted {
-        color: var(--muted);
+      .rooms-list {
+        display: grid;
+        gap: 6px;
       }
-      .small {
+      .room-pill {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        background: #0c1525;
+        color: var(--text);
         font-size: 12px;
       }
-      .divider {
-        height: 1px;
-        background: var(--border);
-        margin: 12px 0;
+      .room-pill.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
       }
-      .pill {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 999px;
-        font-size: 11px;
-        background: #0f1d36;
-        border: 1px solid var(--border);
+      .chat-area {
+        width: 100%;
+        background: var(--chat-bg);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .chat-pane {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        border-left: 1px solid var(--border);
+      }
+      .chat-pane:first-child {
+        border-left: none;
+        border-right: 1px solid var(--border);
+      }
+      .chat-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+      .chat-header h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .chat-header .sub {
+        margin: 2px 0 0;
         color: var(--muted);
+        font-size: 12px;
       }
-      @media (min-width: 980px) {
-        .row.grid-2 {
-          grid-template-columns: 1fr 1fr;
-        }
+      .chat-messages {
+        padding: 14px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .message {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        position: relative;
+      }
+      .message.sent {
+        background: var(--msg-sent);
+        border: 1px solid #1f4b34;
+        align-self: flex-end;
+        margin-left: auto;
+      }
+      .message.received {
+        background: var(--msg-received);
+        border: 1px solid #2a2a4e;
+        align-self: flex-start;
+        margin-right: auto;
+      }
+      .message .time {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+        text-align: right;
+      }
+      .message .sender {
+        font-size: 11px;
+        color: var(--accent);
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+      .chat-input {
+        padding: 12px;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
+        display: flex;
+        gap: 10px;
+      }
+      .chat-input input {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 25px;
+        border: 1px solid var(--border);
+        background: var(--chat-bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+      .no-chat {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--muted);
+        font-size: 16px;
+        text-align: center;
+      }
+      .overlay {
+        padding: 16px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .badge {
+        background: #e74c3c;
+        color: #fff;
+        border-radius: 999px;
+        padding: 2px 6px;
+        font-size: 10px;
       }
     </style>
   </head>
   <body>
     <header>
-      <h1>Chat Room Tester</h1>
+      <h1>Complete Chat System Tester</h1>
       <p>
-        For NestJS Socket.IO chat backend. Test chat room creation, joining, and
-        management.
+        Test auth, WebSocket connection, rooms, and real-time messaging (dual
+        panes with per-user room lists)
       </p>
     </header>
 
     <main>
-      <section class="panel">
-        <h2>Config (shared)</h2>
-        <div class="rowline">
-          <div>
-            <label
-              >HTTP Base URL (e.g. <code>http://localhost:5000</code>)</label
-            >
-            <input
-              id="httpUrl"
-              type="text"
-              placeholder="http://localhost:5000"
-            />
+      <div class="sidebar">
+        <div class="panel">
+          <h2>Configuration</h2>
+          <div class="rowline">
+            <div>
+              <label>HTTP Base URL</label
+              ><input
+                id="httpUrl"
+                type="text"
+                placeholder="http://localhost:5000"
+              />
+            </div>
+            <div>
+              <label>WebSocket Base URL</label
+              ><input
+                id="wsUrl"
+                type="text"
+                placeholder="http://localhost:5000"
+              />
+            </div>
           </div>
-          <div>
-            <label>WebSocket URL (same host)</label>
-            <input id="wsUrl" type="text" placeholder="http://localhost:5000" />
+          <div class="rowline">
+            <div>
+              <label>Ad ID (for testing)</label
+              ><input id="adId" type="text" placeholder="68b6... (ObjectId)" />
+            </div>
+            <div>
+              <label>ACK Timeout (ms)</label
+              ><input
+                id="ackTimeout"
+                type="number"
+                value="3000"
+                min="500"
+                step="100"
+              />
+            </div>
+          </div>
+          <div class="btns">
+            <button onclick="saveConfig()">Save Config</button>
+            <button onclick="clearLogs()">Clear Logs</button>
           </div>
         </div>
-        <div class="rowline">
-          <div>
-            <label>Ad ID (must be 24-character MongoDB ObjectId)</label>
-            <input
-              id="adId"
-              type="text"
-              placeholder="507f1f77bcf86cd799439011"
-              value="507f1f77bcf86cd799439011"
-            />
-          </div>
-          <div>
-            <label>Room ID (auto-filled after creation)</label>
-            <input
-              id="roomId"
-              type="text"
-              placeholder="chat_user123_ad456"
-              readonly
-            />
-          </div>
-        </div>
-        <div class="btns">
-          <button onclick="saveConfig()">Save Config</button>
-          <button onclick="clearLogs()">Clear Logs</button>
-          <span class="status muted"
-            >Tips: Serve this file via <code>npx serve</code> to avoid CORS
-            issues.</span
-          >
-        </div>
-        <div class="divider"></div>
-        <div class="small muted">
-          <strong>Available Events:</strong> createChatRoom, joinChatRoom,
-          leaveChatRoom, getUserChatRooms, ping<br />
-          <strong>Features:</strong> Chat room creation, joining, user
-          management, real-time notifications
-        </div>
-      </section>
 
-      <section class="row grid-2">
-        <div class="panel" id="panelA">
-          <h2>
-            User A
-            <span id="statusA" class="status">● disconnected</span>
-          </h2>
-          <div class="rowline">
-            <div>
-              <label>Username/Email</label>
-              <input
-                id="emailA"
-                type="text"
-                placeholder="user@example.com"
-                value="user@example.com"
-              />
-            </div>
-            <div>
-              <label>Password</label>
-              <input
-                id="passA"
-                type="password"
-                placeholder="••••••••"
-                value="123456"
-              />
+        <!-- User A -->
+        <div class="panel">
+          <h2>User A</h2>
+          <div class="user-info" id="userA-info">
+            <div class="user-avatar">A</div>
+            <div class="user-details">
+              <div class="user-name">Not Logged In</div>
+              <div class="user-status">● disconnected</div>
             </div>
           </div>
           <div class="rowline">
             <div>
-              <label>Access Token (auto-filled after login)</label>
-              <textarea
-                id="tokenA"
-                placeholder="eyJhbGciOi..."
-                readonly
-              ></textarea>
+              <label>Username</label
+              ><input id="emailA" type="text" placeholder="userA" />
             </div>
             <div>
-              <label>User ID (from token)</label>
-              <input
-                id="userIdA"
-                type="text"
-                placeholder="507f1f77bcf86cd799439011"
-                readonly
-              />
+              <label>Password</label
+              ><input id="passA" type="password" placeholder="••••••••" />
             </div>
           </div>
           <div class="btns">
-            <button onclick="login('A')" class="ok">Login</button>
-            <button onclick="logout('A')" class="bad">Logout</button>
-            <button onclick="decodeJwt('A')">Decode Token</button>
-          </div>
-          <div class="btns">
+            <button onclick="login('A')">Login</button>
             <button onclick="connectWS('A')" class="ok">Connect WS</button>
             <button onclick="disconnectWS('A')" class="bad">Disconnect</button>
-            <button onclick="ping('A')">Ping</button>
           </div>
           <div class="btns">
-            <button onclick="createChatRoom('A')" class="ok">
-              Create Chat Room
+            <button onclick="createAdChat('A')">Create Chat Room</button>
+            <button onclick="listChats('A')">List Chats</button>
+            <button onclick="testPing('A')" style="background: #f39c12">
+              Test Ping
             </button>
-            <button onclick="joinChatRoom('A')">Join Room</button>
-            <button onclick="leaveChatRoom('A')">Leave Room</button>
           </div>
-          <div class="btns">
-            <button onclick="getUserChatRooms('A')">Get My Chat Rooms</button>
-            <button onclick="getCurrentRoomInfo('A')">Room Info</button>
+          <div>
+            <h3 style="margin: 12px 0 6px 0">User A Rooms</h3>
+            <div id="chatRoomsA" class="rooms-list">
+              <div class="overlay">No rooms yet</div>
+            </div>
           </div>
-          <h3>Log</h3>
-          <div id="logA" class="log"></div>
         </div>
 
-        <div class="panel" id="panelB">
-          <h2>
-            User B
-            <span id="statusB" class="status">● disconnected</span>
-          </h2>
-          <div class="rowline">
-            <div>
-              <label>Username/Email</label>
-              <input
-                id="emailB"
-                type="text"
-                placeholder="user2@example.com"
-                value="user2@example.com"
-              />
-            </div>
-            <div>
-              <label>Password</label>
-              <input
-                id="passB"
-                type="password"
-                placeholder="••••••••"
-                value="123456"
-              />
+        <!-- User B -->
+        <div class="panel">
+          <h2>User B</h2>
+          <div class="user-info" id="userB-info">
+            <div class="user-avatar">B</div>
+            <div class="user-details">
+              <div class="user-name">Not Logged In</div>
+              <div class="user-status">● disconnected</div>
             </div>
           </div>
           <div class="rowline">
             <div>
-              <label>Access Token (auto-filled after login)</label>
-              <textarea
-                id="tokenB"
-                placeholder="eyJhbGciOi..."
-                readonly
-              ></textarea>
+              <label>Username</label
+              ><input id="emailB" type="text" placeholder="userB" />
             </div>
             <div>
-              <label>User ID (from token)</label>
-              <input
-                id="userIdB"
-                type="text"
-                placeholder="507f1f77bcf86cd799439012"
-                readonly
-              />
+              <label>Password</label
+              ><input id="passB" type="password" placeholder="••••••••" />
             </div>
           </div>
           <div class="btns">
-            <button onclick="login('B')" class="ok">Login</button>
-            <button onclick="logout('B')" class="bad">Logout</button>
-            <button onclick="decodeJwt('B')">Decode Token</button>
-          </div>
-          <div class="btns">
+            <button onclick="login('B')">Login</button>
             <button onclick="connectWS('B')" class="ok">Connect WS</button>
             <button onclick="disconnectWS('B')" class="bad">Disconnect</button>
-            <button onclick="ping('B')">Ping</button>
           </div>
           <div class="btns">
-            <button onclick="createChatRoom('B')" class="ok">
-              Create Chat Room
+            <button onclick="createAdChat('B')">Create Chat Room</button>
+            <button onclick="listChats('B')">List Chats</button>
+            <button onclick="testPing('B')" style="background: #f39c12">
+              Test Ping
             </button>
-            <button onclick="joinChatRoom('B')">Join Room</button>
-            <button onclick="leaveChatRoom('B')">Leave Room</button>
           </div>
-          <div class="btns">
-            <button onclick="getUserChatRooms('B')">Get My Chat Rooms</button>
-            <button onclick="getCurrentRoomInfo('B')">Room Info</button>
+          <div>
+            <h3 style="margin: 12px 0 6px 0">User B Rooms</h3>
+            <div id="chatRoomsB" class="rooms-list">
+              <div class="overlay">No rooms yet</div>
+            </div>
           </div>
-          <h3>Log</h3>
-          <div id="logB" class="log"></div>
         </div>
-      </section>
+
+        <!-- Logs -->
+        <div class="panel">
+          <h2>System Logs</h2>
+          <div class="btns">
+            <button onclick="clearLogs()">Clear Logs</button>
+            <button onclick="clearAllUnread()" style="background: #f39c12">
+              Clear Unread
+            </button>
+            <button
+              onclick="clearDuplicateMessages()"
+              style="background: #e67e22"
+            >
+              Clear Duplicates
+            </button>
+            <button onclick="forceRefreshPanes()" style="background: #3498db">
+              Force Refresh
+            </button>
+            <button onclick="addTestMessage()" style="background: #2ecc71">
+              Test Message
+            </button>
+            <button onclick="debugState()" style="background: #9b59b6">
+              Debug State
+            </button>
+          </div>
+          <div id="systemLog" class="log"></div>
+        </div>
+      </div>
+
+      <!-- Dual chat area -->
+      <div class="chat-area">
+        <!-- Pane A -->
+        <section class="chat-pane" id="paneA">
+          <div class="chat-header">
+            <h3>A’s View</h3>
+            <div class="sub" id="hdrA">Not connected</div>
+          </div>
+          <div class="chat-messages" id="chatMessagesA">
+            <div class="no-chat">
+              <div>
+                <h3>No Active Chat</h3>
+                <p>Select a room from User A list</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input
+              id="messageInputA"
+              type="text"
+              placeholder="A: Type your message..."
+            />
+            <button onclick="sendMessageFrom('A')">Send</button>
+          </div>
+        </section>
+
+        <!-- Pane B -->
+        <section class="chat-pane" id="paneB">
+          <div class="chat-header">
+            <h3>B’s View</h3>
+            <div class="sub" id="hdrB">Not connected</div>
+          </div>
+          <div class="chat-messages" id="chatMessagesB">
+            <div class="no-chat">
+              <div>
+                <h3>No Active Chat</h3>
+                <p>Select a room from User B list</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input
+              id="messageInputB"
+              type="text"
+              placeholder="B: Type your message..."
+            />
+            <button onclick="sendMessageFrom('B')">Send</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script>
-      // ====== Configurable events ======
-      window.EVENTS = {
+      /* =========================
+         ROUTES & EVENTS (MAPPED)
+         ========================= */
+      const EVENTS = {
         createChatRoom: 'createChatRoom',
         joinChatRoom: 'joinChatRoom',
         leaveChatRoom: 'leaveChatRoom',
+        sendMessage: 'sendMessage',
         getUserChatRooms: 'getUserChatRooms',
-        ping: 'ping',
+        message: 'message',
+        chatRoomCreated: 'chatRoomCreated',
+        userJoinedRoom: 'userJoinedRoom',
+        userLeftRoom: 'userLeftRoom',
       };
 
-      // ====== State ======
+      const REST = {
+        login: (base) => `${base}/auth/login`,
+        refresh: (base) => `${base}/refresh-token`,
+        messages: (base, roomId) =>
+          `${base}/chats/rooms/${encodeURIComponent(roomId)}/messages`,
+        markRead: (base, roomId) =>
+          `${base}/chats/rooms/${encodeURIComponent(roomId)}/reads`,
+        unreadCount: (base, roomId) =>
+          `${base}/chats/rooms/${encodeURIComponent(roomId)}/unread-count`,
+      };
+
+      /* ============== GLOBAL STATE ============== */
       const S = {
         httpUrl: localStorage.getItem('httpUrl') || 'http://localhost:5000',
         wsUrl: localStorage.getItem('wsUrl') || 'http://localhost:5000',
         adId: localStorage.getItem('adId') || '',
-        roomId: localStorage.getItem('roomId') || '',
-        A: { socket: null, currentRoom: null },
-        B: { socket: null, currentRoom: null },
+        ackTimeoutMs: Number(localStorage.getItem('ackTimeoutMs') || 3000),
+        currentChatRoom: { A: null, B: null },
+        users: {
+          A: {
+            socket: null,
+            token: '',
+            refreshToken: '',
+            userData: null,
+            connected: false,
+          },
+          B: {
+            socket: null,
+            token: '',
+            refreshToken: '',
+            userData: null,
+            connected: false,
+          },
+        },
+        chatRooms: { A: [], B: [] },
+        // messages per room: [{ id, content, senderId, timestamp }]
+        messages: {},
+        joinedRooms: { A: new Set(), B: new Set() },
+        unreadCounts: { A: {}, B: {} },
+        _listenersBound: false,
       };
 
-      // ====== Helpers ======
-      function el(id) {
-        return document.getElementById(id);
-      }
-      function log(side, msg) {
-        const box = el(side === 'A' ? 'logA' : 'logB');
-        const t = new Date().toLocaleTimeString();
-        box.textContent += `[${t}] ${msg}\n`;
+      /* ============== HELPERS ============== */
+      const el = (id) => document.getElementById(id);
+      function log(msg, type = 'INFO') {
+        const box = el('systemLog');
+        const ts = new Date().toLocaleTimeString();
+        box.textContent += `[${ts}] [${type}] ${msg}\n`;
         box.scrollTop = box.scrollHeight;
+        console.log(msg);
       }
-      function setStatus(side, ok, text) {
-        const s = el(side === 'A' ? 'statusA' : 'statusB');
-        s.textContent = `● ${text}`;
-        s.className = 'status ' + (ok ? 'ok' : 'bad');
+      function decodeJwtClaim(token, key) {
+        try {
+          const p = JSON.parse(atob(token.split('.')[1]));
+          return p?.[key] ?? null;
+        } catch {
+          return null;
+        }
       }
+      function normalizeId(v) {
+        if (!v) return '';
+        let s = String(v);
+        // handle ObjectId("...") or objects accidentally stringified
+        s = s.replace(/^ObjectId\("(.*)"\)$/, '$1');
+        return s.trim();
+      }
+      function isOwnForSide(side, senderId) {
+        const myId = normalizeId(S.users[side].userData?.id || '');
+        return myId && myId === normalizeId(senderId || '');
+      }
+      function formatTime(ts) {
+        try {
+          return new Date(ts).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        } catch {
+          return '';
+        }
+      }
+      function emitWithAck(socket, event, payload, timeoutMs = S.ackTimeoutMs) {
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          const t = setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              reject(new Error(`ACK timeout for ${event}`));
+            }
+          }, timeoutMs);
+          try {
+            if (event === 'getUserChatRooms') {
+              socket.lastGetUserChatRoomsResponse = null;
+              socket.emit(event, payload);
+              const check = setInterval(() => {
+                if (socket.lastGetUserChatRoomsResponse) {
+                  clearInterval(check);
+                  clearTimeout(t);
+                  settled = true;
+                  const resp = socket.lastGetUserChatRoomsResponse;
+                  socket.lastGetUserChatRoomsResponse = null;
+                  resolve(resp);
+                }
+              }, 100);
+              setTimeout(() => {
+                if (!settled) {
+                  clearInterval(check);
+                  settled = true;
+                  reject(
+                    new Error('Response event timeout for getUserChatRooms'),
+                  );
+                }
+              }, timeoutMs);
+            } else if (event === 'ping') {
+              socket.lastPingResponse = null;
+              socket.emit(event, payload);
+              const check = setInterval(() => {
+                if (socket.lastPingResponse) {
+                  clearInterval(check);
+                  clearTimeout(t);
+                  settled = true;
+                  const resp = socket.lastPingResponse;
+                  socket.lastPingResponse = null;
+                  resolve(resp);
+                }
+              }, 100);
+              setTimeout(() => {
+                if (!settled) {
+                  clearInterval(check);
+                  settled = true;
+                  reject(new Error('Response event timeout for ping'));
+                }
+              }, timeoutMs);
+            } else {
+              socket.emit(event, payload, (resp) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(t);
+                resolve(resp);
+              });
+            }
+          } catch (e) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(t);
+            reject(e);
+          }
+        });
+      }
+
+      /* ============== UI UPDATERS ============== */
+      function updateUserInfo(side, userData, connected) {
+        const holder = el(side === 'A' ? 'userA-info' : 'userB-info');
+        const nameEl = holder.querySelector('.user-name');
+        const statusEl = holder.querySelector('.user-status');
+        if (userData) {
+          nameEl.textContent =
+            userData.userName || userData.email || `User ${side}`;
+          statusEl.textContent = connected ? '● connected' : '● disconnected';
+          statusEl.style.color = connected ? '#2ecc71' : '#e74c3c';
+        } else {
+          nameEl.textContent = 'Not Logged In';
+          statusEl.textContent = '● disconnected';
+          statusEl.style.color = '#e74c3c';
+        }
+        el(side === 'A' ? 'hdrA' : 'hdrB').textContent = connected
+          ? `Connected as ${nameEl.textContent}`
+          : 'Not connected';
+        S.users[side].connected = connected;
+        S.users[side].userData = userData;
+      }
+
+      function updateChatRooms(side) {
+        const list = S.chatRooms[side] || [];
+        const container = el(side === 'A' ? 'chatRoomsA' : 'chatRoomsB');
+        if (!list.length) {
+          container.innerHTML = '<div class="overlay">No rooms yet</div>';
+          return;
+        }
+        container.innerHTML = list
+          .map((room) => {
+            const active =
+              S.currentChatRoom[side] === room.roomId
+                ? 'room-pill active'
+                : 'room-pill';
+            const unread = S.unreadCounts[side][room.roomId] || 0;
+            const badge =
+              unread > 0 ? `<span class="badge">${unread}</span>` : '';
+            return `<div class="${active}" onclick="selectChatRoom('${side}','${room.roomId}')">
+              <span>${room.roomId.slice(-8)}</span><span>${badge}</span></div>`;
+          })
+          .join('');
+      }
+
+      function renderMessagesFor(roomId, side) {
+        const pane = el(side === 'A' ? 'chatMessagesA' : 'chatMessagesB');
+
+        if (!S.users[side].userData) {
+          pane.innerHTML = `<div class="overlay">Login ${side} to view chat</div>`;
+          return;
+        }
+        if (!roomId) {
+          pane.innerHTML = `<div class="no-chat"><div><h3>No Active Chat</h3><p>Select a room from User ${side} list</p></div></div>`;
+          return;
+        }
+
+        const list = S.messages[roomId] || [];
+        if (!list.length) {
+          pane.innerHTML = `<div class="no-chat"><div><h3>No Messages Yet</h3><p>Start the conversation</p></div></div>`;
+          return;
+        }
+
+        pane.innerHTML = '';
+        for (const msg of list) {
+          const mine = isOwnForSide(side, msg.senderId);
+          const wrap = document.createElement('div');
+          wrap.className = `message ${mine ? 'sent' : 'received'}`;
+
+          const sender = document.createElement('div');
+          sender.className = 'sender';
+          if (mine) {
+            sender.textContent = 'You';
+          } else {
+            // show counterparty label per your two-user test bench
+            // if sender matches A, label "User A", else "User B"
+            const isA =
+              normalizeId(msg.senderId) === normalizeId(S.users.A.userData?.id);
+            sender.textContent = isA ? 'User A' : 'User B';
+          }
+
+          const body = document.createElement('div');
+          body.className = 'content';
+          body.textContent = msg.content;
+
+          const time = document.createElement('div');
+          time.className = 'time';
+          time.textContent = formatTime(msg.timestamp);
+
+          wrap.append(sender, body, time);
+          pane.appendChild(wrap);
+        }
+        pane.scrollTop = pane.scrollHeight;
+      }
+
+      function addMessageToState(roomId, { id, content, senderId, timestamp }) {
+        if (!roomId) return;
+        if (!S.messages[roomId]) S.messages[roomId] = [];
+
+        const ts = timestamp ? new Date(timestamp) : new Date();
+
+        // strong de-dupe: by backend id if present
+        if (id && S.messages[roomId].some((m) => m.id === id)) {
+          log(`⛔ duplicate by id skipped: ${id}`);
+          return;
+        }
+        // soft de-dupe: same content & sender within same second
+        const secKey = `${content}::${normalizeId(senderId)}::${Math.floor(ts.getTime() / 1000)}`;
+        if (
+          S.messages[roomId].some((m) => {
+            const mk = `${m.content}::${normalizeId(m.senderId)}::${Math.floor(new Date(m.timestamp).getTime() / 1000)}`;
+            return mk === secKey;
+          })
+        ) {
+          log(`⛔ duplicate by soft key skipped: ${content}`);
+          return;
+        }
+
+        S.messages[roomId].push({
+          id: id || null,
+          content,
+          senderId: normalizeId(senderId || ''),
+          timestamp: ts,
+        });
+        S.messages[roomId].sort(
+          (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+        );
+      }
+
+      /* ============== CONFIG & LOGS ============== */
       function saveConfig() {
         S.httpUrl = el('httpUrl').value.trim() || S.httpUrl;
         S.wsUrl = el('wsUrl').value.trim() || S.wsUrl;
         S.adId = el('adId').value.trim() || S.adId;
-        S.roomId = el('roomId').value.trim() || S.roomId;
+        S.ackTimeoutMs = Math.max(
+          200,
+          Number(el('ackTimeout').value) || S.ackTimeoutMs,
+        );
         localStorage.setItem('httpUrl', S.httpUrl);
         localStorage.setItem('wsUrl', S.wsUrl);
         localStorage.setItem('adId', S.adId);
-        localStorage.setItem('roomId', S.roomId);
-        alert('Saved config.');
-        runtimeWarnings();
+        localStorage.setItem('ackTimeoutMs', S.ackTimeoutMs);
+        log('Configuration saved');
       }
       function clearLogs() {
-        el('logA').textContent = '';
-        el('logB').textContent = '';
+        el('systemLog').textContent = '';
+        log('Logs cleared');
       }
-      function getUserId(side) {
-        return el(side === 'A' ? 'userIdA' : 'userIdB').value.trim();
-      }
-      function getToken(side) {
-        return el(side === 'A' ? 'tokenA' : 'tokenB').value.trim();
-      }
-      function setToken(side, token) {
-        el(side === 'A' ? 'tokenA' : 'tokenB').value = token || '';
-      }
-      function parseJwt(token) {
-        try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(
-            atob(base64)
-              .split('')
-              .map((c) => {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-              })
-              .join(''),
-          );
-          return JSON.parse(jsonPayload);
-        } catch (e) {
-          return null;
-        }
+      function clearAllUnread() {
+        S.unreadCounts.A = {};
+        S.unreadCounts.B = {};
+        updateChatRooms('A');
+        updateChatRooms('B');
+        log('All unread counts cleared');
       }
 
-      // ====== Authentication Functions ======
+      function clearDuplicateMessages() {
+        let total = 0;
+        for (const [roomId, messages] of Object.entries(S.messages)) {
+          const byId = new Set();
+          const bySoft = new Set();
+          const uniq = [];
+          for (const m of messages) {
+            const idKey = m.id ? `id:${m.id}` : null;
+            const softKey = `soft:${m.content}::${normalizeId(m.senderId)}::${Math.floor(new Date(m.timestamp).getTime() / 1000)}`;
+            if (idKey) {
+              if (byId.has(idKey)) continue;
+              byId.add(idKey);
+            } else {
+              if (bySoft.has(softKey)) continue;
+              bySoft.add(softKey);
+            }
+            uniq.push(m);
+          }
+          total += messages.length - uniq.length;
+          S.messages[roomId] = uniq;
+        }
+        if (total > 0) {
+          forceRefreshPanes();
+          log(`🧹 Removed ${total} duplicate messages total`);
+        } else log('🧹 No duplicate messages found');
+      }
+
+      function forceRefreshPanes() {
+        if (S.currentChatRoom.A && S.users.A.userData)
+          renderMessagesFor(S.currentChatRoom.A, 'A');
+        if (S.currentChatRoom.B && S.users.B.userData)
+          renderMessagesFor(S.currentChatRoom.B, 'B');
+      }
+      function addTestMessage() {
+        const roomId = S.currentChatRoom.A || S.currentChatRoom.B;
+        if (!roomId) {
+          log('⚠️ No room selected');
+          return;
+        }
+        const fromSide = S.currentChatRoom.A ? 'A' : 'B';
+        const senderId = S.users[fromSide].userData?.id;
+        const content = `Test message at ${new Date().toLocaleTimeString()}`;
+        addMessageToState(roomId, {
+          id: null,
+          content,
+          senderId,
+          timestamp: new Date(),
+        });
+        forceRefreshPanes();
+      }
+      function debugState() {
+        log('🔍 === DEBUG STATE ===');
+        log(
+          `Users: A=${JSON.stringify(S.users.A.userData)}, B=${JSON.stringify(S.users.B.userData)}`,
+        );
+        log(
+          `Current Rooms: A=${S.currentChatRoom.A}, B=${S.currentChatRoom.B}`,
+        );
+        for (const [rid, msgs] of Object.entries(S.messages)) {
+          log(`Room ${rid}: ${msgs.length} msgs`);
+        }
+        log('🔍 === END DEBUG ===');
+      }
+
+      /* ============== AUTH ============== */
       async function login(side) {
         const username = el(side === 'A' ? 'emailA' : 'emailB').value.trim();
         const password = el(side === 'A' ? 'passA' : 'passB').value;
-
         if (!username || !password) {
-          log(side, 'Please enter username and password');
+          log(`Enter ${side} username & password`, 'WARN');
           return;
         }
-
         try {
-          log(side, 'Logging in...');
-
-          const response = await fetch(`${S.httpUrl}/auth/login`, {
+          const res = await fetch(REST.login(S.httpUrl), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
           });
+          const data = await res.json();
+          if (!res.ok)
+            throw new Error(data?.error || data?.message || 'Login failed');
+          let token = data.token || data.access_token || data.accessToken || '';
+          if (token?.startsWith('Bearer ')) token = token.slice(7);
+          S.users[side].token = token;
+          S.users[side].refreshToken = data.refreshToken || '';
+          const userId =
+            data.id ||
+            decodeJwtClaim(token, 'id') ||
+            decodeJwtClaim(token, 'sub') ||
+            username;
+          S.users[side].userData = {
+            id: String(userId || ''),
+            userName: data.userName || username,
+            email: data.email || username,
+            userType: data.userType || 'user',
+          };
+          updateUserInfo(side, S.users[side].userData, false);
+          log(`User ${side} login OK`);
+        } catch (e) {
+          log(`Login ${side} failed: ${e.message}`, 'ERROR');
+        }
+      }
 
-          const data = await response.json();
+      /* ============== WEBSOCKET ============== */
+      function bindGlobalRoomListenersOnce(socket) {
+        if (S._listenersBound) return;
+        S._listenersBound = true;
 
-          if (response.ok) {
-            const token = data.access_token || data.token;
-            setToken(side, token);
+        socket.on(EVENTS.chatRoomCreated, (data) => {
+          log(`chatRoomCreated: ${JSON.stringify(data)}`);
+          refreshChatRooms('A');
+          refreshChatRooms('B');
+        });
+        socket.on(EVENTS.userJoinedRoom, (data) =>
+          log(`userJoinedRoom: ${JSON.stringify(data)}`),
+        );
+        socket.on(EVENTS.userLeftRoom, (data) =>
+          log(`userLeftRoom: ${JSON.stringify(data)}`),
+        );
 
-            // Extract user ID from token
-            const payload = parseJwt(token);
-            if (payload && payload.id) {
-              el(side === 'A' ? 'userIdA' : 'userIdB').value = payload.id;
-              log(side, `Login successful! User ID: ${payload.id}`);
-            } else {
-              log(
-                side,
-                'Login successful but could not extract user ID from token',
-              );
-            }
-          } else {
-            log(side, `Login failed: ${data.message || 'Unknown error'}`);
+        socket.on(EVENTS.message, (data) => {
+          const { roomId, content, senderId, createdAt, _id, id } = data || {};
+          if (!roomId) return;
+
+          // unify id & sender id
+          const msgId = id || _id || null;
+          const sId = normalizeId(senderId);
+
+          addMessageToState(roomId, {
+            id: msgId,
+            content,
+            senderId: sId,
+            timestamp: createdAt || new Date(),
+          });
+
+          // unread bumps for panes not on this room
+          if (S.currentChatRoom.A !== roomId && S.users.A.userData) {
+            S.unreadCounts.A[roomId] = (S.unreadCounts.A[roomId] || 0) + 1;
+            updateChatRooms('A');
           }
-        } catch (error) {
-          log(side, `Login error: ${error.message}`);
-        }
+          if (S.currentChatRoom.B !== roomId && S.users.B.userData) {
+            S.unreadCounts.B[roomId] = (S.unreadCounts.B[roomId] || 0) + 1;
+            updateChatRooms('B');
+          }
+
+          if (S.currentChatRoom.A === roomId && S.users.A.userData)
+            renderMessagesFor(roomId, 'A');
+          if (S.currentChatRoom.B === roomId && S.users.B.userData)
+            renderMessagesFor(roomId, 'B');
+        });
+
+        socket.on('getUserChatRoomsResponse', (data) => {
+          socket.lastGetUserChatRoomsResponse = data;
+        });
+        socket.on('pingResponse', (data) => {
+          socket.lastPingResponse = data;
+        });
       }
 
-      function logout(side) {
-        setToken(side, '');
-        el(side === 'A' ? 'userIdA' : 'userIdB').value = '';
-        log(side, 'Logged out');
-
-        // Disconnect socket if connected
-        const socket = S[side].socket;
-        if (socket && socket.connected) {
-          socket.disconnect();
-        }
-      }
-
-      function decodeJwt(side) {
-        const token = getToken(side);
-        if (!token) {
-          log(side, 'No token to decode');
-          return;
-        }
-
-        const payload = parseJwt(token);
-        if (payload) {
-          log(side, `JWT Payload: ${JSON.stringify(payload, null, 2)}`);
-        } else {
-          log(side, 'Invalid token format');
-        }
-      }
-
-      // ====== WebSocket Functions ======
       function connectWS(side) {
-        const token = getToken(side);
-        if (!token) {
-          alert('Please login first to get an access token.');
+        if (!S.users[side].token) {
+          log(`Login ${side} first`, 'WARN');
+          return;
+        }
+        if (S.users[side].socket?.connected) {
+          log(`User ${side} already connected`, 'WARN');
           return;
         }
 
-        if (typeof window.io !== 'function') {
-          setStatus(side, false, 'socket.io not loaded');
-          log(
-            side,
-            'Socket.IO client script not loaded or blocked. Ensure CDN is reachable.',
+        try {
+          const raw = S.users[side].token;
+          const bearer = `Bearer ${raw}`;
+          const socket = io(`${S.wsUrl}/chat`, {
+            transports: ['websocket', 'polling'],
+            auth: { token: raw },
+            extraHeaders: { Authorization: bearer },
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 10000,
+            autoConnect: false,
+            withCredentials: true,
+          });
+          S.users[side].socket = socket;
+
+          socket.on('connect', () => {
+            log(`WS ${side} connected: ${socket.id}`);
+            updateUserInfo(side, S.users[side].userData, true);
+            S.unreadCounts[side] = {};
+            for (const rid of S.joinedRooms[side])
+              socket.emit(EVENTS.joinChatRoom, { roomId: rid });
+          });
+          socket.on('disconnect', (reason) => {
+            log(`WS ${side} disconnected: ${reason}`);
+            updateUserInfo(side, S.users[side].userData, false);
+          });
+          socket.on('connect_error', (err) =>
+            log(`WS ${side} connect_error: ${err.message}`, 'ERROR'),
           );
-          return;
+          socket.on('connected', (payload) =>
+            log(`${side} connected event: ${JSON.stringify(payload)}`),
+          );
+
+          bindGlobalRoomListenersOnce(socket);
+          socket.connect();
+        } catch (e) {
+          log(`WS connect ${side} failed: ${e.message}`, 'ERROR');
         }
-
-        const socket = window.io(`${S.wsUrl}/chat`, {
-          transports: ['websocket'],
-          auth: { token: `Bearer ${token}` },
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-          timeout: 10000,
-          autoConnect: false,
-        });
-        S[side].socket = socket;
-
-        socket.on('connect', () => {
-          setStatus(side, true, 'connected #' + socket.id);
-          log(side, 'Connected ' + socket.id);
-        });
-
-        socket.on('connect_error', (err) => {
-          setStatus(side, false, 'connect_error');
-          try {
-            const details = {
-              message: err?.message,
-              description: err?.description,
-              data: err?.data,
-              type: err?.type,
-            };
-            log(side, 'Connect error: ' + JSON.stringify(details));
-          } catch (_) {
-            log(
-              side,
-              'Connect error: ' +
-                (err && err.message ? err.message : String(err)),
-            );
-          }
-        });
-
-        socket.on('disconnect', (reason) => {
-          setStatus(side, false, 'disconnected (' + reason + ')');
-          log(side, 'Disconnected: ' + reason);
-        });
-
-        socket.on('reconnect_attempt', (n) =>
-          log(side, 'Reconnect attempt #' + n),
-        );
-        socket.on('reconnect', (n) =>
-          log(side, 'Reconnected after attempts: ' + n),
-        );
-        socket.on('reconnect_error', (e) =>
-          log(side, 'Reconnect error: ' + (e?.message || e)),
-        );
-        socket.on('reconnect_failed', () => log(side, 'Reconnect failed'));
-
-        // Chat room events
-        socket.on('createChatRoomResponse', (data) => {
-          log(side, 'Create chat room response: ' + JSON.stringify(data));
-          if (data.success && data.chatRoom) {
-            S[side].currentRoom = data.chatRoom;
-            el('roomId').value = data.chatRoom.roomId;
-            S.roomId = data.chatRoom.roomId;
-            localStorage.setItem('roomId', S.roomId);
-          }
-        });
-
-        socket.on('chatRoomCreated', (data) => {
-          log(side, 'Chat room created event: ' + JSON.stringify(data));
-        });
-
-        socket.on('joinChatRoomResponse', (data) => {
-          log(side, 'Join chat room response: ' + JSON.stringify(data));
-        });
-
-        socket.on('leaveChatRoomResponse', (data) => {
-          log(side, 'Leave chat room response: ' + JSON.stringify(data));
-        });
-
-        socket.on('userChatRooms', (data) => {
-          log(side, 'User chat rooms: ' + JSON.stringify(data));
-        });
-
-        socket.on('userJoinedRoom', (data) => {
-          log(side, 'User joined room: ' + JSON.stringify(data));
-        });
-
-        socket.on('userLeftRoom', (data) => {
-          log(side, 'User left room: ' + JSON.stringify(data));
-        });
-
-        socket.on('connected', (data) => {
-          log(side, 'Connection confirmed: ' + JSON.stringify(data));
-        });
-
-        socket.on('pong', (data) => {
-          log(side, 'Pong received: ' + JSON.stringify(data));
-        });
-
-        socket.on('error', (e) => log(side, 'WS error: ' + JSON.stringify(e)));
-
-        socket.connect();
       }
 
       function disconnectWS(side) {
-        const s = S[side].socket;
-        if (s) {
-          s.disconnect();
-          S[side].socket = null;
+        if (S.users[side].socket) {
+          S.users[side].socket.disconnect();
+          S.users[side].socket = null;
         }
-        setStatus(side, false, 'disconnected');
-        log(side, 'Disconnected');
+        updateUserInfo(side, S.users[side].userData, false);
+        S.unreadCounts[side] = {};
+        S.currentChatRoom[side] = null;
+        renderMessagesFor(null, side);
+        updateChatRooms(side);
+        log(`User ${side} disconnected`);
       }
 
-      function ping(side) {
-        const s = S[side].socket;
-        if (!s || !s.connected) return alert('Connect WS first.');
-        s.emit(window.EVENTS.ping);
-        log(side, 'Ping sent');
-      }
+      /* ============== ROOMS & HISTORY ============== */
+      async function selectChatRoom(side, roomId) {
+        const prev = S.currentChatRoom[side];
+        if (prev && prev !== roomId) {
+          S.users[side].socket?.emit(EVENTS.leaveChatRoom, { roomId: prev });
+        }
+        S.currentChatRoom[side] = roomId;
+        S.users[side].socket?.emit(EVENTS.joinChatRoom, { roomId });
+        S.joinedRooms[side].add(roomId);
 
-      function createChatRoom(side) {
-        const s = S[side].socket;
-        if (!s || !s.connected) return alert('Connect WS first.');
+        if (S.unreadCounts[side][roomId]) {
+          S.unreadCounts[side][roomId] = 0;
+          updateChatRooms(side);
+        }
+        el(side === 'A' ? 'hdrA' : 'hdrB').textContent = S.users[side].connected
+          ? `In ${roomId}`
+          : 'Not connected';
+        updateChatRooms(side);
 
-        const adId = el('adId').value.trim();
+        try {
+          const res = await fetch(REST.messages(S.httpUrl, roomId));
+          const payload = await res.json();
+          if (res.ok && payload?.success) {
+            const items = Array.isArray(payload.data) ? payload.data : [];
+            if (!S.messages[roomId]) S.messages[roomId] = [];
+            // reset and refill from history
+            S.messages[roomId] = [];
+            for (const m of items) {
+              const content = m.content ?? '';
+              const ts = m.createdAt ? new Date(m.createdAt) : new Date();
+              const senderId = normalizeId(
+                typeof m.senderId === 'object' && m.senderId
+                  ? m.senderId
+                  : m.senderId || '',
+              );
+              const mid = m._id || m.id || null;
+              addMessageToState(roomId, {
+                id: mid,
+                content,
+                senderId,
+                timestamp: ts,
+              });
+            }
+          } else {
+            log(`⚠️ history load failed: ${payload?.error || 'Unknown error'}`);
+          }
+        } catch (e) {
+          log(`❌ history error: ${e.message}`);
+        }
 
-        if (!adId) return alert('Please enter an Ad ID first.');
+        renderMessagesFor(roomId, side);
 
-        log(side, `Creating chat room for ad ${adId}`);
-        s.emit(window.EVENTS.createChatRoom, { adId: adId });
-      }
-
-      function joinChatRoom(side) {
-        const s = S[side].socket;
-        if (!s || !s.connected) return alert('Connect WS first.');
-
-        const roomId = el('roomId').value.trim();
-
-        if (!roomId)
-          return alert('Please create a chat room first or enter a Room ID.');
-
-        log(side, `Joining chat room ${roomId}`);
-        s.emit(window.EVENTS.joinChatRoom, { roomId: roomId });
-      }
-
-      function leaveChatRoom(side) {
-        const s = S[side].socket;
-        if (!s || !s.connected) return alert('Connect WS first.');
-
-        const roomId = el('roomId').value.trim();
-
-        if (!roomId) return alert('Please enter a Room ID first.');
-
-        log(side, `Leaving chat room ${roomId}`);
-        s.emit(window.EVENTS.leaveChatRoom, { roomId: roomId });
-      }
-
-      function getUserChatRooms(side) {
-        const s = S[side].socket;
-        if (!s || !s.connected) return alert('Connect WS first.');
-
-        log(side, 'Getting user chat rooms');
-        s.emit(window.EVENTS.getUserChatRooms);
-      }
-
-      function getCurrentRoomInfo(side) {
-        const room = S[side].currentRoom;
-        if (room) {
-          log(side, 'Current room info: ' + JSON.stringify(room, null, 2));
-        } else {
-          log(side, 'No current room info available');
+        try {
+          await fetch(REST.markRead(S.httpUrl, roomId), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          log(`Marked messages as read for ${side} in ${roomId}`);
+        } catch (e) {
+          log(`Failed to mark read: ${e.message}`, 'WARN');
         }
       }
 
-      // ====== Init UI from localStorage ======
+      async function createAdChat(side) {
+        const sock = S.users[side].socket;
+        if (!sock?.connected) {
+          log(`Connect WS for ${side} first`, 'WARN');
+          return;
+        }
+        const currentAdId = (el('adId').value || '').trim();
+        if (currentAdId) S.adId = currentAdId;
+        if (!S.adId) {
+          log('Set an Ad ID first', 'WARN');
+          return;
+        }
+
+        try {
+          const resp = await emitWithAck(sock, EVENTS.createChatRoom, {
+            adId: S.adId,
+          });
+          if (resp?.success) {
+            const rid = resp.chatRoom?.roomId;
+            if (rid) {
+              S.users[side].socket?.emit(EVENTS.joinChatRoom, { roomId: rid });
+              S.joinedRooms[side].add(rid);
+              await selectChatRoom(side, rid);
+            }
+            refreshChatRooms(side);
+            log(`Room created by ${side}`);
+          } else {
+            log(resp?.error || 'createChatRoom failed', 'ERROR');
+          }
+        } catch (e) {
+          log(`createChatRoom error: ${e.message}`, 'ERROR');
+        }
+      }
+
+      async function listChats(side) {
+        const sock = S.users[side].socket;
+        if (!sock?.connected) {
+          log(`Connect WS for ${side} first`, 'WARN');
+          return;
+        }
+        try {
+          const resp = await emitWithAck(sock, EVENTS.getUserChatRooms, {});
+          if (resp?.success) {
+            S.chatRooms[side] = resp.chatRooms || [];
+            updateChatRooms(side);
+            log(`Found ${S.chatRooms[side].length} rooms for ${side}`);
+          } else {
+            log(resp?.error || 'getUserChatRooms failed', 'ERROR');
+          }
+        } catch (e) {
+          log(`getUserChatRooms error: ${e.message}`, 'ERROR');
+        }
+      }
+
+      function refreshChatRooms(side) {
+        if (!side) {
+          if (S.users.A.socket?.connected) listChats('A');
+          if (S.users.B.socket?.connected) listChats('B');
+          return;
+        }
+        if (S.users[side].socket?.connected) listChats(side);
+      }
+
+      async function testPing(side) {
+        const sock = S.users[side].socket;
+        if (!sock?.connected) {
+          log(`Connect WS for ${side} first`, 'WARN');
+          return;
+        }
+        try {
+          const t0 = Date.now();
+          const resp = await emitWithAck(sock, 'ping', { t0 }, 1000);
+          if (resp?.ok) {
+            const latency = Date.now() - t0;
+            log(`Ping ${side}: ${latency}ms latency`);
+          } else log(`Ping ${side} failed: ${resp?.error || 'Unknown'}`);
+        } catch (e) {
+          log(`Ping ${side} error: ${e.message}`);
+        }
+      }
+
+      /* ============== MESSAGING ============== */
+      async function sendMessageFrom(side) {
+        const roomId = S.currentChatRoom[side];
+        if (!roomId) {
+          log(`Select a room in ${side} section first`, 'WARN');
+          return;
+        }
+        const input = el(side === 'A' ? 'messageInputA' : 'messageInputB');
+        const content = input.value.trim();
+        if (!content) return;
+
+        const sock = S.users[side].socket;
+        if (!sock?.connected) {
+          log(`User ${side} not connected`, 'WARN');
+          return;
+        }
+
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+
+        // optimistic add (temporary id)
+        const tempId = `temp-${roomId}-${Date.now()}-${Math.random()}`;
+        const senderId = S.users[side].userData?.id;
+        addMessageToState(roomId, {
+          id: tempId,
+          content,
+          senderId,
+          timestamp: new Date(),
+        });
+        if (S.users.A.userData && S.currentChatRoom.A === roomId)
+          renderMessagesFor(roomId, 'A');
+        if (S.users.B.userData && S.currentChatRoom.B === roomId)
+          renderMessagesFor(roomId, 'B');
+
+        try {
+          const resp = await emitWithAck(sock, EVENTS.sendMessage, {
+            roomId,
+            content,
+            type: 'text',
+          });
+          if (resp?.success) {
+            // When the server echo arrives with real id, duplicate guard will skip
+            // If server also returns the id now, you can upgrade temp -> real id:
+            if (resp.message?.id || resp.message?._id) {
+              // remove temp (if any) & add real
+              const realId = resp.message.id || resp.message._id;
+              // remove temp entry that matches content & my sender within 2s window
+              const msgs = S.messages[roomId] || [];
+              const cutoff = Date.now() - 2000;
+              S.messages[roomId] = msgs.filter((m) => {
+                return !(
+                  m.id === tempId ||
+                  (m.id === null &&
+                    m.content === content &&
+                    isOwnForSide(side, m.senderId) &&
+                    new Date(m.timestamp).getTime() >= cutoff)
+                );
+              });
+              addMessageToState(roomId, {
+                id: realId,
+                content,
+                senderId,
+                timestamp: resp.message.createdAt || new Date(),
+              });
+              forceRefreshPanes();
+            }
+          } else {
+            log(resp?.error || 'sendMessage failed', 'ERROR');
+          }
+        } catch (e) {
+          log(`sendMessage error: ${e.message}`, 'ERROR');
+        }
+      }
+
+      /* ============== INIT ============== */
       function init() {
         el('httpUrl').value = S.httpUrl;
         el('wsUrl').value = S.wsUrl;
         el('adId').value = S.adId;
-        el('roomId').value = S.roomId;
-        runtimeWarnings();
-      }
-      init();
-
-      // ====== Environment diagnostics ======
-      function isIOS() {
-        return (
-          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        el('ackTimeout').value = S.ackTimeoutMs;
+        el('messageInputA').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessageFrom('A');
+          }
+        });
+        el('messageInputB').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessageFrom('B');
+          }
+        });
+        log(
+          'Ready: login/connect both; list rooms separately; select room per user; chat live.',
         );
       }
-      function warnAll(msg) {
-        log('A', 'WARN: ' + msg);
-        log('B', 'WARN: ' + msg);
-      }
-      function runtimeWarnings() {
-        const pageIsHttps = location.protocol === 'https:';
-        const httpUrl = S.httpUrl || el('httpUrl').value.trim();
-        const wsUrl = S.wsUrl || el('wsUrl').value.trim();
-        if (!httpUrl || !wsUrl) return;
 
-        // Mixed content warnings
-        if (pageIsHttps) {
-          if (httpUrl.startsWith('http://'))
-            warnAll(
-              'Page is HTTPS but HTTP Base URL is http:// (mixed content will be blocked). Use https:// or open this page over http://',
-            );
-          if (wsUrl.startsWith('ws://') || wsUrl.startsWith('http://'))
-            warnAll(
-              'Page is HTTPS but WebSocket URL is insecure (ws:// or http://). Use wss:// or serve this page over http://',
-            );
-        }
+      // Expose
+      window.saveConfig = saveConfig;
+      window.clearLogs = clearLogs;
+      window.clearAllUnread = clearAllUnread;
+      window.clearDuplicateMessages = clearDuplicateMessages;
+      window.forceRefreshPanes = forceRefreshPanes;
+      window.addTestMessage = addTestMessage;
+      window.debugState = debugState;
+      window.login = login;
+      window.connectWS = connectWS;
+      window.disconnectWS = disconnectWS;
+      window.createAdChat = createAdChat;
+      window.listChats = listChats;
+      window.selectChatRoom = selectChatRoom;
+      window.sendMessageFrom = sendMessageFrom;
+      window.testPing = testPing;
 
-        // iOS device warnings
-        if (isIOS()) {
-          if (
-            /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(httpUrl) ||
-            /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(wsUrl)
-          ) {
-            warnAll(
-              'On iOS, "localhost" refers to the phone itself. Use your computer\'s LAN IP (e.g., http://192.168.x.x:5000) for both URLs.',
-            );
-          }
-        }
-      }
+      init();
     </script>
   </body>
 </html>

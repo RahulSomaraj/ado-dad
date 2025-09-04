@@ -16,17 +16,32 @@ export enum UserRole {
 
 @Schema({ timestamps: true })
 export class ChatRoom {
-  @Prop({ required: true, unique: true })
-  roomId: string; // Format: chat_${initiatorId}_${adId}
+  @Prop({ required: true, unique: true, index: true })
+  roomId: string; // human-readable id used by clients
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-  initiatorId: mongoose.Types.ObjectId; // User who started the chat
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
+  initiatorId: mongoose.Types.ObjectId; // user who created the chat
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Ad', required: true })
-  adId: mongoose.Types.ObjectId; // Advertisement being discussed
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ad',
+    required: true,
+    index: true,
+  })
+  adId: mongoose.Types.ObjectId; // advertisement being discussed
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-  adPosterId: mongoose.Types.ObjectId; // Person who created the ad
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
+  adPosterId: mongoose.Types.ObjectId; // other participant
 
   @Prop({ type: [String], required: true })
   participants: string[]; // Array of user IDs: [initiatorId, adPosterId]
@@ -38,6 +53,7 @@ export class ChatRoom {
     required: true,
     enum: ChatRoomStatus,
     default: ChatRoomStatus.ACTIVE,
+    index: true,
   })
   status: ChatRoomStatus;
 
@@ -68,3 +84,9 @@ ChatRoomSchema.index({ createdAt: -1 });
 ChatRoomSchema.index({ initiatorId: 1, status: 1 });
 ChatRoomSchema.index({ adPosterId: 1, status: 1 });
 ChatRoomSchema.index({ adId: 1, status: 1 });
+
+// Additional performance indexes
+ChatRoomSchema.index(
+  { initiatorId: 1, adPosterId: 1 },
+  { name: 'by_participants' },
+);

@@ -13,11 +13,10 @@ export enum MessageType {
 @Schema({ timestamps: true })
 export class ChatMessage {
   @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ChatRoom',
+    type: String,
     required: true,
   })
-  roomId: mongoose.Types.ObjectId;
+  roomId: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   senderId: mongoose.Types.ObjectId;
@@ -44,11 +43,19 @@ export class ChatMessage {
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 
 // Indexes for fast lookups
-ChatMessageSchema.index({ roomId: 1, createdAt: -1 });
+ChatMessageSchema.index(
+  { roomRef: 1, createdAt: -1 },
+  { name: 'roomRef_createdAt' },
+);
+ChatMessageSchema.index(
+  { roomId: 1, createdAt: -1 },
+  { name: 'roomId_createdAt' },
+);
 ChatMessageSchema.index({ senderId: 1 });
 ChatMessageSchema.index({ isRead: 1 });
 ChatMessageSchema.index({ createdAt: -1 });
 
 // Compound indexes
+ChatMessageSchema.index({ roomRef: 1, isRead: 1 });
 ChatMessageSchema.index({ roomId: 1, isRead: 1 });
 ChatMessageSchema.index({ senderId: 1, createdAt: -1 });

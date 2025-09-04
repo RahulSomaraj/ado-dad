@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
+import { ChatController } from './chat.controller';
+import { ContentModerationService } from './services/content-moderation.service';
+import { RateLimitGuard } from './guards/rate-limit.guard';
 import { ChatRoom, ChatRoomSchema } from './schemas/chat-room.schema';
 import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
 import { Ad, AdSchema } from '../ads/schemas/ad.schema';
@@ -14,7 +17,13 @@ import { Ad, AdSchema } from '../ads/schemas/ad.schema';
       { name: Ad.name, schema: AdSchema },
     ]),
   ],
-  providers: [ChatGateway, ChatService],
-  exports: [ChatGateway, ChatService],
+  controllers: [ChatController],
+  providers: [
+    ChatGateway,
+    ChatService,
+    ContentModerationService,
+    RateLimitGuard,
+  ],
+  exports: [ChatGateway, ChatService, ContentModerationService],
 })
 export class ChatModule {}

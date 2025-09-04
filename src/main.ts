@@ -39,6 +39,7 @@ async function bootstrap() {
       'X-Platform',
       'User-Agent',
     ],
+    credentials: true,
   });
 
   // (b) Global security headers via Helmet

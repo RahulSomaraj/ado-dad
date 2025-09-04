@@ -13,21 +13,61 @@ export class WsJwtGuard implements CanActivate {
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const client = ctx.switchToWs().getClient();
+    const handlerName = ctx.getHandler()?.name || 'unknown';
 
+    this.logger.log(`[WsJwtGuard] event=${handlerName} socket=${client.id}`);
+
+    // Print detailed handshake information for debugging
     this.logger.log(
-      `WsJwtGuard: Processing connection for client ${client.id}`,
+      `=== WebSocket Handshake Debug for Client ${client.id} ===`,
     );
+    this.logger.log(
+      `Headers: ${JSON.stringify(client.handshake.headers, null, 2)}`,
+    );
+    this.logger.log(`Auth: ${JSON.stringify(client.handshake.auth, null, 2)}`);
+    this.logger.log(
+      `Query: ${JSON.stringify(client.handshake.query, null, 2)}`,
+    );
+    this.logger.log(`URL: ${client.handshake.url}`);
+    this.logger.log(`Method: ${client.handshake.method}`);
+    this.logger.log(`Address: ${client.handshake.address}`);
+    this.logger.log(`Time: ${client.handshake.time}`);
+    this.logger.log(`Issued: ${client.handshake.issued}`);
+    this.logger.log(`================================================`);
 
-    // Get token from auth or headers
-    const rawAuth = (
-      client.handshake.auth?.token ||
-      client.handshake.headers['authorization'] ||
-      ''
-    ).toString();
+    // Get token from multiple sources for better compatibility
+    let rawAuth = '';
+
+    // Try auth object first (Socket.IO v4+)
+    if (client.handshake.auth?.token) {
+      rawAuth = client.handshake.auth.token.toString();
+      this.logger.log(`WsJwtGuard: Token found in auth.token`);
+    }
+    // Try headers as fallback
+    else if (client.handshake.headers['authorization']) {
+      rawAuth = client.handshake.headers['authorization'].toString();
+      this.logger.log(`WsJwtGuard: Token found in headers.authorization`);
+    }
+    // Try query parameters as last resort
+    else if (client.handshake.query?.token) {
+      rawAuth = client.handshake.query.token.toString();
+      this.logger.log(`WsJwtGuard: Token found in query.token`);
+    }
 
     this.logger.log(
       `WsJwtGuard: Raw auth received: ${rawAuth ? 'present' : 'missing'}`,
     );
+
+    if (!rawAuth) {
+      this.logger.warn(
+        `[WsJwtGuard] No token provided for client ${client.id}`,
+      );
+      this.logger.warn(
+        `[WsJwtGuard] Available sources: auth=${!!client.handshake.auth?.token}, headers=${!!client.handshake.headers['authorization']}, query=${!!client.handshake.query?.token}`,
+      );
+      this.logger.warn(`[WsJwtGuard] blocked socket=${client.id}`);
+      return false;
+    }
 
     const bearer = rawAuth.replace(/^Bearer\s+/i, '').trim();
 
@@ -118,7 +158,7 @@ export class WsJwtGuard implements CanActivate {
       // Set user info on client
       (client as any).user = { id: userId, roles: payload?.roles };
       this.logger.log(
-        `WsJwtGuard: User ${userId} authenticated for client ${client.id}`,
+        `[WsJwtGuard] User ${userId} authenticated for client ${client.id}`,
       );
 
       return true;
