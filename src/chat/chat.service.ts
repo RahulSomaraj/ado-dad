@@ -238,6 +238,37 @@ export class ChatService {
       .exec();
   }
 
+  /** Check if a chat room already exists between initiator and ad poster for a specific ad */
+  async findExistingChatRoom(
+    initiatorId: string,
+    adId: string,
+  ): Promise<ChatRoom | null> {
+    this.validateObjectId(initiatorId, 'Initiator ID');
+    this.validateObjectId(adId, 'Ad ID');
+
+    // First, get the ad to find the ad poster
+    const ad = await this.adModel.findById(adId).exec();
+    if (!ad) {
+      throw new Error('Ad not found');
+    }
+
+    const adPosterId = this.ensureStringId(ad.postedBy);
+
+    // Check if room already exists (either direction)
+    const existingRoom = await this.chatRoomModel
+      .findOne({
+        adId: new Types.ObjectId(adId),
+        $or: [
+          { initiatorId: new Types.ObjectId(initiatorId) },
+          { initiatorId: new Types.ObjectId(adPosterId) },
+        ],
+        status: ChatRoomStatus.ACTIVE,
+      })
+      .exec();
+
+    return existingRoom;
+  }
+
   /** Deactivate all rooms for an ad (e.g., ad sold/removed) */
   async deactivateChatRoom(adId: string): Promise<void> {
     this.validateObjectId(adId, 'Ad ID');

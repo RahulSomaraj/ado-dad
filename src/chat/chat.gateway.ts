@@ -391,6 +391,60 @@ export class ChatGateway
     }
   }
 
+  // ---------- CHECK EXISTING CHAT ROOM ----------
+  @SubscribeMessage('checkExistingChatRoom')
+  async handleCheckExistingChatRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { adId: string },
+    callback?: (response: any) => void,
+  ) {
+    try {
+      const userId = (client as any).user?.id as string;
+      if (!userId) {
+        callback?.({ success: false, error: 'User not authenticated' });
+        return;
+      }
+
+      this.logger.log(
+        `🔍 Checking existing room for user ${userId} and ad ${payload.adId}`,
+      );
+
+      const existingRoom = await this.chatService.findExistingChatRoom(
+        userId,
+        payload.adId,
+      );
+
+      if (existingRoom) {
+        this.logger.log(`✅ Found existing room: ${existingRoom.roomId}`);
+        callback?.({
+          success: true,
+          exists: true,
+          room: {
+            roomId: existingRoom.roomId,
+            initiatorId: existingRoom.initiatorId,
+            adId: existingRoom.adId,
+            adPosterId: existingRoom.adPosterId,
+            participants: existingRoom.participants,
+            status: existingRoom.status,
+            lastMessageAt: existingRoom.lastMessageAt,
+            messageCount: existingRoom.messageCount,
+            createdAt: (existingRoom as any).createdAt,
+          },
+        });
+      } else {
+        this.logger.log(`❌ No existing room found`);
+        callback?.({
+          success: true,
+          exists: false,
+          room: null,
+        });
+      }
+    } catch (e: any) {
+      this.logger.error(`❌ [checkExistingChatRoom] Error: ${e.message}`);
+      callback?.({ success: false, error: e.message });
+    }
+  }
+
   // ---------- GET USER CHAT ROOMS (manual event handling) ----------
   @SubscribeMessage('getUserChatRooms')
   async handleGetUserChatRooms(
@@ -421,12 +475,28 @@ export class ChatGateway
     try {
       const userId = (client as any).user?.id as string;
       this.logger.log('🟢 [getUserChatRooms] userId:', userId);
+      this.logger.log(
+        '🟢 [getUserChatRooms] user object:',
+        (client as any).user,
+      );
+
+      if (!userId) {
+        this.logger.error(
+          '❌ [getUserChatRooms] No userId found in client.user',
+        );
+        client.emit('getUserChatRoomsResponse', {
+          success: false,
+          error: 'User not authenticated',
+        });
+        return;
+      }
 
       const chatRooms = await this.chatService.getUserChatRooms(userId);
       this.logger.log(
         '🟢 [getUserChatRooms] chatRooms count:',
         chatRooms.length,
       );
+      this.logger.log('🟢 [getUserChatRooms] chatRooms:', chatRooms);
 
       const response = {
         success: true,

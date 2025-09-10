@@ -1144,9 +1144,15 @@
           return;
         }
         try {
+          log(`🔍 [listChats] Requesting rooms for ${side}...`);
+          log(`🔍 [listChats] User data:`, S.users[side].userData);
           const resp = await emitWithAck(sock, EVENTS.getUserChatRooms, {});
+          log(`🔍 [listChats] Response received:`, resp);
           if (resp?.success) {
             S.chatRooms[side] = resp.chatRooms || [];
+            log(
+              `🔍 [listChats] Stored ${S.chatRooms[side].length} rooms for ${side}`,
+            );
             updateChatRooms(side);
             log(`Found ${S.chatRooms[side].length} rooms for ${side}`);
           } else {
