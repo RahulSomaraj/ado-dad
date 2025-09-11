@@ -102,6 +102,21 @@ export class ChatGateway
             this.logger.log(`🔍 [onAny] first arg type: ${typeof args[0]}`);
             this.logger.log(`🔍 [onAny] first arg:`, args[0]);
           }
+
+          // Special logging for createChatRoom to debug the issue
+          if (event === 'createChatRoom') {
+            this.logger.log(`🔍 [onAny] createChatRoom event details:`);
+            this.logger.log(`🔍 [onAny] args.length: ${args.length}`);
+            this.logger.log(`🔍 [onAny] args:`, args);
+            this.logger.log(
+              `🔍 [onAny] last arg type: ${typeof args[args.length - 1]}`,
+            );
+            this.logger.log(
+              `🔍 [onAny] last arg is function: ${typeof args[args.length - 1] === 'function'}`,
+            );
+            this.logger.log(`🔍 [onAny] first arg type: ${typeof args[0]}`);
+            this.logger.log(`🔍 [onAny] first arg:`, args[0]);
+          }
         });
       });
     } else {
@@ -166,34 +181,36 @@ export class ChatGateway
     }
   }
 
-  // ---------- PING (manual event handling) ----------
+  // ---------- PING ----------
   @SubscribeMessage('ping')
   handlePing(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { t0?: number },
-    callback?: (resp: any) => void,
   ) {
+    this.logger.log('🏓 [ping] handler ENTER');
+    this.logger.log(`🏓 [ping] client.id: ${client.id}`);
+    this.logger.log(`🏓 [ping] payload:`, payload);
+
     try {
       this.logger.log(`🏓 Ping from ${client.id}`);
-
-      // Since NestJS is not passing the callback correctly, emit a custom event
       const response = { ok: true, t0: payload?.t0, ts: Date.now() };
-      client.emit('pingResponse', response);
-      this.logger.log(`✅ [ping] Response emitted via custom event`);
+      this.logger.log('✅ [ping] Returning response:', response);
+      return response;
     } catch (e: any) {
       this.logger.error(`❌ [ping] Error: ${e.message}`);
-      // Emit error response
-      client.emit('pingResponse', { ok: false, error: e.message });
+      const errorResponse = { ok: false, error: e.message };
+      this.logger.log('✅ [ping] Returning error response:', errorResponse);
+      return errorResponse;
     }
   }
 
   // ---------- SEND MESSAGE ----------
   @SubscribeMessage('sendMessage')
-  @RateLimit({
-    maxRequests: 10,
-    windowMs: 10000,
-    message: 'Too many messages, please slow down',
-  })
+  // @RateLimit({
+  //   maxRequests: 10,
+  //   windowMs: 10000,
+  //   message: 'Too many messages, please slow down',
+  // })
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: SendMessageDto,
@@ -261,18 +278,17 @@ export class ChatGateway
 
   // ---------- CREATE CHAT ROOM ----------
   @SubscribeMessage('createChatRoom')
-  @RateLimit({
-    maxRequests: 5,
-    windowMs: 60000,
-    message: 'Too many chat room creation attempts',
-  })
   async handleCreateChatRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: CreateChatRoomDto,
-    callback?: (response: any) => void,
   ) {
+    this.logger.log('🟢 [createChatRoom] handler ENTER');
+    this.logger.log(`🟢 [createChatRoom] client.id: ${client.id}`);
+    this.logger.log(`🟢 [createChatRoom] payload:`, payload);
+
     try {
       const userId = (client as any).user.id as string;
+      this.logger.log(`🟢 [createChatRoom] userId: ${userId}`);
       this.logger.log(`Creating chat for ad ${payload.adId} by ${userId}`);
 
       const chatRoom = await this.chatService.createChatRoom(
@@ -283,7 +299,7 @@ export class ChatGateway
 
       const response = {
         success: true,
-        chatRoom: {
+        data: {
           roomId: chatRoom.roomId,
           initiatorId: chatRoom.initiatorId,
           adId: chatRoom.adId,
@@ -295,13 +311,21 @@ export class ChatGateway
         message: 'Chat room created successfully',
       };
 
-      callback?.(response);
+      this.logger.log('✅ [createChatRoom] Returning response:', response);
 
       // notify anyone already in the room (usually just creator at this moment)
       this.server.to(chatRoom.roomId).emit('chatRoomCreated', response);
+
+      return response;
     } catch (e: any) {
-      this.logger.error(`Error creating chat room: ${e.message}`);
-      callback?.({ success: false, error: e.message });
+      this.logger.error(`❌ [createChatRoom] Error: ${e.message}`);
+      this.logger.error(`❌ [createChatRoom] Stack: ${e.stack}`);
+      const errorResponse = { success: false, error: e.message };
+      this.logger.log(
+        '✅ [createChatRoom] Returning error response:',
+        errorResponse,
+      );
+      return errorResponse;
     }
   }
 

@@ -9,12 +9,49 @@ import {
   Body,
   BadRequestException,
   NotFoundException,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
+import { CreateChatRoomDto } from './dto/create-chat-room.dto';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 
 @Controller('chats')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
+
+  // Public: Create a new chat room
+  @Post('rooms')
+  @UseGuards(JwtAuthGuard)
+  async createChatRoom(
+    @Request() req: any,
+    @Body() createChatRoomDto: CreateChatRoomDto,
+  ) {
+    const userId = req.user.id;
+
+    try {
+      const chatRoom = await this.chatService.createChatRoom(
+        userId,
+        createChatRoomDto.adId,
+      );
+
+      return {
+        success: true,
+        data: {
+          roomId: chatRoom.roomId,
+          initiatorId: chatRoom.initiatorId,
+          adId: chatRoom.adId,
+          adPosterId: chatRoom.adPosterId,
+          participants: chatRoom.participants,
+          status: chatRoom.status,
+          createdAt: (chatRoom as any).createdAt,
+        },
+        message: 'Chat room created successfully',
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
+  }
 
   // Admin: List chat rooms with filters and pagination
   @Get('rooms')
@@ -142,7 +179,7 @@ export class ChatController {
   }
 
   // Public: Get messages for a room (for participants)
-  @Get('rooms/:roomId/messages')
+  @Get('rooms/:roomId/messages/public')
   async getMessages(
     @Param('roomId') roomId: string,
     @Query('limit') limit = '50',

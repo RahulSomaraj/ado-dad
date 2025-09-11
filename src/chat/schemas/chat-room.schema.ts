@@ -16,14 +16,13 @@ export enum UserRole {
 
 @Schema({ timestamps: true })
 export class ChatRoom {
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: true })
   roomId: string; // human-readable id used by clients
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   })
   initiatorId: mongoose.Types.ObjectId; // user who created the chat
 
@@ -31,7 +30,6 @@ export class ChatRoom {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Ad',
     required: true,
-    index: true,
   })
   adId: mongoose.Types.ObjectId; // advertisement being discussed
 
@@ -39,7 +37,6 @@ export class ChatRoom {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   })
   adPosterId: mongoose.Types.ObjectId; // other participant
 
@@ -53,7 +50,6 @@ export class ChatRoom {
     required: true,
     enum: ChatRoomStatus,
     default: ChatRoomStatus.ACTIVE,
-    index: true,
   })
   status: ChatRoomStatus;
 

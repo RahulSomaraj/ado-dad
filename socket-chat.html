@@ -317,7 +317,11 @@
           <div class="rowline">
             <div>
               <label>Ad ID (for testing)</label
-              ><input id="adId" type="text" placeholder="68b6... (ObjectId)" />
+              ><input
+                id="adId"
+                type="text"
+                placeholder="68c266a228a0cfafe36c84bf"
+              />
             </div>
             <div>
               <label>ACK Timeout (ms)</label
@@ -527,7 +531,7 @@
       const S = {
         httpUrl: localStorage.getItem('httpUrl') || 'http://localhost:5000',
         wsUrl: localStorage.getItem('wsUrl') || 'http://localhost:5000',
-        adId: localStorage.getItem('adId') || '',
+        adId: localStorage.getItem('adId') || '68c266a228a0cfafe36c84bf',
         ackTimeoutMs: Number(localStorage.getItem('ackTimeoutMs') || 3000),
         currentChatRoom: { A: null, B: null },
         users: {
