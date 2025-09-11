@@ -139,9 +139,10 @@ export class ChatService {
 
       const adPosterId = this.ensureStringId(ad.postedBy);
       this.validateObjectId(adPosterId, 'Ad poster ID');
-      if (initiatorId === adPosterId) {
-        throw new BadRequestException('Cannot create chat room with yourself');
-      }
+      // Removed self-chat validation - users can now create chat rooms with themselves
+      // if (initiatorId === adPosterId) {
+      //   throw new BadRequestException('Cannot create chat room with yourself');
+      // }
 
       // Try to find existing room (unique index on { initiatorId, adId } is recommended)
       const existing = await this.chatRoomModel.findOne({

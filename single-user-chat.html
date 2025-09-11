@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Single User Chat Interface</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        font-weight: 300;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 1.1rem;
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        min-height: 600px;
+      }
+
+      .left-panel,
+      .right-panel {
+        padding: 30px;
+        border-right: 1px solid #eee;
+      }
+
+      .right-panel {
+        border-right: none;
+      }
+
+      .section {
+        margin-bottom: 30px;
+      }
+
+      .section h2 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .section h2::before {
+        content: '';
+        width: 4px;
+        height: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 2px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #555;
+        font-weight: 500;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e1e5e9;
+        border-radius: 10px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-secondary {
+        background: #6c757d;
+      }
+
+      .btn-success {
+        background: #28a745;
+      }
+
+      .btn-danger {
+        background: #dc3545;
+      }
+
+      .status {
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-weight: 500;
+      }
+
+      .status.connected {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .status.loading {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+
+      .list-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #e1e5e9;
+        border-radius: 10px;
+        background: #f8f9fa;
+      }
+
+      .list-item {
+        padding: 15px;
+        border-bottom: 1px solid #e1e5e9;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .list-item:hover {
+        background: #e9ecef;
+      }
+
+      .list-item:last-child {
+        border-bottom: none;
+      }
+
+      .list-item.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .list-item h4 {
+        margin-bottom: 5px;
+        font-size: 1rem;
+      }
+
+      .list-item p {
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6c757d;
+      }
+
+      .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        opacity: 0.5;
+      }
+
+      .log-container {
+        background: #f8f9fa;
+        border: 1px solid #e1e5e9;
+        border-radius: 10px;
+        padding: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+      }
+
+      .log-entry {
+        margin-bottom: 5px;
+        padding: 2px 0;
+      }
+
+      .log-entry.info {
+        color: #0066cc;
+      }
+      .log-entry.success {
+        color: #28a745;
+      }
+      .log-entry.error {
+        color: #dc3545;
+      }
+      .log-entry.warning {
+        color: #ffc107;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 4px;
+        background: #e9ecef;
+        color: #495057;
+      }
+
+      .badge.success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .badge.danger {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .badge.warning {
+        background: #fff3cd;
+        color: #856404;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>💬 Single User Chat Interface</h1>
+        <p>Login, connect, and manage your chat rooms</p>
+      </div>
+
+      <div class="main-content">
+        <!-- Left Panel: Login & Connection -->
+        <div class="left-panel">
+          <!-- Login Section -->
+          <div class="section">
+            <h2>🔐 Login</h2>
+            <div class="form-group">
+              <label>Username (Phone/Email)</label>
+              <input
+                type="text"
+                id="username"
+                placeholder="1212121212"
+                value="1212121212"
+              />
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                id="password"
+                placeholder="Enter password"
+                value="123456"
+              />
+            </div>
+            <button class="btn" id="loginBtn">Login</button>
+          </div>
+
+          <!-- Connection Status -->
+          <div class="section">
+            <h2>🔌 Connection Status</h2>
+            <div id="connectionStatus" class="status disconnected">
+              <span id="statusText">Disconnected</span>
+            </div>
+            <button class="btn btn-secondary" id="connectBtn" disabled>
+              Connect to Chat
+            </button>
+            <button class="btn btn-danger" id="disconnectBtn" disabled>
+              Disconnect
+            </button>
+          </div>
+
+          <!-- Configuration -->
+          <div class="section">
+            <h2>⚙️ Configuration</h2>
+            <div class="form-group">
+              <label>Server URL</label>
+              <input type="text" id="serverUrl" value="http://localhost:5000" />
+            </div>
+            <div class="form-group">
+              <label>ACK Timeout (ms)</label>
+              <input type="number" id="ackTimeout" value="5000" />
+            </div>
+          </div>
+
+          <!-- Activity Log -->
+          <div class="section">
+            <h2>📋 Activity Log</h2>
+            <div id="activityLog" class="log-container">
+              <div class="log-entry info">Ready to start...</div>
+            </div>
+            <button class="btn btn-secondary" id="clearLogBtn">
+              Clear Log
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Panel: Ads & Rooms -->
+        <div class="right-panel">
+          <!-- Ads Section -->
+          <div class="section">
+            <h2>📋 Available Ads</h2>
+            <button class="btn" id="loadAdsBtn" disabled>Load Ads</button>
+            <div id="adsList" class="list-container">
+              <div class="empty-state">
+                <div>📄</div>
+                <p>Click "Load Ads" to fetch available advertisements</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create Room Section -->
+          <div class="section">
+            <h2>➕ Create Chat Room</h2>
+            <div class="form-group">
+              <label>Select Ad</label>
+              <select id="selectedAdId">
+                <option value="">Select an ad to create room</option>
+              </select>
+            </div>
+            <button class="btn btn-success" id="createRoomBtn" disabled>
+              Create Chat Room
+            </button>
+          </div>
+
+          <!-- My Chat Rooms -->
+          <div class="section">
+            <h2>💬 My Chat Rooms</h2>
+            <button class="btn" id="loadRoomsBtn" disabled>
+              Load My Rooms
+            </button>
+            <div id="roomsList" class="list-container">
+              <div class="empty-state">
+                <div>💬</div>
+                <p>Click "Load My Rooms" to fetch your chat rooms</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Global state
+      const S = {
+        serverUrl: 'http://localhost:5000',
+        ackTimeout: 5000,
+        socket: null,
+        user: null,
+        token: null,
+        ads: [],
+        rooms: [],
+        selectedAdId: null,
+      };
+
+      // DOM elements
+      const elements = {
+        // Login
+        username: document.getElementById('username'),
+        password: document.getElementById('password'),
+        loginBtn: document.getElementById('loginBtn'),
+
+        // Connection
+        connectionStatus: document.getElementById('connectionStatus'),
+        statusText: document.getElementById('statusText'),
+        connectBtn: document.getElementById('connectBtn'),
+        disconnectBtn: document.getElementById('disconnectBtn'),
+
+        // Configuration
+        serverUrl: document.getElementById('serverUrl'),
+        ackTimeout: document.getElementById('ackTimeout'),
+
+        // Log
+        activityLog: document.getElementById('activityLog'),
+        clearLogBtn: document.getElementById('clearLogBtn'),
+
+        // Ads
+        loadAdsBtn: document.getElementById('loadAdsBtn'),
+        adsList: document.getElementById('adsList'),
+
+        // Create Room
+        selectedAdId: document.getElementById('selectedAdId'),
+        createRoomBtn: document.getElementById('createRoomBtn'),
+
+        // Rooms
+        loadRoomsBtn: document.getElementById('loadRoomsBtn'),
+        roomsList: document.getElementById('roomsList'),
+      };
+
+      // Utility functions
+      function log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = `[${timestamp}] ${message}`;
+        elements.activityLog.appendChild(logEntry);
+        elements.activityLog.scrollTop = elements.activityLog.scrollHeight;
+      }
+
+      function updateConnectionStatus(connected, message) {
+        elements.connectionStatus.className = `status ${connected ? 'connected' : 'disconnected'}`;
+        elements.statusText.textContent = message;
+        elements.connectBtn.disabled = connected || !S.user;
+        elements.disconnectBtn.disabled = !connected;
+        elements.loadAdsBtn.disabled = !connected;
+        elements.loadRoomsBtn.disabled = !connected;
+      }
+
+      function updateButtonStates() {
+        const hasAdSelected = S.selectedAdId || elements.selectedAdId.value;
+        elements.createRoomBtn.disabled = !S.socket || !hasAdSelected;
+        log(
+          `Button state updated - socket: ${!!S.socket}, ad selected: ${!!hasAdSelected}`,
+          'info',
+        );
+      }
+
+      // Login functionality
+      async function login() {
+        const username = elements.username.value.trim();
+        const password = elements.password.value.trim();
+
+        if (!username || !password) {
+          log('Please enter username and password', 'error');
+          return;
+        }
+
+        try {
+          log('Attempting login...', 'info');
+          elements.loginBtn.disabled = true;
+          elements.loginBtn.innerHTML =
+            '<span class="loading-spinner"></span> Logging in...';
+
+          const response = await fetch(`${S.serverUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Login failed: ${response.status} ${response.statusText}`,
+            );
+          }
+
+          const data = await response.json();
+          S.user = data;
+          S.token = data.token;
+
+          log(`Login successful! Welcome ${data.userName}`, 'success');
+          updateConnectionStatus(false, 'Ready to connect');
+        } catch (error) {
+          log(`Login failed: ${error.message}`, 'error');
+        } finally {
+          elements.loginBtn.disabled = false;
+          elements.loginBtn.textContent = 'Login';
+        }
+      }
+
+      // Socket connection
+      function connectSocket() {
+        if (!S.token) {
+          log('Please login first', 'error');
+          return;
+        }
+
+        try {
+          log('Connecting to WebSocket...', 'info');
+          updateConnectionStatus(false, 'Connecting...');
+
+          S.socket = io(S.serverUrl + '/chat', {
+            transports: ['websocket', 'polling'],
+            auth: { token: S.token },
+          });
+
+          S.socket.on('connect', () => {
+            log(`Connected to chat server: ${S.socket.id}`, 'success');
+            updateConnectionStatus(true, `Connected (${S.socket.id})`);
+          });
+
+          S.socket.on('disconnect', (reason) => {
+            log(`Disconnected: ${reason}`, 'warning');
+            updateConnectionStatus(false, 'Disconnected');
+          });
+
+          S.socket.on('connect_error', (error) => {
+            log(`Connection failed: ${error.message}`, 'error');
+            updateConnectionStatus(false, 'Connection failed');
+          });
+
+          // Chat room events
+          S.socket.on('chatRoomCreated', (data) => {
+            log(`Chat room created: ${data.data.roomId}`, 'success');
+            loadMyRooms(); // Refresh rooms list
+          });
+
+          S.socket.on('userJoinedRoom', (data) => {
+            log(`User joined room: ${data.roomId}`, 'info');
+          });
+
+          // Custom event for getUserChatRooms response
+          S.socket.on('getUserChatRoomsResponse', (response) => {
+            if (response.success) {
+              S.rooms = response.chatRooms || [];
+              renderRooms();
+              log(`Loaded ${S.rooms.length} chat rooms`, 'success');
+            } else {
+              log(`Failed to load rooms: ${response.error}`, 'error');
+            }
+
+            elements.loadRoomsBtn.disabled = false;
+            elements.loadRoomsBtn.textContent = 'Load My Rooms';
+          });
+        } catch (error) {
+          log(`Socket connection error: ${error.message}`, 'error');
+          updateConnectionStatus(false, 'Connection failed');
+        }
+      }
+
+      function disconnectSocket() {
+        if (S.socket) {
+          S.socket.disconnect();
+          S.socket = null;
+          log('Disconnected from chat server', 'info');
+          updateConnectionStatus(false, 'Disconnected');
+        }
+      }
+
+      // Load ads
+      async function loadAds() {
+        try {
+          log('Loading ads...', 'info');
+          elements.loadAdsBtn.disabled = true;
+          elements.loadAdsBtn.innerHTML =
+            '<span class="loading-spinner"></span> Loading...';
+
+          const response = await fetch(`${S.serverUrl}/ads/list`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: S.token,
+            },
+            body: JSON.stringify({
+              page: 1,
+              limit: 20,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to load ads: ${response.status}`);
+          }
+
+          const data = await response.json();
+          S.ads = data.data || [];
+
+          renderAds();
+          updateAdSelector();
+          log(`Loaded ${S.ads.length} ads`, 'success');
+        } catch (error) {
+          log(`Failed to load ads: ${error.message}`, 'error');
+        } finally {
+          elements.loadAdsBtn.disabled = false;
+          elements.loadAdsBtn.textContent = 'Load Ads';
+        }
+      }
+
+      function renderAds() {
+        if (S.ads.length === 0) {
+          elements.adsList.innerHTML = `
+                    <div class="empty-state">
+                        <div>📄</div>
+                        <p>No ads available</p>
+                    </div>
+                `;
+          return;
+        }
+
+        // Debug: Log the first ad to see its structure
+        log(`Debug - First ad structure:`, 'info');
+        log(`Debug - ad._id: ${S.ads[0]._id}`, 'info');
+        log(`Debug - ad.id: ${S.ads[0].id}`, 'info');
+        log(`Debug - Full ad object:`, 'info');
+        console.log('First ad object:', S.ads[0]);
+
+        elements.adsList.innerHTML = S.ads
+          .map(
+            (ad) => `
+                <div class="list-item" data-ad-id="${ad.id}">
+                    <h4>${ad.title || 'Untitled Ad'}</h4>
+                    <p>Price: $${ad.price || 'N/A'}</p>
+                    <p>Location: ${ad.location || 'N/A'}</p>
+                    <p>Category: ${ad.category || 'N/A'}</p>
+                    <span class="badge ${ad.isActive ? 'success' : 'danger'}">
+                        ${ad.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
+            `,
+          )
+          .join('');
+
+        // Add click handlers
+        elements.adsList.querySelectorAll('.list-item').forEach((item) => {
+          item.addEventListener('click', () => {
+            elements.adsList
+              .querySelectorAll('.list-item')
+              .forEach((i) => i.classList.remove('active'));
+            item.classList.add('active');
+
+            // Debug: Log what's being extracted
+            const extractedId = item.dataset.adId;
+            log(`Debug - item.dataset.adId: ${extractedId}`, 'info');
+            log(`Debug - item.dataset:`, 'info');
+            console.log('Item dataset:', item.dataset);
+
+            S.selectedAdId = extractedId;
+            elements.selectedAdId.value = S.selectedAdId;
+            log(`Ad clicked - selected ad ID: ${S.selectedAdId}`, 'info');
+            updateButtonStates();
+          });
+        });
+      }
+
+      function updateAdSelector() {
+        elements.selectedAdId.innerHTML =
+          '<option value="">Select an ad to create room</option>';
+        S.ads.forEach((ad, index) => {
+          const option = document.createElement('option');
+          const adId = ad.id;
+          option.value = adId;
+          option.textContent = `${ad.title || 'Untitled'} - $${ad.price || 'N/A'}`;
+          elements.selectedAdId.appendChild(option);
+
+          // Debug: Log first few ads being added to dropdown
+          if (index < 3) {
+            log(
+              `Debug - Adding to dropdown: adId=${adId}, title=${ad.title}`,
+              'info',
+            );
+          }
+        });
+      }
+
+      // Create chat room
+      function createChatRoom() {
+        // Debug logging
+        log(`Debug - S.selectedAdId: ${S.selectedAdId}`, 'info');
+        log(
+          `Debug - elements.selectedAdId.value: ${elements.selectedAdId.value}`,
+          'info',
+        );
+        log(`Debug - S.socket exists: ${!!S.socket}`, 'info');
+
+        if (!S.socket) {
+          log('Please connect to WebSocket first', 'error');
+          return;
+        }
+
+        // Use dropdown value if S.selectedAdId is not set
+        const adIdToUse = S.selectedAdId || elements.selectedAdId.value;
+
+        if (!adIdToUse || adIdToUse === '') {
+          log('Please select an ad first', 'error');
+          return;
+        }
+
+        try {
+          log(`Creating chat room for ad: ${adIdToUse}`, 'info');
+          elements.createRoomBtn.disabled = true;
+          elements.createRoomBtn.innerHTML =
+            '<span class="loading-spinner"></span> Creating...';
+
+          S.socket.emit('createChatRoom', { adId: adIdToUse }, (response) => {
+            if (response.success) {
+              log(
+                `Chat room created successfully: ${response.data.roomId}`,
+                'success',
+              );
+              loadMyRooms(); // Refresh rooms list
+            } else {
+              log(`Failed to create chat room: ${response.error}`, 'error');
+            }
+
+            elements.createRoomBtn.disabled = false;
+            elements.createRoomBtn.textContent = 'Create Chat Room';
+          });
+        } catch (error) {
+          log(`Error creating chat room: ${error.message}`, 'error');
+          elements.createRoomBtn.disabled = false;
+          elements.createRoomBtn.textContent = 'Create Chat Room';
+        }
+      }
+
+      // Load my chat rooms
+      function loadMyRooms() {
+        if (!S.socket) {
+          log('Please connect first', 'error');
+          return;
+        }
+
+        try {
+          log('Loading my chat rooms...', 'info');
+          elements.loadRoomsBtn.disabled = true;
+          elements.loadRoomsBtn.innerHTML =
+            '<span class="loading-spinner"></span> Loading...';
+
+          // Emit the event - response will come via 'getUserChatRoomsResponse' event
+          S.socket.emit('getUserChatRooms', {});
+        } catch (error) {
+          log(`Error loading rooms: ${error.message}`, 'error');
+          elements.loadRoomsBtn.disabled = false;
+          elements.loadRoomsBtn.textContent = 'Load My Rooms';
+        }
+      }
+
+      function renderRooms() {
+        if (S.rooms.length === 0) {
+          elements.roomsList.innerHTML = `
+                    <div class="empty-state">
+                        <div>💬</div>
+                        <p>No chat rooms found</p>
+                    </div>
+                `;
+          return;
+        }
+
+        elements.roomsList.innerHTML = S.rooms
+          .map(
+            (room) => `
+                <div class="list-item" data-room-id="${room.roomId}">
+                    <h4>Room: ${room.roomId}</h4>
+                    <p>Ad ID: ${room.adId}</p>
+                    <p>Participants: ${room.participants.length}</p>
+                    <p>Status: ${room.status}</p>
+                    <p>Messages: ${room.messageCount || 0}</p>
+                    <span class="badge ${room.status === 'active' ? 'success' : 'warning'}">
+                        ${room.status}
+                    </span>
+                </div>
+            `,
+          )
+          .join('');
+
+        // Add click handlers
+        elements.roomsList.querySelectorAll('.list-item').forEach((item) => {
+          item.addEventListener('click', () => {
+            elements.roomsList
+              .querySelectorAll('.list-item')
+              .forEach((i) => i.classList.remove('active'));
+            item.classList.add('active');
+            const roomId = item.dataset.roomId;
+            log(`Selected room: ${roomId}`, 'info');
+          });
+        });
+      }
+
+      // Event listeners
+      elements.loginBtn.addEventListener('click', login);
+      elements.connectBtn.addEventListener('click', connectSocket);
+      elements.disconnectBtn.addEventListener('click', disconnectSocket);
+      elements.clearLogBtn.addEventListener('click', () => {
+        elements.activityLog.innerHTML =
+          '<div class="log-entry info">Log cleared</div>';
+      });
+      elements.loadAdsBtn.addEventListener('click', loadAds);
+      elements.createRoomBtn.addEventListener('click', createChatRoom);
+      elements.loadRoomsBtn.addEventListener('click', loadMyRooms);
+
+      // Configuration updates
+      elements.serverUrl.addEventListener('change', (e) => {
+        S.serverUrl = e.target.value;
+      });
+
+      elements.ackTimeout.addEventListener('change', (e) => {
+        S.ackTimeout = parseInt(e.target.value);
+      });
+
+      elements.selectedAdId.addEventListener('change', (e) => {
+        S.selectedAdId = e.target.value;
+        log(`Dropdown changed - selected ad ID: ${S.selectedAdId}`, 'info');
+        updateButtonStates();
+      });
+
+      // Initialize
+      log('Single User Chat Interface ready', 'success');
+      log('1) Login with your credentials', 'info');
+      log('2) Connect to WebSocket', 'info');
+      log('3) Load ads and create chat rooms', 'info');
+    </script>
+  </body>
+</html>
