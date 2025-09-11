@@ -38,9 +38,16 @@ export class ChatService {
    * Helpers
    * ========================= */
 
-  private validateObjectId(id: string, field: string): void {
-    if (!id || typeof id !== 'string' || !Types.ObjectId.isValid(id)) {
+  private validateObjectId(id: string | Types.ObjectId, field: string): void {
+    if (!id) {
       throw new BadRequestException(`Invalid ${field} format: ${id}`);
+    }
+
+    // Convert to string if it's an ObjectId instance
+    const idString = typeof id === 'string' ? id : id.toString();
+
+    if (!Types.ObjectId.isValid(idString)) {
+      throw new BadRequestException(`Invalid ${field} format: ${idString}`);
     }
   }
 
@@ -225,14 +232,17 @@ export class ChatService {
   }
 
   /** Get all ACTIVE rooms for a user (as initiator or ad poster) sorted by recency */
-  async getUserChatRooms(userId: string): Promise<ChatRoom[]> {
+  async getUserChatRooms(userId: string | Types.ObjectId): Promise<ChatRoom[]> {
+    console.log('getUserChatRooms - userId:', userId, 'type:', typeof userId);
     this.validateObjectId(userId, 'User ID');
+
+    // Ensure userId is a string for the query
+    const userIdString =
+      typeof userId === 'string' ? userId : userId.toString();
+
     return this.chatRoomModel
       .find({
-        $or: [
-          { initiatorId: new Types.ObjectId(userId) },
-          { adPosterId: new Types.ObjectId(userId) },
-        ],
+        $or: [{ initiatorId: userIdString }, { adPosterId: userIdString }],
         status: ChatRoomStatus.ACTIVE,
       })
       .sort({ lastMessageAt: -1, createdAt: -1 })
@@ -241,11 +251,16 @@ export class ChatService {
 
   /** Check if a chat room already exists between initiator and ad poster for a specific ad */
   async findExistingChatRoom(
-    initiatorId: string,
-    adId: string,
+    initiatorId: string | Types.ObjectId,
+    adId: string | Types.ObjectId,
   ): Promise<ChatRoom | null> {
     this.validateObjectId(initiatorId, 'Initiator ID');
     this.validateObjectId(adId, 'Ad ID');
+
+    // Ensure IDs are strings for the query
+    const initiatorIdString =
+      typeof initiatorId === 'string' ? initiatorId : initiatorId.toString();
+    const adIdString = typeof adId === 'string' ? adId : adId.toString();
 
     // First, get the ad to find the ad poster
     const ad = await this.adModel.findById(adId).exec();

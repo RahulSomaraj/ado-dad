@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
+  ApiOperation,
   ApiResponse,
   ApiBody,
   ApiBearerAuth,
@@ -37,13 +38,119 @@ export class ChatController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
-  @ApiBody({
-    description: 'Create a new chat room',
-    type: CreateChatRoomDto,
+  @ApiOperation({
+    summary: 'Create a new chat room',
+    description: `
+      Create a new chat room for communication between users regarding a specific advertisement.
+      
+      **Features:**
+      - Creates a chat room between the current user and the ad poster
+      - Automatically adds both users as participants
+      - Generates a unique room ID based on ad and user information
+      - Sets initial status as 'active'
+      - Returns complete room information including participants
+      
+      **Business Logic:**
+      - Users can create chat rooms for any advertisement
+      - Each ad can have multiple chat rooms (one per initiator)
+      - Room ID format: chat_{adId}_{initiatorId}_{adPosterId}
+      - Automatically handles user role assignment (initiator/receiver)
+    `,
   })
-  @ApiResponse({ status: 201, description: 'Chat room created successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - Invalid data' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBody({
+    description: 'Create a new chat room for an advertisement',
+    type: CreateChatRoomDto,
+    examples: {
+      basic_chat_room: {
+        summary: 'Basic Chat Room Creation',
+        description: 'Create a chat room for a specific advertisement',
+        value: {
+          adId: '507f1f77bcf86cd799439011',
+        },
+      },
+      property_chat_room: {
+        summary: 'Property Chat Room',
+        description: 'Create a chat room for a property advertisement',
+        value: {
+          adId: '507f1f77bcf86cd799439012',
+        },
+      },
+      vehicle_chat_room: {
+        summary: 'Vehicle Chat Room',
+        description: 'Create a chat room for a vehicle advertisement',
+        value: {
+          adId: '507f1f77bcf86cd799439013',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Chat room created successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          roomId:
+            'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+          initiatorId: '507f1f77bcf86cd799439021',
+          adId: '507f1f77bcf86cd799439011',
+          adPosterId: '507f1f77bcf86cd799439022',
+          participants: [
+            '507f1f77bcf86cd799439021',
+            '507f1f77bcf86cd799439022',
+          ],
+          status: 'active',
+          createdAt: '2024-01-15T10:30:00.000Z',
+        },
+        message: 'Chat room created successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data or validation error',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'Invalid Ad ID format: invalid-id',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not found - Advertisement not found',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: 'Advertisement not found',
+        error: 'Not Found',
+      },
+    },
+  })
   async createChatRoom(
     @Request() req: any,
     @Body() createChatRoomDto: CreateChatRoomDto,
@@ -83,11 +190,88 @@ export class ChatController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get user chat rooms',
+    description: `
+      Retrieve all chat rooms where the current user is a participant.
+      
+      **Features:**
+      - Returns all active chat rooms for the authenticated user
+      - Includes rooms where user is initiator or ad poster
+      - Shows last message timestamp and message count
+      - Sorted by most recent activity
+      - Returns complete room information
+      
+      **Response includes:**
+      - Room ID and participants
+      - Advertisement ID and poster information
+      - Room status and timestamps
+      - Message count and last activity
+    `,
+  })
   @ApiResponse({
     status: 200,
     description: 'User chat rooms retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: [
+          {
+            roomId:
+              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+            initiatorId: '507f1f77bcf86cd799439021',
+            adId: '507f1f77bcf86cd799439011',
+            adPosterId: '507f1f77bcf86cd799439022',
+            participants: [
+              '507f1f77bcf86cd799439021',
+              '507f1f77bcf86cd799439022',
+            ],
+            status: 'active',
+            lastMessageAt: '2024-01-15T14:30:00.000Z',
+            messageCount: 5,
+            createdAt: '2024-01-15T10:30:00.000Z',
+          },
+          {
+            roomId:
+              'chat_507f1f77bcf86cd799439012_507f1f77bcf86cd799439021_507f1f77bcf86cd799439023',
+            initiatorId: '507f1f77bcf86cd799439021',
+            adId: '507f1f77bcf86cd799439012',
+            adPosterId: '507f1f77bcf86cd799439023',
+            participants: [
+              '507f1f77bcf86cd799439021',
+              '507f1f77bcf86cd799439023',
+            ],
+            status: 'active',
+            lastMessageAt: '2024-01-15T12:15:00.000Z',
+            messageCount: 12,
+            createdAt: '2024-01-15T09:15:00.000Z',
+          },
+        ],
+      },
+    },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
   async getUserChatRooms(@Request() req: any) {
     const userId = req.user.id || req.user._id;
 
@@ -122,19 +306,114 @@ export class ChatController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
-  @ApiParam({ name: 'roomId', description: 'Chat room ID' })
+  @ApiOperation({
+    summary: 'Get room messages',
+    description: `
+      Retrieve messages from a specific chat room.
+      
+      **Features:**
+      - Returns paginated messages from the specified room
+      - Supports limit parameter for message count control
+      - Messages are sorted by creation time (newest first)
+      - Includes sender information and timestamps
+      - Supports cursor-based pagination for large message histories
+      
+      **Parameters:**
+      - roomId: Unique identifier for the chat room
+      - limit: Maximum number of messages to retrieve (default: 50, max: 100)
+    `,
+  })
+  @ApiParam({
+    name: 'roomId',
+    description: 'Chat room ID',
+    example:
+      'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+  })
   @ApiQuery({
     name: 'limit',
-    description: 'Number of messages to retrieve',
+    description: 'Number of messages to retrieve (default: 50, max: 100)',
     required: false,
     type: Number,
+    example: 50,
   })
   @ApiResponse({
     status: 200,
     description: 'Room messages retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: [
+          {
+            id: '507f1f77bcf86cd799439031',
+            roomId:
+              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+            senderId: '507f1f77bcf86cd799439021',
+            content: 'Hello! Is this property still available?',
+            messageType: 'text',
+            timestamp: '2024-01-15T14:30:00.000Z',
+            isRead: true,
+            sender: {
+              id: '507f1f77bcf86cd799439021',
+              name: 'John Doe',
+              email: 'john.doe@example.com',
+            },
+          },
+          {
+            id: '507f1f77bcf86cd799439032',
+            roomId:
+              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+            senderId: '507f1f77bcf86cd799439022',
+            content:
+              'Yes, it is still available. Would you like to schedule a viewing?',
+            messageType: 'text',
+            timestamp: '2024-01-15T14:32:00.000Z',
+            isRead: false,
+            sender: {
+              id: '507f1f77bcf86cd799439022',
+              name: 'Jane Smith',
+              email: 'jane.smith@example.com',
+            },
+          },
+        ],
+        roomId:
+          'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+      },
+    },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Room not found' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Insufficient permissions or not a room participant',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not found - Room not found',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: 'Chat room not found',
+        error: 'Not Found',
+      },
+    },
+  })
   async getRoomMessages(
     @Param('roomId') roomId: string,
     @Query('limit') limit = '50',
@@ -161,16 +440,101 @@ export class ChatController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Check existing chat room',
+    description: `
+      Check if a chat room already exists between the current user and the ad poster for a specific advertisement.
+      
+      **Features:**
+      - Checks for existing chat room between current user and ad poster
+      - Returns room information if found, null if not found
+      - Useful for preventing duplicate chat room creation
+      - Validates user permissions and ad existence
+      
+      **Use Cases:**
+      - Before creating a new chat room
+      - To check if user can start a conversation
+      - To get existing room ID for navigation
+    `,
+  })
   @ApiParam({
     name: 'adId',
-    description: 'Ad ID to check for existing chat room',
+    description: 'Advertisement ID to check for existing chat room',
+    example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
     status: 200,
     description: 'Chat room existence checked successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          exists: true,
+          room: {
+            roomId:
+              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+            initiatorId: '507f1f77bcf86cd799439021',
+            adId: '507f1f77bcf86cd799439011',
+            adPosterId: '507f1f77bcf86cd799439022',
+            participants: [
+              '507f1f77bcf86cd799439021',
+              '507f1f77bcf86cd799439022',
+            ],
+            status: 'active',
+            lastMessageAt: '2024-01-15T14:30:00.000Z',
+            messageCount: 5,
+            createdAt: '2024-01-15T10:30:00.000Z',
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 400, description: 'Bad request - Invalid ad ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'No existing chat room found',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          exists: false,
+          room: null,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid ad ID format',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'Invalid Ad ID format: invalid-id',
+        error: 'Bad Request',
+      },
+    },
+  })
   async checkExistingChatRoom(
     @Param('adId') adId: string,
     @Request() req: any,
