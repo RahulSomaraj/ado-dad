@@ -2,32 +2,57 @@ import {
   Controller,
   Get,
   Post,
-  Put,
-  Delete,
   Param,
   Query,
   Body,
   BadRequestException,
-  NotFoundException,
   UseGuards,
   Request,
+  UseFilters,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { CreateChatRoomDto } from './dto/create-chat-room.dto';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
+import { RolesGuard } from '../roles/roles.guard';
 
+@ApiTags('Chat')
 @Controller('chats')
+@UseFilters(new HttpExceptionFilter('Chat'))
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  // Public: Create a new chat room
+  // Create a new chat room
   @Post('rooms')
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiBody({
+    description: 'Create a new chat room',
+    type: CreateChatRoomDto,
+  })
+  @ApiResponse({ status: 201, description: 'Chat room created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - Invalid data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async createChatRoom(
     @Request() req: any,
     @Body() createChatRoomDto: CreateChatRoomDto,
   ) {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
+
+    if (!userId) {
+      throw new BadRequestException('User ID not found in request');
+    }
 
     try {
       const chatRoom = await this.chatService.createChatRoom(
@@ -53,192 +78,124 @@ export class ChatController {
     }
   }
 
-  // Admin: List chat rooms with filters and pagination
+  // Get user's chat rooms
   @Get('rooms')
-  async listChatRooms(
-    @Query('userId') userId?: string,
-    @Query('adId') adId?: string,
-    @Query('status') status?: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit = '50',
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    const filters = {
-      userId,
-      adId,
-      status,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
-    };
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiResponse({
+    status: 200,
+    description: 'User chat rooms retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getUserChatRooms(@Request() req: any) {
+    const userId = req.user.id || req.user._id;
 
-    const result = await this.chatService.listChatRoomsForAdmin(
-      filters,
-      cursor,
-      parseInt(limit, 10),
-    );
-
-    return {
-      success: true,
-      data: result.rooms,
-      pagination: {
-        cursor: result.nextCursor,
-        hasMore: result.hasMore,
-        total: result.total,
-      },
-    };
-  }
-
-  // Admin: Get messages for a specific room
-  @Get('rooms/:roomId/messages')
-  async getRoomMessages(
-    @Param('roomId') roomId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit = '50',
-  ) {
-    const messages = await this.chatService.getRoomMessagesForAdmin(
-      roomId,
-      cursor,
-      parseInt(limit, 10),
-    );
-
-    return {
-      success: true,
-      data: messages,
-      roomId,
-    };
-  }
-
-  // Admin: Archive a chat room
-  @Post('rooms/:roomId/archive')
-  async archiveChatRoom(@Param('roomId') roomId: string) {
-    await this.chatService.archiveChatRoom(roomId);
-    return {
-      success: true,
-      message: 'Chat room archived successfully',
-      roomId,
-    };
-  }
-
-  // Admin: Update chat room status
-  @Put('rooms/:roomId/status')
-  async updateChatRoomStatus(
-    @Param('roomId') roomId: string,
-    @Body() body: { status: string },
-  ) {
-    if (!body.status) {
-      throw new BadRequestException('Status is required');
+    if (!userId) {
+      throw new BadRequestException('User ID not found in request');
     }
 
-    await this.chatService.updateChatRoomStatus(roomId, body.status);
-    return {
-      success: true,
-      message: 'Chat room status updated successfully',
-      roomId,
-      status: body.status,
-    };
-  }
+    try {
+      const chatRooms = await this.chatService.getUserChatRooms(userId);
 
-  // Admin: Export chat data
-  @Get('export')
-  async exportChats(
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('adId') adId?: string,
-    @Query('userId') userId?: string,
-    @Query('format') format = 'json',
-  ) {
-    if (!from || !to) {
-      throw new BadRequestException('From and to dates are required');
-    }
-
-    const data = await this.chatService.exportChatData({
-      from: new Date(from),
-      to: new Date(to),
-      adId,
-      userId,
-    });
-
-    if (format === 'csv') {
-      // Convert to CSV format
-      const csv = this.convertToCSV(data.rooms);
       return {
         success: true,
-        data: csv,
-        format: 'csv',
-        filename: `chat-export-${from}-${to}.csv`,
+        data: chatRooms.map((room) => ({
+          roomId: room.roomId,
+          initiatorId: room.initiatorId,
+          adId: room.adId,
+          adPosterId: room.adPosterId,
+          participants: room.participants,
+          status: room.status,
+          lastMessageAt: room.lastMessageAt,
+          messageCount: room.messageCount,
+          createdAt: (room as any).createdAt,
+        })),
       };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
     }
-
-    return {
-      success: true,
-      data,
-      format: 'json',
-      filename: `chat-export-${from}-${to}.json`,
-    };
   }
 
-  // Public: Get messages for a room (for participants)
-  @Get('rooms/:roomId/messages/public')
-  async getMessages(
+  // Get messages for a room
+  @Get('rooms/:roomId/messages')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiParam({ name: 'roomId', description: 'Chat room ID' })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of messages to retrieve',
+    required: false,
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Room messages retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Room not found' })
+  async getRoomMessages(
     @Param('roomId') roomId: string,
     @Query('limit') limit = '50',
-    @Query('offset') offset = '0',
   ) {
-    const messages = await this.chatService.getRoomMessages(
-      roomId,
-      undefined, // cursor
-      parseInt(limit, 10),
-    );
+    try {
+      const messages = await this.chatService.getRoomMessages(
+        roomId,
+        undefined, // cursor
+        parseInt(limit, 10),
+      );
 
-    return {
-      success: true,
-      data: messages,
-      roomId,
-    };
+      return {
+        success: true,
+        data: messages,
+        roomId,
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
   }
 
-  // Public: Mark messages as read
-  @Post('rooms/:roomId/reads')
-  async markAsRead(
-    @Param('roomId') roomId: string,
-    @Body() body: { lastReadMessageId?: string },
+  // Check if chat room exists for an ad
+  @Get('rooms/check/:adId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiParam({
+    name: 'adId',
+    description: 'Ad ID to check for existing chat room',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat room existence checked successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Bad request - Invalid ad ID' })
+  async checkExistingChatRoom(
+    @Param('adId') adId: string,
+    @Request() req: any,
   ) {
-    // Note: User ID comes from JWT token via guard
-    if (body.lastReadMessageId) {
-      await this.chatService.markMessagesAsRead(roomId, body.lastReadMessageId);
+    const userId = req.user.id || req.user._id;
+
+    if (!userId) {
+      throw new BadRequestException('User ID not found in request');
     }
 
-    return {
-      success: true,
-      message: 'Messages marked as read',
-      roomId,
-    };
-  }
+    try {
+      const existingRoom = await this.chatService.findExistingChatRoom(
+        userId,
+        adId,
+      );
 
-  // Public: Get unread count for a room
-  @Get('rooms/:roomId/unread-count')
-  async getUnreadCount(@Param('roomId') roomId: string) {
-    const count = await this.chatService.getUnreadCount(roomId);
-
-    return {
-      success: true,
-      data: { unreadCount: count },
-      roomId,
-    };
-  }
-
-  private convertToCSV(data: any[]): string {
-    if (!data.length) return '';
-
-    const headers = Object.keys(data[0]);
-    const csvRows = [
-      headers.join(','),
-      ...data.map((row) =>
-        headers.map((header) => JSON.stringify(row[header] || '')).join(','),
-      ),
-    ];
-
-    return csvRows.join('\n');
+      return {
+        success: true,
+        data: {
+          exists: !!existingRoom,
+          roomId: existingRoom?.roomId || null,
+        },
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
   }
 }
