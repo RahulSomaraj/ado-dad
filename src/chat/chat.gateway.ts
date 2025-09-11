@@ -269,6 +269,9 @@ export class ChatGateway
 
       this.logger.log(`🟢 [sendMessage] Sending callback response:`, response);
       callback?.(response);
+
+      // Also emit custom event for consistency
+      client.emit('sendMessageResponse', response);
     } catch (e: any) {
       this.logger.error(`❌ [sendMessage] Error: ${e.message}`);
       this.logger.error(`❌ [sendMessage] Stack: ${e.stack}`);
@@ -369,6 +372,9 @@ export class ChatGateway
       };
 
       callback?.(response);
+
+      // Also emit custom event for consistency
+      client.emit('joinChatRoomResponse', response);
 
       // Notify others (not the joiner)
       client.to(roomId).emit('userJoinedRoom', {
