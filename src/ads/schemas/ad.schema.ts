@@ -49,4 +49,5 @@ AdSchema.index(
 );
 AdSchema.index({ isActive: 1, location: 1, price: 1 }, { background: true });
 AdSchema.index({ postedBy: 1, isActive: 1 }, { background: true });
-AdSchema.index({ title: 'text', description: 'text' }, { background: true });
+// Text index for search functionality - only description field exists
+AdSchema.index({ description: 'text' }, { background: true });

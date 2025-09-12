@@ -163,10 +163,9 @@ export class AdsService {
     // ------- Pipeline -------
     const pipeline: any[] = [];
 
-    // Optional search: prefer $text if you have a text index; fallback could be regex
-    if (search && `${search}`.trim()) {
-      pipeline.push({ $match: { $text: { $search: `${search}`.trim() } } });
-    }
+    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
+    // Store search term for later use
+    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
 
     // Base visibility: show everything when no filters (except soft-deleted)
     pipeline.push({ $match: { isDeleted: { $ne: true } } });
@@ -556,6 +555,40 @@ export class AdsService {
           as: 'vehicleVariantInfo',
         },
       },
+      // Fuel type lookup for search
+      {
+        $lookup: {
+          from: 'fueltypes',
+          localField: 'vehicleDetails.fuelTypeId',
+          foreignField: '_id',
+          as: 'vehicleFuelTypeInfo',
+        },
+      },
+      {
+        $lookup: {
+          from: 'fueltypes',
+          localField: 'commercialVehicleDetails.fuelTypeId',
+          foreignField: '_id',
+          as: 'commercialVehicleFuelTypeInfo',
+        },
+      },
+      // Transmission type lookup for search
+      {
+        $lookup: {
+          from: 'transmissiontypes',
+          localField: 'vehicleDetails.transmissionTypeId',
+          foreignField: '_id',
+          as: 'vehicleTransmissionTypeInfo',
+        },
+      },
+      {
+        $lookup: {
+          from: 'transmissiontypes',
+          localField: 'commercialVehicleDetails.transmissionTypeId',
+          foreignField: '_id',
+          as: 'commercialVehicleTransmissionTypeInfo',
+        },
+      },
     );
 
     // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
@@ -670,8 +703,20 @@ export class AdsService {
       pipeline.push({
         $match: {
           $or: [
-            // Search in ad title
-            { title: { $regex: searchTerm, $options: 'i' } },
+            // Search in ad description
+            { description: { $regex: searchTerm, $options: 'i' } },
+            // Search in location
+            { location: { $regex: searchTerm, $options: 'i' } },
+            // Search in price (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$price' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
             // Search in manufacturer names
             { 'manufacturerInfo.name': { $regex: searchTerm, $options: 'i' } },
             {
@@ -710,6 +755,142 @@ export class AdsService {
                 $options: 'i',
               },
             },
+            // Search in vehicle details
+            { 'vehicleDetails.color': { $regex: searchTerm, $options: 'i' } },
+            {
+              'commercialVehicleDetails.color': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in year (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$vehicleDetails.year' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.year' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in mileage (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$vehicleDetails.mileage' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.mileage' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in additional features
+            {
+              'vehicleDetails.additionalFeatures': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.additionalFeatures': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in property details
+            {
+              'propertyDetails.propertyType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in commercial vehicle details
+            {
+              'commercialVehicleDetails.commercialVehicleType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.bodyType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in payload capacity (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $toString: '$commercialVehicleDetails.payloadCapacity',
+                  },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in axle count (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.axleCount' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in seating capacity (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $toString: '$commercialVehicleDetails.seatingCapacity',
+                  },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in fuel type names
+            {
+              'vehicleFuelTypeInfo.name': { $regex: searchTerm, $options: 'i' },
+            },
+            {
+              'commercialVehicleFuelTypeInfo.name': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in transmission type names
+            {
+              'vehicleTransmissionTypeInfo.name': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleTransmissionTypeInfo.name': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
           ],
         },
       });
@@ -729,6 +910,10 @@ export class AdsService {
         commercialManufacturerInfo: 0,
         vehicleModelInfo: 0,
         vehicleVariantInfo: 0,
+        vehicleFuelTypeInfo: 0,
+        commercialVehicleFuelTypeInfo: 0,
+        vehicleTransmissionTypeInfo: 0,
+        commercialVehicleTransmissionTypeInfo: 0,
       },
     });
 
