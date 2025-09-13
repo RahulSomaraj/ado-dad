@@ -12,6 +12,8 @@ export enum AdCategory {
 
 @Schema({ timestamps: true })
 export class Ad {
+  _id: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   description: string;
 
@@ -32,6 +34,9 @@ export class Ad {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   postedBy: mongoose.Types.ObjectId;
+
+  @Prop({ required: false, trim: true })
+  title?: string;
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);

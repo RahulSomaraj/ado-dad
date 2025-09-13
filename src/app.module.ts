@@ -16,6 +16,7 @@ import { UsersModule } from './users/users.module';
 
 // Feature modules
 import { AdsModule } from './ads/ads.module';
+import { AdsV2Module } from './ads-v2/ads.v2.module';
 import { BannerModule } from './banner/banner.module';
 import { CartModule } from './cart/cart.module';
 import { CategoryModule } from './category/category.module';
@@ -104,6 +105,7 @@ import { configService } from './config/mongo.config';
     AuthModule,
     UsersModule,
     AdsModule,
+    AdsV2Module,
     BannerModule,
     CartModule,
     CategoryModule,
