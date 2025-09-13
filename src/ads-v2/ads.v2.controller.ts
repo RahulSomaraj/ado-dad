@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Get,
   UseGuards,
   Req,
   BadRequestException,
@@ -23,7 +24,9 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { CreateAdV2Dto } from './dto/create-ad-v2.dto';
+import { ListAdsV2Dto } from './dto/list-ads-v2.dto';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
+import { ListAdsUc } from './application/use-cases/list-ads.uc';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../auth/guard/roles.decorator';
@@ -36,7 +39,10 @@ import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
 export class AdsV2Controller {
-  constructor(private readonly createAdUc: CreateAdUc) {}
+  constructor(
+    private readonly createAdUc: CreateAdUc,
+    private readonly listAdsUc: ListAdsUc,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -337,6 +343,306 @@ export class AdsV2Controller {
       return result as DetailedAdResponseDto;
     } catch (error) {
       console.error('Error creating v2 advertisement:', error);
+      throw error;
+    }
+  }
+
+  @Post('list')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get advertisements with basic filtering (v2)',
+    description: `
+      Retrieve advertisements with simple filtering capabilities.
+      
+      **Features:**
+      - Basic category filtering
+      - Text search across title and description
+      - Location filtering
+      - Price range filtering
+      - Pagination and sorting
+      - All filters are optional
+      
+      **Response includes:**
+      - Advertisement details
+      - User information
+      - Category-specific details
+      - Pagination metadata
+    `,
+  })
+  @ApiBody({
+    description: 'Advertisement listing filters',
+    type: ListAdsV2Dto,
+    examples: {
+      basic: {
+        summary: 'Basic listing',
+        description: 'Get all ads with default pagination',
+        value: {
+          page: 1,
+          limit: 20,
+        },
+      },
+      property: {
+        summary: 'Property ads',
+        description: 'Get property ads in Mumbai',
+        value: {
+          category: 'property',
+          location: 'Mumbai',
+          minPrice: 100000,
+          maxPrice: 5000000,
+          page: 1,
+          limit: 10,
+        },
+      },
+      search: {
+        summary: 'Search ads',
+        description: 'Search for specific terms',
+        value: {
+          search: 'apartment',
+          location: 'Delhi',
+          page: 1,
+          limit: 20,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisements retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              title: { type: 'string', example: 'Beautiful 2BHK Apartment' },
+              description: { type: 'string', example: 'Spacious apartment...' },
+              price: { type: 'number', example: 5000000 },
+              location: { type: 'string', example: 'Mumbai, Maharashtra' },
+              category: { type: 'string', example: 'property' },
+              isActive: { type: 'boolean', example: true },
+              status: { type: 'string', example: 'active' },
+              postedAt: { type: 'string', format: 'date-time' },
+              updatedAt: { type: 'string', format: 'date-time' },
+              postedBy: { type: 'string', example: '507f1f77bcf86cd799439021' },
+              user: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  email: { type: 'string' },
+                  phone: { type: 'string' },
+                },
+              },
+              propertyDetails: {
+                type: 'object',
+                description: 'Property-specific details (for property ads)',
+                properties: {
+                  propertyType: { type: 'string' },
+                  bedrooms: { type: 'number' },
+                  bathrooms: { type: 'number' },
+                  areaSqft: { type: 'number' },
+                  floor: { type: 'number' },
+                  isFurnished: { type: 'boolean' },
+                  hasParking: { type: 'boolean' },
+                  hasGarden: { type: 'boolean' },
+                  amenities: { type: 'array', items: { type: 'string' } },
+                },
+              },
+              vehicleDetails: {
+                type: 'object',
+                description:
+                  'Vehicle-specific details with manufacturer, model, fuel, and transmission info',
+                properties: {
+                  vehicleType: { type: 'string' },
+                  year: { type: 'number' },
+                  mileage: { type: 'number' },
+                  color: { type: 'string' },
+                  isFirstOwner: { type: 'boolean' },
+                  hasInsurance: { type: 'boolean' },
+                  hasRcBook: { type: 'boolean' },
+                  additionalFeatures: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                  manufacturer: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                  model: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                      vehicleType: { type: 'string' },
+                      bodyType: { type: 'string' },
+                    },
+                  },
+                  variant: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                      price: { type: 'number' },
+                    },
+                  },
+                  fuelType: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                  transmissionType: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                },
+              },
+              commercialVehicleDetails: {
+                type: 'object',
+                description:
+                  'Commercial vehicle-specific details with manufacturer, model, fuel, and transmission info',
+                properties: {
+                  commercialVehicleType: { type: 'string' },
+                  bodyType: { type: 'string' },
+                  year: { type: 'number' },
+                  mileage: { type: 'number' },
+                  payloadCapacity: { type: 'number' },
+                  payloadUnit: { type: 'string' },
+                  axleCount: { type: 'number' },
+                  color: { type: 'string' },
+                  hasInsurance: { type: 'boolean' },
+                  hasFitness: { type: 'boolean' },
+                  hasPermit: { type: 'boolean' },
+                  seatingCapacity: { type: 'number' },
+                  additionalFeatures: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                  manufacturer: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                  model: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                      vehicleType: { type: 'string' },
+                      bodyType: { type: 'string' },
+                    },
+                  },
+                  variant: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                      price: { type: 'number' },
+                    },
+                  },
+                  fuelType: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                  transmissionType: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      name: { type: 'string' },
+                      displayName: { type: 'string' },
+                    },
+                  },
+                },
+              },
+              images: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+        total: { type: 'number', example: 150 },
+        page: { type: 'number', example: 1 },
+        limit: { type: 'number', example: 20 },
+        totalPages: { type: 'number', example: 8 },
+        hasNext: { type: 'boolean', example: true },
+        hasPrev: { type: 'boolean', example: false },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid request parameters',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'Validation failed',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  async list(@Body() dto: ListAdsV2Dto) {
+    try {
+      console.log('Listing v2 advertisements with filters:', dto);
+
+      const result = await this.listAdsUc.exec(dto);
+
+      console.log(
+        `v2 Advertisements retrieved: ${result.data.length} of ${result.total}`,
+      );
+      return result;
+    } catch (error) {
+      console.error('Error listing v2 advertisements:', error);
       throw error;
     }
   }

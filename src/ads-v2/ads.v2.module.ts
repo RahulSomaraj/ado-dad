@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdsV2Controller } from './ads.v2.controller';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
+import { ListAdsUc } from './application/use-cases/list-ads.uc';
 
 // Repositories
 import { AdRepository } from './infrastructure/repos/ad.repo';
@@ -63,6 +64,7 @@ const OutboxSchema = {
   providers: [
     // Use cases
     CreateAdUc,
+    ListAdsUc,
 
     // Repositories
     AdRepository,
@@ -84,6 +86,7 @@ const OutboxSchema = {
   exports: [
     // Export use cases for potential external use
     CreateAdUc,
+    ListAdsUc,
 
     // Export services for potential external use
     IdempotencyService,

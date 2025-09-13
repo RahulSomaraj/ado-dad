@@ -390,4 +390,8 @@ export class AdRepository {
   ): Promise<any> {
     return this.model.deleteOne(filter, options).exec();
   }
+
+  async aggregate(pipeline: any[]): Promise<any[]> {
+    return this.model.aggregate(pipeline).exec();
+  }
 }
