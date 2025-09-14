@@ -22,7 +22,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     // 🔹 Check if user exists
     console.log('JWT Strategy - Payload:', payload);
-    
+
     // Try to find user by ID (handle both string and ObjectId)
     let user;
     try {
@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // If findById fails, try to find by _id field
       user = await this.userModel.findOne({ _id: payload.id }).exec();
     }
-    
+
     console.log('JWT Strategy - User from DB:', user);
 
     if (!user) {
@@ -52,7 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const userWithType = {
       ...user.toObject(),
       id: (user as any)._id.toString(), // Add id property for compatibility
-      userType: payload.userType || (user as any).userType,
+      type: (user as any).type, // Use the correct property name from schema
     };
 
     console.log('JWT Strategy - Final user object:', userWithType);

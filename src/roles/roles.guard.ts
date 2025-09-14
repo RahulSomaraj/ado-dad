@@ -19,7 +19,13 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
 
-    // If user.userType is a single value, check if it exists in requiredRoles
+    // Check if user exists and has type property
+    if (!user || !user.type) {
+      console.log('RolesGuard - User or type not found:', { user });
+      return false;
+    }
+
+    // If user.type is a single value, check if it exists in requiredRoles
     return requiredRoles.includes(user.type);
   }
 }
