@@ -32,8 +32,8 @@ import { UserType } from '../users/enums/user.types';
 @ApiBearerAuth()
 @Controller('favorites')
 @UseFilters(new HttpExceptionFilter('Favorites'))
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN) // Temporarily disabled for testing
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
@@ -45,13 +45,15 @@ export class FavoriteController {
   })
   @ApiBody({ type: CreateFavoriteDto })
   async addFavorite(@Req() req, @Body() createFavoriteDto: CreateFavoriteDto) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return this.favoriteService.addFavorite(userId, createFavoriteDto);
   }
 
   @Get()
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
     summary: "Get user's favorite ads with detailed information",
     description:
@@ -70,31 +72,22 @@ export class FavoriteController {
     description: 'Number of items per page',
   })
   @ApiQuery({
-    name: 'category',
-    required: false,
-    type: String,
-    description: 'Filter by ad category',
-  })
-  @ApiQuery({
     name: 'itemId',
     required: false,
     type: String,
     description: 'Filter by specific item ID',
   })
-  @ApiQuery({
-    name: 'itemType',
-    required: false,
-    enum: ['ad'],
-    description: 'Filter by item type',
-  })
   async getUserFavorites(@Req() req, @Query() query) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    // Get user ID from JWT token
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return await this.favoriteService.getUserFavorites(userId, query);
   }
 
   @Get(':favoriteId')
-  @Roles(UserType.USER, UserType.ADMIN)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
     summary: 'Get a specific favorite by ID with detailed information',
     description:
@@ -106,13 +99,15 @@ export class FavoriteController {
     description: 'MongoDB ObjectId of the favorite',
   })
   async getFavoriteById(@Req() req, @Param('favoriteId') favoriteId: string) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return await this.favoriteService.getFavoriteById(userId, favoriteId);
   }
 
   @Put(':favoriteId')
-  @Roles(UserType.USER)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({ summary: 'Update a favorite' })
   @ApiParam({ name: 'favoriteId', type: String })
   @ApiBody({ type: UpdateFavoriteDto })
@@ -121,8 +116,10 @@ export class FavoriteController {
     @Param('favoriteId') favoriteId: string,
     @Body() updateFavoriteDto: UpdateFavoriteDto,
   ) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return await this.favoriteService.updateFavorite(
       userId,
       favoriteId,
@@ -131,17 +128,19 @@ export class FavoriteController {
   }
 
   @Delete(':favoriteId')
-  @Roles(UserType.USER)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({ summary: 'Remove an item from favorites' })
   @ApiParam({ name: 'favoriteId', type: String })
   async removeFavorite(@Req() req, @Param('favoriteId') favoriteId: string) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return await this.favoriteService.removeFavorite(userId, favoriteId);
   }
 
   @Post('toggle/:adId')
-  @Roles(UserType.USER, UserType.SHOWROOM)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
     summary: 'Toggle favorite status for an ad',
     description:
@@ -154,28 +153,26 @@ export class FavoriteController {
     example: '65b90e8f5d9f6c001c5a1234',
   })
   async toggleFavorite(@Req() req, @Param('adId') adId: string) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
     return await this.favoriteService.toggleFavorite(userId, adId);
   }
 
   @Get('count/total')
-  @Roles(UserType.USER, UserType.SHOWROOM)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
     summary: "Get user's total favorites count",
     description:
       'Returns the total number of ads favorited by the current user',
   })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    type: String,
-    description: 'Filter by ad category',
-  })
-  async getFavoritesCount(@Req() req, @Query() query: any) {
-    // For testing - use a hardcoded user ID or get from request if available
-    const userId = req.user?.id || '65b90e8f5d9f6c001c5a1230'; // Replace with actual user ID for testing
-    const count = await this.favoriteService.getFavoritesCount(userId, query);
+  async getFavoritesCount(@Req() req) {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
+    const count = await this.favoriteService.getFavoritesCount(userId);
     return count;
   }
 }
