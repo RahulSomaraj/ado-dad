@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
@@ -24,6 +25,7 @@ import {
   ApiConsumes,
   ApiBody,
   ApiParam,
+  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AdsService } from '../services/ads.service';
@@ -987,6 +989,82 @@ export class AdsController {
     if (!userId) {
       throw new BadRequestException('User ID not found in request');
     }
+    return this.adsService.getUserAds(userId, filterDto);
+  }
+
+  // Get ads by user ID
+  @Get('user/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @ApiOperation({
+    summary: 'Get advertisements by user ID',
+    description:
+      'Retrieve all advertisements posted by a specific user with pagination and sorting',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID to filter ads by',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 20, max: 100)',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Sort field (default: createdAt)',
+    enum: ['createdAt', 'title', 'price', 'updatedAt'],
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    type: String,
+    description: 'Sort order (default: DESC)',
+    enum: ['ASC', 'DESC'],
+    example: 'DESC',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User advertisements retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  async getAdsByUser(
+    @Param('userId') userId: string,
+    @Query()
+    query: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
+  ) {
+    const filterDto: FilterAdDto = {
+      page: query.page,
+      limit: query.limit,
+      sortBy: query.sortBy as any,
+      sortOrder: query.sortOrder,
+    };
+
     return this.adsService.getUserAds(userId, filterDto);
   }
 }
