@@ -37,6 +37,9 @@ export class Ad {
 
   @Prop({ required: false, trim: true })
   title?: string;
+
+  @Prop({ default: 0 })
+  viewCount?: number;
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);

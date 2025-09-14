@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Param,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -27,6 +28,7 @@ import { CreateAdV2Dto } from './dto/create-ad-v2.dto';
 import { ListAdsV2Dto } from './dto/list-ads-v2.dto';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
+import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../auth/guard/roles.decorator';
@@ -42,6 +44,7 @@ export class AdsV2Controller {
   constructor(
     private readonly createAdUc: CreateAdUc,
     private readonly listAdsUc: ListAdsUc,
+    private readonly getAdByIdUc: GetAdByIdUc,
   ) {}
 
   @Post()
@@ -673,6 +676,77 @@ export class AdsV2Controller {
       return result;
     } catch (error) {
       console.error('Error listing v2 advertisements:', error);
+      throw error;
+    }
+  }
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Get advertisement by ID with complete details and all relations (v2)',
+    description: `
+      Retrieve a single advertisement with comprehensive details including all relations.
+      
+      **Features:**
+      - Complete advertisement information
+      - Enhanced user details (name, email, phone, profile picture, type)
+      - Category-specific details (property, vehicle, commercial vehicle)
+      - Vehicle inventory details (manufacturer, model, variant, transmission, fuel)
+      - Chat relations (participants, last messages, chat count)
+      - Engagement metrics (favorites count, view count, user's favorite status)
+      - Ratings and reviews (when available)
+      - View count tracking (increments on each request)
+      
+      **Response includes:**
+      - Advertisement details
+      - User information with enhanced profile data
+      - Property details (for property ads)
+      - Vehicle details with inventory information (for vehicle ads)
+      - Commercial vehicle details (for commercial vehicle ads)
+      - Related chat rooms and messages
+      - Favorites and engagement metrics
+      - View count and analytics data
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement retrieved successfully with all relations',
+    type: DetailedAdResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid advertisement ID format',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Advertisement not found',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing JWT token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  async getById(
+    @Param('id') id: string,
+    @Req() req: any,
+  ): Promise<DetailedAdResponseDto> {
+    try {
+      console.log(`v2 Get advertisement by ID: ${id}`);
+
+      const userId = req?.user?.id;
+      const result = await this.getAdByIdUc.exec({ adId: id, userId });
+
+      console.log(`v2 Advertisement retrieved: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error('Error getting v2 advertisement by ID:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw error;
     }
   }

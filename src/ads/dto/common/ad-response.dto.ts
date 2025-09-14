@@ -22,8 +22,6 @@ export class AdResponseDto {
   })
   year?: number;
 
-  
-
   @ApiPropertyOptional({
     description: 'Advertisement images URLs',
     type: [String],
@@ -292,6 +290,12 @@ export class DetailedAdResponseDto extends AdResponseDto {
     };
     createdAt: Date;
   }>;
+
+  @ApiPropertyOptional({ description: 'View count' })
+  viewCount?: number;
+
+  @ApiPropertyOptional({ description: 'Has user chat with this ad' })
+  hasUserChat?: boolean;
 }
 
 export class PaginatedAdResponseDto {
@@ -318,7 +322,10 @@ export class PaginatedAdResponseDto {
 }
 
 export class PaginatedDetailedAdResponseDto {
-  @ApiProperty({ description: 'List of advertisements with details', type: [DetailedAdResponseDto] })
+  @ApiProperty({
+    description: 'List of advertisements with details',
+    type: [DetailedAdResponseDto],
+  })
   data: DetailedAdResponseDto[];
 
   @ApiProperty({ description: 'Total number of advertisements' })

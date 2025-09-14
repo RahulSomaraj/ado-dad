@@ -28,6 +28,11 @@ import {
 
 // Related schemas for comprehensive ad details
 import { Favorite, FavoriteSchema } from '../favorites/schemas/schema.favorite';
+import { ChatRoom, ChatRoomSchema } from '../chat/schemas/chat-room.schema';
+import {
+  ChatMessage,
+  ChatMessageSchema,
+} from '../chat/schemas/chat-message.schema';
 
 // External modules and services
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
@@ -44,6 +49,8 @@ import { RedisService } from '../shared/redis.service';
       { name: CommercialVehicleAd.name, schema: CommercialVehicleAdSchema },
       { name: PropertyType.name, schema: PropertyTypeSchema },
       { name: Favorite.name, schema: FavoriteSchema },
+      { name: ChatRoom.name, schema: ChatRoomSchema },
+      { name: ChatMessage.name, schema: ChatMessageSchema },
     ]),
     // External modules
     VehicleInventoryModule,

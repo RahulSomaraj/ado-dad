@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AdsV2Controller } from './ads.v2.controller';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
+import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
 
 // Repositories
 import { AdRepository } from './infrastructure/repos/ad.repo';
@@ -33,6 +34,12 @@ import {
   CommercialVehicleAd,
   CommercialVehicleAdSchema,
 } from '../ads/schemas/commercial-vehicle-ad.schema';
+import { Favorite, FavoriteSchema } from '../favorites/schemas/schema.favorite';
+import { ChatRoom, ChatRoomSchema } from '../chat/schemas/chat-room.schema';
+import {
+  ChatMessage,
+  ChatMessageSchema,
+} from '../chat/schemas/chat-message.schema';
 
 // Outbox schema
 const OutboxSchema = {
@@ -56,6 +63,9 @@ const OutboxSchema = {
       { name: PropertyAd.name, schema: PropertyAdSchema },
       { name: VehicleAd.name, schema: VehicleAdSchema },
       { name: CommercialVehicleAd.name, schema: CommercialVehicleAdSchema },
+      { name: Favorite.name, schema: FavoriteSchema },
+      { name: ChatRoom.name, schema: ChatRoomSchema },
+      { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: 'Outbox', schema: OutboxSchema },
     ]),
     VehicleInventoryModule,
@@ -65,6 +75,7 @@ const OutboxSchema = {
     // Use cases
     CreateAdUc,
     ListAdsUc,
+    GetAdByIdUc,
 
     // Repositories
     AdRepository,
@@ -87,6 +98,7 @@ const OutboxSchema = {
     // Export use cases for potential external use
     CreateAdUc,
     ListAdsUc,
+    GetAdByIdUc,
 
     // Export services for potential external use
     IdempotencyService,

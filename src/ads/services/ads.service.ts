@@ -17,6 +17,14 @@ import {
   Favorite,
   FavoriteDocument,
 } from '../../favorites/schemas/schema.favorite';
+import {
+  ChatRoom,
+  ChatRoomDocument,
+} from '../../chat/schemas/chat-room.schema';
+import {
+  ChatMessage,
+  ChatMessageDocument,
+} from '../../chat/schemas/chat-message.schema';
 
 import { FilterAdDto } from '../dto/common/filter-ad.dto';
 import {
@@ -50,6 +58,10 @@ export class AdsService {
     private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
+    @InjectModel(ChatRoom.name)
+    private readonly chatRoomModel: Model<ChatRoomDocument>,
+    @InjectModel(ChatMessage.name)
+    private readonly messageModel: Model<ChatMessageDocument>,
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
@@ -1069,20 +1081,36 @@ export class AdsService {
       await this.redisService.cacheGet<DetailedAdResponseDto>(cacheKey);
     if (cached) return cached;
 
-    // Basic pipeline with core lookups
+    // Enhanced pipeline with comprehensive lookups
     const pipeline = [
       { $match: { _id: new Types.ObjectId(id), isDeleted: { $ne: true } } },
-      // User information
+
+      // Enhanced user information with more details
       {
         $lookup: {
           from: 'users',
           localField: 'postedBy',
           foreignField: '_id',
           as: 'user',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                name: 1,
+                email: 1,
+                phoneNumber: 1,
+                profilePic: 1,
+                type: 1,
+                createdAt: 1,
+                isDeleted: 1,
+              },
+            },
+          ],
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-      // Property details
+
+      // Property details with enhanced lookup
       {
         $lookup: {
           from: 'propertyads',
@@ -1091,7 +1119,8 @@ export class AdsService {
           as: 'propertyDetails',
         },
       },
-      // Vehicle details
+
+      // Vehicle details with enhanced lookup
       {
         $lookup: {
           from: 'vehicleads',
@@ -1100,13 +1129,21 @@ export class AdsService {
           as: 'vehicleDetails',
         },
       },
-      // Commercial vehicle details
+
+      // Commercial vehicle details with enhanced lookup
       {
         $lookup: {
           from: 'commercialvehicleads',
           localField: '_id',
           foreignField: 'ad',
           as: 'commercialVehicleDetails',
+        },
+      },
+
+      // Add view count (increment on each request)
+      {
+        $addFields: {
+          viewCount: { $ifNull: ['$viewCount', 0] },
         },
       },
     ];
@@ -1117,6 +1154,13 @@ export class AdsService {
     }
 
     const ad = results[0];
+
+    // Increment view count
+    await this.adModel.updateOne(
+      { _id: new Types.ObjectId(id) },
+      { $inc: { viewCount: 1 } },
+    );
+
     const detailed = this.mapToDetailedResponseDto(ad);
 
     // Populate vehicle inventory details with sub-relations
@@ -1145,6 +1189,9 @@ export class AdsService {
       detailed.isFavorited = !!userFavorite;
     }
 
+    // Get chat relations
+    await this.populateChatRelations(detailed, userId);
+
     // Get ratings and reviews (if rating system exists for ads)
     const ratings = await this.getAdRatings(id);
     if (ratings) {
@@ -1152,6 +1199,9 @@ export class AdsService {
       detailed.ratingsCount = ratings.ratingsCount;
       detailed.reviews = ratings.reviews;
     }
+
+    // Add view count to response
+    detailed.viewCount = (ad.viewCount || 0) + 1;
 
     await this.redisService.cacheSet(cacheKey, detailed, AdsService.TTL.BY_ID);
     return detailed;
@@ -1658,6 +1708,78 @@ export class AdsService {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('❌ Error warming up ads cache:', error);
+    }
+  }
+
+  /** ---------- CHAT RELATIONS ENRICHMENT ---------- */
+  private async populateChatRelations(
+    detailedAd: DetailedAdResponseDto,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      // Get chat rooms related to this ad
+      const chatRooms = await this.chatRoomModel
+        .find({ adId: new Types.ObjectId(detailedAd.id) })
+        .populate('initiatorId', 'name email profilePic')
+        .populate('adPosterId', 'name email profilePic')
+        .sort({ lastMessageAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get last message for each chat room
+      const chatRoomsWithMessages = await Promise.all(
+        chatRooms.map(async (room: any) => {
+          const lastMessage = await this.messageModel
+            .findOne({ roomId: room._id })
+            .sort({ createdAt: -1 })
+            .populate('senderId', 'name')
+            .lean();
+
+          return {
+            id: room._id.toString(),
+            participants: [
+              {
+                id: room.initiatorId._id.toString(),
+                name: room.initiatorId.name || 'Unknown',
+                email: room.initiatorId.email || '',
+              },
+              {
+                id: room.adPosterId._id.toString(),
+                name: room.adPosterId.name || 'Unknown',
+                email: room.adPosterId.email || '',
+              },
+            ],
+            lastMessage: lastMessage
+              ? {
+                  content: lastMessage.content,
+                  createdAt: (lastMessage as any).createdAt || new Date(),
+                  sender: (lastMessage as any).senderId?.name || 'Unknown',
+                }
+              : undefined,
+            createdAt: room.createdAt || new Date(),
+          };
+        }),
+      );
+
+      detailedAd.chats = chatRoomsWithMessages;
+      detailedAd.chatsCount = chatRooms.length;
+
+      // Check if current user has an active chat with this ad
+      if (userId) {
+        const userChatRoom = await this.chatRoomModel.findOne({
+          adId: new Types.ObjectId(detailedAd.id),
+          $or: [
+            { initiatorId: new Types.ObjectId(userId) },
+            { adPosterId: new Types.ObjectId(userId) },
+          ],
+        });
+        detailedAd.hasUserChat = !!userChatRoom;
+      }
+    } catch (error) {
+      console.error('Error populating chat relations:', error);
+      // Don't throw error, just set empty values
+      detailedAd.chats = [];
+      detailedAd.chatsCount = 0;
     }
   }
 
