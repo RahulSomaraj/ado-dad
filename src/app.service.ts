@@ -19,6 +19,8 @@ export interface LoginResponse {
   userName: string;
   email: string;
   userType: string;
+  phoneNumber: string;
+  profilePic?: string;
 }
 
 interface TokenPayload {
@@ -83,6 +85,8 @@ export class AppService {
         userName: user.name,
         email: user.email,
         userType: user.type,
+        phoneNumber: user.phoneNumber,
+        profilePic: user.profilePic,
       };
     } catch (error) {
       this.logger.error(`Login failed for user ${user.email}:`, error);
@@ -133,6 +137,8 @@ export class AppService {
         userName: user.name,
         email: user.email,
         userType: user.type,
+        phoneNumber: user.phoneNumber,
+        profilePic: user.profilePic,
       };
     } catch (error) {
       this.logger.error(`Token refresh failed for user ${user.email}:`, error);

@@ -12,7 +12,7 @@ import {
   Res,
   Header,
 } from '@nestjs/common';
-import { AppService } from './app.service';
+import { AppService, LoginResponse } from './app.service';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { RefreshTokenGuard } from './auth/guard/refresh-guard';
 import { RefreshTokenDto } from './auth/dto/refresh-token.dto';
@@ -301,14 +301,7 @@ export class AppController {
   login(
     @Body() userLoginDto: LoginUserDto,
     @Request() req,
-  ): Promise<{
-    id: any;
-    token: string;
-    refreshToken: string;
-    userName: string;
-    email: string;
-    userType: string;
-  }> {
+  ): Promise<LoginResponse> {
     console.log('🚀 Login endpoint called with:', {
       username: userLoginDto.username,
       password: '***',

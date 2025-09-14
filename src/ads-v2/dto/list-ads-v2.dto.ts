@@ -21,8 +21,9 @@ export class ListAdsV2Dto {
   category?: AdCategoryV2;
 
   @ApiPropertyOptional({
-    description: 'Search term for title and description',
-    example: 'apartment',
+    description:
+      'Enhanced search term across ad content and vehicle inventory details. Searches in: title, description, manufacturer names, model names, variant names, fuel types, and transmission types',
+    example: 'honda civic automatic',
   })
   @IsOptional()
   @IsString()

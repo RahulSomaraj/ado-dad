@@ -350,13 +350,19 @@ export class AdsV2Controller {
   @Post('list')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Get advertisements with basic filtering (v2)',
+    summary: 'Get advertisements with enhanced filtering and search (v2)',
     description: `
-      Retrieve advertisements with simple filtering capabilities.
+      Retrieve advertisements with comprehensive filtering and search capabilities.
       
       **Features:**
       - Basic category filtering
-      - Text search across title and description
+      - Enhanced text search across:
+        - Ad title and description
+        - Vehicle manufacturer names (Honda, Toyota, etc.)
+        - Vehicle model names (Civic, Camry, etc.)
+        - Vehicle variant names (LX, EX, etc.)
+        - Fuel type names (Petrol, Diesel, Electric, etc.)
+        - Transmission type names (Manual, Automatic, CVT, etc.)
       - Location filtering
       - Price range filtering
       - Pagination and sorting
@@ -365,7 +371,9 @@ export class AdsV2Controller {
       **Response includes:**
       - Advertisement details
       - User information
-      - Category-specific details
+      - Detailed vehicle information with manufacturer, model, fuel, transmission details
+      - Property details (for property ads)
+      - Commercial vehicle details (for commercial vehicle ads)
       - Pagination metadata
     `,
   })
@@ -394,13 +402,35 @@ export class AdsV2Controller {
         },
       },
       search: {
-        summary: 'Search ads',
-        description: 'Search for specific terms',
+        summary: 'Enhanced search ads',
+        description: 'Search across ad content and vehicle inventory details',
         value: {
-          search: 'apartment',
-          location: 'Delhi',
+          search: 'honda civic',
+          location: 'Mumbai',
           page: 1,
           limit: 20,
+        },
+      },
+      vehicleSearch: {
+        summary: 'Search by vehicle details',
+        description:
+          'Search by manufacturer, model, fuel type, or transmission',
+        value: {
+          search: 'toyota automatic',
+          category: 'private_vehicle',
+          page: 1,
+          limit: 10,
+        },
+      },
+      fuelSearch: {
+        summary: 'Search by fuel type',
+        description:
+          'Find vehicles by fuel type (petrol, diesel, electric, etc.)',
+        value: {
+          search: 'electric',
+          category: 'private_vehicle',
+          page: 1,
+          limit: 15,
         },
       },
     },
