@@ -967,6 +967,18 @@ export class AdsService {
     return response;
   }
 
+  /** ---------- CHECK IF AD EXISTS ---------- */
+  async exists(id: string): Promise<boolean> {
+    if (!this.isValidId(id)) {
+      return false;
+    }
+    const count = await this.adModel.countDocuments({
+      _id: new Types.ObjectId(id),
+      isDeleted: { $ne: true },
+    });
+    return count > 0;
+  }
+
   /** ---------- FIND ONE ---------- */
   async findOne(id: string): Promise<AdResponseDto> {
     if (!this.isValidId(id)) {
