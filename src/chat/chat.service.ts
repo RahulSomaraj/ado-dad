@@ -236,13 +236,13 @@ export class ChatService {
     console.log('getUserChatRooms - userId:', userId, 'type:', typeof userId);
     this.validateObjectId(userId, 'User ID');
 
-    // Ensure userId is a string for the query
-    const userIdString =
-      typeof userId === 'string' ? userId : userId.toString();
+    // Convert userId to ObjectId for proper comparison
+    const userIdObjectId =
+      typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
 
     return this.chatRoomModel
       .find({
-        $or: [{ initiatorId: userIdString }, { adPosterId: userIdString }],
+        $or: [{ initiatorId: userIdObjectId }, { adPosterId: userIdObjectId }],
         status: ChatRoomStatus.ACTIVE,
       })
       .sort({ lastMessageAt: -1, createdAt: -1 })
