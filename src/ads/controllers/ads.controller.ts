@@ -921,6 +921,7 @@ export class AdsController {
       - Supports pagination
       - Can filter by category and status
       - Includes user information and ad statistics
+      - Shows sold out status for each advertisement
       
       **Response includes:**
       - Advertisement details
@@ -959,6 +960,10 @@ export class AdsController {
           description: 'Sort order (default: DESC)',
           enum: ['ASC', 'DESC'],
         },
+        soldOut: {
+          type: 'boolean',
+          description: 'Filter by sold out status',
+        },
       },
     },
     description: 'Filter and pagination parameters for user advertisements',
@@ -983,6 +988,7 @@ export class AdsController {
       search?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
+      soldOut?: boolean;
     } = {},
   ) {
     const userId = req.user.id;

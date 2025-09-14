@@ -201,6 +201,7 @@ export class GetAdByIdUc {
       location: ad.location,
       category: ad.category,
       isActive: ad.isActive,
+      soldOut: ad.soldOut || false,
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy.toString(),

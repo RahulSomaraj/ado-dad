@@ -477,6 +477,7 @@ export class AdsService {
       search?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
+      soldOut?: boolean;
     } = {},
   ): Promise<PaginatedDetailedAdResponseDto> {
     if (!this.isValidId(userId)) {
@@ -500,6 +501,7 @@ export class AdsService {
       search,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
+      soldOut,
     } = filters;
     page = this.clamp(Number(page) || 1, 1, 1e9);
     limit = this.clamp(Number(limit) || 20, 1, 100);
@@ -508,12 +510,17 @@ export class AdsService {
     const pipeline: any[] = [];
 
     // Match user's ads only
-    pipeline.push({
-      $match: {
-        postedBy: new Types.ObjectId(userId),
-        isDeleted: { $ne: true },
-      },
-    });
+    const matchStage: any = {
+      postedBy: new Types.ObjectId(userId),
+      isDeleted: { $ne: true },
+    };
+
+    // Add soldOut filter if provided
+    if (soldOut !== undefined) {
+      matchStage.soldOut = soldOut;
+    }
+
+    pipeline.push({ $match: matchStage });
 
     // User lookup
     pipeline.push(
@@ -1895,6 +1902,7 @@ export class AdsService {
       location: ad.location,
       category: ad.category,
       isActive: ad.isActive,
+      soldOut: ad.soldOut || false,
       postedAt: ad.createdAt, // expose createdAt as postedAt
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy,

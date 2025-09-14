@@ -85,6 +85,15 @@ export class FilterAdDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
+    description: 'Filter by sold out status',
+    example: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  soldOut?: boolean;
+
+  @ApiPropertyOptional({
     description: 'Filter by premium manufacturer status',
     example: true,
   })

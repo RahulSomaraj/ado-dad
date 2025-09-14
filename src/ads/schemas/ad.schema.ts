@@ -32,6 +32,9 @@ export class Ad {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  soldOut: boolean;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   postedBy: mongoose.Types.ObjectId;
 
@@ -49,6 +52,7 @@ AdSchema.index({ category: 1, createdAt: -1 });
 AdSchema.index({ location: 1 });
 AdSchema.index({ postedBy: 1 });
 AdSchema.index({ isActive: 1 });
+AdSchema.index({ soldOut: 1 });
 AdSchema.index({ price: 1 });
 // Compound indexes moved from service
 AdSchema.index(

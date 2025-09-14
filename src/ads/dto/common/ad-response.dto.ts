@@ -37,6 +37,9 @@ export class AdResponseDto {
   @ApiProperty({ description: 'Is advertisement active' })
   isActive: boolean;
 
+  @ApiProperty({ description: 'Is advertisement sold out' })
+  soldOut: boolean;
+
   @ApiProperty({ description: 'Posted date' })
   postedAt: Date;
 
