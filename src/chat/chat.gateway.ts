@@ -530,17 +530,7 @@ export class ChatGateway
 
       const response = {
         success: true,
-        chatRooms: chatRooms.map((room) => ({
-          roomId: room.roomId,
-          initiatorId: room.initiatorId,
-          adId: room.adId,
-          adPosterId: room.adPosterId,
-          participants: room.participants,
-          status: room.status,
-          lastMessageAt: room.lastMessageAt,
-          messageCount: room.messageCount,
-          createdAt: (room as any).createdAt,
-        })),
+        chatRooms: chatRooms,
       };
 
       this.logger.log('🟢 [getUserChatRooms] response prepared:', response);

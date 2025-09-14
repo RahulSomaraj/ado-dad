@@ -19,6 +19,7 @@ import {
   MessageType,
 } from './schemas/chat-message.schema';
 import { Ad, AdDocument } from '../ads/schemas/ad.schema';
+import { User } from '../users/schemas/user.schema';
 import { ContentModerationService } from './services/content-moderation.service';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class ChatService {
     @InjectModel(ChatMessage.name)
     private readonly chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Ad.name) private readonly adModel: Model<AdDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly contentModerationService: ContentModerationService,
   ) {}
 
@@ -231,8 +233,8 @@ export class ChatService {
     });
   }
 
-  /** Get all ACTIVE rooms for a user (as initiator or ad poster) sorted by recency */
-  async getUserChatRooms(userId: string | Types.ObjectId): Promise<ChatRoom[]> {
+  /** Get all ACTIVE rooms for a user (as initiator or ad poster) sorted by recency with enhanced data */
+  async getUserChatRooms(userId: string | Types.ObjectId): Promise<any[]> {
     console.log('getUserChatRooms - userId:', userId, 'type:', typeof userId);
     this.validateObjectId(userId, 'User ID');
 
@@ -240,13 +242,87 @@ export class ChatService {
     const userIdObjectId =
       typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
 
-    return this.chatRoomModel
+    // Get chat rooms with basic info
+    const chatRooms = await this.chatRoomModel
       .find({
         $or: [{ initiatorId: userIdObjectId }, { adPosterId: userIdObjectId }],
         status: ChatRoomStatus.ACTIVE,
       })
       .sort({ lastMessageAt: -1, createdAt: -1 })
       .exec();
+
+    // Enhance each room with user details and latest message
+    const enhancedRooms = await Promise.all(
+      chatRooms.map(async (room) => {
+        // Get the other user (not the current user)
+        const otherUserId = room.initiatorId.equals(userIdObjectId)
+          ? room.adPosterId
+          : room.initiatorId;
+
+        // Get user details
+        const otherUser = await this.userModel
+          .findById(otherUserId)
+          .select('name profilePic email')
+          .lean()
+          .exec();
+
+        // Get latest message
+        const latestMessage = await this.chatMessageModel
+          .findOne({ roomId: room.roomId })
+          .sort({ createdAt: -1 })
+          .select('content type createdAt')
+          .lean()
+          .exec();
+
+        // Get ad details
+        const adDetails = await this.adModel
+          .findById(room.adId)
+          .select('title description price images category')
+          .lean()
+          .exec();
+
+        return {
+          roomId: room.roomId,
+          initiatorId: room.initiatorId,
+          adId: room.adId,
+          adPosterId: room.adPosterId,
+          participants: room.participants,
+          status: room.status,
+          lastMessageAt: room.lastMessageAt,
+          messageCount: room.messageCount,
+          createdAt: room.createdAt,
+          updatedAt: room.updatedAt,
+          // Enhanced data
+          otherUser: otherUser
+            ? {
+                id: otherUser._id,
+                name: otherUser.name,
+                profilePic: otherUser.profilePic,
+                email: otherUser.email,
+              }
+            : null,
+          latestMessage: latestMessage
+            ? {
+                content: latestMessage.content,
+                type: latestMessage.type,
+                createdAt: (latestMessage as any).createdAt,
+              }
+            : null,
+          adDetails: adDetails
+            ? {
+                id: adDetails._id,
+                title: adDetails.title,
+                description: adDetails.description,
+                price: adDetails.price,
+                images: adDetails.images,
+                category: adDetails.category,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return enhancedRooms;
   }
 
   /** Check if a chat room already exists between initiator and ad poster for a specific ad */

@@ -191,27 +191,30 @@ export class ChatController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get user chat rooms',
+    summary: 'Get user chat rooms with enhanced data',
     description: `
-      Retrieve all chat rooms where the current user is a participant.
+      Retrieve all chat rooms where the current user is a participant with enhanced information.
       
       **Features:**
       - Returns all active chat rooms for the authenticated user
       - Includes rooms where user is initiator or ad poster
       - Shows last message timestamp and message count
       - Sorted by most recent activity
-      - Returns complete room information
+      - Returns complete room information with user details
       
       **Response includes:**
       - Room ID and participants
       - Advertisement ID and poster information
       - Room status and timestamps
       - Message count and last activity
+      - **Other user details**: Name, profile picture, email
+      - **Latest message**: Content, type, and timestamp
+      - **Advertisement details**: Title, description, price, images, category
     `,
   })
   @ApiResponse({
     status: 200,
-    description: 'User chat rooms retrieved successfully',
+    description: 'User chat rooms retrieved successfully with enhanced data',
     schema: {
       example: {
         success: true,
@@ -230,6 +233,29 @@ export class ChatController {
             lastMessageAt: '2024-01-15T14:30:00.000Z',
             messageCount: 5,
             createdAt: '2024-01-15T10:30:00.000Z',
+            updatedAt: '2024-01-15T14:30:00.000Z',
+            otherUser: {
+              id: '507f1f77bcf86cd799439022',
+              name: 'John Doe',
+              profilePic: 'https://example.com/profile.jpg',
+              email: 'john@example.com',
+            },
+            latestMessage: {
+              content: 'Hello, is this still available?',
+              type: 'text',
+              createdAt: '2024-01-15T14:30:00.000Z',
+            },
+            adDetails: {
+              id: '507f1f77bcf86cd799439011',
+              title: 'Beautiful 3 Bedroom Apartment',
+              description: 'Spacious apartment with modern amenities',
+              price: 2500,
+              images: [
+                'https://example.com/image1.jpg',
+                'https://example.com/image2.jpg',
+              ],
+              category: 'property',
+            },
           },
           {
             roomId:
@@ -284,17 +310,7 @@ export class ChatController {
 
       return {
         success: true,
-        data: chatRooms.map((room) => ({
-          roomId: room.roomId,
-          initiatorId: room.initiatorId,
-          adId: room.adId,
-          adPosterId: room.adPosterId,
-          participants: room.participants,
-          status: room.status,
-          lastMessageAt: room.lastMessageAt,
-          messageCount: room.messageCount,
-          createdAt: (room as any).createdAt,
-        })),
+        data: chatRooms,
       };
     } catch (error: any) {
       throw new BadRequestException(error.message);

@@ -8,6 +8,7 @@ import { RateLimitGuard } from './guards/rate-limit.guard';
 import { ChatRoom, ChatRoomSchema } from './schemas/chat-room.schema';
 import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
 import { Ad, AdSchema } from '../ads/schemas/ad.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Ad, AdSchema } from '../ads/schemas/ad.schema';
       { name: ChatRoom.name, schema: ChatRoomSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: Ad.name, schema: AdSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [ChatController],
