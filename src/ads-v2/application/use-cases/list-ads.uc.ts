@@ -17,7 +17,10 @@ export interface PaginatedAdsResponse {
 export class ListAdsUc {
   constructor(private readonly adRepo: AdRepository) {}
 
-  async exec(filters: ListAdsV2Dto): Promise<PaginatedAdsResponse> {
+  async exec(
+    filters: ListAdsV2Dto,
+    userId?: string,
+  ): Promise<PaginatedAdsResponse> {
     const {
       category,
       search,
@@ -80,6 +83,29 @@ export class ListAdsUc {
     pipeline.push({
       $unwind: { path: '$user', preserveNullAndEmptyArrays: true },
     });
+
+    // Favorites lookup (only if userId is provided)
+    if (userId) {
+      pipeline.push({
+        $lookup: {
+          from: 'favorites',
+          let: { adId: '$_id', userId: { $toObjectId: userId } },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$itemId', '$$adId'] },
+                    { $eq: ['$userId', '$$userId'] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'favoriteDetails',
+        },
+      });
+    }
 
     // Property details lookup
     pipeline.push({
@@ -444,6 +470,9 @@ export class ListAdsUc {
           email: '$user.email',
           phone: '$user.phone',
         },
+        isFavorite: userId
+          ? { $gt: [{ $size: '$favoriteDetails' }, 0] }
+          : false,
         propertyDetails: { $arrayElemAt: ['$propertyDetails', 0] },
         vehicleDetails: {
           $let: {
@@ -534,6 +563,7 @@ export class ListAdsUc {
         vehicleDetails: 1,
         commercialVehicleDetails: 1,
         images: 1,
+        isFavorite: 1,
       },
     });
 

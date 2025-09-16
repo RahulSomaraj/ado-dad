@@ -257,6 +257,11 @@ export class DetailedAdResponseDto extends AdResponseDto {
   @ApiPropertyOptional({ description: 'Is favorited by current user' })
   isFavorited?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Is favorited by current user (alternative field name)',
+  })
+  isFavorite?: boolean;
+
   @ApiPropertyOptional({ description: 'Chats count' })
   chatsCount?: number;
 

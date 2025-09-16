@@ -166,6 +166,9 @@ export class GetAdByIdUc {
         itemType: 'ad',
       });
       detailed.isFavorited = !!userFavorite;
+      detailed.isFavorite = !!userFavorite; // For consistency with list endpoint
+    } else {
+      detailed.isFavorite = false; // For unauthenticated users
     }
 
     // Get chat relations

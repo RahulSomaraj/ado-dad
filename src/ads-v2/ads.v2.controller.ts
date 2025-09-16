@@ -377,6 +377,7 @@ export class AdsV2Controller {
       - Detailed vehicle information with manufacturer, model, fuel, transmission details
       - Property details (for property ads)
       - Commercial vehicle details (for commercial vehicle ads)
+      - Favorite status for authenticated users (isFavorite field)
       - Pagination metadata
     `,
   })
@@ -612,6 +613,7 @@ export class AdsV2Controller {
                 },
               },
               images: { type: 'array', items: { type: 'string' } },
+              isFavorite: { type: 'boolean', example: false },
             },
           },
         },
@@ -664,11 +666,14 @@ export class AdsV2Controller {
       },
     },
   })
-  async list(@Body() dto: ListAdsV2Dto) {
+  async list(@Body() dto: ListAdsV2Dto, @Req() req: any) {
     try {
       console.log('Listing v2 advertisements with filters:', dto);
 
-      const result = await this.listAdsUc.exec(dto);
+      // Get user ID from auth token if available
+      const userId = req.user?.id || null;
+
+      const result = await this.listAdsUc.exec(dto, userId);
 
       console.log(
         `v2 Advertisements retrieved: ${result.data.length} of ${result.total}`,
