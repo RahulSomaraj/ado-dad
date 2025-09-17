@@ -105,4 +105,86 @@ export class VehicleInventoryGateway {
       return undefined;
     }
   }
+
+  // Methods to get full objects for detailed responses
+  async getManufacturer(manufacturerId: string): Promise<any> {
+    try {
+      const manufacturer =
+        await this.inventory.findManufacturerById(manufacturerId);
+      return (
+        manufacturer || {
+          _id: manufacturerId,
+          name: 'Not Found',
+          displayName: 'Not Found',
+        }
+      );
+    } catch (error) {
+      return {
+        _id: manufacturerId,
+        name: 'Not Found',
+        displayName: 'Not Found',
+      };
+    }
+  }
+
+  async getModel(modelId: string): Promise<any> {
+    try {
+      const model = await this.inventory.findVehicleModelById(modelId);
+      return (
+        model || { _id: modelId, name: 'Not Found', displayName: 'Not Found' }
+      );
+    } catch (error) {
+      return { _id: modelId, name: 'Not Found', displayName: 'Not Found' };
+    }
+  }
+
+  async getVariant(variantId: string): Promise<any> {
+    try {
+      const variant = await this.inventory.findVehicleVariantById(variantId);
+      return (
+        variant || {
+          _id: variantId,
+          name: 'Not Found',
+          displayName: 'Not Found',
+        }
+      );
+    } catch (error) {
+      return { _id: variantId, name: 'Not Found', displayName: 'Not Found' };
+    }
+  }
+
+  async getTransmissionType(transmissionId: string): Promise<any> {
+    try {
+      const transmission =
+        await this.inventory.findTransmissionTypeById(transmissionId);
+      return (
+        transmission || {
+          _id: transmissionId,
+          name: 'Not Found',
+          displayName: 'Not Found',
+        }
+      );
+    } catch (error) {
+      return {
+        _id: transmissionId,
+        name: 'Not Found',
+        displayName: 'Not Found',
+      };
+    }
+  }
+
+  async getFuelType(fuelTypeId: string): Promise<any> {
+    try {
+      const fuelType = await this.inventory.findFuelTypeById(fuelTypeId);
+      return (
+        fuelType || {
+          _id: fuelTypeId,
+          name: 'Not Found',
+          displayName: 'Not Found',
+        }
+      );
+    } catch (error) {
+      return { _id: fuelTypeId, name: 'Not Found', displayName: 'Not Found' };
+    }
+  }
 }

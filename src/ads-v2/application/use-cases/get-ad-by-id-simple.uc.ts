@@ -197,13 +197,23 @@ export class GetAdByIdUc {
       // Fetch vehicle inventory details individually
       const [manufacturer, model, variant, fuelType, transmissionType] =
         await Promise.all([
-          this.inventory.getManufacturer(vehicleDetails.manufacturerId || ''),
-          this.inventory.getModel(vehicleDetails.modelId || ''),
-          this.inventory.getVariant(vehicleDetails.variantId || ''),
-          this.inventory.getFuelType(vehicleDetails.fuelTypeId || ''),
-          this.inventory.getTransmissionType(
-            vehicleDetails.transmissionTypeId || '',
-          ),
+          vehicleDetails.manufacturerId
+            ? this.inventory.getManufacturer(vehicleDetails.manufacturerId)
+            : Promise.resolve(undefined),
+          vehicleDetails.modelId
+            ? this.inventory.getModel(vehicleDetails.modelId)
+            : Promise.resolve(undefined),
+          vehicleDetails.variantId
+            ? this.inventory.getVariant(vehicleDetails.variantId)
+            : Promise.resolve(undefined),
+          vehicleDetails.fuelTypeId
+            ? this.inventory.getFuelType(vehicleDetails.fuelTypeId)
+            : Promise.resolve(undefined),
+          vehicleDetails.transmissionTypeId
+            ? this.inventory.getTransmissionType(
+                vehicleDetails.transmissionTypeId,
+              )
+            : Promise.resolve(undefined),
         ]);
 
       processedVehicleDetails = {
@@ -224,15 +234,25 @@ export class GetAdByIdUc {
       // Fetch commercial vehicle inventory details individually
       const [manufacturer, model, variant, fuelType, transmissionType] =
         await Promise.all([
-          this.inventory.getManufacturer(
-            commercialVehicleDetails.manufacturerId || '',
-          ),
-          this.inventory.getModel(commercialVehicleDetails.modelId || ''),
-          this.inventory.getVariant(commercialVehicleDetails.variantId || ''),
-          this.inventory.getFuelType(commercialVehicleDetails.fuelTypeId || ''),
-          this.inventory.getTransmissionType(
-            commercialVehicleDetails.transmissionTypeId || '',
-          ),
+          commercialVehicleDetails.manufacturerId
+            ? this.inventory.getManufacturer(
+                commercialVehicleDetails.manufacturerId,
+              )
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.modelId
+            ? this.inventory.getModel(commercialVehicleDetails.modelId)
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.variantId
+            ? this.inventory.getVariant(commercialVehicleDetails.variantId)
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.fuelTypeId
+            ? this.inventory.getFuelType(commercialVehicleDetails.fuelTypeId)
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.transmissionTypeId
+            ? this.inventory.getTransmissionType(
+                commercialVehicleDetails.transmissionTypeId,
+              )
+            : Promise.resolve(undefined),
         ]);
 
       processedCommercialVehicleDetails = {

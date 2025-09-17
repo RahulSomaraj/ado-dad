@@ -11,6 +11,9 @@ export class AdResponseDto {
   @ApiProperty({ description: 'Advertisement ID' })
   id: string;
 
+  @ApiPropertyOptional({ description: 'Advertisement title' })
+  title?: string;
+
   @ApiProperty({ description: 'Advertisement description' })
   description: string;
 
