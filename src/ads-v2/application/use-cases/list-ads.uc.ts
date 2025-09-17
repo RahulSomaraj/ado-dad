@@ -55,7 +55,16 @@ export class ListAdsUc {
       });
     }
 
-    // Price filters
+    // Location filter
+    if (location) {
+      pipeline.push({
+        $match: {
+          location: { $regex: location, $options: 'i' },
+        },
+      });
+    }
+
+    // Price filters (before lookups)
     if (minPrice || maxPrice) {
       const priceMatch: any = {};
       if (minPrice) priceMatch.$gte = minPrice;
@@ -65,11 +74,15 @@ export class ListAdsUc {
       });
     }
 
-    // Location filter
-    if (location) {
+    // Basic search filter (before lookups)
+    if (search) {
       pipeline.push({
         $match: {
-          location: { $regex: location, $options: 'i' },
+          $or: [
+            // Basic ad fields
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ],
         },
       });
     }
@@ -151,25 +164,6 @@ export class ListAdsUc {
             },
           ],
           as: 'favoriteDetails',
-        },
-      });
-    }
-
-    // Enhanced search filter - search across title, description, and basic vehicle fields
-    if (search) {
-      pipeline.push({
-        $match: {
-          $or: [
-            // Basic ad fields
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-
-            // Property search fields
-            {
-              'propertyDetails.propertyType': { $regex: search, $options: 'i' },
-            },
-            { 'propertyDetails.amenities': { $regex: search, $options: 'i' } },
-          ],
         },
       });
     }

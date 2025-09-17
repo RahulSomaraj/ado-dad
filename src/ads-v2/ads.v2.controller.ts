@@ -370,7 +370,7 @@ export class AdsV2Controller {
         - Property types (apartment, house, villa, etc.)
         - Property amenities (parking, garden, furnished, etc.)
       - Location filtering
-      - Price range filtering
+      - Price range filtering (minPrice, maxPrice - both optional)
       - Pagination and sorting
       - All filters are optional
       
@@ -394,8 +394,11 @@ export class AdsV2Controller {
     examples: {
       basic: {
         summary: 'Basic listing',
-        description: 'Get all ads with default pagination',
+        description: 'Get all ads with pagination',
         value: {
+          search: 'honda',
+          minPrice: 10000,
+          maxPrice: 1000000,
           page: 1,
           limit: 20,
         },
@@ -404,6 +407,7 @@ export class AdsV2Controller {
         summary: 'Property ads',
         description: 'Get property ads in Mumbai',
         value: {
+          search: 'apartment',
           category: 'property',
           location: 'Mumbai',
           minPrice: 100000,
@@ -412,46 +416,16 @@ export class AdsV2Controller {
           limit: 10,
         },
       },
-      search: {
-        summary: 'Enhanced search ads',
-        description: 'Search across ad content and vehicle inventory details',
+      vehicle: {
+        summary: 'Vehicle ads',
+        description: 'Get vehicle ads',
         value: {
-          search: 'honda civic',
-          location: 'Mumbai',
+          search: 'toyota',
+          category: 'private_vehicle',
+          minPrice: 50000,
+          maxPrice: 5000000,
           page: 1,
           limit: 20,
-        },
-      },
-      vehicleSearch: {
-        summary: 'Search by vehicle details',
-        description:
-          'Search by manufacturer, model, fuel type, or transmission',
-        value: {
-          search: 'toyota automatic',
-          category: 'private_vehicle',
-          page: 1,
-          limit: 10,
-        },
-      },
-      fuelSearch: {
-        summary: 'Search by fuel type',
-        description:
-          'Find vehicles by fuel type (petrol, diesel, electric, etc.)',
-        value: {
-          search: 'electric',
-          category: 'private_vehicle',
-          page: 1,
-          limit: 15,
-        },
-      },
-      propertySearch: {
-        summary: 'Search property ads',
-        description: 'Search property ads by type, amenities, or description',
-        value: {
-          search: 'apartment parking',
-          category: 'property',
-          page: 1,
-          limit: 10,
         },
       },
     },
