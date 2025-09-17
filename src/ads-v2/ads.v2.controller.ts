@@ -360,12 +360,14 @@ export class AdsV2Controller {
       **Features:**
       - Basic category filtering
       - Enhanced text search across:
-        - Ad title and description
+        - Ad title and description (all categories)
         - Vehicle manufacturer names (Honda, Toyota, etc.)
         - Vehicle model names (Civic, Camry, etc.)
         - Vehicle variant names (LX, EX, etc.)
         - Fuel type names (Petrol, Diesel, Electric, etc.)
         - Transmission type names (Manual, Automatic, CVT, etc.)
+        - Property types (apartment, house, villa, etc.)
+        - Property amenities (parking, garden, furnished, etc.)
       - Location filtering
       - Price range filtering
       - Pagination and sorting
@@ -439,6 +441,16 @@ export class AdsV2Controller {
           category: 'private_vehicle',
           page: 1,
           limit: 15,
+        },
+      },
+      propertySearch: {
+        summary: 'Search property ads',
+        description: 'Search property ads by type, amenities, or description',
+        value: {
+          search: 'apartment parking',
+          category: 'property',
+          page: 1,
+          limit: 10,
         },
       },
     },

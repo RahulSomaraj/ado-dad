@@ -319,146 +319,6 @@ export class ListAdsUc {
       },
     });
 
-    // Enhanced search filter - search across title, description, and vehicle inventory fields
-    if (search) {
-      pipeline.push({
-        $match: {
-          $or: [
-            // Basic ad fields
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-
-            // Vehicle manufacturer names
-            {
-              'vehicleManufacturerDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'vehicleManufacturerDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Vehicle model names
-            { 'vehicleModelDetails.name': { $regex: search, $options: 'i' } },
-            {
-              'vehicleModelDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Vehicle variant names
-            { 'vehicleVariantDetails.name': { $regex: search, $options: 'i' } },
-            {
-              'vehicleVariantDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Fuel type names
-            {
-              'vehicleFuelTypeDetails.name': { $regex: search, $options: 'i' },
-            },
-            {
-              'vehicleFuelTypeDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Transmission type names
-            {
-              'vehicleTransmissionTypeDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'vehicleTransmissionTypeDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Commercial vehicle manufacturer names
-            {
-              'commercialManufacturerDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialManufacturerDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Commercial vehicle model names
-            {
-              'commercialVehicleModelDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialVehicleModelDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Commercial vehicle variant names
-            {
-              'commercialVehicleVariantDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialVehicleVariantDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Commercial vehicle fuel type names
-            {
-              'commercialFuelTypeDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialFuelTypeDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-
-            // Commercial vehicle transmission type names
-            {
-              'commercialTransmissionTypeDetails.name': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialTransmissionTypeDetails.displayName': {
-                $regex: search,
-                $options: 'i',
-              },
-            },
-          ],
-        },
-      });
-    }
-
     // Add fields for better response structure
     pipeline.push({
       $addFields: {
@@ -542,6 +402,172 @@ export class ListAdsUc {
         },
       },
     });
+
+    // Enhanced search filter - search across title, description, vehicle inventory fields, and property fields
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            // Basic ad fields
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+
+            // Vehicle manufacturer names
+            {
+              'vehicleDetails.manufacturer.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'vehicleDetails.manufacturer.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Vehicle model names
+            {
+              'vehicleDetails.model.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'vehicleDetails.model.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Vehicle variant names
+            {
+              'vehicleDetails.variant.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'vehicleDetails.variant.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Fuel type names
+            {
+              'vehicleDetails.fuelType.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'vehicleDetails.fuelType.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Transmission type names
+            {
+              'vehicleDetails.transmissionType.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'vehicleDetails.transmissionType.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Commercial vehicle manufacturer names
+            {
+              'commercialVehicleDetails.manufacturer.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.manufacturer.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Commercial vehicle model names
+            {
+              'commercialVehicleDetails.model.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.model.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Commercial vehicle variant names
+            {
+              'commercialVehicleDetails.variant.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.variant.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Commercial vehicle fuel type names
+            {
+              'commercialVehicleDetails.fuelType.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.fuelType.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Commercial vehicle transmission type names
+            {
+              'commercialVehicleDetails.transmissionType.name': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.transmissionType.displayName': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+
+            // Property-specific search fields
+            {
+              'propertyDetails.propertyType': {
+                $regex: search,
+                $options: 'i',
+              },
+            },
+            {
+              'propertyDetails.amenities': {
+                $in: [new RegExp(search, 'i')],
+              },
+            },
+          ],
+        },
+      });
+    }
 
     // Project final fields
     pipeline.push({
