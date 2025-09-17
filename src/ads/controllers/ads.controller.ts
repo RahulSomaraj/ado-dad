@@ -1000,12 +1000,10 @@ export class AdsController {
 
   // Get ads by user ID
   @Get('user/:userId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
     summary: 'Get advertisements by user ID',
     description:
-      'Retrieve all advertisements posted by a specific user with pagination and sorting',
+      'Retrieve all advertisements posted by a specific user with pagination and sorting. No authentication required.',
   })
   @ApiParam({
     name: 'userId',
@@ -1047,12 +1045,8 @@ export class AdsController {
     description: 'User advertisements retrieved successfully',
   })
   @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Authentication required',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions',
+    status: 404,
+    description: 'User not found',
   })
   async getAdsByUser(
     @Param('userId') userId: string,
