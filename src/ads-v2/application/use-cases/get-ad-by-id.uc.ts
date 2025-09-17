@@ -245,6 +245,16 @@ export class GetAdByIdUc {
       };
     }
 
+    const userResponse = ad.user
+      ? {
+          id: ad.user._id.toString(),
+          name: ad.user.name,
+          email: ad.user.email,
+          phone: ad.user.phoneNumber,
+          profilePic: ad.user.profilePic,
+        }
+      : undefined;
+
     return {
       id: ad._id.toString(),
       title: ad.title,
@@ -258,15 +268,7 @@ export class GetAdByIdUc {
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy.toString(),
-      user: ad.user
-        ? {
-            id: ad.user._id.toString(),
-            name: ad.user.name,
-            email: ad.user.email,
-            phone: ad.user.phoneNumber,
-            profilePic: ad.user.profilePic,
-          }
-        : undefined,
+      user: userResponse,
       propertyDetails: ad.propertyDetails?.[0] || undefined,
       vehicleDetails: processedVehicleDetails,
       commercialVehicleDetails: processedCommercialVehicleDetails,
