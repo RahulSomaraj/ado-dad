@@ -36,10 +36,7 @@ import { UserType } from '../users/enums/user.types';
 import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
 
 @ApiTags('Ads v2')
-@ApiBearerAuth()
 @Controller('v2/ads')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
 export class AdsV2Controller {
   constructor(
     private readonly createAdUc: CreateAdUc,
@@ -49,6 +46,9 @@ export class AdsV2Controller {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create a new advertisement (v2)',
     description: `
@@ -371,6 +371,10 @@ export class AdsV2Controller {
       - Pagination and sorting
       - All filters are optional
       
+      **Authentication:**
+      - No authentication required (public endpoint)
+      - If authenticated, includes favorite status (isFavorite field)
+      
       **Response includes:**
       - Advertisement details
       - User information
@@ -636,26 +640,6 @@ export class AdsV2Controller {
       },
     },
   })
-  @ApiUnauthorizedResponse({
-    description: 'Unauthorized - authentication required',
-    schema: {
-      example: {
-        statusCode: 401,
-        message: 'Unauthorized',
-        error: 'Unauthorized',
-      },
-    },
-  })
-  @ApiForbiddenResponse({
-    description: 'Forbidden - insufficient permissions',
-    schema: {
-      example: {
-        statusCode: 403,
-        message: 'Forbidden resource',
-        error: 'Forbidden',
-      },
-    },
-  })
   @ApiInternalServerErrorResponse({
     description: 'Internal server error',
     schema: {
@@ -693,6 +677,10 @@ export class AdsV2Controller {
     description: `
       Retrieve a single advertisement with comprehensive details including all relations.
       
+      **Authentication:**
+      - No authentication required (public endpoint)
+      - If authenticated, includes user's favorite status and chat relations
+      
       **Features:**
       - Complete advertisement information
       - Enhanced user details (name, email, phone, profile picture, type)
@@ -726,14 +714,6 @@ export class AdsV2Controller {
   @ApiResponse({
     status: 404,
     description: 'Advertisement not found',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Invalid or missing JWT token',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions',
   })
   async getById(
     @Param('id') id: string,
