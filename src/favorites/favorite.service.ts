@@ -54,6 +54,7 @@ export class FavoriteService {
     if (existing) {
       await this.favoriteModel.deleteOne({ _id: existing._id });
       await this.invalidateFavoritesCache(userId);
+      await this.invalidateAdDetailCache(adId, userId);
       return { isFavorited: false, message: 'Ad removed from favorites' };
     }
 
@@ -63,6 +64,7 @@ export class FavoriteService {
     }).save();
 
     await this.invalidateFavoritesCache(userId);
+    await this.invalidateAdDetailCache(adId, userId);
     return {
       isFavorited: true,
       favoriteId: (saved._id as any).toString(),
@@ -433,6 +435,9 @@ export class FavoriteService {
       });
     }
 
+    // Get the old favorite to know which ad cache to invalidate
+    const oldFavorite = await this.favoriteModel.findById(favOid);
+
     const favorite = await this.favoriteModel.findOneAndUpdate(
       { _id: favOid, userId: userOid },
       { itemId: newAdOid },
@@ -441,6 +446,11 @@ export class FavoriteService {
     if (!favorite) throw new NotFoundException('Favorite not found');
 
     await this.invalidateFavoritesCache(userId);
+    // Invalidate cache for both old and new ad
+    if (oldFavorite) {
+      await this.invalidateAdDetailCache(oldFavorite.itemId.toString(), userId);
+    }
+    await this.invalidateAdDetailCache(updateFavoriteDto.adId, userId);
     return favorite;
   }
 
@@ -458,6 +468,8 @@ export class FavoriteService {
     if (!favorite) throw new NotFoundException('Favorite not found');
 
     await this.invalidateFavoritesCache(userId);
+    // Also invalidate ad detail cache using the adId from the favorite record
+    await this.invalidateAdDetailCache(favorite.itemId.toString(), userId);
     return { message: 'Item removed from favorites' };
   }
 
@@ -504,6 +516,23 @@ export class FavoriteService {
       const keys = await this.redisService.keys(`fav:list:${userId}:*`);
       if (keys?.length)
         await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+    } catch {
+      // swallow cache errors
+    }
+  }
+
+  private async invalidateAdDetailCache(
+    adId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      // Invalidate ad detail cache for this specific user
+      const userCacheKey = `ads:v2:getById:${adId}:${userId}`;
+      await this.redisService.cacheDel(userCacheKey);
+
+      // Also invalidate anonymous cache (in case user was not authenticated when cached)
+      const anonymousCacheKey = `ads:v2:getById:${adId}:anonymous`;
+      await this.redisService.cacheDel(anonymousCacheKey);
     } catch {
       // swallow cache errors
     }
