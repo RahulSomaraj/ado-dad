@@ -264,6 +264,7 @@ export class GetAdByIdUc {
             name: ad.user.name,
             email: ad.user.email,
             phone: ad.user.phoneNumber,
+            profilePic: ad.user.profilePic,
           }
         : undefined,
       propertyDetails: ad.propertyDetails?.[0] || undefined,

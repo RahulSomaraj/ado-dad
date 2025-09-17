@@ -184,6 +184,7 @@ export class ListAdsUc {
           name: '$user.name',
           email: '$user.email',
           phone: '$user.phoneNumber',
+          profilePic: '$user.profilePic',
         },
         isFavorite: userId
           ? { $gt: [{ $size: '$favoriteDetails' }, 0] }
@@ -340,6 +341,7 @@ export class ListAdsUc {
             name: ad.user.name,
             email: ad.user.email,
             phone: ad.user.phone,
+            profilePic: ad.user.profilePic,
           }
         : undefined,
       propertyDetails: ad.propertyDetails || undefined,

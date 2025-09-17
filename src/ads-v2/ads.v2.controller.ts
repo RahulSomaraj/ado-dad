@@ -252,6 +252,7 @@ export class AdsV2Controller {
           name: 'John Doe',
           email: 'john@example.com',
           phone: '+91-9876543210',
+          profilePic: 'https://example.com/profile.jpg',
         },
         vehicleDetails: {
           vehicleType: 'four_wheeler',
@@ -484,6 +485,7 @@ export class AdsV2Controller {
                   name: { type: 'string' },
                   email: { type: 'string' },
                   phone: { type: 'string' },
+                  profilePic: { type: 'string' },
                 },
               },
               propertyDetails: {
