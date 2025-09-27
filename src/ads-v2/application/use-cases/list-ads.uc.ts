@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
 import { ListAdsV2Dto } from '../../dto/list-ads-v2.dto';
@@ -31,6 +32,8 @@ export class ListAdsUc {
       location,
       minPrice,
       maxPrice,
+      fuelTypeIds,
+      transmissionTypeIds,
       page = 1,
       limit = 20,
       sortBy = 'createdAt',
@@ -143,6 +146,47 @@ export class ListAdsUc {
         as: 'commercialVehicleDetails',
       },
     });
+
+    // Two-wheeler specific filters (only apply if category is two_wheeler)
+    if (
+      category === 'two_wheeler' &&
+      (fuelTypeIds?.length || transmissionTypeIds?.length)
+    ) {
+      const twoWheelerMatch: any = {};
+
+      if (fuelTypeIds?.length && transmissionTypeIds?.length) {
+        twoWheelerMatch.vehicleDetails = {
+          $elemMatch: {
+            fuelTypeId: {
+              $in: fuelTypeIds.map((id) => new Types.ObjectId(id)),
+            },
+            transmissionTypeId: {
+              $in: transmissionTypeIds.map((id) => new Types.ObjectId(id)),
+            },
+          },
+        };
+      } else if (fuelTypeIds?.length) {
+        twoWheelerMatch.vehicleDetails = {
+          $elemMatch: {
+            fuelTypeId: {
+              $in: fuelTypeIds.map((id) => new Types.ObjectId(id)),
+            },
+          },
+        };
+      } else if (transmissionTypeIds?.length) {
+        twoWheelerMatch.vehicleDetails = {
+          $elemMatch: {
+            transmissionTypeId: {
+              $in: transmissionTypeIds.map((id) => new Types.ObjectId(id)),
+            },
+          },
+        };
+      }
+
+      pipeline.push({
+        $match: twoWheelerMatch,
+      });
+    }
 
     // Favorites lookup (only if userId is provided)
     if (userId) {

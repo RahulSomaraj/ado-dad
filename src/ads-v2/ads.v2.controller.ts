@@ -359,7 +359,7 @@ export class AdsV2Controller {
       Retrieve advertisements with comprehensive filtering and search capabilities.
       
       **Features:**
-      - Basic category filtering
+      - Basic category filtering (property, private_vehicle, commercial_vehicle, two_wheeler)
       - Enhanced text search across:
         - Ad title and description (all categories)
         - Vehicle manufacturer names (Honda, Toyota, etc.)
@@ -371,6 +371,9 @@ export class AdsV2Controller {
         - Property amenities (parking, garden, furnished, etc.)
       - Location filtering
       - Price range filtering (minPrice, maxPrice - both optional)
+      - Two-wheeler specific filtering:
+        - Fuel type IDs (fuelTypeIds) - filter by specific fuel types
+        - Transmission type IDs (transmissionTypeIds) - filter by specific transmission types
       - Pagination and sorting
       - All filters are optional
       
@@ -424,6 +427,20 @@ export class AdsV2Controller {
           category: 'private_vehicle',
           minPrice: 50000,
           maxPrice: 5000000,
+          page: 1,
+          limit: 20,
+        },
+      },
+      two_wheeler: {
+        summary: 'Two-wheeler ads',
+        description: 'Get two-wheeler ads with specific filters',
+        value: {
+          search: 'honda',
+          category: 'two_wheeler',
+          minPrice: 20000,
+          maxPrice: 200000,
+          fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
+          transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
           page: 1,
           limit: 20,
         },

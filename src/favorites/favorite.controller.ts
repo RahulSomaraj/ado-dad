@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   UseFilters,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
@@ -47,7 +48,7 @@ export class FavoriteController {
   async addFavorite(@Req() req, @Body() createFavoriteDto: CreateFavoriteDto) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User not authenticated');
     }
     return this.favoriteService.addFavorite(userId, createFavoriteDto);
   }
@@ -81,7 +82,7 @@ export class FavoriteController {
     // Get user ID from JWT token
     const userId = req.user?.id;
     if (!userId) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User not authenticated');
     }
     return await this.favoriteService.getUserFavorites(userId, query);
   }
@@ -101,7 +102,7 @@ export class FavoriteController {
   async getFavoriteById(@Req() req, @Param('favoriteId') favoriteId: string) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User not authenticated');
     }
     return await this.favoriteService.getFavoriteById(userId, favoriteId);
   }
@@ -118,7 +119,7 @@ export class FavoriteController {
   ) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User not authenticated');
     }
     return await this.favoriteService.updateFavorite(
       userId,
@@ -134,7 +135,7 @@ export class FavoriteController {
   async removeFavorite(@Req() req, @Param('favoriteId') favoriteId: string) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User not authenticated');
     }
     return await this.favoriteService.removeFavorite(userId, favoriteId);
   }

@@ -5,6 +5,8 @@ import {
   IsEnum,
   Min,
   Max,
+  IsArray,
+  IsMongoId,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -104,4 +106,27 @@ export class ListAdsV2Dto {
   @IsOptional()
   @IsString()
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
+
+  // Two-wheeler specific filters
+  @ApiPropertyOptional({
+    description:
+      'Fuel type IDs for two-wheeler filtering (array of MongoDB ObjectIds)',
+    type: [String],
+    example: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  fuelTypeIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Transmission type IDs for two-wheeler filtering (array of MongoDB ObjectIds)',
+    type: [String],
+    example: ['68b53a421f3fb49e93b9ef59', '68b53a421f3fb49e93b9ef60'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  transmissionTypeIds?: string[];
 }

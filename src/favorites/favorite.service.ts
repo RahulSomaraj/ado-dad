@@ -10,6 +10,7 @@ import { RedisService } from '../shared/redis.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { AdsService } from '../ads/services/ads.service';
+import { GetAdByIdUc } from '../ads-v2/application/use-cases/get-ad-by-id.uc';
 
 const toObjectId = (id: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -26,6 +27,7 @@ export class FavoriteService {
     @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
     private readonly redisService: RedisService,
     private readonly adsService: AdsService,
+    private readonly getAdByIdUc: GetAdByIdUc,
   ) {}
 
   // -------- CREATE / TOGGLE --------
@@ -369,7 +371,7 @@ export class FavoriteService {
           ],
         },
       },
-      { $unwind: { path: 'ad', preserveNullAndEmptyArrays: false } },
+      { $unwind: { path: '$ad', preserveNullAndEmptyArrays: false } },
     ];
 
     const favorites = await this.favoriteModel.aggregate(pipeline);
@@ -533,6 +535,16 @@ export class FavoriteService {
       // Also invalidate anonymous cache (in case user was not authenticated when cached)
       const anonymousCacheKey = `ads:v2:getById:${adId}:anonymous`;
       await this.redisService.cacheDel(anonymousCacheKey);
+
+      // Repopulate cache with fresh data for both user and anonymous
+      await Promise.all([
+        this.getAdByIdUc.exec({ adId, userId }).catch(() => {
+          // If user-specific fetch fails, continue silently
+        }),
+        this.getAdByIdUc.exec({ adId, userId: undefined }).catch(() => {
+          // If anonymous fetch fails, continue silently
+        }),
+      ]);
     } catch {
       // swallow cache errors
     }

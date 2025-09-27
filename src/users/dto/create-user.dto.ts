@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsUrl,
+  IsPhoneNumber,
 } from 'class-validator';
 import { UserType } from '../enums/user.types';
 
@@ -35,10 +36,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   type: UserType;
 
-  @ApiProperty({ 
+  @ApiProperty({
     example: 'https://example.com/profile.jpg',
     description: 'Profile picture URL (optional)',
-    required: false 
+    required: false,
   })
   @IsOptional()
   @IsUrl()
@@ -53,7 +54,7 @@ export class CreateUserWithFileDto {
   name: string;
 
   @ApiProperty({ example: '+123456789' })
-  @IsString()
+  @IsPhoneNumber('IN')
   @IsNotEmpty()
   phoneNumber: string;
 
