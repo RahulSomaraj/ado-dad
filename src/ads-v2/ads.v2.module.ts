@@ -13,7 +13,6 @@ import { CommercialVehicleAdRepository } from './infrastructure/repos/commercial
 
 // Services
 import { IdempotencyService } from './infrastructure/services/idempotency.service';
-import { AdsCache } from './infrastructure/services/ads-cache';
 import { VehicleInventoryGateway } from './infrastructure/services/vehicle-inventory.gateway';
 import { CommercialIntentService } from './infrastructure/services/commercial-intent.service';
 import { OutboxService } from './infrastructure/services/outbox.service';
@@ -85,7 +84,6 @@ const OutboxSchema = {
 
     // Services
     IdempotencyService,
-    AdsCache,
     VehicleInventoryGateway,
     CommercialIntentService,
     OutboxService,
@@ -102,7 +100,6 @@ const OutboxSchema = {
 
     // Export services for potential external use
     IdempotencyService,
-    AdsCache,
     VehicleInventoryGateway,
     OutboxService,
   ],

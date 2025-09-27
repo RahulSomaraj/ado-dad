@@ -10,7 +10,6 @@ import { RedisService } from '../shared/redis.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { AdsService } from '../ads/services/ads.service';
-import { GetAdByIdUc } from '../ads-v2/application/use-cases/get-ad-by-id.uc';
 
 const toObjectId = (id: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -27,7 +26,6 @@ export class FavoriteService {
     @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
     private readonly redisService: RedisService,
     private readonly adsService: AdsService,
-    private readonly getAdByIdUc: GetAdByIdUc,
   ) {}
 
   // -------- CREATE / TOGGLE --------
@@ -56,7 +54,6 @@ export class FavoriteService {
     if (existing) {
       await this.favoriteModel.deleteOne({ _id: existing._id });
       await this.invalidateFavoritesCache(userId);
-      await this.invalidateAdDetailCache(adId, userId);
       return { isFavorited: false, message: 'Ad removed from favorites' };
     }
 
@@ -66,7 +63,6 @@ export class FavoriteService {
     }).save();
 
     await this.invalidateFavoritesCache(userId);
-    await this.invalidateAdDetailCache(adId, userId);
     return {
       isFavorited: true,
       favoriteId: (saved._id as any).toString(),
@@ -448,11 +444,6 @@ export class FavoriteService {
     if (!favorite) throw new NotFoundException('Favorite not found');
 
     await this.invalidateFavoritesCache(userId);
-    // Invalidate cache for both old and new ad
-    if (oldFavorite) {
-      await this.invalidateAdDetailCache(oldFavorite.itemId.toString(), userId);
-    }
-    await this.invalidateAdDetailCache(updateFavoriteDto.adId, userId);
     return favorite;
   }
 
@@ -470,8 +461,6 @@ export class FavoriteService {
     if (!favorite) throw new NotFoundException('Favorite not found');
 
     await this.invalidateFavoritesCache(userId);
-    // Also invalidate ad detail cache using the adId from the favorite record
-    await this.invalidateAdDetailCache(favorite.itemId.toString(), userId);
     return { message: 'Item removed from favorites' };
   }
 
@@ -518,33 +507,6 @@ export class FavoriteService {
       const keys = await this.redisService.keys(`fav:list:${userId}:*`);
       if (keys?.length)
         await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
-    } catch {
-      // swallow cache errors
-    }
-  }
-
-  private async invalidateAdDetailCache(
-    adId: string,
-    userId: string,
-  ): Promise<void> {
-    try {
-      // Invalidate ad detail cache for this specific user
-      const userCacheKey = `ads:v2:getById:${adId}:${userId}`;
-      await this.redisService.cacheDel(userCacheKey);
-
-      // Also invalidate anonymous cache (in case user was not authenticated when cached)
-      const anonymousCacheKey = `ads:v2:getById:${adId}:anonymous`;
-      await this.redisService.cacheDel(anonymousCacheKey);
-
-      // Repopulate cache with fresh data for both user and anonymous
-      await Promise.all([
-        this.getAdByIdUc.exec({ adId, userId }).catch(() => {
-          // If user-specific fetch fails, continue silently
-        }),
-        this.getAdByIdUc.exec({ adId, userId: undefined }).catch(() => {
-          // If anonymous fetch fails, continue silently
-        }),
-      ]);
     } catch {
       // swallow cache errors
     }

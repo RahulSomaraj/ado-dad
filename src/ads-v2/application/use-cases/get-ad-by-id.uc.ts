@@ -6,7 +6,6 @@ import {
 import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
-import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { DetailedAdResponseDto } from '../../../ads/dto/common/ad-response.dto';
 import { AdCategory } from '../../../ads/schemas/ad.schema';
 import {
@@ -26,13 +25,9 @@ import { Model } from 'mongoose';
 
 @Injectable()
 export class GetAdByIdUc {
-  private static readonly CACHE_PREFIX = 'ads:v2:getById:';
-  private static readonly TTL = 900; // 15 minutes
-
   constructor(
     private readonly adRepo: AdRepository,
     private readonly inventory: VehicleInventoryGateway,
-    private readonly cache: AdsCache,
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
     @InjectModel(ChatRoom.name)
@@ -52,12 +47,7 @@ export class GetAdByIdUc {
       throw new BadRequestException(`Invalid ad ID: ${adId}`);
     }
 
-    // Check cache first
-    const cacheKey = `${GetAdByIdUc.CACHE_PREFIX}${adId}:${userId || 'anonymous'}`;
-    const cached = await this.cache.get<DetailedAdResponseDto>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // No caching - fetch directly from database
 
     // Build simplified aggregation pipeline
     const pipeline = [
@@ -176,13 +166,6 @@ export class GetAdByIdUc {
     // Add view count to response
     detailed.viewCount = (ad.viewCount || 0) + 1;
 
-    // Cache the result
-    await this.cache.setById(
-      adId,
-      userId || 'anonymous',
-      detailed,
-      GetAdByIdUc.TTL,
-    );
     return detailed;
   }
 
