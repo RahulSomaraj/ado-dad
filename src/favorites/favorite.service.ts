@@ -258,6 +258,8 @@ export class FavoriteService {
         commercialVehicleDetails: ad.commercialVehicleDetails?.[0] || undefined,
         favoriteId: favorite._id.toString(),
         favoritedAt: favorite.createdAt,
+        isFavorite: true, // All ads in favorites list are favorited
+        isFavorited: true, // Alternative field name for consistency
       };
     });
 
@@ -399,6 +401,8 @@ export class FavoriteService {
       commercialVehicleDetails: ad.commercialVehicleDetails?.[0] || undefined,
       favoriteId: fav._id.toString(),
       favoritedAt: fav.createdAt,
+      isFavorite: true,
+      isFavorited: true,
     };
   }
 
