@@ -507,6 +507,9 @@ export class FavoriteService {
       const keys = await this.redisService.keys(`fav:list:${userId}:*`);
       if (keys?.length)
         await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+
+      // Also invalidate user favorites cache for list endpoint
+      await this.redisService.cacheDel(`ads:v2:userFavorites:${userId}`);
     } catch {
       // swallow cache errors
     }

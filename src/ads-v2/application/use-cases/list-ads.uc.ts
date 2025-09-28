@@ -2,8 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
+import { AdsCache } from '../../infrastructure/services/ads-cache';
+import { RedisService } from '../../../shared/redis.service';
 import { ListAdsV2Dto } from '../../dto/list-ads-v2.dto';
 import { DetailedAdResponseDto } from '../../../ads/dto/common/ad-response.dto';
+import {
+  Favorite,
+  FavoriteDocument,
+} from '../../../favorites/schemas/schema.favorite';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
 export interface PaginatedAdsResponse {
   data: DetailedAdResponseDto[];
@@ -15,17 +23,129 @@ export interface PaginatedAdsResponse {
   hasPrev: boolean;
 }
 
+export interface CachedListData {
+  data: DetailedAdResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  cachedAt: number;
+}
+
 @Injectable()
 export class ListAdsUc {
+  private static readonly CACHE_TTL = 300; // 5 minutes
+
   constructor(
     private readonly adRepo: AdRepository,
     private readonly inventory: VehicleInventoryGateway,
+    private readonly cache: AdsCache,
+    private readonly redisService: RedisService,
+    @InjectModel(Favorite.name)
+    private readonly favoriteModel: Model<FavoriteDocument>,
   ) {}
 
   async exec(
     filters: ListAdsV2Dto,
     userId?: string,
   ): Promise<PaginatedAdsResponse> {
+    // 1. Check if this request should be cached
+    const cacheKey = this.generateListCacheKey(filters);
+
+    let baseData: CachedListData | null = null;
+
+    if (cacheKey) {
+      // 2. Try to get from cache (only for specific scenarios)
+      baseData = await this.cache.get<CachedListData>(cacheKey);
+    }
+
+    if (!baseData) {
+      // 3. Fetch from database
+      baseData = await this.fetchListDataFromDatabase(filters);
+
+      // 4. Cache only if it's one of our target scenarios
+      if (cacheKey) {
+        await this.cache.setList(cacheKey, baseData, ListAdsUc.CACHE_TTL);
+      }
+    }
+
+    // 5. Add user-specific isFavorite data
+    if (userId) {
+      const userFavorites = await this.getUserFavorites(userId);
+      baseData.data = this.addIsFavoriteToAds(baseData.data, userFavorites);
+    } else {
+      baseData.data = this.addIsFavoriteToAds(baseData.data, []);
+    }
+
+    return {
+      data: baseData.data,
+      total: baseData.total,
+      page: baseData.page,
+      limit: baseData.limit,
+      totalPages: baseData.totalPages,
+      hasNext: baseData.hasNext,
+      hasPrev: baseData.hasPrev,
+    };
+  }
+
+  /**
+   * Generate cache key only for specific scenarios:
+   * 1. All ads (no filters except pagination and sort)
+   * 2. Category + Location only (no other filters)
+   */
+  private generateListCacheKey(filters: ListAdsV2Dto): string | null {
+    const {
+      category,
+      location,
+      search,
+      minPrice,
+      maxPrice,
+      fuelTypeIds,
+      transmissionTypeIds,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    } = filters;
+
+    // Scenario 1: All ads (no filters except pagination and sort)
+    if (
+      !category &&
+      !location &&
+      !search &&
+      !minPrice &&
+      !maxPrice &&
+      !fuelTypeIds?.length &&
+      !transmissionTypeIds?.length
+    ) {
+      return `ads:v2:list:all&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
+    }
+
+    // Scenario 2: Category + Location only (no other filters)
+    if (
+      category &&
+      location &&
+      !search &&
+      !minPrice &&
+      !maxPrice &&
+      !fuelTypeIds?.length &&
+      !transmissionTypeIds?.length
+    ) {
+      return `ads:v2:list:category=${category}&location=${location}&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
+    }
+
+    // All other combinations: NO CACHING
+    return null;
+  }
+
+  /**
+   * Fetch list data from database (original logic)
+   */
+  private async fetchListDataFromDatabase(
+    filters: ListAdsV2Dto,
+  ): Promise<CachedListData> {
     const {
       category,
       search,
@@ -188,29 +308,7 @@ export class ListAdsUc {
       });
     }
 
-    // Favorites lookup (only if userId is provided)
-    if (userId) {
-      pipeline.push({
-        $lookup: {
-          from: 'favorites',
-          let: { adId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$userId', { $toObjectId: userId }] },
-                    { $eq: ['$itemId', '$$adId'] },
-                    { $eq: ['$itemType', 'ad'] },
-                  ],
-                },
-              },
-            },
-          ],
-          as: 'favoriteDetails',
-        },
-      });
-    }
+    // No favorites lookup in base data - will be added per user
 
     // Add fields for better response structure
     pipeline.push({
@@ -224,9 +322,7 @@ export class ListAdsUc {
           phone: '$user.phoneNumber',
           profilePic: '$user.profilePic',
         },
-        isFavorite: userId
-          ? { $gt: [{ $size: '$favoriteDetails' }, 0] }
-          : false,
+        isFavorite: false, // Will be set per user
         propertyDetails: { $arrayElemAt: ['$propertyDetails', 0] },
         vehicleDetails: { $arrayElemAt: ['$vehicleDetails', 0] },
         commercialVehicleDetails: {
@@ -298,6 +394,7 @@ export class ListAdsUc {
       totalPages,
       hasNext: page < totalPages,
       hasPrev: page > 1,
+      cachedAt: Date.now(),
     };
   }
 
@@ -387,5 +484,48 @@ export class ListAdsUc {
       commercialVehicleDetails: processedCommercialVehicleDetails,
       isFavorite: ad.isFavorite || false,
     };
+  }
+
+  /**
+   * Get user's favorite ad IDs (with caching)
+   */
+  private async getUserFavorites(userId: string): Promise<string[]> {
+    const cacheKey = `ads:v2:userFavorites:${userId}`;
+    let favorites = await this.cache.get<string[]>(cacheKey);
+
+    if (!favorites) {
+      // Fetch from database
+      const favoriteDocs = await this.favoriteModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          itemType: 'ad',
+        })
+        .select('itemId')
+        .lean();
+
+      favorites = favoriteDocs.map((doc) => doc.itemId.toString());
+
+      // Cache for 5 minutes - use RedisService directly
+      await this.redisService.cacheSet(
+        cacheKey,
+        favorites,
+        ListAdsUc.CACHE_TTL,
+      );
+    }
+
+    return favorites;
+  }
+
+  /**
+   * Add isFavorite field to ads based on user's favorites
+   */
+  private addIsFavoriteToAds(
+    ads: DetailedAdResponseDto[],
+    userFavorites: string[],
+  ): DetailedAdResponseDto[] {
+    return ads.map((ad) => ({
+      ...ad,
+      isFavorite: userFavorites.includes(ad.id),
+    }));
   }
 }

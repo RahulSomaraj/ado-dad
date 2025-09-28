@@ -6,6 +6,7 @@ import { VehicleAdRepository } from '../../infrastructure/repos/vehicle-ad.repo'
 import { CommercialVehicleAdRepository } from '../../infrastructure/repos/commercial-vehicle-ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
 import { IdempotencyService } from '../../infrastructure/services/idempotency.service';
+import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { CommercialIntentService } from '../../infrastructure/services/commercial-intent.service';
 import { OutboxService } from '../../infrastructure/services/outbox.service';
 import { CreateAdV2Dto, AdCategoryV2 } from '../../dto/create-ad-v2.dto';
@@ -26,6 +27,7 @@ export class CreateAdUc {
     private readonly cvehRepo: CommercialVehicleAdRepository,
     private readonly inventory: VehicleInventoryGateway,
     private readonly idem: IdempotencyService,
+    private readonly cache: AdsCache,
     private readonly intent: CommercialIntentService,
     private readonly outbox: OutboxService,
   ) {}
@@ -147,7 +149,8 @@ export class CreateAdUc {
         userType: userType,
       });
 
-      // 7) No cache invalidation needed
+      // 7) Invalidate list caches
+      await this.cache.invalidateLists();
 
       // 8) Hydrate read model for response
       const detailed = await this.adRepo.aggregateOneByIdDetailed(savedAd._id);
