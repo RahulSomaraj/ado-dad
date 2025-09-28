@@ -34,6 +34,8 @@ import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../auth/guard/roles.decorator';
 import { UserType } from '../users/enums/user.types';
 import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('Ads v2')
 @Controller('v2/ads')
@@ -42,7 +44,30 @@ export class AdsV2Controller {
     private readonly createAdUc: CreateAdUc,
     private readonly listAdsUc: ListAdsUc,
     private readonly getAdByIdUc: GetAdByIdUc,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Extract user ID from JWT token if present
+   */
+  private extractUserIdFromToken(authHeader: string): string | null {
+    try {
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+      }
+
+      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      const secret =
+        this.configService.get('TOKEN_KEY') ||
+        'default-secret-key-change-in-production';
+
+      const payload = this.jwtService.verify(token, { secret });
+      return payload.id || null;
+    } catch (error) {
+      return null;
+    }
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -657,16 +682,11 @@ export class AdsV2Controller {
   })
   async list(@Body() dto: ListAdsV2Dto, @Req() req: any) {
     try {
-      console.log('Listing v2 advertisements with filters:', dto);
-
       // Get user ID from auth token if available
-      const userId = req.user?.id || null;
+      const authHeader = req.headers.authorization;
+      const userId = this.extractUserIdFromToken(authHeader);
 
-      const result = await this.listAdsUc.exec(dto, userId);
-
-      console.log(
-        `v2 Advertisements retrieved: ${result.data.length} of ${result.total}`,
-      );
+      const result = await this.listAdsUc.exec(dto, userId || undefined);
       return result;
     } catch (error) {
       console.error('Error listing v2 advertisements:', error);

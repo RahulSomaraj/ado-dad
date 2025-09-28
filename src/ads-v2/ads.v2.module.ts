@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule } from '@nestjs/config';
 import { AdsV2Controller } from './ads.v2.controller';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
@@ -69,6 +71,8 @@ const OutboxSchema = {
       { name: 'Outbox', schema: OutboxSchema },
     ]),
     VehicleInventoryModule,
+    JwtModule.register({}), // Register JwtModule for JwtService
+    ConfigModule, // Register ConfigModule for ConfigService
   ],
   controllers: [AdsV2Controller],
   providers: [

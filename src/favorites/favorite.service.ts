@@ -510,10 +510,8 @@ export class FavoriteService {
 
       // Also invalidate user favorites cache for list endpoint
       await this.redisService.cacheDel(`ads:v2:userFavorites:${userId}`);
-
-      console.log(`Invalidated favorites cache for user: ${userId}`);
     } catch (error) {
-      console.error('Error invalidating favorites cache:', error);
+      // swallow cache errors
     }
   }
 }
