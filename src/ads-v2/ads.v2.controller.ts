@@ -723,6 +723,7 @@ export class AdsV2Controller {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Get advertisement by ID with complete details and all relations (v2)',
@@ -730,15 +731,16 @@ export class AdsV2Controller {
       Retrieve a single advertisement with comprehensive details including all relations.
       
       **Authentication:**
-      - No authentication required (public endpoint)
-      - If authenticated, includes user's favorite status and chat relations
+      - **Optional**: No authentication required (public endpoint)
+      - **With Bearer Token**: If you provide a valid JWT token in Authorization header, the response will include your favorite status (isFavorite field) and chat relations
+      - **Without Token**: All ads will show isFavorite: false and no chat relations
       
       **Features:**
       - Complete advertisement information
       - Enhanced user details (name, email, phone, profile picture, type)
       - Category-specific details (property, vehicle, commercial vehicle)
       - Vehicle inventory details (manufacturer, model, variant, transmission, fuel)
-      - Chat relations (participants, last messages, chat count)
+      - Chat relations (participants, last messages, chat count) - only for authenticated users
       - Engagement metrics (favorites count, view count, user's favorite status)
       - Ratings and reviews (when available)
       - View count tracking (increments on each request)
@@ -749,10 +751,17 @@ export class AdsV2Controller {
       - Property details (for property ads)
       - Vehicle details with inventory information (for vehicle ads)
       - Commercial vehicle details (for commercial vehicle ads)
-      - Related chat rooms and messages
+      - Related chat rooms and messages (authenticated users only)
       - Favorites and engagement metrics
       - View count and analytics data
     `,
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    description:
+      'Optional JWT Bearer token for personalized favorites and chat relations. Format: "Bearer <token>". If provided, isFavorite field will show your personal favorites.',
+    required: false,
+    example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   @ApiResponse({
     status: 200,
@@ -772,12 +781,14 @@ export class AdsV2Controller {
     @Req() req: any,
   ): Promise<DetailedAdResponseDto> {
     try {
-      console.log(`v2 Get advertisement by ID: ${id}`);
+      // Get user ID from auth token if available
+      const authHeader = req.headers.authorization;
+      const userId = this.extractUserIdFromToken(authHeader);
 
-      const userId = req?.user?.id;
-      const result = await this.getAdByIdUc.exec({ adId: id, userId });
-
-      console.log(`v2 Advertisement retrieved: ${result.id}`);
+      const result = await this.getAdByIdUc.exec({
+        adId: id,
+        userId: userId || undefined,
+      });
       return result;
     } catch (error) {
       console.error('Error getting v2 advertisement by ID:', error);
