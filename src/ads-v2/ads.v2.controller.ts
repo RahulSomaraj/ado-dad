@@ -378,6 +378,7 @@ export class AdsV2Controller {
 
   @Post('list')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get advertisements with enhanced filtering and search (v2)',
     description: `
@@ -403,8 +404,9 @@ export class AdsV2Controller {
       - All filters are optional
       
       **Authentication:**
-      - No authentication required (public endpoint)
-      - If authenticated, includes favorite status (isFavorite field)
+      - **Optional**: No authentication required (public endpoint)
+      - **With Bearer Token**: If you provide a valid JWT token in Authorization header, the response will include your favorite status (isFavorite field)
+      - **Without Token**: All ads will show isFavorite: false
       
       **Response includes:**
       - Advertisement details
@@ -416,13 +418,33 @@ export class AdsV2Controller {
       - Pagination metadata
     `,
   })
+  @ApiHeader({
+    name: 'Authorization',
+    description:
+      'Optional JWT Bearer token for personalized favorites. Format: "Bearer <token>". If provided, isFavorite field will show your personal favorites.',
+    required: false,
+    example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
   @ApiBody({
     description: 'Advertisement listing filters',
     type: ListAdsV2Dto,
     examples: {
       basic: {
-        summary: 'Basic listing',
-        description: 'Get all ads with pagination',
+        summary: 'Basic listing (no auth)',
+        description:
+          'Get all ads with pagination - no authentication required. All isFavorite will be false.',
+        value: {
+          search: 'honda',
+          minPrice: 10000,
+          maxPrice: 1000000,
+          page: 1,
+          limit: 20,
+        },
+      },
+      authenticated: {
+        summary: 'Authenticated listing',
+        description:
+          'Get ads with personal favorites. Include Authorization header with Bearer token to see your favorites.',
         value: {
           search: 'honda',
           minPrice: 10000,
@@ -647,7 +669,12 @@ export class AdsV2Controller {
                 },
               },
               images: { type: 'array', items: { type: 'string' } },
-              isFavorite: { type: 'boolean', example: false },
+              isFavorite: {
+                type: 'boolean',
+                description:
+                  'Whether this ad is favorited by the current user. Always false for unauthenticated users.',
+                example: false,
+              },
             },
           },
         },
