@@ -135,7 +135,6 @@ export class GetAdByIdUc {
     // Get favorites count
     const favoritesCount = await this.favoriteModel.countDocuments({
       itemId: new Types.ObjectId(adId),
-      itemType: 'ad',
     });
     detailed.favoritesCount = favoritesCount;
 
@@ -144,7 +143,6 @@ export class GetAdByIdUc {
       const userFavorite = await this.favoriteModel.findOne({
         userId: new Types.ObjectId(userId),
         itemId: new Types.ObjectId(adId),
-        itemType: 'ad',
       });
       detailed.isFavorited = !!userFavorite;
       detailed.isFavorite = !!userFavorite; // For consistency with list endpoint

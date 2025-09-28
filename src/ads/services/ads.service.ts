@@ -1194,7 +1194,6 @@ export class AdsService {
     // Get favorites count
     const favoritesCount = await this.favoriteModel.countDocuments({
       itemId: new Types.ObjectId(id),
-      itemType: 'ad',
     });
     detailed.favoritesCount = favoritesCount;
 
@@ -1203,7 +1202,6 @@ export class AdsService {
       const userFavorite = await this.favoriteModel.findOne({
         userId: new Types.ObjectId(userId),
         itemId: new Types.ObjectId(id),
-        itemType: 'ad',
       });
       detailed.isFavorited = !!userFavorite;
     }

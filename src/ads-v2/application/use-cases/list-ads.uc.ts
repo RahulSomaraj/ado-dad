@@ -498,7 +498,6 @@ export class ListAdsUc {
       const favoriteDocs = await this.favoriteModel
         .find({
           userId: new Types.ObjectId(userId),
-          itemType: 'ad',
         })
         .select('itemId')
         .lean();

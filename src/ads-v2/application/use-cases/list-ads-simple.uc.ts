@@ -144,7 +144,6 @@ export class ListAdsUc {
                   $and: [
                     { $eq: ['$userId', { $toObjectId: userId }] },
                     { $eq: ['$itemId', '$$adId'] },
-                    { $eq: ['$itemType', 'ad'] },
                   ],
                 },
               },
