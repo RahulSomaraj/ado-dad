@@ -303,7 +303,43 @@ export class UsersService {
         );
       }
 
-      // Update user
+      // Handle password change specially to ensure it gets hashed
+      if (updateData.password) {
+        this.assertStrongPassword(updateData.password);
+        // Use save() method to trigger pre-save hook for password hashing
+        existingUser.password = updateData.password;
+        await existingUser.save();
+
+        // Remove password from updateData to avoid double processing
+        const { password, ...updateDataWithoutPassword } = updateData;
+
+        // Update other fields if any
+        if (Object.keys(updateDataWithoutPassword).length > 0) {
+          await this.userModel
+            .findByIdAndUpdate(id, updateDataWithoutPassword, {
+              new: true,
+              runValidators: true,
+            })
+            .exec();
+        }
+
+        // Fetch updated user without password field
+        const updatedUser = await this.userModel
+          .findById(id)
+          .select('_id name email type phoneNumber profilePic updatedAt')
+          .exec();
+
+        if (!updatedUser) {
+          throw new NotFoundException('User not found');
+        }
+
+        this.logger.log(`User updated successfully: ${updatedUser.email}`);
+        await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
+        await this.invalidateUsersListCaches();
+        return updatedUser;
+      }
+
+      // Update user (no password change)
       const updatedUser = await this.userModel
         .findByIdAndUpdate(id, updateData, {
           new: true,
@@ -684,7 +720,9 @@ export class UsersService {
       throw new BadRequestException('Current password incorrect');
     }
     this.assertStrongPassword(newPassword);
-    (user as any).password = newPassword; // Let the pre-save hook hash it    await user.save();
+    // Set plain text password - the pre-save hook will handle hashing
+    (user as any).password = newPassword;
+    await user.save();
     try {
       await this.authTokenModel.deleteMany({ userId: user._id }).exec();
     } catch (e) {
