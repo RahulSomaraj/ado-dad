@@ -684,8 +684,7 @@ export class UsersService {
       throw new BadRequestException('Current password incorrect');
     }
     this.assertStrongPassword(newPassword);
-    (user as any).password = await bcrypt.hash(newPassword, 12);
-    await user.save();
+    (user as any).password = newPassword; // Let the pre-save hook hash it    await user.save();
     try {
       await this.authTokenModel.deleteMany({ userId: user._id }).exec();
     } catch (e) {
@@ -775,6 +774,96 @@ export class UsersService {
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  /**
+   * Forgot password - send reset email if user exists
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      // 1. Check if user exists with this email
+      const user = await this.userModel.findOne({ email }).lean();
+
+      if (!user) {
+        // Return success message even if user doesn't exist (security best practice)
+        return {
+          message: 'If the email exists, a password reset link has been sent.',
+        };
+      }
+
+      // 2. Generate reset token
+      const resetToken = this.generateResetToken();
+
+      // 3. Store reset token in cache with expiry (1 hour)
+      const cacheKey = `password_reset:${user._id}`;
+      await this.redisService.cacheSet(cacheKey, resetToken, 3600); // 1 hour TTL
+
+      // 4. Generate reset link
+      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&userId=${user._id}`;
+
+      // 5. Send email with reset link
+      await this.sendPasswordResetEmail(user.email, user.name, resetLink);
+
+      return {
+        message: 'If the email exists, a password reset link has been sent.',
+      };
+    } catch (error) {
+      this.logger.error('Error in forgotPassword:', error);
+      // Return success message even on error (security best practice)
+      return {
+        message: 'If the email exists, a password reset link has been sent.',
+      };
+    }
+  }
+
+  /**
+   * Generate a secure reset token
+   */
+  private generateResetToken(): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Send password reset email
+   */
+  private async sendPasswordResetEmail(
+    email: string,
+    name: string,
+    resetLink: string,
+  ): Promise<void> {
+    try {
+      const {
+        EMAIL_TEMPLATES,
+        EMAIL_TEMPLATE_VARIABLES,
+      } = require('../common/constants/email-templates');
+
+      // Replace template variables
+      const htmlContent = EMAIL_TEMPLATES.FORGOT_PASSWORD.html.replace(
+        EMAIL_TEMPLATE_VARIABLES.FORGOT_PASSWORD.resetLink,
+        resetLink,
+      );
+
+      const textContent = EMAIL_TEMPLATES.FORGOT_PASSWORD.text.replace(
+        EMAIL_TEMPLATE_VARIABLES.FORGOT_PASSWORD.resetLink,
+        resetLink,
+      );
+
+      await this.emailService.sendEmail({
+        to: email,
+        subject: EMAIL_TEMPLATES.FORGOT_PASSWORD.subject,
+        html: htmlContent,
+        text: textContent,
+      });
+
+      this.logger.log(`Password reset email sent to ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${email}:`,
+        error,
+      );
+      throw error;
     }
   }
 }

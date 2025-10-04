@@ -28,6 +28,7 @@ import {
   ApiBody,
   ApiBearerAuth,
   ApiConsumes,
+  ApiOperation,
 } from '@nestjs/swagger';
 import { CreateUserDto, CreateUserWithFileDto } from './dto/create-user.dto'; // Import both DTOs
 import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
@@ -248,6 +249,48 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })
   async verifyOTP(@Body() body: { email: string; otp: string }) {
     return this.usersService.verifyOTP(body.email, body.otp);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Send a password reset email to the user if the email exists in the system.',
+  })
+  @ApiBody({
+    description: 'Email address for password reset',
+    schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'user@example.com',
+          description: 'User email address',
+        },
+      },
+      required: ['email'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset email sent (if email exists)',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'If the email exists, a password reset link has been sent.',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid email format',
+  })
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.usersService.forgotPassword(body.email);
   }
 
   @ApiBearerAuth()
