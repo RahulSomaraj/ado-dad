@@ -737,9 +737,9 @@ export class UsersService {
   }
 
   private assertStrongPassword(pw: string) {
-    if (typeof pw !== 'string' || pw.length < 12) {
+    if (typeof pw !== 'string' || pw.length < 8) {
       throw new BadRequestException(
-        'Password must be at least 12 characters long',
+        'Password must be at least 8 characters long',
       );
     }
     const hasUpper = /[A-Z]/.test(pw);
