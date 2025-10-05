@@ -536,79 +536,8 @@ export class AdsService {
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
     );
 
-    // Manufacturer lookup for search
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'manufacturers',
-          localField: 'vehicleDetails.manufacturerId',
-          foreignField: '_id',
-          as: 'manufacturerInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'manufacturers',
-          localField: 'commercialVehicleDetails.manufacturerId',
-          foreignField: '_id',
-          as: 'commercialManufacturerInfo',
-        },
-      },
-    );
-
-    // Vehicle model and variant lookup for search
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'vehiclemodels',
-          localField: 'vehicleDetails.modelId',
-          foreignField: '_id',
-          as: 'vehicleModelInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'vehiclevariants',
-          localField: 'vehicleDetails.variantId',
-          foreignField: '_id',
-          as: 'vehicleVariantInfo',
-        },
-      },
-      // Fuel type lookup for search
-      {
-        $lookup: {
-          from: 'fueltypes',
-          localField: 'vehicleDetails.fuelTypeId',
-          foreignField: '_id',
-          as: 'vehicleFuelTypeInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'fueltypes',
-          localField: 'commercialVehicleDetails.fuelTypeId',
-          foreignField: '_id',
-          as: 'commercialVehicleFuelTypeInfo',
-        },
-      },
-      // Transmission type lookup for search
-      {
-        $lookup: {
-          from: 'transmissiontypes',
-          localField: 'vehicleDetails.transmissionTypeId',
-          foreignField: '_id',
-          as: 'vehicleTransmissionTypeInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'transmissiontypes',
-          localField: 'commercialVehicleDetails.transmissionTypeId',
-          foreignField: '_id',
-          as: 'commercialVehicleTransmissionTypeInfo',
-        },
-      },
-    );
+    // Note: Manufacturer, model, fuel type, and transmission lookups removed
+    // These will be fetched individually using VehicleInventoryService in the mapping function
 
     // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
     // Property
@@ -716,7 +645,7 @@ export class AdsService {
       },
     );
 
-    // ----- Search functionality -----
+    // ----- Basic Search functionality -----
     if (search && search.trim()) {
       const searchTerm = search.trim();
       pipeline.push({
@@ -734,44 +663,6 @@ export class AdsService {
                   regex: searchTerm,
                   options: 'i',
                 },
-              },
-            },
-            // Search in manufacturer names
-            { 'manufacturerInfo.name': { $regex: searchTerm, $options: 'i' } },
-            {
-              'manufacturerInfo.displayName': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialManufacturerInfo.name': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialManufacturerInfo.displayName': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            // Search in vehicle model names
-            { 'vehicleModelInfo.name': { $regex: searchTerm, $options: 'i' } },
-            {
-              'vehicleModelInfo.displayName': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            // Search in vehicle variant names
-            {
-              'vehicleVariantInfo.name': { $regex: searchTerm, $options: 'i' },
-            },
-            {
-              'vehicleVariantInfo.displayName': {
-                $regex: searchTerm,
-                $options: 'i',
               },
             },
             // Search in vehicle details
@@ -887,29 +778,6 @@ export class AdsService {
                 },
               },
             },
-            // Search in fuel type names
-            {
-              'vehicleFuelTypeInfo.name': { $regex: searchTerm, $options: 'i' },
-            },
-            {
-              'commercialVehicleFuelTypeInfo.name': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            // Search in transmission type names
-            {
-              'vehicleTransmissionTypeInfo.name': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
-            {
-              'commercialVehicleTransmissionTypeInfo.name': {
-                $regex: searchTerm,
-                $options: 'i',
-              },
-            },
           ],
         },
       });
@@ -922,19 +790,8 @@ export class AdsService {
     );
     pipeline.push({ $sort: { [sortField]: sortDirection } });
 
-    // Clean up lookup arrays from output
-    pipeline.push({
-      $project: {
-        manufacturerInfo: 0,
-        commercialManufacturerInfo: 0,
-        vehicleModelInfo: 0,
-        vehicleVariantInfo: 0,
-        vehicleFuelTypeInfo: 0,
-        commercialVehicleFuelTypeInfo: 0,
-        vehicleTransmissionTypeInfo: 0,
-        commercialVehicleTransmissionTypeInfo: 0,
-      },
-    });
+    // Note: Manufacturer, model, fuel type, and transmission names will be added
+    // in the mapping function using VehicleInventoryService (v2 approach)
 
     // ----- Pagination -----
     pipeline.push({
@@ -950,14 +807,17 @@ export class AdsService {
     const data = result?.[0]?.data ?? [];
     const total = result?.[0]?.total?.[0]?.count ?? 0;
 
-    const dtoData = data.map((ad: any) => {
-      const dto = this.mapToResponseDto(ad);
-      dto.year =
-        ad.vehicleDetails?.[0]?.year ??
-        ad.commercialVehicleDetails?.[0]?.year ??
-        null;
-      return dto;
-    });
+    // Map ads to DTOs with inventory details (v2 approach)
+    const dtoData = await Promise.all(
+      data.map(async (ad: any) => {
+        const dto = await this.mapToResponseDtoWithInventory(ad);
+        dto.year =
+          ad.vehicleDetails?.[0]?.year ??
+          ad.commercialVehicleDetails?.[0]?.year ??
+          null;
+        return dto;
+      }),
+    );
 
     const response: PaginatedDetailedAdResponseDto = {
       data: dtoData,
@@ -1915,6 +1775,158 @@ export class AdsService {
       vehicleDetails: ad.vehicleDetails || [],
       commercialVehicleDetails: ad.commercialVehicleDetails || [],
       propertyDetails: ad.propertyDetails || [],
+    };
+  }
+
+  /**
+   * Map ad to response DTO with inventory details (v2 approach)
+   */
+  private async mapToResponseDtoWithInventory(
+    ad: any,
+  ): Promise<DetailedAdResponseDto> {
+    const base = this.mapToResponseDto(ad);
+
+    // Vehicle details processing with inventory information
+
+    // Process vehicle details with inventory information
+    const vehicleDetails = ad.vehicleDetails;
+    let processedVehicleDetails = vehicleDetails;
+
+    if (vehicleDetails && Object.keys(vehicleDetails).length > 0) {
+      // Fetch vehicle inventory details individually with error handling
+      const [manufacturer, model, variant, fuelType, transmissionType] =
+        await Promise.all([
+          vehicleDetails.manufacturerId
+            ? this.vehicleInventoryService
+                .findManufacturerById(vehicleDetails.manufacturerId)
+                .catch(() => ({
+                  _id: vehicleDetails.manufacturerId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          vehicleDetails.modelId
+            ? this.vehicleInventoryService
+                .findVehicleModelById(vehicleDetails.modelId)
+                .catch(() => ({
+                  _id: vehicleDetails.modelId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          vehicleDetails.variantId
+            ? this.vehicleInventoryService
+                .findVehicleVariantById(vehicleDetails.variantId)
+                .catch(() => ({
+                  _id: vehicleDetails.variantId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          vehicleDetails.fuelTypeId
+            ? this.vehicleInventoryService
+                .findFuelTypeById(vehicleDetails.fuelTypeId)
+                .catch(() => ({
+                  _id: vehicleDetails.fuelTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          vehicleDetails.transmissionTypeId
+            ? this.vehicleInventoryService
+                .findTransmissionTypeById(vehicleDetails.transmissionTypeId)
+                .catch(() => ({
+                  _id: vehicleDetails.transmissionTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+        ]);
+
+      processedVehicleDetails = {
+        ...vehicleDetails,
+        manufacturer,
+        model,
+        variant,
+        fuelType,
+        transmissionType,
+      };
+    }
+
+    // Process commercial vehicle details with inventory information
+    const commercialVehicleDetails = ad.commercialVehicleDetails;
+    let processedCommercialVehicleDetails = commercialVehicleDetails;
+
+    if (
+      commercialVehicleDetails &&
+      Object.keys(commercialVehicleDetails).length > 0
+    ) {
+      // Fetch commercial vehicle inventory details individually with error handling
+      const [manufacturer, model, variant, fuelType, transmissionType] =
+        await Promise.all([
+          commercialVehicleDetails.manufacturerId
+            ? this.vehicleInventoryService
+                .findManufacturerById(commercialVehicleDetails.manufacturerId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.manufacturerId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.modelId
+            ? this.vehicleInventoryService
+                .findVehicleModelById(commercialVehicleDetails.modelId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.modelId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.variantId
+            ? this.vehicleInventoryService
+                .findVehicleVariantById(commercialVehicleDetails.variantId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.variantId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.fuelTypeId
+            ? this.vehicleInventoryService
+                .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.fuelTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.transmissionTypeId
+            ? this.vehicleInventoryService
+                .findTransmissionTypeById(
+                  commercialVehicleDetails.transmissionTypeId,
+                )
+                .catch(() => ({
+                  _id: commercialVehicleDetails.transmissionTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
+            : Promise.resolve(undefined),
+        ]);
+
+      processedCommercialVehicleDetails = {
+        ...commercialVehicleDetails,
+        manufacturer,
+        model,
+        variant,
+        fuelType,
+        transmissionType,
+      };
+    }
+
+    return {
+      ...base,
+      vehicleDetails: processedVehicleDetails || undefined,
+      commercialVehicleDetails: processedCommercialVehicleDetails || undefined,
     };
   }
 
