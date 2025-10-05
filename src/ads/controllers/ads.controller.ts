@@ -49,8 +49,8 @@ import {
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth-guard';
 import { S3Service } from '../../shared/s3.service';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
-import { RolesGuard } from '../../auth/guard/roles.guards';
-import { Roles } from '../../auth/guard/roles.decorator';
+import { RolesGuard } from '../../roles/roles.guard';
+import { Roles } from '../../roles/roles.decorator';
 import { UserType } from '../../users/enums/user.types';
 import { LoggingInterceptor } from '../../interceptors/logging.interceptors';
 
@@ -549,7 +549,7 @@ export class AdsController {
 
   @Post('upload-images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN, UserType.SHOWROOM)
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
@@ -598,7 +598,7 @@ export class AdsController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN, UserType.SHOWROOM)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update advertisement by ID',
