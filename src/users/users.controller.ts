@@ -154,7 +154,7 @@ export class UsersController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Get(':id')
   @ApiResponse({ status: 200, description: 'User found' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -164,7 +164,7 @@ export class UsersController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Put(':id')
   @ApiBody({
     description: 'Update user details',

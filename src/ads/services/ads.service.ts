@@ -1146,7 +1146,7 @@ export class AdsService {
         );
     }
 
-    await this.invalidateAdCache();
+    await this.invalidateAdCache(undefined, userId);
     return result;
   }
 
@@ -1489,7 +1489,7 @@ export class AdsService {
         break;
     }
 
-    await this.invalidateAdCache(id);
+    await this.invalidateAdCache(id, userId);
     return this.findOne(id);
   }
 
@@ -1506,7 +1506,7 @@ export class AdsService {
     // Check if user is admin or super admin (they can delete any ad)
     if (userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN) {
       await this.adModel.findByIdAndDelete(id);
-      await this.invalidateAdCache(id);
+      await this.invalidateAdCache(id, userId);
       return;
     }
 
@@ -1519,25 +1519,52 @@ export class AdsService {
 
     // User is the owner, proceed with deletion
     await this.adModel.findByIdAndDelete(id);
-    await this.invalidateAdCache(id);
+    await this.invalidateAdCache(id, userId);
   }
 
   /** ---------- REDIS / CACHING UTILS ---------- */
-  private async invalidateAdCache(adId?: string): Promise<void> {
+  private async invalidateAdCache(
+    adId?: string,
+    userId?: string,
+  ): Promise<void> {
     try {
-      const keys = await this.redisService.keys(
+      // Invalidate general ad listings
+      const findAllKeys = await this.redisService.keys(
         `${AdsService.CACHE_PREFIX}findAll*`,
       );
-      if (keys.length > 0) {
-        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      if (findAllKeys.length > 0) {
+        await Promise.all(
+          findAllKeys.map((k) => this.redisService.cacheDel(k)),
+        );
       }
+
+      // Invalidate user-specific ad listings
+      const getUserAdsKeys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}getUserAds*`,
+      );
+      if (getUserAdsKeys.length > 0) {
+        await Promise.all(
+          getUserAdsKeys.map((k) => this.redisService.cacheDel(k)),
+        );
+      }
+
+      // Invalidate specific ad details if adId provided
       if (adId) {
-        // delete all per-user variants
         const idKeys = await this.redisService.keys(
           `${AdsService.CACHE_PREFIX}getById:${adId}:*`,
         );
         if (idKeys?.length) {
           await Promise.all(idKeys.map((k) => this.redisService.cacheDel(k)));
+        }
+      }
+
+      // Invalidate user-specific caches if userId provided
+      if (userId) {
+        const userKeys = await this.redisService.keys(
+          `${AdsService.CACHE_PREFIX}*userId*${userId}*`,
+        );
+        if (userKeys.length > 0) {
+          await Promise.all(userKeys.map((k) => this.redisService.cacheDel(k)));
         }
       }
     } catch (err) {
