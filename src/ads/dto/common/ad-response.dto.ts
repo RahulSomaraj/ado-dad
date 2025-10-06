@@ -34,6 +34,9 @@ export class AdResponseDto {
   @ApiProperty({ description: 'Advertisement location' })
   location: string;
 
+  @ApiPropertyOptional({ description: 'Advertisement link' })
+  link?: string;
+
   @ApiProperty({ description: 'Advertisement category', enum: AdCategory })
   category: AdCategory;
 

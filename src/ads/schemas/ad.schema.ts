@@ -35,6 +35,15 @@ export class Ad {
   @Prop({ default: false })
   soldOut: boolean;
 
+  @Prop({ default: false })
+  isApproved: boolean;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false })
+  approvedBy?: mongoose.Types.ObjectId;
+
+  @Prop({ type: String, required: false })
+  link?: string;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   postedBy: mongoose.Types.ObjectId;
 
@@ -51,8 +60,10 @@ export const AdSchema = SchemaFactory.createForClass(Ad);
 AdSchema.index({ category: 1, createdAt: -1 });
 AdSchema.index({ location: 1 });
 AdSchema.index({ postedBy: 1 });
+AdSchema.index({ approvedBy: 1 });
 AdSchema.index({ isActive: 1 });
 AdSchema.index({ soldOut: 1 });
+AdSchema.index({ isApproved: 1 });
 AdSchema.index({ price: 1 });
 // Compound indexes moved from service
 AdSchema.index(
@@ -61,5 +72,12 @@ AdSchema.index(
 );
 AdSchema.index({ isActive: 1, location: 1, price: 1 }, { background: true });
 AdSchema.index({ postedBy: 1, isActive: 1 }, { background: true });
+AdSchema.index({ isApproved: 1, isActive: 1 }, { background: true });
+AdSchema.index(
+  { isApproved: 1, category: 1, createdAt: -1 },
+  { background: true },
+);
+AdSchema.index({ approvedBy: 1, isApproved: 1 }, { background: true });
+AdSchema.index({ link: 1 }, { background: true });
 // Text index for search functionality - only description field exists
 AdSchema.index({ description: 'text' }, { background: true });

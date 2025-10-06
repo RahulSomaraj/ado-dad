@@ -179,8 +179,8 @@ export class AdsService {
     // Store search term for later use
     const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
 
-    // Base visibility: show everything when no filters (except soft-deleted)
-    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+    // Base visibility: show only approved ads (except soft-deleted)
+    pipeline.push({ $match: { isDeleted: { $ne: true }, isApproved: true } });
 
     // Optional category filter
     if (filters.category) {
@@ -509,10 +509,11 @@ export class AdsService {
     // ------- Pipeline -------
     const pipeline: any[] = [];
 
-    // Match user's ads only
+    // Match user's ads only (including approved status)
     const matchStage: any = {
       postedBy: new Types.ObjectId(userId),
       isDeleted: { $ne: true },
+      isApproved: true,
     };
 
     // Add soldOut filter if provided
@@ -1244,6 +1245,7 @@ export class AdsService {
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
     });
@@ -1285,6 +1287,7 @@ export class AdsService {
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
     });
@@ -1337,6 +1340,7 @@ export class AdsService {
         price: data.price,
         images: data.images ?? [],
         location: data.location,
+        link: data.link,
         postedBy: new Types.ObjectId(userId),
         category: AdCategory.COMMERCIAL_VEHICLE,
       });
@@ -1399,6 +1403,7 @@ export class AdsService {
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,
     });
@@ -1469,6 +1474,7 @@ export class AdsService {
     if (Array.isArray(updateData.images)) adUpdate.images = updateData.images;
     if (typeof updateData.location === 'string')
       adUpdate.location = updateData.location;
+    if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
     if (typeof updateData.isActive === 'boolean')
       adUpdate.isActive = updateData.isActive;
     if (Object.keys(adUpdate).length) {
@@ -1522,6 +1528,236 @@ export class AdsService {
     await this.invalidateAdCache(id, userId);
   }
 
+  /** ---------- APPROVAL WORKFLOW ---------- */
+  async updateAdApproval(
+    id: string,
+    isApproved: boolean,
+    approvedBy: string,
+  ): Promise<AdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+
+    const ad = await this.adModel.findById(id);
+    if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    // Update the ad with approval information
+    const updateData: any = {
+      isApproved,
+      updatedAt: new Date(),
+    };
+
+    if (isApproved) {
+      updateData.approvedBy = new Types.ObjectId(approvedBy);
+    } else {
+      updateData.approvedBy = null;
+    }
+
+    await this.adModel.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    // Invalidate cache to ensure fresh data
+    await this.invalidateAdCache(id, approvedBy);
+
+    return this.findOne(id);
+  }
+
+  /** ---------- ADMIN ONLY - ALL ADS (INCLUDING UNAPPROVED) ---------- */
+  async getAllAdsForAdmin(
+    filters: FilterAdDto,
+  ): Promise<PaginatedDetailedAdResponseDto> {
+    // Build deterministic cache key
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+
+    const safeFilters = this.normalize(filters);
+    const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    let {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      search,
+    } = filters;
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // ------- Pipeline -------
+    const pipeline: any[] = [];
+
+    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
+    // Store search term for later use
+    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+
+    // Base visibility: show all ads (including unapproved) except soft-deleted
+    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+
+    // Optional category filter
+    if (filters.category) {
+      pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // user
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
+
+    // Add approvedBy user lookup for admin view
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'approvedBy',
+          foreignField: '_id',
+          as: 'approvedByUser',
+          pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+      },
+      {
+        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Add vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+      {
+        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Add commercial vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $unwind: {
+          path: '$commercialVehicleDetails',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    // Add property details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+      {
+        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Apply search filter if provided
+    if (searchTerm) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { location: { $regex: searchTerm, $options: 'i' } },
+            { 'user.name': { $regex: searchTerm, $options: 'i' } },
+            { 'user.email': { $regex: searchTerm, $options: 'i' } },
+          ],
+        },
+      });
+    }
+
+    // Sort
+    pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+    // Facet for pagination
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const [result] = await this.adModel.aggregate(pipeline);
+    const data = result.data || [];
+    const total = result.total[0]?.count || 0;
+
+    // Map to response DTOs with inventory details
+    const dtoData = await Promise.all(
+      data.map(async (ad: any) => {
+        const dto = await this.mapToResponseDtoWithInventory(ad);
+        dto.year =
+          ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
+        return dto;
+      }),
+    );
+
+    const totalPages = Math.ceil(total / limit);
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    // Cache the result
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
+  }
+
   /** ---------- REDIS / CACHING UTILS ---------- */
   private async invalidateAdCache(
     adId?: string,
@@ -1545,6 +1781,16 @@ export class AdsService {
       if (getUserAdsKeys.length > 0) {
         await Promise.all(
           getUserAdsKeys.map((k) => this.redisService.cacheDel(k)),
+        );
+      }
+
+      // Invalidate admin all ads cache
+      const adminAllAdsKeys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}getAllAdsForAdmin*`,
+      );
+      if (adminAllAdsKeys.length > 0) {
+        await Promise.all(
+          adminAllAdsKeys.map((k) => this.redisService.cacheDel(k)),
         );
       }
 
@@ -1785,6 +2031,7 @@ export class AdsService {
       price: ad.price,
       images: ad.images,
       location: ad.location,
+      link: ad.link,
       category: ad.category,
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,

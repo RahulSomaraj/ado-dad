@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -1066,5 +1067,130 @@ export class AdsController {
     };
 
     return this.adsService.getUserAds(userId, filterDto);
+  }
+
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get all advertisements (Admin only)',
+    description: `
+      Retrieve all advertisements including unapproved ones. Only accessible by admin and super admin.
+      
+      **Features:**
+      - Returns all ads (approved and unapproved)
+      - Includes detailed ad information with approval status
+      - Supports pagination and filtering
+      - Shows who approved each ad
+      - Includes vehicle inventory details
+      - Enhanced search capabilities
+      
+      **Response includes:**
+      - Advertisement details with approval status
+      - Category-specific information
+      - User information (posted by)
+      - Approver information (approved by)
+      - Pagination metadata
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All advertisements retrieved successfully',
+    type: PaginatedDetailedAdResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Admin access required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  @ApiBearerAuth()
+  async getAllAdsForAdmin(
+    @Query()
+    query: {
+      page?: number;
+      limit?: number;
+      category?: string;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<PaginatedDetailedAdResponseDto> {
+    const filterDto: FilterAdDto = {
+      page: query.page,
+      limit: query.limit,
+      category: query.category as any,
+      search: query.search,
+      sortBy: query.sortBy as any,
+      sortOrder: query.sortOrder,
+    };
+
+    return this.adsService.getAllAdsForAdmin(filterDto);
+  }
+
+  @Patch(':id/approval')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Update advertisement approval status',
+    description:
+      'Approve or reject an advertisement. Only accessible by admin and super admin.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isApproved: {
+          type: 'boolean',
+          description: 'Set to true to approve, false to reject',
+        },
+      },
+      required: ['isApproved'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advertisement approval status updated successfully',
+    type: AdResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Admin access required',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Advertisement not found',
+  })
+  @ApiBearerAuth()
+  async updateAdApproval(
+    @Param('id') id: string,
+    @Body() body: { isApproved: boolean },
+    @Request() req: any,
+  ): Promise<AdResponseDto> {
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+
+      return await this.adsService.updateAdApproval(
+        id,
+        body.isApproved,
+        req.user.id,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        throw new BadRequestException(
+          'Invalid ad id: ObjectId must be a 24 character hex string',
+        );
+      }
+      throw error;
+    }
   }
 }
