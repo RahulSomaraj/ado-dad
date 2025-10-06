@@ -6,7 +6,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Favorite, FavoriteDocument } from './schemas/schema.favorite';
-import { RedisService } from '../shared/redis.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { AdsService } from '../ads/services/ads.service';
@@ -24,7 +23,6 @@ const toObjectId = (id: string) => {
 export class FavoriteService {
   constructor(
     @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
-    private readonly redisService: RedisService,
     private readonly adsService: AdsService,
   ) {}
 
@@ -53,7 +51,6 @@ export class FavoriteService {
 
     if (existing) {
       await this.favoriteModel.deleteOne({ _id: existing._id });
-      await this.invalidateFavoritesCache(userId);
       return { isFavorited: false, message: 'Ad removed from favorites' };
     }
 
@@ -62,7 +59,6 @@ export class FavoriteService {
       itemId: adOid,
     }).save();
 
-    await this.invalidateFavoritesCache(userId);
     return {
       isFavorited: true,
       favoriteId: (saved._id as any).toString(),
@@ -98,15 +94,6 @@ export class FavoriteService {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
-
-    const cacheKey = `fav:list:${userId}:${JSON.stringify({
-      itemId: query.itemId || null,
-      page,
-      limit,
-    })}`;
-
-    const cached = await this.redisService.cacheGet<any>(cacheKey);
-    if (cached) return cached;
 
     const userOid = toObjectId(userId);
     const itemOid = query.itemId ? toObjectId(query.itemId) : null;
@@ -275,7 +262,6 @@ export class FavoriteService {
       hasPrev: page > 1,
     };
 
-    await this.redisService.cacheSet(cacheKey, result, 120);
     return result;
   }
 
@@ -437,7 +423,6 @@ export class FavoriteService {
       });
     }
 
-    // Get the old favorite to know which ad cache to invalidate
     const oldFavorite = await this.favoriteModel.findById(favOid);
 
     const favorite = await this.favoriteModel.findOneAndUpdate(
@@ -447,7 +432,6 @@ export class FavoriteService {
     );
     if (!favorite) throw new NotFoundException('Favorite not found');
 
-    await this.invalidateFavoritesCache(userId);
     return favorite;
   }
 
@@ -464,7 +448,6 @@ export class FavoriteService {
     });
     if (!favorite) throw new NotFoundException('Favorite not found');
 
-    await this.invalidateFavoritesCache(userId);
     return { message: 'Item removed from favorites' };
   }
 
@@ -502,20 +485,5 @@ export class FavoriteService {
     const res = await this.favoriteModel.aggregate(pipeline);
     const count = res[0]?.count ?? 0;
     return { count };
-  }
-
-  // -------- CACHE --------
-
-  private async invalidateFavoritesCache(userId: string): Promise<void> {
-    try {
-      const keys = await this.redisService.keys(`fav:list:${userId}:*`);
-      if (keys?.length)
-        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
-
-      // Also invalidate user favorites cache for list endpoint
-      await this.redisService.cacheDel(`ads:v2:userFavorites:${userId}`);
-    } catch (error) {
-      // swallow cache errors
-    }
   }
 }

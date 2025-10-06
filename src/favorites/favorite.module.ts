@@ -3,7 +3,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { FavoriteSchema } from './schemas/schema.favorite';
 import { FavoriteService } from './favorite.service';
 import { FavoriteController } from './favorite.controller';
-import { RedisService } from '../shared/redis.service';
 import { AdsModule } from '../ads/ads.module';
 
 @Module({
@@ -11,7 +10,7 @@ import { AdsModule } from '../ads/ads.module';
     MongooseModule.forFeature([{ name: 'Favorite', schema: FavoriteSchema }]),
     AdsModule,
   ],
-  providers: [FavoriteService, RedisService],
+  providers: [FavoriteService],
   controllers: [FavoriteController],
   exports: [FavoriteService],
 })
