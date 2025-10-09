@@ -51,7 +51,12 @@ export class GetAdByIdUc {
 
     // Build simplified aggregation pipeline
     const pipeline = [
-      { $match: { _id: new Types.ObjectId(adId), isDeleted: { $ne: true } } },
+      {
+        $match: {
+          _id: new Types.ObjectId(adId),
+          isDeleted: { $ne: true },
+        },
+      },
 
       // Enhanced user information with more details
       {

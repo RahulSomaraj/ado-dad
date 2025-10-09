@@ -40,11 +40,12 @@ export class ListAdsUc {
     // Build simplified aggregation pipeline
     const pipeline: any[] = [];
 
-    // Base match - exclude deleted ads
+    // Base match - exclude deleted ads and only show approved ads
     pipeline.push({
       $match: {
         isDeleted: { $ne: true },
         isActive: true,
+        isApproved: true, // Only show approved ads in listings
       },
     });
 
