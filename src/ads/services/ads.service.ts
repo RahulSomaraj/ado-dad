@@ -848,7 +848,7 @@ export class AdsService {
   }
 
   /** ---------- FIND ONE ---------- */
-  async findOne(id: string): Promise<AdResponseDto> {
+  async findOne(id: string): Promise<DetailedAdResponseDto> {
     if (!this.isValidId(id)) {
       throw new BadRequestException(`Invalid ad ID: ${id}`);
     }
@@ -864,6 +864,19 @@ export class AdsService {
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      // Add approvedBy user lookup
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'approvedBy',
+          foreignField: '_id',
+          as: 'approvedByUser',
+          pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+      },
+      {
+        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+      },
       {
         $lookup: {
           from: 'vehicleads',
@@ -1089,7 +1102,7 @@ export class AdsService {
   async createAd(
     createDto: CreateAdDto,
     userId: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     // Auto-detect commercial vehicle intent
     if (createDto.data?.modelId) {
       const commercialDefaults =
@@ -1238,7 +1251,7 @@ export class AdsService {
   private async createPropertyAdFromUnified(
     data: any,
     userId: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     const ad = new this.adModel({
       title: '',
       description: data.description,
@@ -1271,7 +1284,7 @@ export class AdsService {
   private async createVehicleAdFromUnified(
     data: any,
     userId: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     const model = await this.vehicleInventoryService.findVehicleModelById(
       data.modelId,
     );
@@ -1319,7 +1332,7 @@ export class AdsService {
   private async createCommercialVehicleAdFromUnified(
     data: any,
     userId: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     await this.validateVehicleInventoryReferences(data);
 
     const model = await this.vehicleInventoryService.findVehicleModelById(
@@ -1387,7 +1400,7 @@ export class AdsService {
   private async createTwoWheelerAdFromUnified(
     data: any,
     userId: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     const model = await this.vehicleInventoryService.findVehicleModelById(
       data.modelId,
     );
@@ -1438,7 +1451,7 @@ export class AdsService {
     updateDto: any,
     userId: string,
     userType?: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     if (!this.isValidId(id)) {
       throw new BadRequestException(`Invalid ad ID: ${id}`);
     }
@@ -1533,7 +1546,7 @@ export class AdsService {
     id: string,
     isApproved: boolean,
     approvedBy: string,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     if (!this.isValidId(id)) {
       throw new BadRequestException(`Invalid ad ID: ${id}`);
     }

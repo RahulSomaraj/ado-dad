@@ -1153,7 +1153,7 @@ export class AdsController {
   @ApiResponse({
     status: 200,
     description: 'Advertisement approval status updated successfully',
-    type: AdResponseDto,
+    type: DetailedAdResponseDto,
   })
   @ApiResponse({
     status: 401,
@@ -1168,7 +1168,7 @@ export class AdsController {
     @Param('id') id: string,
     @Body() body: { isApproved: boolean },
     @Request() req: any,
-  ): Promise<AdResponseDto> {
+  ): Promise<DetailedAdResponseDto> {
     try {
       if (!Types.ObjectId.isValid(id)) {
         throw new BadRequestException(
