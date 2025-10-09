@@ -2035,6 +2035,8 @@ export class AdsService {
       category: ad.category,
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
+      isApproved: ad.isApproved || false,
+      approvedBy: ad.approvedBy ? (ad.approvedBy as any).toString() : undefined,
       postedAt: ad.createdAt, // expose createdAt as postedAt
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy,
@@ -2044,6 +2046,13 @@ export class AdsService {
             name: ad.user.name,
             email: ad.user.email,
             phone: ad.user.phone,
+          }
+        : undefined,
+      approvedByUser: ad.approvedByUser
+        ? {
+            id: (ad.approvedByUser._id as any)?.toString?.(),
+            name: ad.approvedByUser.name,
+            email: ad.approvedByUser.email,
           }
         : undefined,
       vehicleDetails: ad.vehicleDetails || [],

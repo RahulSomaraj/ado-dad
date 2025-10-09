@@ -63,6 +63,12 @@ export class AdResponseDto {
     phone?: string;
     profilePic?: string;
   };
+
+  @ApiProperty({ description: 'Is advertisement approved' })
+  isApproved: boolean;
+
+  @ApiPropertyOptional({ description: 'Approved by user ID' })
+  approvedBy?: string;
 }
 
 // Property-specific details
@@ -311,6 +317,13 @@ export class DetailedAdResponseDto extends AdResponseDto {
 
   @ApiPropertyOptional({ description: 'Has user chat with this ad' })
   hasUserChat?: boolean;
+
+  @ApiPropertyOptional({ description: 'Approved by user information' })
+  approvedByUser?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export class PaginatedAdResponseDto {

@@ -467,6 +467,8 @@ export class ListAdsUc {
       category: ad.category,
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
+      isApproved: ad.isApproved || false,
+      approvedBy: ad.approvedBy ? ad.approvedBy.toString() : undefined,
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,
       postedBy: ad.postedBy.toString(),
