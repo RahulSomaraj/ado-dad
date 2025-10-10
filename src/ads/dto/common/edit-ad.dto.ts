@@ -61,6 +61,14 @@ export class EditAdDataDto {
   @IsString()
   location?: string;
 
+  @ApiPropertyOptional({
+    description: 'Advertisement link',
+    example: 'https://example.com/more-details',
+  })
+  @IsOptional()
+  @IsString()
+  link?: string;
+
   // Property-specific fields (optional for all)
   @ApiPropertyOptional({
     description: 'Property type (for property ads)',

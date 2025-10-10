@@ -62,6 +62,14 @@ export class CommonData {
   @IsString({ each: true })
   @IsOptional()
   images?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Advertisement link',
+    example: 'https://example.com/more-details',
+  })
+  @IsString()
+  @IsOptional()
+  link?: string;
 }
 
 export class PropertyData {

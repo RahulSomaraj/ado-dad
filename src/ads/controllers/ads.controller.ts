@@ -272,6 +272,7 @@ export class AdsController {
               'Spacious and well-maintained 2BHK apartment with modern amenities and excellent connectivity.',
             price: 8500000,
             location: 'Bandra West, Mumbai, Maharashtra',
+            link: 'https://example.com/property-details/bandra-apartment',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property1.jpg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property2.jpg',
@@ -306,6 +307,7 @@ export class AdsController {
               'Well-maintained Honda City in excellent condition. Single owner, full service history.',
             price: 850000,
             location: 'Dwarka, Delhi, NCR',
+            link: 'https://example.com/vehicle-details/honda-city-2020',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/vehicle1.jpg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/vehicle2.jpg',
@@ -344,6 +346,7 @@ export class AdsController {
               'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business.',
             price: 1800000,
             location: 'Pune, Maharashtra',
+            link: 'https://example.com/commercial-vehicle-details/tata-407-truck',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck1.jpg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/truck2.jpg',
@@ -386,6 +389,7 @@ export class AdsController {
               'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency.',
             price: 65000,
             location: 'Koramangala, Bangalore, Karnataka',
+            link: 'https://example.com/two-wheeler-details/honda-activa-6g',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/scooter1.jpg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/scooter2.jpg',

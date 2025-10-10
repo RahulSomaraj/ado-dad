@@ -120,6 +120,7 @@ export class AdsV2Controller {
               'എറണാകുളം ജില്ല arayankaav ടൗണിനു സമീപം പ്രീമിയം പ്ലോട്ടുകൾ വില്പനക്ക് 9747757547',
             price: 100000,
             location: 'arayankaav',
+            link: 'https://example.com/property-details/arayankaav-plot',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/0104fc6e-f6cd-44a3-b95b-83f742255912-image_1757679411039.jpeg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3f432878-2cda-44c9-b203-18932a2cc648-image_1757679412305.jpeg',
@@ -151,6 +152,7 @@ export class AdsV2Controller {
             description: 'Sporty Porsche Macan Turbo with turbo performance.',
             price: 120000090,
             location: 'Pune, Maharashtra',
+            link: 'https://example.com/vehicle-details/porsche-macan-turbo',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3fa63fc6-d4a8-437a-89f1-c86dc3e55c62-image_1756892894323.jpeg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/4aa322a1-134c-4a58-87b7-ef53ad2d2783-image_1756892894685.jpeg',
@@ -188,6 +190,7 @@ export class AdsV2Controller {
               'Heavy duty truck for commercial use with valid permits',
             price: 1500000,
             location: 'Pune, Maharashtra',
+            link: 'https://example.com/commercial-vehicle-details/heavy-duty-truck',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3fa63fc6-d4a8-437a-89f1-c86dc3e55c62-image_1756892894323.jpeg',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/4aa322a1-134c-4a58-87b7-ef53ad2d2783-image_1756892894685.jpeg',
@@ -231,6 +234,7 @@ export class AdsV2Controller {
             description: 'Bike near chittar for sale, good condition',
             price: 45000,
             location: 'Chittar,Pathanmathitta',
+            link: 'https://example.com/two-wheeler-details/chittar-bike',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/6137d10f-798b-41c0-9f89-2f2a09be7aa3-image_1757739698227.png',
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/1d3be360-f296-4882-b490-449ed58a7dc7-image_1757739701656.png',

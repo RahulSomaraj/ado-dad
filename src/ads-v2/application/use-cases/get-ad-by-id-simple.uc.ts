@@ -275,6 +275,7 @@ export class GetAdByIdUc {
       price: ad.price,
       images: ad.images || [],
       location: ad.location,
+      link: ad.link || '',
       category: ad.category,
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
