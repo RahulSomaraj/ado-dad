@@ -1134,7 +1134,7 @@ export class AdsController {
     return this.adsService.getAllAdsForAdmin(filterDto);
   }
 
-  @Patch(':id/approval')
+  @Put(':id/approval')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
