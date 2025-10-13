@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -2224,6 +2225,47 @@ export class AdsService {
       vehicleDetails: processedVehicleDetails || undefined,
       commercialVehicleDetails: processedCommercialVehicleDetails || undefined,
     };
+  }
+
+  /**
+   * Update soldOut status for an advertisement
+   * This method is intentionally lightweight to support a public PATCH endpoint
+   */
+  async updateSoldOut(
+    id: string,
+    soldOut: boolean,
+    requesterId?: string,
+    requesterType?: string,
+  ): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+
+    // Ensure ad exists first
+    const ad = await this.adModel.findById(id).lean();
+    if (!ad) {
+      throw new NotFoundException('Advertisement not found');
+    }
+
+    // Authorization: Admin/Super Admin full access; others must own the ad
+    const isPrivileged =
+      requesterType === 'admin' || requesterType === 'super_admin';
+    const isOwner =
+      requesterId && ad.postedBy?.toString?.() === requesterId.toString();
+    if (!isPrivileged && !isOwner) {
+      throw new ForbiddenException(
+        'You are not allowed to update sold-out status for this advertisement',
+      );
+    }
+
+    const updated = await this.adModel.findByIdAndUpdate(
+      id,
+      { $set: { soldOut, updatedAt: new Date() } },
+      { new: true },
+    );
+
+    // Reuse aggregation-based fetch to return enriched data consistently
+    return await this.findOne(id);
   }
 
   private mapToDetailedResponseDto(ad: any): DetailedAdResponseDto {

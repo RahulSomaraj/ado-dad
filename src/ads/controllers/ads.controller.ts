@@ -664,6 +664,48 @@ export class AdsController {
     }
   }
 
+  @Patch(':id/sold')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update sold-out status',
+    description:
+      'Toggle the soldOut status for an advertisement. Users/Showrooms can update only their own ads. Admin/Super Admin can update any ad.',
+  })
+  @ApiParam({ name: 'id', description: 'Advertisement ID (MongoDB ObjectId)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        soldOut: { type: 'boolean', description: 'Sold-out status' },
+      },
+      required: ['soldOut'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sold-out status updated',
+    type: DetailedAdResponseDto,
+  })
+  async updateSoldOut(
+    @Param('id') id: string,
+    @Body() body: { soldOut: boolean },
+    @Request() req: any,
+  ): Promise<DetailedAdResponseDto> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        'Invalid ad id: ObjectId must be a 24 character hex string',
+      );
+    }
+    return this.adsService.updateSoldOut(
+      id,
+      body.soldOut,
+      req.user.id,
+      req.user.type,
+    );
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
