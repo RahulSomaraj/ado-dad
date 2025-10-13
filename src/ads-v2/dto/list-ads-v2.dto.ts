@@ -130,6 +130,43 @@ export class ListAdsV2Dto {
   @IsMongoId({ each: true })
   transmissionTypeIds?: string[];
 
+  // Two-wheeler specific filters
+  @ApiPropertyOptional({
+    description: 'Manufacturer ID for two-wheeler filtering',
+    example: '68b53a26933e8b3908eb5448',
+  })
+  @IsOptional()
+  @IsMongoId()
+  manufacturerId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Model ID for two-wheeler filtering',
+    example: '68b53a26933e8b3908eb5449',
+  })
+  @IsOptional()
+  @IsMongoId()
+  modelId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Minimum year for two-wheeler filtering',
+    example: 2020,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1900)
+  minYear?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum year for two-wheeler filtering',
+    example: 2024,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1900)
+  maxYear?: number;
+
   // Property-specific filters
   @ApiPropertyOptional({
     description: 'Property types to include',

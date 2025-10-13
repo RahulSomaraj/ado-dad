@@ -154,6 +154,10 @@ export class ListAdsUc {
       maxPrice,
       fuelTypeIds,
       transmissionTypeIds,
+      manufacturerId,
+      modelId,
+      minYear,
+      maxYear,
       propertyTypes,
       minBedrooms,
       maxBedrooms,
@@ -323,36 +327,45 @@ export class ListAdsUc {
     // Two-wheeler specific filters (only apply if category is two_wheeler)
     if (
       category === 'two_wheeler' &&
-      (fuelTypeIds?.length || transmissionTypeIds?.length)
+      (fuelTypeIds?.length ||
+        transmissionTypeIds?.length ||
+        manufacturerId ||
+        modelId ||
+        minYear !== undefined ||
+        maxYear !== undefined)
     ) {
       const twoWheelerMatch: any = {};
+      const elemMatchConditions: any = {};
 
-      if (fuelTypeIds?.length && transmissionTypeIds?.length) {
-        twoWheelerMatch.vehicleDetails = {
-          $elemMatch: {
-            fuelTypeId: {
-              $in: fuelTypeIds.map((id) => new Types.ObjectId(id)),
-            },
-            transmissionTypeId: {
-              $in: transmissionTypeIds.map((id) => new Types.ObjectId(id)),
-            },
-          },
+      if (fuelTypeIds?.length) {
+        elemMatchConditions.fuelTypeId = {
+          $in: fuelTypeIds.map((id) => new Types.ObjectId(id)),
         };
-      } else if (fuelTypeIds?.length) {
-        twoWheelerMatch.vehicleDetails = {
-          $elemMatch: {
-            fuelTypeId: {
-              $in: fuelTypeIds.map((id) => new Types.ObjectId(id)),
-            },
-          },
+      }
+
+      if (transmissionTypeIds?.length) {
+        elemMatchConditions.transmissionTypeId = {
+          $in: transmissionTypeIds.map((id) => new Types.ObjectId(id)),
         };
-      } else if (transmissionTypeIds?.length) {
+      }
+
+      if (manufacturerId) {
+        elemMatchConditions.manufacturerId = new Types.ObjectId(manufacturerId);
+      }
+
+      if (modelId) {
+        elemMatchConditions.modelId = new Types.ObjectId(modelId);
+      }
+
+      if (minYear !== undefined || maxYear !== undefined) {
+        elemMatchConditions.year = {};
+        if (minYear !== undefined) elemMatchConditions.year.$gte = minYear;
+        if (maxYear !== undefined) elemMatchConditions.year.$lte = maxYear;
+      }
+
+      if (Object.keys(elemMatchConditions).length > 0) {
         twoWheelerMatch.vehicleDetails = {
-          $elemMatch: {
-            transmissionTypeId: {
-              $in: transmissionTypeIds.map((id) => new Types.ObjectId(id)),
-            },
-          },
+          $elemMatch: elemMatchConditions,
         };
       }
 
