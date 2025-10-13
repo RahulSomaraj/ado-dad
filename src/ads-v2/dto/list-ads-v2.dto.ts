@@ -129,4 +129,53 @@ export class ListAdsV2Dto {
   @IsArray()
   @IsMongoId({ each: true })
   transmissionTypeIds?: string[];
+
+  // Property-specific filters
+  @ApiPropertyOptional({
+    description: 'Property types to include',
+    type: [String],
+    example: ['apartment', 'house', 'villa'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  propertyTypes?: string[];
+
+  @ApiPropertyOptional({ description: 'Minimum bedrooms', example: 2 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minBedrooms?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum bedrooms', example: 4 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxBedrooms?: number;
+
+  @ApiPropertyOptional({ description: 'Minimum area (sqft)', example: 500 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minArea?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum area (sqft)', example: 2000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxArea?: number;
+
+  @ApiPropertyOptional({ description: 'Is furnished', example: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  isFurnished?: boolean;
+
+  @ApiPropertyOptional({ description: 'Has parking', example: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  hasParking?: boolean;
 }

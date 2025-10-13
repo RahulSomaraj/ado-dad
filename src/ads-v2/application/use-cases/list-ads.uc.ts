@@ -154,6 +154,13 @@ export class ListAdsUc {
       maxPrice,
       fuelTypeIds,
       transmissionTypeIds,
+      propertyTypes,
+      minBedrooms,
+      maxBedrooms,
+      minArea,
+      maxArea,
+      isFurnished,
+      hasParking,
       page = 1,
       limit = 20,
       sortBy = 'createdAt',
@@ -247,6 +254,51 @@ export class ListAdsUc {
         as: 'propertyDetails',
       },
     });
+
+    // Property-specific filters
+    if (
+      propertyTypes ||
+      minBedrooms !== undefined ||
+      maxBedrooms !== undefined ||
+      minArea !== undefined ||
+      maxArea !== undefined ||
+      isFurnished !== undefined ||
+      hasParking !== undefined
+    ) {
+      // Ensure we are filtering only property ads when property filters are present
+      pipeline.push({ $match: { category: 'property' } });
+
+      const propMatch: any = {};
+
+      if (propertyTypes && propertyTypes.length > 0) {
+        propMatch['propertyDetails.propertyType'] = { $in: propertyTypes };
+      }
+      if (minBedrooms !== undefined || maxBedrooms !== undefined) {
+        propMatch['propertyDetails.bedrooms'] = {};
+        if (minBedrooms !== undefined)
+          propMatch['propertyDetails.bedrooms'].$gte = minBedrooms;
+        if (maxBedrooms !== undefined)
+          propMatch['propertyDetails.bedrooms'].$lte = maxBedrooms;
+      }
+      if (minArea !== undefined || maxArea !== undefined) {
+        propMatch['propertyDetails.areaSqft'] = {};
+        if (minArea !== undefined)
+          propMatch['propertyDetails.areaSqft'].$gte = minArea;
+        if (maxArea !== undefined)
+          propMatch['propertyDetails.areaSqft'].$lte = maxArea;
+      }
+      if (isFurnished !== undefined) {
+        propMatch['propertyDetails.isFurnished'] = isFurnished;
+      }
+      if (hasParking !== undefined) {
+        propMatch['propertyDetails.hasParking'] = hasParking;
+      }
+
+      if (Object.keys(propMatch).length > 0) {
+        // propertyDetails may be an array; match on any element
+        pipeline.push({ $match: propMatch });
+      }
+    }
 
     // Vehicle details lookup
     pipeline.push({
