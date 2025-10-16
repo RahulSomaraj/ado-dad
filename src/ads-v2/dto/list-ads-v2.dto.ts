@@ -135,7 +135,7 @@ export class ListAdsV2Dto {
   // Two-wheeler specific filters
   @ApiPropertyOptional({
     description:
-      'Fuel type IDs for two-wheeler filtering (array of MongoDB ObjectIds)',
+      'Fuel type IDs for vehicle filtering (works for private_vehicle, commercial_vehicle, two_wheeler categories)',
     type: [String],
     example: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
   })
@@ -146,7 +146,7 @@ export class ListAdsV2Dto {
 
   @ApiPropertyOptional({
     description:
-      'Transmission type IDs for two-wheeler filtering (array of MongoDB ObjectIds)',
+      'Transmission type IDs for vehicle filtering (works for private_vehicle, commercial_vehicle, two_wheeler categories)',
     type: [String],
     example: ['68b53a421f3fb49e93b9ef59', '68b53a421f3fb49e93b9ef60'],
   })
@@ -155,9 +155,9 @@ export class ListAdsV2Dto {
   @IsMongoId({ each: true })
   transmissionTypeIds?: string[];
 
-  // Two-wheeler specific filters
+  // Vehicle specific filters (works for private_vehicle, commercial_vehicle, two_wheeler)
   @ApiPropertyOptional({
-    description: 'Manufacturer ID for two-wheeler filtering',
+    description: 'Manufacturer ID for vehicle filtering',
     example: '68b53a26933e8b3908eb5448',
   })
   @IsOptional()
@@ -165,7 +165,7 @@ export class ListAdsV2Dto {
   manufacturerId?: string;
 
   @ApiPropertyOptional({
-    description: 'Model ID for two-wheeler filtering',
+    description: 'Model ID for vehicle filtering',
     example: '68b53a26933e8b3908eb5449',
   })
   @IsOptional()
@@ -173,7 +173,7 @@ export class ListAdsV2Dto {
   modelId?: string;
 
   @ApiPropertyOptional({
-    description: 'Minimum year for two-wheeler filtering',
+    description: 'Minimum year for vehicle filtering',
     example: 2020,
   })
   @IsOptional()
@@ -183,7 +183,7 @@ export class ListAdsV2Dto {
   minYear?: number;
 
   @ApiPropertyOptional({
-    description: 'Maximum year for two-wheeler filtering',
+    description: 'Maximum year for vehicle filtering',
     example: 2024,
   })
   @IsOptional()

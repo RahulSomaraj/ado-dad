@@ -402,9 +402,12 @@ export class AdsV2Controller {
       - Location filtering (text-based and geographic coordinates)
       - Intelligent location filtering with automatic distance fallback (state-based with 50km→1000km expansion)
       - Price range filtering (minPrice, maxPrice - both optional)
-      - Two-wheeler specific filtering:
+      - Vehicle specific filtering (works for private_vehicle, commercial_vehicle, two_wheeler):
         - Fuel type IDs (fuelTypeIds) - filter by specific fuel types
         - Transmission type IDs (transmissionTypeIds) - filter by specific transmission types
+        - Manufacturer ID (manufacturerId) - filter by specific manufacturer
+        - Model ID (modelId) - filter by specific vehicle model
+        - Year range (minYear, maxYear) - filter by vehicle year
       - Pagination and sorting
       - All filters are optional
       
@@ -492,8 +495,9 @@ export class AdsV2Controller {
         },
       },
       vehicle: {
-        summary: 'Vehicle ads',
-        description: 'Get vehicle ads with location-based filtering',
+        summary: 'Private vehicle ads',
+        description:
+          'Get private vehicle ads with location-based and vehicle-specific filtering',
         value: {
           search: 'toyota',
           category: 'private_vehicle',
@@ -501,6 +505,12 @@ export class AdsV2Controller {
           longitude: 72.8777,
           minPrice: 50000,
           maxPrice: 5000000,
+          fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
+          transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
+          manufacturerId: '68b53a26933e8b3908eb5448',
+          modelId: '68b53a26933e8b3908eb5449',
+          minYear: 2018,
+          maxYear: 2023,
           page: 1,
           limit: 20,
         },
@@ -522,6 +532,27 @@ export class AdsV2Controller {
           modelId: '68b53a26933e8b3908eb5449',
           minYear: 2020,
           maxYear: 2024,
+          page: 1,
+          limit: 20,
+        },
+      },
+      commercial_vehicle: {
+        summary: 'Commercial vehicle ads',
+        description:
+          'Get commercial vehicle ads with location-based and vehicle-specific filtering',
+        value: {
+          search: 'truck',
+          category: 'commercial_vehicle',
+          latitude: 19.076,
+          longitude: 72.8777,
+          minPrice: 500000,
+          maxPrice: 5000000,
+          fuelTypeIds: ['68b53a26933e8b3908eb5448'],
+          transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
+          manufacturerId: '68b53a26933e8b3908eb5448',
+          modelId: '68b53a26933e8b3908eb5449',
+          minYear: 2015,
+          maxYear: 2022,
           page: 1,
           limit: 20,
         },

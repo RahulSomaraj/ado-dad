@@ -152,7 +152,7 @@ export class ListAdsUc {
     if (filters.latitude !== undefined && filters.longitude !== undefined) {
       return await this.fetchWithDistanceFallback(filters);
     }
-    
+
     // Otherwise, use the original logic
     return await this.fetchWithOriginalLogic(filters);
   }
@@ -169,12 +169,12 @@ export class ListAdsUc {
     for (const distance of distanceThresholds) {
       try {
         const result = await this.fetchWithSpecificDistance(filters, distance);
-        
+
         // If we found results, return them
         if (result.total > 0) {
           return result;
         }
-        
+
         // Store the last result (even if empty) for fallback
         lastResult = result;
       } catch (error) {
@@ -415,9 +415,11 @@ export class ListAdsUc {
       },
     });
 
-    // Two-wheeler specific filters (only apply if category is two_wheeler)
+    // Vehicle specific filters (apply to all vehicle categories: private_vehicle, commercial_vehicle, two_wheeler)
     if (
-      category === 'two_wheeler' &&
+      (category === 'private_vehicle' ||
+        category === 'commercial_vehicle' ||
+        category === 'two_wheeler') &&
       (fuelTypeIds?.length ||
         transmissionTypeIds?.length ||
         manufacturerId ||
@@ -425,7 +427,7 @@ export class ListAdsUc {
         minYear !== undefined ||
         maxYear !== undefined)
     ) {
-      const twoWheelerMatch: any = {};
+      const vehicleMatch: any = {};
       const elemMatchConditions: any = {};
 
       if (fuelTypeIds?.length) {
@@ -455,13 +457,24 @@ export class ListAdsUc {
       }
 
       if (Object.keys(elemMatchConditions).length > 0) {
-        twoWheelerMatch.vehicleDetails = {
-          $elemMatch: elemMatchConditions,
-        };
+        // Apply filters to the appropriate vehicle details collection based on category
+        if (category === 'two_wheeler') {
+          vehicleMatch.vehicleDetails = {
+            $elemMatch: elemMatchConditions,
+          };
+        } else if (category === 'private_vehicle') {
+          vehicleMatch.vehicleDetails = {
+            $elemMatch: elemMatchConditions,
+          };
+        } else if (category === 'commercial_vehicle') {
+          vehicleMatch.commercialVehicleDetails = {
+            $elemMatch: elemMatchConditions,
+          };
+        }
       }
 
       pipeline.push({
-        $match: twoWheelerMatch,
+        $match: vehicleMatch,
       });
     }
 
