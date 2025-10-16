@@ -143,10 +143,75 @@ export class ListAdsUc {
   }
 
   /**
-   * Fetch list data from database (original logic)
+   * Fetch list data from database with automatic distance fallback
    */
   private async fetchListDataFromDatabase(
     filters: ListAdsV2Dto,
+  ): Promise<CachedListData> {
+    // If location coordinates are provided, try with automatic distance fallback
+    if (filters.latitude !== undefined && filters.longitude !== undefined) {
+      return await this.fetchWithDistanceFallback(filters);
+    }
+    
+    // Otherwise, use the original logic
+    return await this.fetchWithOriginalLogic(filters);
+  }
+
+  /**
+   * Fetch with automatic distance fallback when no results found
+   */
+  private async fetchWithDistanceFallback(
+    filters: ListAdsV2Dto,
+  ): Promise<CachedListData> {
+    const distanceThresholds = [50, 100, 200, 500, 1000]; // km
+    let lastResult: CachedListData | null = null;
+
+    for (const distance of distanceThresholds) {
+      try {
+        const result = await this.fetchWithSpecificDistance(filters, distance);
+        
+        // If we found results, return them
+        if (result.total > 0) {
+          return result;
+        }
+        
+        // Store the last result (even if empty) for fallback
+        lastResult = result;
+      } catch (error) {
+        console.warn(`Failed to fetch with distance ${distance}km:`, error);
+        // Continue to next distance threshold
+      }
+    }
+
+    // If no results found with any distance, return the last attempt
+    // or fetch without location filtering as final fallback
+    if (lastResult) {
+      return lastResult;
+    }
+
+    // Final fallback: fetch without location filtering
+    const { latitude, longitude, ...filtersWithoutLocation } = filters;
+    return await this.fetchWithOriginalLogic(filtersWithoutLocation);
+  }
+
+  /**
+   * Fetch with a specific distance threshold
+   */
+  private async fetchWithSpecificDistance(
+    filters: ListAdsV2Dto,
+    distanceKm: number,
+  ): Promise<CachedListData> {
+    const modifiedFilters = { ...filters };
+    // We'll pass the distance to the location hierarchy service
+    return await this.fetchWithOriginalLogic(modifiedFilters, distanceKm);
+  }
+
+  /**
+   * Fetch list data from database (original logic with optional distance override)
+   */
+  private async fetchWithOriginalLogic(
+    filters: ListAdsV2Dto,
+    customDistanceKm?: number,
   ): Promise<CachedListData> {
     const {
       category,
@@ -189,11 +254,12 @@ export class ListAdsUc {
 
     // Hierarchical location-based filtering
     if (latitude !== undefined && longitude !== undefined) {
-      // Get location hierarchy pipeline stages
+      // Get location hierarchy pipeline stages with custom distance if provided
       const locationPipeline =
         this.locationHierarchyService.getLocationAggregationPipeline(
           latitude,
           longitude,
+          customDistanceKm, // Pass custom distance for fallback mechanism
         );
 
       // Add location filtering stages to pipeline
@@ -433,6 +499,7 @@ export class ListAdsUc {
         location: 1,
         latitude: 1,
         longitude: 1,
+        distance: 1, // Include distance field
         category: 1,
         isActive: 1,
         soldOut: 1,
@@ -572,6 +639,7 @@ export class ListAdsUc {
       location: ad.location,
       latitude: ad.latitude || 9.3311,
       longitude: ad.longitude || 76.9222,
+      distance: ad.distance || 0, // Distance in kilometers from search location
       link: ad.link || '',
       category: ad.category,
       isActive: ad.isActive,

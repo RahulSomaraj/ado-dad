@@ -45,6 +45,31 @@ export class FilterAdDto {
   @IsString()
   location?: string;
 
+  // Geographic location filters
+  @ApiPropertyOptional({
+    description:
+      'Latitude for geographic filtering (searches within 10km radius)',
+    example: 19.076,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Longitude for geographic filtering (searches within 10km radius)',
+    example: 72.8777,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
   @ApiPropertyOptional({
     description: 'Minimum price filter',
     minimum: 0,

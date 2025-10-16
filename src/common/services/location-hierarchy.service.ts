@@ -212,97 +212,102 @@ export class LocationHierarchyService {
   }
 
   /**
-   * Get MongoDB aggregation pipeline stages for location-based filtering
+   * Get MongoDB aggregation pipeline stages for intelligent location filtering
    * @param latitude - Latitude coordinate
    * @param longitude - Longitude coordinate
-   * @param customConfig - Optional custom configuration
+   * @param radiusKm - Search radius in kilometers (default: 50km)
    * @returns Array of MongoDB aggregation stages
    */
   getLocationAggregationPipeline(
     latitude: number,
     longitude: number,
-    customConfig?: LocationHierarchyConfig,
+    radiusKm: number = 50,
   ): any[] {
-    const locationFilter = this.getLocationFilter(
-      latitude,
-      longitude,
-      customConfig,
-    );
-    const locationBoundaries = this.getLocationBoundaries(
-      latitude,
-      longitude,
-      customConfig,
-    );
     const pipeline: any[] = [];
 
-    // Add location-based match stages based on priority
-    if (locationFilter.district) {
-      // Highest priority: Filter by district
-      const districtBoundary = locationBoundaries.find(
-        (b) => b.type === 'district',
-      );
-      pipeline.push({
-        $match: {
-          $or: [
-            // Exact district match
-            { location: { $regex: locationFilter.district, $options: 'i' } },
-            // Or coordinates within district bounds
-            {
-              latitude: {
-                $gte: districtBoundary?.bounds.south,
-                $lte: districtBoundary?.bounds.north,
-              },
-              longitude: {
-                $gte: districtBoundary?.bounds.west,
-                $lte: districtBoundary?.bounds.east,
-              },
+    // First, determine which state the coordinates fall within
+    const locationBoundaries = this.getLocationBoundaries(latitude, longitude);
+    const stateBoundary = locationBoundaries.find((b) => b.type === 'state');
+
+    // Add distance calculation for all ads
+    pipeline.push({
+      $addFields: {
+        distance: {
+          $let: {
+            vars: {
+              latDiff: { $abs: { $subtract: ['$latitude', latitude] } },
+              lonDiff: { $abs: { $subtract: ['$longitude', longitude] } },
             },
-          ],
+            in: {
+              $multiply: [
+                111.32, // Approximate km per degree at equator
+                { $add: ['$$latDiff', '$$lonDiff'] }, // Manhattan distance
+              ],
+            },
+          },
         },
-      });
-    } else if (locationFilter.state) {
-      // Medium priority: Filter by state
-      const stateBoundary = locationBoundaries.find((b) => b.type === 'state');
+      },
+    });
+
+    // Apply intelligent filtering based on state boundaries
+    if (stateBoundary) {
+      // If coordinates fall within a known state, return all ads in that state
+      // But if custom distance is provided (for fallback), use distance-based filtering instead
+      if (radiusKm !== 50) {
+        // Custom distance provided - use distance-based filtering even within state
+        pipeline.push({
+          $match: {
+            $and: [
+              { latitude: { $exists: true, $ne: null } },
+              { longitude: { $exists: true, $ne: null } },
+              { distance: { $lte: radiusKm } },
+            ],
+          },
+        });
+      } else {
+        // Default behavior - return all ads in the state
+        pipeline.push({
+          $match: {
+            $or: [
+              // Ads with coordinates within state bounds
+              {
+                $and: [
+                  { latitude: { $exists: true, $ne: null } },
+                  { longitude: { $exists: true, $ne: null } },
+                  {
+                    $and: [
+                      {
+                        $gte: ['$latitude', stateBoundary.bounds.south],
+                      },
+                      {
+                        $lte: ['$latitude', stateBoundary.bounds.north],
+                      },
+                      {
+                        $gte: ['$longitude', stateBoundary.bounds.west],
+                      },
+                      {
+                        $lte: ['$longitude', stateBoundary.bounds.east],
+                      },
+                    ],
+                  },
+                ],
+              },
+              // Ads with state name in location text
+              {
+                location: { $regex: stateBoundary.name, $options: 'i' },
+              },
+            ],
+          },
+        });
+      }
+    } else {
+      // If coordinates don't fall within a known state, use radius-based filtering
       pipeline.push({
         $match: {
-          $or: [
-            // State name in location
-            { location: { $regex: locationFilter.state, $options: 'i' } },
-            // Or coordinates within state bounds
-            {
-              latitude: {
-                $gte: stateBoundary?.bounds.south,
-                $lte: stateBoundary?.bounds.north,
-              },
-              longitude: {
-                $gte: stateBoundary?.bounds.west,
-                $lte: stateBoundary?.bounds.east,
-              },
-            },
-          ],
-        },
-      });
-    } else if (locationFilter.country) {
-      // Lowest priority: Filter by country
-      const countryBoundary = locationBoundaries.find(
-        (b) => b.type === 'country',
-      );
-      pipeline.push({
-        $match: {
-          $or: [
-            // Country name in location
-            { location: { $regex: locationFilter.country, $options: 'i' } },
-            // Or coordinates within country bounds
-            {
-              latitude: {
-                $gte: countryBoundary?.bounds.south,
-                $lte: countryBoundary?.bounds.north,
-              },
-              longitude: {
-                $gte: countryBoundary?.bounds.west,
-                $lte: countryBoundary?.bounds.east,
-              },
-            },
+          $and: [
+            { latitude: { $exists: true, $ne: null } },
+            { longitude: { $exists: true, $ne: null } },
+            { distance: { $lte: radiusKm } },
           ],
         },
       });
@@ -312,115 +317,83 @@ export class LocationHierarchyService {
   }
 
   /**
-   * Add location priority scoring to aggregation pipeline
+   * Add intelligent location scoring to aggregation pipeline
    * @param latitude - Latitude coordinate
    * @param longitude - Longitude coordinate
-   * @param customConfig - Optional custom configuration
    * @returns MongoDB aggregation stage for location scoring
    */
-  getLocationScoringStage(
-    latitude: number,
-    longitude: number,
-    customConfig?: LocationHierarchyConfig,
-  ): any {
-    const locationBoundaries = this.getLocationBoundaries(
-      latitude,
-      longitude,
-      customConfig,
-    );
-    const districtBoundary = locationBoundaries.find(
-      (b) => b.type === 'district',
-    );
+  getLocationScoringStage(latitude: number, longitude: number): any {
+    const locationBoundaries = this.getLocationBoundaries(latitude, longitude);
     const stateBoundary = locationBoundaries.find((b) => b.type === 'state');
-    const countryBoundary = locationBoundaries.find(
-      (b) => b.type === 'country',
-    );
 
     return {
       $addFields: {
         locationScore: {
-          $switch: {
-            branches: [
-              // District match gets highest score
-              {
-                when: {
-                  $and: [
-                    { $ne: ['$latitude', null] },
-                    { $ne: ['$longitude', null] },
-                    {
+          $cond: {
+            if: {
+              $and: [
+                { $ne: ['$latitude', null] },
+                { $ne: ['$longitude', null] },
+                { $ne: ['$distance', null] },
+              ],
+            },
+            then: {
+              $cond: {
+                if: stateBoundary
+                  ? {
+                      // Check if ad is within the same state
                       $and: [
                         {
-                          $gte: ['$latitude', districtBoundary?.bounds.south],
+                          $gte: ['$latitude', stateBoundary.bounds.south],
                         },
                         {
-                          $lte: ['$latitude', districtBoundary?.bounds.north],
+                          $lte: ['$latitude', stateBoundary.bounds.north],
                         },
                         {
-                          $gte: ['$longitude', districtBoundary?.bounds.west],
+                          $gte: ['$longitude', stateBoundary.bounds.west],
                         },
                         {
-                          $lte: ['$longitude', districtBoundary?.bounds.east],
+                          $lte: ['$longitude', stateBoundary.bounds.east],
+                        },
+                      ],
+                    }
+                  : false,
+                then: {
+                  // Higher score for ads in the same state, prioritized by distance
+                  $round: [
+                    {
+                      $add: [
+                        1000, // Base score for same state
+                        {
+                          $subtract: [
+                            100, // Distance bonus
+                            {
+                              $multiply: ['$distance', 1], // Subtract 1 point per km
+                            },
+                          ],
                         },
                       ],
                     },
+                    2,
                   ],
                 },
-                then: 100, // Highest score for district match
-              },
-              // State match gets medium score
-              {
-                when: {
-                  $and: [
-                    { $ne: ['$latitude', null] },
-                    { $ne: ['$longitude', null] },
+                else: {
+                  // Lower score for ads outside the state, still distance-based
+                  $round: [
                     {
-                      $and: [
+                      $subtract: [
+                        100, // Base score for different state
                         {
-                          $gte: ['$latitude', stateBoundary?.bounds.south],
-                        },
-                        {
-                          $lte: ['$latitude', stateBoundary?.bounds.north],
-                        },
-                        {
-                          $gte: ['$longitude', stateBoundary?.bounds.west],
-                        },
-                        {
-                          $lte: ['$longitude', stateBoundary?.bounds.east],
+                          $multiply: ['$distance', 2], // Subtract 2 points per km
                         },
                       ],
                     },
+                    2,
                   ],
                 },
-                then: 50, // Medium score for state match
               },
-              // Country match gets low score
-              {
-                when: {
-                  $and: [
-                    { $ne: ['$latitude', null] },
-                    { $ne: ['$longitude', null] },
-                    {
-                      $and: [
-                        {
-                          $gte: ['$latitude', countryBoundary?.bounds.south],
-                        },
-                        {
-                          $lte: ['$latitude', countryBoundary?.bounds.north],
-                        },
-                        {
-                          $gte: ['$longitude', countryBoundary?.bounds.west],
-                        },
-                        {
-                          $lte: ['$longitude', countryBoundary?.bounds.east],
-                        },
-                      ],
-                    },
-                  ],
-                },
-                then: 10, // Low score for country match
-              },
-            ],
-            default: 0, // No location match
+            },
+            else: 0, // No location data
           },
         },
       },

@@ -40,6 +40,11 @@ export class AdResponseDto {
   @ApiPropertyOptional({ description: 'Longitude coordinate' })
   longitude?: number;
 
+  @ApiPropertyOptional({
+    description: 'Distance in kilometers from search location',
+  })
+  distance?: number;
+
   @ApiPropertyOptional({ description: 'Advertisement link' })
   link?: string;
 

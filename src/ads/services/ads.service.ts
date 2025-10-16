@@ -40,6 +40,7 @@ import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-invento
 import { RedisService } from '../../shared/redis.service';
 import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
 import { GeocodingService } from '../../common/services/geocoding.service';
+import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
 import { UserType } from '../../users/enums/user.types';
 
 @Injectable()
@@ -68,6 +69,7 @@ export class AdsService {
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
     private readonly geocodingService: GeocodingService,
+    private readonly locationHierarchyService: LocationHierarchyService,
   ) {}
 
   /** ---------- HELPERS ---------- */
@@ -167,6 +169,8 @@ export class AdsService {
       sortBy = 'createdAt',
       sortOrder = 'DESC',
       search,
+      latitude,
+      longitude,
     } = filters;
     const { field: sortField, dir: sortDirection } = this.coerceSort(
       sortBy,
@@ -188,6 +192,27 @@ export class AdsService {
     // Optional category filter
     if (filters.category) {
       pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // Hierarchical location-based filtering
+    if (latitude !== undefined && longitude !== undefined) {
+      // Get location hierarchy pipeline stages
+      const locationPipeline =
+        this.locationHierarchyService.getLocationAggregationPipeline(
+          latitude,
+          longitude,
+        );
+
+      // Add location filtering stages to pipeline
+      pipeline.push(...locationPipeline);
+
+      // Add location scoring for prioritization
+      pipeline.push(
+        this.locationHierarchyService.getLocationScoringStage(
+          latitude,
+          longitude,
+        ),
+      );
     }
 
     // user
@@ -423,13 +448,25 @@ export class AdsService {
     }
 
     // ----- Sorting -----
-    pipeline.push({ $sort: { [sortField]: sortDirection } });
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortField]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({ $sort: { [sortField]: sortDirection } });
+    }
 
     // Clean up manufacturer lookup arrays from output
     pipeline.push({
       $project: {
         manufacturerInfo: 0,
         commercialManufacturerInfo: 0,
+        locationScore: 1, // Include location score for sorting
       },
     });
 
@@ -1641,6 +1678,8 @@ export class AdsService {
       sortBy = 'createdAt',
       sortOrder = 'DESC',
       search,
+      latitude,
+      longitude,
     } = filters;
     const { field: sortField, dir: sortDirection } = this.coerceSort(
       sortBy,
@@ -1662,6 +1701,27 @@ export class AdsService {
     // Optional category filter
     if (filters.category) {
       pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // Hierarchical location-based filtering
+    if (latitude !== undefined && longitude !== undefined) {
+      // Get location hierarchy pipeline stages
+      const locationPipeline =
+        this.locationHierarchyService.getLocationAggregationPipeline(
+          latitude,
+          longitude,
+        );
+
+      // Add location filtering stages to pipeline
+      pipeline.push(...locationPipeline);
+
+      // Add location scoring for prioritization
+      pipeline.push(
+        this.locationHierarchyService.getLocationScoringStage(
+          latitude,
+          longitude,
+        ),
+      );
     }
 
     // user
@@ -1758,7 +1818,18 @@ export class AdsService {
     }
 
     // Sort
-    pipeline.push({ $sort: { [sortField]: sortDirection } });
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortField]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({ $sort: { [sortField]: sortDirection } });
+    }
 
     // Facet for pagination
     pipeline.push({

@@ -399,7 +399,8 @@ export class AdsV2Controller {
         - Transmission type names (Manual, Automatic, CVT, etc.)
         - Property types (apartment, house, villa, etc.)
         - Property amenities (parking, garden, furnished, etc.)
-      - Location filtering
+      - Location filtering (text-based and geographic coordinates)
+      - Intelligent location filtering with automatic distance fallback (state-based with 50km→1000km expansion)
       - Price range filtering (minPrice, maxPrice - both optional)
       - Two-wheeler specific filtering:
         - Fuel type IDs (fuelTypeIds) - filter by specific fuel types
@@ -412,8 +413,18 @@ export class AdsV2Controller {
       - **With Bearer Token**: If you provide a valid JWT token in Authorization header, the response will include your favorite status (isFavorite field)
       - **Without Token**: All ads will show isFavorite: false
       
+      **Location-based Filtering:**
+      - **Text-based**: Use 'location' field for partial text matching (e.g., "Mumbai", "Kerala")
+      - **Intelligent geographic**: Use 'latitude' and 'longitude' for smart location filtering
+      - **State-based logic**: If coordinates fall within a known state, shows ALL ads in that state
+      - **Automatic distance fallback**: If no results found, automatically expands search radius (50km → 100km → 200km → 500km → 1000km)
+      - **Final fallback**: If still no results, removes location filtering entirely
+      - **Distance prioritization**: Within the same state, closer ads appear first
+      - **Distance calculation**: Uses Manhattan distance approximation for compatibility
+      - **Response includes**: latitude, longitude coordinates and distance for each ad
+      
       **Response includes:**
-      - Advertisement details
+      - Advertisement details with geographic coordinates (latitude, longitude)
       - User information
       - Detailed vehicle information with manufacturer, model, fuel, transmission details
       - Property details (for property ads)
@@ -441,6 +452,8 @@ export class AdsV2Controller {
           search: 'honda',
           minPrice: 10000,
           maxPrice: 1000000,
+          latitude: 19.076,
+          longitude: 72.8777,
           page: 1,
           limit: 20,
         },
@@ -453,29 +466,39 @@ export class AdsV2Controller {
           search: 'honda',
           minPrice: 10000,
           maxPrice: 1000000,
+          latitude: 19.076,
+          longitude: 72.8777,
           page: 1,
           limit: 20,
         },
       },
       property: {
         summary: 'Property ads',
-        description: 'Get property ads in Mumbai',
+        description: 'Get property ads in Mumbai with location-based filtering',
         value: {
           search: 'apartment',
           category: 'property',
           location: 'Mumbai',
+          latitude: 19.076,
+          longitude: 72.8777,
           minPrice: 100000,
           maxPrice: 5000000,
+          minBedrooms: 2,
+          maxBedrooms: 4,
+          isFurnished: true,
+          hasParking: true,
           page: 1,
           limit: 10,
         },
       },
       vehicle: {
         summary: 'Vehicle ads',
-        description: 'Get vehicle ads',
+        description: 'Get vehicle ads with location-based filtering',
         value: {
           search: 'toyota',
           category: 'private_vehicle',
+          latitude: 19.076,
+          longitude: 72.8777,
           minPrice: 50000,
           maxPrice: 5000000,
           page: 1,
@@ -484,14 +507,20 @@ export class AdsV2Controller {
       },
       two_wheeler: {
         summary: 'Two-wheeler ads',
-        description: 'Get two-wheeler ads with specific filters',
+        description:
+          'Get two-wheeler ads with location-based and specific filters',
         value: {
           search: 'honda',
           category: 'two_wheeler',
+          latitude: 9.3311,
+          longitude: 76.9222,
           minPrice: 20000,
           maxPrice: 200000,
           fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
           transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
+          manufacturerId: '68b53a26933e8b3908eb5448',
+          minYear: 2020,
+          maxYear: 2024,
           page: 1,
           limit: 20,
         },
@@ -514,6 +543,13 @@ export class AdsV2Controller {
               description: { type: 'string', example: 'Spacious apartment...' },
               price: { type: 'number', example: 5000000 },
               location: { type: 'string', example: 'Mumbai, Maharashtra' },
+              latitude: { type: 'number', example: 19.076 },
+              longitude: { type: 'number', example: 72.8777 },
+              distance: {
+                type: 'number',
+                example: 2.5,
+                description: 'Distance in kilometers from search location',
+              },
               category: { type: 'string', example: 'property' },
               isActive: { type: 'boolean', example: true },
               status: { type: 'string', example: 'active' },
