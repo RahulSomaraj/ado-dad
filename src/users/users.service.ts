@@ -894,7 +894,6 @@ export class UsersService {
         html: htmlContent,
         text: textContent,
       });
-
       this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
       this.logger.error(
