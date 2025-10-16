@@ -12,6 +12,7 @@ import {
 } from '../../../favorites/schemas/schema.favorite';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
 
 export interface PaginatedAdsResponse {
   data: DetailedAdResponseDto[];
@@ -45,6 +46,7 @@ export class ListAdsUc {
     private readonly redisService: RedisService,
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
+    private readonly locationHierarchyService: LocationHierarchyService,
   ) {}
 
   async exec(
@@ -185,87 +187,25 @@ export class ListAdsUc {
       },
     });
 
-    // Geographic filtering (radius-based search)
+    // Hierarchical location-based filtering
     if (latitude !== undefined && longitude !== undefined) {
-      // Fixed radius of 10km for location-based filtering
-      const FIXED_RADIUS_KM = 10;
-      const radiusInMeters = FIXED_RADIUS_KM * 1000;
+      // Get location hierarchy pipeline stages
+      const locationPipeline =
+        this.locationHierarchyService.getLocationAggregationPipeline(
+          latitude,
+          longitude,
+        );
 
-      pipeline.push({
-        $match: {
-          latitude: { $exists: true, $ne: null },
-          longitude: { $exists: true, $ne: null },
-          $expr: {
-            $lte: [
-              {
-                $multiply: [
-                  6371000, // Earth's radius in meters
-                  {
-                    $acos: {
-                      $add: [
-                        {
-                          $multiply: [
-                            {
-                              $sin: {
-                                $multiply: [
-                                  { $divide: ['$latitude', 180] },
-                                  Math.PI,
-                                ],
-                              },
-                            },
-                            {
-                              $sin: {
-                                $multiply: [
-                                  { $divide: [latitude, 180] },
-                                  Math.PI,
-                                ],
-                              },
-                            },
-                          ],
-                        },
-                        {
-                          $multiply: [
-                            {
-                              $cos: {
-                                $multiply: [
-                                  { $divide: ['$latitude', 180] },
-                                  Math.PI,
-                                ],
-                              },
-                            },
-                            {
-                              $cos: {
-                                $multiply: [
-                                  { $divide: [longitude, 180] },
-                                  Math.PI,
-                                ],
-                              },
-                            },
-                            {
-                              $cos: {
-                                $multiply: [
-                                  {
-                                    $divide: [
-                                      { $subtract: ['$longitude', longitude] },
-                                      180,
-                                    ],
-                                  },
-                                  Math.PI,
-                                ],
-                              },
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  },
-                ],
-              },
-              radiusInMeters,
-            ],
-          },
-        },
-      });
+      // Add location filtering stages to pipeline
+      pipeline.push(...locationPipeline);
+
+      // Add location scoring for prioritization
+      pipeline.push(
+        this.locationHierarchyService.getLocationScoringStage(
+          latitude,
+          longitude,
+        ),
+      );
     }
 
     // Category filter
@@ -491,6 +431,8 @@ export class ListAdsUc {
         price: 1,
         images: 1,
         location: 1,
+        latitude: 1,
+        longitude: 1,
         category: 1,
         isActive: 1,
         soldOut: 1,
@@ -505,14 +447,27 @@ export class ListAdsUc {
         propertyDetails: 1,
         vehicleDetails: 1,
         commercialVehicleDetails: 1,
+        locationScore: 1, // Include location score for sorting
       },
     });
 
-    // Sort
+    // Sort with location priority
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-    pipeline.push({
-      $sort: { [sortBy]: sortDirection },
-    });
+
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortBy]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({
+        $sort: { [sortBy]: sortDirection },
+      });
+    }
 
     // Count total documents
     const countPipeline = [...pipeline];
