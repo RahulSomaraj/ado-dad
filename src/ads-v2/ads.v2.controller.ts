@@ -519,6 +519,7 @@ export class AdsV2Controller {
           fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
           transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
           manufacturerId: '68b53a26933e8b3908eb5448',
+          modelId: '68b53a26933e8b3908eb5449',
           minYear: 2020,
           maxYear: 2024,
           page: 1,
