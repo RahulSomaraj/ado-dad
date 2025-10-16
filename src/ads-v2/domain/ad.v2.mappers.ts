@@ -118,7 +118,7 @@ export async function buildTitle(
     // For property, use a simple title based on property type and location
     const propertyType = dto.property?.propertyType || 'Property';
     const bedrooms = dto.property?.bedrooms || '';
-    const location = dto.data.location.split(',')[0]; // Get first part of location
+    const location = dto.data.location?.split(',')[0] || 'Unknown Location'; // Get first part of location
     return `${bedrooms ? bedrooms + 'BHK ' : ''}${propertyType} in ${location}`.trim();
   }
 

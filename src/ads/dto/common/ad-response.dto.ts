@@ -34,6 +34,12 @@ export class AdResponseDto {
   @ApiProperty({ description: 'Advertisement location' })
   location: string;
 
+  @ApiPropertyOptional({ description: 'Latitude coordinate' })
+  latitude?: number;
+
+  @ApiPropertyOptional({ description: 'Longitude coordinate' })
+  longitude?: number;
+
   @ApiPropertyOptional({ description: 'Advertisement link' })
   link?: string;
 

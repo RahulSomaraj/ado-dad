@@ -40,13 +40,32 @@ export class CommonData {
   @Min(0)
   price!: number;
 
-  @ApiProperty({
-    description: 'Advertisement location',
+  @ApiPropertyOptional({
+    description:
+      'Advertisement location (auto-generated from coordinates if not provided)',
     example: 'Bandra West, Mumbai, Maharashtra',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  location!: string;
+  location?: string;
+
+  @ApiProperty({
+    description: 'Latitude coordinate',
+    example: 19.076,
+  })
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number;
+
+  @ApiProperty({
+    description: 'Longitude coordinate',
+    example: 72.8777,
+  })
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number;
 
   @ApiPropertyOptional({
     description: 'Advertisement images URLs',

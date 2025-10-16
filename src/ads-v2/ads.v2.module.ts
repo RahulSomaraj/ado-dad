@@ -24,6 +24,7 @@ import { OutboxService } from './infrastructure/services/outbox.service';
 import { RedisService } from '../shared/redis.service';
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { CommercialVehicleDetectionService } from '../ads/services/commercial-vehicle-detection.service';
+import { GeocodingService } from '../common/services/geocoding.service';
 
 // Schemas
 import { Ad, AdSchema } from '../ads/schemas/ad.schema';
@@ -106,6 +107,7 @@ const OutboxSchema = {
     // External services
     RedisService,
     CommercialVehicleDetectionService,
+    GeocodingService,
   ],
   exports: [
     // Export use cases for potential external use

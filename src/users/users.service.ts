@@ -826,7 +826,7 @@ export class UsersService {
       if (!user) {
         // Return success message even if user doesn't exist (security best practice)
         return {
-          message: 'If the email exists, a password reset link has been sent.',
+          message: 'User Not found. Please Check your email.',
         };
       }
 
@@ -844,7 +844,7 @@ export class UsersService {
       await this.sendPasswordResetEmail(user.email, user.name, resetLink);
 
       return {
-        message: 'If the email exists, a password reset link has been sent.',
+        message: 'Please Signin to your email and reset your password.',
       };
     } catch (error) {
       this.logger.error('Error in forgotPassword:', error);

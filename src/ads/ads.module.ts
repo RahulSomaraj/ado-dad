@@ -38,6 +38,7 @@ import {
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { S3Service } from '../shared/s3.service';
 import { RedisService } from '../shared/redis.service';
+import { GeocodingService } from '../common/services/geocoding.service';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { RedisService } from '../shared/redis.service';
     CommercialVehicleDetectionService,
     S3Service,
     RedisService,
+    GeocodingService,
   ],
   exports: [AdsService, LookupService, MongooseModule],
 })

@@ -23,8 +23,15 @@ export class Ad {
   @Prop({ type: [String], required: false })
   images?: string[];
 
-  @Prop({ required: true, trim: true })
-  location: string;
+  @Prop({ required: false, trim: true })
+  location?: string;
+
+  // Geographic coordinates for location-based filtering
+  @Prop({ type: Number, required: false })
+  latitude?: number;
+
+  @Prop({ type: Number, required: false })
+  longitude?: number;
 
   @Prop({ required: true, enum: AdCategory })
   category: AdCategory;
@@ -81,3 +88,5 @@ AdSchema.index({ approvedBy: 1, isApproved: 1 }, { background: true });
 AdSchema.index({ link: 1 }, { background: true });
 // Text index for search functionality - only description field exists
 AdSchema.index({ description: 'text' }, { background: true });
+// 2dsphere index for geographic queries
+AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });

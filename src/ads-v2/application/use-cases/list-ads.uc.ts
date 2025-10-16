@@ -150,6 +150,8 @@ export class ListAdsUc {
       category,
       search,
       location,
+      latitude,
+      longitude,
       minPrice,
       maxPrice,
       fuelTypeIds,
@@ -182,6 +184,89 @@ export class ListAdsUc {
         isApproved: true, // Only show approved ads in listings
       },
     });
+
+    // Geographic filtering (radius-based search)
+    if (latitude !== undefined && longitude !== undefined) {
+      // Fixed radius of 10km for location-based filtering
+      const FIXED_RADIUS_KM = 10;
+      const radiusInMeters = FIXED_RADIUS_KM * 1000;
+
+      pipeline.push({
+        $match: {
+          latitude: { $exists: true, $ne: null },
+          longitude: { $exists: true, $ne: null },
+          $expr: {
+            $lte: [
+              {
+                $multiply: [
+                  6371000, // Earth's radius in meters
+                  {
+                    $acos: {
+                      $add: [
+                        {
+                          $multiply: [
+                            {
+                              $sin: {
+                                $multiply: [
+                                  { $divide: ['$latitude', 180] },
+                                  Math.PI,
+                                ],
+                              },
+                            },
+                            {
+                              $sin: {
+                                $multiply: [
+                                  { $divide: [latitude, 180] },
+                                  Math.PI,
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                        {
+                          $multiply: [
+                            {
+                              $cos: {
+                                $multiply: [
+                                  { $divide: ['$latitude', 180] },
+                                  Math.PI,
+                                ],
+                              },
+                            },
+                            {
+                              $cos: {
+                                $multiply: [
+                                  { $divide: [longitude, 180] },
+                                  Math.PI,
+                                ],
+                              },
+                            },
+                            {
+                              $cos: {
+                                $multiply: [
+                                  {
+                                    $divide: [
+                                      { $subtract: ['$longitude', longitude] },
+                                      180,
+                                    ],
+                                  },
+                                  Math.PI,
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+              radiusInMeters,
+            ],
+          },
+        },
+      });
+    }
 
     // Category filter
     if (category) {

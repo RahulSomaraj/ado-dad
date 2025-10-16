@@ -9,6 +9,7 @@ import { IdempotencyService } from '../../infrastructure/services/idempotency.se
 import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { CommercialIntentService } from '../../infrastructure/services/commercial-intent.service';
 import { OutboxService } from '../../infrastructure/services/outbox.service';
+import { GeocodingService } from '../../../common/services/geocoding.service';
 import { CreateAdV2Dto, AdCategoryV2 } from '../../dto/create-ad-v2.dto';
 import {
   mapToDetailedResponseDto,
@@ -30,6 +31,7 @@ export class CreateAdUc {
     private readonly cache: AdsCache,
     private readonly intent: CommercialIntentService,
     private readonly outbox: OutboxService,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   async exec(input: {
@@ -60,6 +62,24 @@ export class CreateAdUc {
 
     // 3) Optional auto-detection for commercial
     const enrichedDto = await this.intent.applyIfCommercial(dto);
+
+    // 3.5) Auto-generate location from coordinates if not provided
+    if (
+      !enrichedDto.data.location &&
+      enrichedDto.data.latitude &&
+      enrichedDto.data.longitude
+    ) {
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          enrichedDto.data.latitude,
+          enrichedDto.data.longitude,
+        );
+        enrichedDto.data.location = geocodingResult.location;
+      } catch (error) {
+        // If geocoding fails, use coordinates as fallback
+        enrichedDto.data.location = `${enrichedDto.data.latitude.toFixed(4)}, ${enrichedDto.data.longitude.toFixed(4)}`;
+      }
+    }
 
     // 4) Inventory integrity checks (vehicle/commercial only)
     if (enrichedDto.category !== AdCategoryV2.PROPERTY) {

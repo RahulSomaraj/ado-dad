@@ -39,6 +39,7 @@ import { CreateAdDto } from '../dto/common/create-ad.dto';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { RedisService } from '../../shared/redis.service';
 import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
+import { GeocodingService } from '../../common/services/geocoding.service';
 import { UserType } from '../../users/enums/user.types';
 
 @Injectable()
@@ -66,6 +67,7 @@ export class AdsService {
     private readonly vehicleInventoryService: VehicleInventoryService,
     private readonly redisService: RedisService,
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   /** ---------- HELPERS ---------- */
@@ -1133,6 +1135,24 @@ export class AdsService {
       }
     }
 
+    // Auto-generate location from coordinates if not provided
+    if (
+      !createDto.data.location &&
+      createDto.data.latitude &&
+      createDto.data.longitude
+    ) {
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        createDto.data.location = geocodingResult.location;
+      } catch (error) {
+        // If geocoding fails, use coordinates as fallback
+        createDto.data.location = `${createDto.data.latitude.toFixed(4)}, ${createDto.data.longitude.toFixed(4)}`;
+      }
+    }
+
     this.validateRequiredFields(createDto);
 
     let result: AdResponseDto;
@@ -1168,9 +1188,16 @@ export class AdsService {
   private validateRequiredFields(createDto: CreateAdDto): void {
     const { category, data } = createDto;
 
-    if (!data?.description || data.price == null || !data.location) {
+    if (!data?.description || data.price == null) {
       throw new BadRequestException(
-        'Description, price, and location are required for all ad types',
+        'Description and price are required for all ad types',
+      );
+    }
+
+    // Location is required - either provided directly or generated from coordinates
+    if (!data.location && (!data.latitude || !data.longitude)) {
+      throw new BadRequestException(
+        'Either location or both latitude and longitude are required',
       );
     }
 
