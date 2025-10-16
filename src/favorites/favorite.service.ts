@@ -128,6 +128,14 @@ export class FavoriteService {
           foreignField: '_id',
           as: 'ad',
           pipeline: [
+            // Filter out sold-out ads
+            {
+              $match: {
+                soldOut: false,
+                isDeleted: { $ne: true },
+                isActive: true,
+              },
+            },
             {
               $lookup: {
                 from: 'users',

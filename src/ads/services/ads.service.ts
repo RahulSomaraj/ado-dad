@@ -556,9 +556,11 @@ export class AdsService {
       isApproved: true,
     };
 
-    // Add soldOut filter if provided
+    // Add soldOut filter - default to false (exclude sold-out ads) unless explicitly requested
     if (soldOut !== undefined) {
       matchStage.soldOut = soldOut;
+    } else {
+      matchStage.soldOut = false; // Default: exclude sold-out ads
     }
 
     pipeline.push({ $match: matchStage });

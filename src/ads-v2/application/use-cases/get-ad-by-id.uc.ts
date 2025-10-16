@@ -55,6 +55,7 @@ export class GetAdByIdUc {
         $match: {
           _id: new Types.ObjectId(adId),
           isDeleted: { $ne: true },
+          soldOut: false, // Exclude sold-out ads
         },
       },
 
