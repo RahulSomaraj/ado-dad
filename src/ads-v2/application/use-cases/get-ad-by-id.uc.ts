@@ -248,6 +248,8 @@ export class GetAdByIdUc {
       price: ad.price,
       images: ad.images || [],
       location: ad.location,
+      latitude: ad.latitude,
+      longitude: ad.longitude,
       link: ad.link || '',
       category: ad.category,
       isActive: ad.isActive,

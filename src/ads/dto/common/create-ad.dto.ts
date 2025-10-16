@@ -383,6 +383,8 @@ export class CreateAdDto {
             'Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood.',
           price: 8500000,
           location: 'Bandra West, Mumbai, Maharashtra',
+          latitude: 19.076,
+          longitude: 72.8777,
           link: 'https://example.com/property-details/bandra-apartment',
           images: [
             'https://example.com/property/living-room.jpg',
@@ -408,6 +410,8 @@ export class CreateAdDto {
             'Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute.',
           price: 850000,
           location: 'Dwarka, Delhi, NCR',
+          latitude: 28.5921,
+          longitude: 77.0467,
           link: 'https://example.com/vehicle-details/honda-city-2020',
           images: [
             'https://example.com/vehicle/exterior.jpg',
@@ -442,6 +446,8 @@ export class CreateAdDto {
             'Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits.',
           price: 1800000,
           location: 'Pune, Maharashtra',
+          latitude: 18.5204,
+          longitude: 73.8567,
           link: 'https://example.com/commercial-vehicle-details/tata-407-truck',
           images: [
             'https://example.com/truck/exterior.jpg',
@@ -481,6 +487,8 @@ export class CreateAdDto {
             'Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute.',
           price: 65000,
           location: 'Koramangala, Bangalore, Karnataka',
+          latitude: 12.9352,
+          longitude: 77.6245,
           link: 'https://example.com/two-wheeler-details/honda-activa-6g',
           images: [
             'https://example.com/scooter/exterior.jpg',

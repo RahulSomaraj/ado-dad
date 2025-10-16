@@ -272,6 +272,8 @@ export class AdsController {
               'Spacious and well-maintained 2BHK apartment with modern amenities and excellent connectivity.',
             price: 8500000,
             location: 'Bandra West, Mumbai, Maharashtra',
+            latitude: 19.076,
+            longitude: 72.8777,
             link: 'https://example.com/property-details/bandra-apartment',
             images: [
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property1.jpg',
@@ -433,6 +435,8 @@ export class AdsController {
           'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property1.jpg',
         ],
         location: 'Bandra West, Mumbai, Maharashtra',
+        latitude: 19.076,
+        longitude: 72.8777,
         category: 'property',
         isActive: true,
         postedAt: '2024-01-15T10:30:00.000Z',
