@@ -275,20 +275,14 @@ export class LocationHierarchyService {
                   { latitude: { $exists: true, $ne: null } },
                   { longitude: { $exists: true, $ne: null } },
                   {
-                    $and: [
-                      {
-                        $gte: ['$latitude', stateBoundary.bounds.south],
-                      },
-                      {
-                        $lte: ['$latitude', stateBoundary.bounds.north],
-                      },
-                      {
-                        $gte: ['$longitude', stateBoundary.bounds.west],
-                      },
-                      {
-                        $lte: ['$longitude', stateBoundary.bounds.east],
-                      },
-                    ],
+                    latitude: {
+                      $gte: stateBoundary.bounds.south,
+                      $lte: stateBoundary.bounds.north,
+                    },
+                    longitude: {
+                      $gte: stateBoundary.bounds.west,
+                      $lte: stateBoundary.bounds.east,
+                    },
                   },
                 ],
               },
