@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdsV2Controller } from './ads.v2.controller';
+import { LocationConfigController } from './controllers/location-config.controller';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
 import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
@@ -85,7 +86,7 @@ const OutboxSchema = {
     }), // Register JwtModule for JwtService
     ConfigModule, // Register ConfigModule for ConfigService
   ],
-  controllers: [AdsV2Controller],
+  controllers: [AdsV2Controller, LocationConfigController],
   providers: [
     // Use cases
     CreateAdUc,
