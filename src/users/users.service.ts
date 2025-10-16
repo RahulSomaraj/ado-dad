@@ -864,6 +864,58 @@ export class UsersService {
   }
 
   /**
+   * Reset password using token
+   */
+  async resetPassword(
+    userId: string,
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    try {
+      // 1. Validate user exists
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new Error('Invalid user ID');
+      }
+
+      // 2. Check if token exists in cache
+      const cacheKey = `password_reset:${userId}`;
+      const storedToken = await this.redisService.cacheGet(cacheKey);
+
+      if (!storedToken || storedToken !== token) {
+        throw new Error('Invalid or expired reset token');
+      }
+
+      // 3. Hash new password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // 4. Update user password
+      await this.userModel.findByIdAndUpdate(userId, {
+        password: hashedPassword,
+      });
+
+      // 5. Remove token from cache (one-time use)
+      await this.redisService.cacheDel(cacheKey);
+
+      // 6. Invalidate user cache
+      await this.invalidateUsersListCaches();
+
+      this.logger.log(`Password reset successfully for user ${userId}`);
+
+      return {
+        message:
+          'Password reset successfully. You can now login with your new password.',
+      };
+    } catch (error) {
+      this.logger.error('Error in resetPassword:', error);
+      throw new Error(
+        'Failed to reset password. Please request a new reset link.',
+      );
+    }
+  }
+
+  /**
    * Send password reset email
    */
   private async sendPasswordResetEmail(

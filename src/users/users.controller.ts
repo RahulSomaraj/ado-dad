@@ -293,6 +293,68 @@ export class UsersController {
     return this.usersService.forgotPassword(body.email);
   }
 
+  @Post('reset-password')
+  @ApiOperation({
+    summary: 'Reset password using token',
+    description:
+      'Reset user password using the token received from forgot password email.',
+  })
+  @ApiBody({
+    description: 'Password reset data',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          example: '507f1f77bcf86cd799439011',
+          description: 'User ID from reset link',
+        },
+        token: {
+          type: 'string',
+          example: 'a1b2c3d4e5f6...',
+          description: 'Reset token from email link',
+        },
+        newPassword: {
+          type: 'string',
+          example: 'NewSecurePassword123!',
+          description: 'New password',
+        },
+      },
+      required: ['userId', 'token', 'newPassword'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example:
+            'Password reset successfully. You can now login with your new password.',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid token or user ID',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Token expired or invalid',
+  })
+  async resetPassword(
+    @Body() body: { userId: string; token: string; newPassword: string },
+  ) {
+    return this.usersService.resetPassword(
+      body.userId,
+      body.token,
+      body.newPassword,
+    );
+  }
+
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
