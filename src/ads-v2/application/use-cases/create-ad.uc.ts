@@ -111,9 +111,14 @@ export class CreateAdUc {
           price: enrichedDto.data.price,
           images: (enrichedDto.data.images ?? []).slice(0, 20),
           location: enrichedDto.data.location,
+          latitude: enrichedDto.data.latitude,
+          longitude: enrichedDto.data.longitude,
+          link: enrichedDto.data.link,
           postedBy: new Types.ObjectId(userId),
           category: enrichedDto.category as any, // Cast to match schema enum
           isActive: true,
+          soldOut: false, // Always set soldOut to false by default
+          isApproved: false, // Always set isApproved to false by default
         },
         { session },
       );

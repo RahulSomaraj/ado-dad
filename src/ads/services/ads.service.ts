@@ -1328,6 +1328,8 @@ export class AdsService {
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
     });
     const savedAd = await ad.save();
 
@@ -1370,6 +1372,8 @@ export class AdsService {
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
     });
     const savedAd = await ad.save();
 
@@ -1423,6 +1427,8 @@ export class AdsService {
         link: data.link,
         postedBy: new Types.ObjectId(userId),
         category: AdCategory.COMMERCIAL_VEHICLE,
+        soldOut: false, // Always set soldOut to false by default
+        isApproved: false, // Always set isApproved to false by default
       });
       const savedAd = await ad.save({ session });
 
@@ -1486,6 +1492,8 @@ export class AdsService {
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
     });
     const savedAd = await ad.save();
 
