@@ -455,17 +455,19 @@ export class ChatService {
   }
 
   /**
-   * Get messages for a room with keyset pagination.
+   * Get messages for a room with keyset pagination and sender details.
    * - cursor = last seen message _id (string); returns newer->older (descending by _id).
+   * - Includes sender information for each message
    */
   async getRoomMessages(
     roomId: string,
     cursor?: string,
     limit = 50,
   ): Promise<{
-    messages: ChatMessage[];
+    messages: any[];
     nextCursor: string | null;
     hasMore: boolean;
+    total: number;
   }> {
     const room = await this.getChatRoom(roomId);
 
@@ -475,12 +477,59 @@ export class ChatService {
       query._id = { $lt: new Types.ObjectId(cursor) }; // descending stream
     }
 
-    const docs = await this.chatMessageModel
-      .find(query)
-      .sort({ _id: -1 })
-      .limit(Math.min(Math.max(limit, 1), 200) + 1) // clamp 1..200 then fetch +1
-      .lean()
-      .exec();
+    // Get total count for this room
+    const total = await this.chatMessageModel.countDocuments({
+      roomId: room.roomId,
+    });
+
+    // First, let's try a simple query to see if messages exist
+    const simpleQuery = { roomId: room.roomId };
+    if (cursor) {
+      simpleQuery._id = { $lt: new Types.ObjectId(cursor) };
+    }
+
+    // Get messages with sender details using aggregation
+    const pipeline: any[] = [
+      { $match: simpleQuery },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'senderId',
+          foreignField: '_id',
+          as: 'sender',
+        },
+      },
+      {
+        $unwind: {
+          path: '$sender',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          roomId: 1,
+          senderId: 1,
+          type: 1,
+          content: 1,
+          attachments: 1,
+          isRead: 1,
+          readAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          sender: {
+            _id: '$sender._id',
+            name: '$sender.name',
+            email: '$sender.email',
+            profilePic: '$sender.profilePic',
+          },
+        },
+      },
+      { $sort: { _id: -1 } },
+      { $limit: Math.min(Math.max(limit, 1), 200) + 1 },
+    ];
+
+    const docs = await this.chatMessageModel.aggregate(pipeline).exec();
 
     const hasMore = docs.length > limit;
     const messages = hasMore ? docs.slice(0, limit) : docs;
@@ -488,7 +537,7 @@ export class ChatService {
       ? messages[messages.length - 1]._id.toString()
       : null;
 
-    return { messages, nextCursor, hasMore };
+    return { messages, nextCursor, hasMore, total };
   }
 
   /**

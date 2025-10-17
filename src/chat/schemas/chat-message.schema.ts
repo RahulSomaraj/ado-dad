@@ -13,10 +13,17 @@ export enum MessageType {
 @Schema({ timestamps: true })
 export class ChatMessage {
   @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChatRoom',
+    required: true,
+  })
+  roomRef: mongoose.Types.ObjectId; // ObjectId reference to ChatRoom
+
+  @Prop({
     type: String,
     required: true,
   })
-  roomId: string;
+  roomId: string; // denormalized string id for convenience
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   senderId: mongoose.Types.ObjectId;
@@ -38,6 +45,12 @@ export class ChatMessage {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   readBy?: mongoose.Types.ObjectId;
+
+  @Prop({ type: [String], default: [] })
+  moderationFlags?: string[];
+
+  @Prop({ type: Number, default: 0 })
+  moderationScore?: number;
 }
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);

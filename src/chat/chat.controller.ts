@@ -323,20 +323,28 @@ export class ChatController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get room messages',
+    summary: 'Get room messages with pagination',
     description: `
-      Retrieve messages from a specific chat room.
+      Retrieve messages from a specific chat room with cursor-based pagination.
       
       **Features:**
-      - Returns paginated messages from the specified room
-      - Supports limit parameter for message count control
-      - Messages are sorted by creation time (newest first)
-      - Includes sender information and timestamps
-      - Supports cursor-based pagination for large message histories
+      - Returns paginated messages from the specified room (newest first)
+      - Cursor-based pagination for efficient loading of message history
+      - Includes complete sender information (name, email, profile picture)
+      - Supports limit parameter for message count control (1-200 messages)
+      - Returns pagination metadata (nextCursor, hasMore, total count)
+      - Perfect for mobile and web chat interfaces
+      
+      **Pagination:**
+      - First request: Don't include cursor parameter
+      - Subsequent requests: Use nextCursor from previous response
+      - Messages are returned in descending order (newest first)
+      - Use nextCursor to load older messages
       
       **Parameters:**
       - roomId: Unique identifier for the chat room
-      - limit: Maximum number of messages to retrieve (default: 50, max: 100)
+      - limit: Maximum number of messages to retrieve (default: 50, max: 200)
+      - cursor: Message ID to start pagination from (optional)
     `,
   })
   @ApiParam({
@@ -347,50 +355,70 @@ export class ChatController {
   })
   @ApiQuery({
     name: 'limit',
-    description: 'Number of messages to retrieve (default: 50, max: 100)',
+    description: 'Number of messages to retrieve (default: 50, max: 200)',
     required: false,
     type: Number,
     example: 50,
   })
+  @ApiQuery({
+    name: 'cursor',
+    description: 'Cursor for pagination (message ID to start from)',
+    required: false,
+    type: String,
+    example: '507f1f77bcf86cd799439031',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Room messages retrieved successfully',
+    description: 'Room messages retrieved successfully with pagination',
     schema: {
       example: {
         success: true,
-        data: [
-          {
-            id: '507f1f77bcf86cd799439031',
-            roomId:
-              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
-            senderId: '507f1f77bcf86cd799439021',
-            content: 'Hello! Is this property still available?',
-            messageType: 'text',
-            timestamp: '2024-01-15T14:30:00.000Z',
-            isRead: true,
-            sender: {
-              id: '507f1f77bcf86cd799439021',
-              name: 'John Doe',
-              email: 'john.doe@example.com',
+        data: {
+          messages: [
+            {
+              _id: '507f1f77bcf86cd799439031',
+              roomId:
+                'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+              senderId: '507f1f77bcf86cd799439021',
+              content: 'Hello! Is this property still available?',
+              type: 'text',
+              attachments: [],
+              isRead: true,
+              readAt: '2024-01-15T14:31:00.000Z',
+              createdAt: '2024-01-15T14:30:00.000Z',
+              updatedAt: '2024-01-15T14:30:00.000Z',
+              sender: {
+                _id: '507f1f77bcf86cd799439021',
+                name: 'John Doe',
+                email: 'john.doe@example.com',
+                profilePic: 'https://example.com/profile1.jpg',
+              },
             },
-          },
-          {
-            id: '507f1f77bcf86cd799439032',
-            roomId:
-              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
-            senderId: '507f1f77bcf86cd799439022',
-            content:
-              'Yes, it is still available. Would you like to schedule a viewing?',
-            messageType: 'text',
-            timestamp: '2024-01-15T14:32:00.000Z',
-            isRead: false,
-            sender: {
-              id: '507f1f77bcf86cd799439022',
-              name: 'Jane Smith',
-              email: 'jane.smith@example.com',
+            {
+              _id: '507f1f77bcf86cd799439032',
+              roomId:
+                'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+              senderId: '507f1f77bcf86cd799439022',
+              content:
+                'Yes, it is still available. Would you like to schedule a viewing?',
+              type: 'text',
+              attachments: [],
+              isRead: false,
+              readAt: null,
+              createdAt: '2024-01-15T14:32:00.000Z',
+              updatedAt: '2024-01-15T14:32:00.000Z',
+              sender: {
+                _id: '507f1f77bcf86cd799439022',
+                name: 'Jane Smith',
+                email: 'jane.smith@example.com',
+                profilePic: 'https://example.com/profile2.jpg',
+              },
             },
-          },
-        ],
+          ],
+          nextCursor: '507f1f77bcf86cd799439030',
+          hasMore: true,
+          total: 25,
+        },
         roomId:
           'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
       },
@@ -433,17 +461,18 @@ export class ChatController {
   async getRoomMessages(
     @Param('roomId') roomId: string,
     @Query('limit') limit = '50',
+    @Query('cursor') cursor?: string,
   ) {
     try {
-      const messages = await this.chatService.getRoomMessages(
+      const result = await this.chatService.getRoomMessages(
         roomId,
-        undefined, // cursor
+        cursor, // cursor for pagination
         parseInt(limit, 10),
       );
 
       return {
         success: true,
-        data: messages,
+        data: result,
         roomId,
       };
     } catch (error: any) {
