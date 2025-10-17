@@ -284,6 +284,7 @@ export class UserReportController {
   }
 
   @Get(':id')
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get a specific user report',
     description: `
