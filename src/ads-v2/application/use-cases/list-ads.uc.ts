@@ -249,7 +249,7 @@ export class ListAdsUc {
         isDeleted: { $ne: true },
         isActive: true,
         isApproved: true, // Only show approved ads in listings
-        soldOut: false, // Exclude sold-out ads from listings
+        soldOut: { $ne: true }, // Exclude sold-out ads from listings (include null/undefined)
       },
     });
 
