@@ -405,8 +405,8 @@ export class AdsV2Controller {
       - Vehicle specific filtering (works for private_vehicle, commercial_vehicle, two_wheeler):
         - Fuel type IDs (fuelTypeIds) - filter by specific fuel types
         - Transmission type IDs (transmissionTypeIds) - filter by specific transmission types
-        - Manufacturer ID (manufacturerId) - filter by specific manufacturer
-        - Model ID (modelId) - filter by specific vehicle model
+        - Manufacturer IDs (manufacturerIds) - filter by specific manufacturers (array)
+        - Model IDs (modelIds) - filter by specific vehicle models (array)
         - Year range (minYear, maxYear) - filter by vehicle year
       - Pagination and sorting
       - All filters are optional
@@ -507,8 +507,11 @@ export class AdsV2Controller {
           maxPrice: 5000000,
           fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
           transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
-          manufacturerId: '68b53a26933e8b3908eb5448',
-          modelId: '68b53a26933e8b3908eb5449',
+          manufacturerIds: [
+            '68b53a26933e8b3908eb5448',
+            '68b53a26933e8b3908eb5449',
+          ],
+          modelIds: ['68b53a26933e8b3908eb5449', '68b53a26933e8b3908eb5450'],
           minYear: 2018,
           maxYear: 2023,
           page: 1,
@@ -528,8 +531,11 @@ export class AdsV2Controller {
           maxPrice: 200000,
           fuelTypeIds: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
           transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
-          manufacturerId: '68b53a26933e8b3908eb5448',
-          modelId: '68b53a26933e8b3908eb5449',
+          manufacturerIds: [
+            '68b53a26933e8b3908eb5448',
+            '68b53a26933e8b3908eb5449',
+          ],
+          modelIds: ['68b53a26933e8b3908eb5449', '68b53a26933e8b3908eb5450'],
           minYear: 2020,
           maxYear: 2024,
           page: 1,
@@ -549,8 +555,11 @@ export class AdsV2Controller {
           maxPrice: 5000000,
           fuelTypeIds: ['68b53a26933e8b3908eb5448'],
           transmissionTypeIds: ['68b53a421f3fb49e93b9ef59'],
-          manufacturerId: '68b53a26933e8b3908eb5448',
-          modelId: '68b53a26933e8b3908eb5449',
+          manufacturerIds: [
+            '68b53a26933e8b3908eb5448',
+            '68b53a26933e8b3908eb5449',
+          ],
+          modelIds: ['68b53a26933e8b3908eb5449', '68b53a26933e8b3908eb5450'],
           minYear: 2015,
           maxYear: 2022,
           page: 1,

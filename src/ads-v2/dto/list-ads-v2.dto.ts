@@ -157,20 +157,25 @@ export class ListAdsV2Dto {
 
   // Vehicle specific filters (works for private_vehicle, commercial_vehicle, two_wheeler)
   @ApiPropertyOptional({
-    description: 'Manufacturer ID for vehicle filtering',
-    example: '68b53a26933e8b3908eb5448',
+    description:
+      'Manufacturer IDs for vehicle filtering (array of manufacturer IDs)',
+    type: [String],
+    example: ['68b53a26933e8b3908eb5448', '68b53a26933e8b3908eb5449'],
   })
   @IsOptional()
-  @IsMongoId()
-  manufacturerId?: string;
+  @IsArray()
+  @IsMongoId({ each: true })
+  manufacturerIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Model ID for vehicle filtering',
-    example: '68b53a26933e8b3908eb5449',
+    description: 'Model IDs for vehicle filtering (array of model IDs)',
+    type: [String],
+    example: ['68b53a26933e8b3908eb5449', '68b53a26933e8b3908eb5450'],
   })
   @IsOptional()
-  @IsMongoId()
-  modelId?: string;
+  @IsArray()
+  @IsMongoId({ each: true })
+  modelIds?: string[];
 
   @ApiPropertyOptional({
     description: 'Minimum year for vehicle filtering',

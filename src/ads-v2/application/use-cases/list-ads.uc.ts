@@ -223,8 +223,8 @@ export class ListAdsUc {
       maxPrice,
       fuelTypeIds,
       transmissionTypeIds,
-      manufacturerId,
-      modelId,
+      manufacturerIds,
+      modelIds,
       minYear,
       maxYear,
       propertyTypes,
@@ -423,8 +423,8 @@ export class ListAdsUc {
         category === 'two_wheeler') &&
       (fuelTypeIds?.length ||
         transmissionTypeIds?.length ||
-        manufacturerId ||
-        modelId ||
+        manufacturerIds?.length ||
+        modelIds?.length ||
         minYear !== undefined ||
         maxYear !== undefined)
     ) {
@@ -443,12 +443,16 @@ export class ListAdsUc {
         };
       }
 
-      if (manufacturerId) {
-        elemMatchConditions.manufacturerId = new Types.ObjectId(manufacturerId);
+      if (manufacturerIds?.length) {
+        elemMatchConditions.manufacturerId = {
+          $in: manufacturerIds.map((id) => new Types.ObjectId(id)),
+        };
       }
 
-      if (modelId) {
-        elemMatchConditions.modelId = new Types.ObjectId(modelId);
+      if (modelIds?.length) {
+        elemMatchConditions.modelId = {
+          $in: modelIds.map((id) => new Types.ObjectId(id)),
+        };
       }
 
       if (minYear !== undefined || maxYear !== undefined) {
