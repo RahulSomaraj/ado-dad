@@ -21,7 +21,6 @@ export class RolesGuard implements CanActivate {
 
     // Check if user exists and has type property
     if (!user || !user.type) {
-      console.log('RolesGuard - User or type not found:', { user });
       return false;
     }
 

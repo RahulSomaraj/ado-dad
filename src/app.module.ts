@@ -28,6 +28,7 @@ import { UploadModule } from './shared/upload.module';
 import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.module';
 import { VehicleModule } from './vehicles/vehicle.module';
 import { ChatModule } from './chat/chat.module';
+import { UserReportModule } from './users/user-report.module';
 
 // Services
 import { EmailService } from './utils/email.service';
@@ -104,6 +105,7 @@ import { configService } from './config/mongo.config';
     // Feature modules
     AuthModule,
     UsersModule,
+    UserReportModule,
     AdsModule,
     AdsV2Module,
     BannerModule,
