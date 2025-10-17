@@ -668,7 +668,7 @@ export class AdsController {
     }
   }
 
-  @Patch(':id/sold')
+  @Put(':id/sold')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()

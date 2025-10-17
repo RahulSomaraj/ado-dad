@@ -483,7 +483,7 @@ export class ChatService {
     });
 
     // First, let's try a simple query to see if messages exist
-    const simpleQuery = { roomId: room.roomId };
+    const simpleQuery: any = { roomId: room.roomId };
     if (cursor) {
       simpleQuery._id = { $lt: new Types.ObjectId(cursor) };
     }
