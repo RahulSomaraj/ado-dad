@@ -521,6 +521,8 @@ export class ListAdsUc {
         category: 1,
         isActive: 1,
         soldOut: 1,
+        isApproved: 1, // Include isApproved field
+        approvedBy: 1, // Include approvedBy field
         postedBy: 1,
         createdAt: 1,
         updatedAt: 1,
