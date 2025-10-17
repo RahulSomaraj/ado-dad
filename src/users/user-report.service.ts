@@ -120,7 +120,7 @@ export class UserReportService {
     };
 
     // Regular users can only see their own reports
-    if (requesterType !== 'ADMIN' && requesterType !== 'SUPER_ADMIN') {
+    if (requesterType !== 'AD' && requesterType !== 'SA') {
       matchConditions.reportedBy = new Types.ObjectId(requesterId);
     }
 
@@ -326,7 +326,7 @@ export class UserReportService {
     }
 
     // Check permissions
-    if (requesterType !== 'ADMIN' && requesterType !== 'SUPER_ADMIN') {
+    if (requesterType !== 'AD' && requesterType !== 'SA') {
       if (report.reportedBy.toString() !== requesterId) {
         throw new ForbiddenException('You can only view your own reports');
       }
@@ -342,6 +342,7 @@ export class UserReportService {
     reportId: string,
     updateReportDto: UpdateUserReportDto,
     adminId: string,
+    adminType: string,
   ): Promise<UserReportResponseDto> {
     if (!Types.ObjectId.isValid(reportId)) {
       throw new BadRequestException('Invalid report ID');
@@ -371,7 +372,7 @@ export class UserReportService {
 
     this.logger.log(`Report ${reportId} updated by admin ${adminId}`);
 
-    return this.getReportById(reportId, adminId, 'ADMIN');
+    return this.getReportById(reportId, adminId, adminType);
   }
 
   /**

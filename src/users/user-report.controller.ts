@@ -394,6 +394,7 @@ export class UserReportController {
       id,
       updateReportDto,
       req.user.id,
+      req.user.type,
     );
   }
 
