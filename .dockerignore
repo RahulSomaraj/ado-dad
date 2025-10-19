@@ -104,5 +104,5 @@ README.md
 *.md
 
 # Seed scripts (optional - remove if you want to include them)
-src/*/seed/
+# src/*/seed/  # Commented out to allow seed services to be included in build
 src/*/debug-*.ts 

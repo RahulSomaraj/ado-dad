@@ -12,6 +12,7 @@ import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Connection } from 'mongoose';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -122,11 +123,64 @@ async function bootstrap() {
   app.use(urlencoded({ limit: '1mb', extended: true }));
   app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-  await app.listen(PORT, '0.0.0.0', () => {
+  const server = await app.listen(PORT, '0.0.0.0', () => {
     Logger.log(`🚀 Server listening on port ${PORT}`);
     Logger.log(`📚 Swagger UI: http://localhost:${PORT}/docs`);
     Logger.log(`🌍 ENV: ${NODE_ENV}`);
   });
+
+  // Graceful shutdown handling
+  const gracefulShutdown = async (signal: string) => {
+    Logger.log(`🛑 Received ${signal}. Starting graceful shutdown...`);
+
+    // Stop accepting new connections
+    server.close(async () => {
+      Logger.log('🔒 HTTP server closed');
+
+      try {
+        // Close MongoDB connections
+        const mongoose = await import('mongoose');
+        if (mongoose.connection.readyState === 1) {
+          await mongoose.connection.close();
+          Logger.log('🔒 MongoDB connection closed');
+        }
+
+        // Close the NestJS application (this will trigger OnModuleDestroy for Redis)
+        await app.close();
+        Logger.log('🔒 Application closed');
+
+        Logger.log('✅ Graceful shutdown completed');
+        process.exit(0);
+      } catch (error) {
+        Logger.error('❌ Error during graceful shutdown:', error);
+        process.exit(1);
+      }
+    });
+
+    // Force close after 30 seconds
+    setTimeout(() => {
+      Logger.error('⏰ Graceful shutdown timeout. Forcing exit...');
+      process.exit(1);
+    }, 30000);
+  };
+
+  // Handle different termination signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // For nodemon
+
+  // Handle uncaught exceptions and unhandled rejections
+  process.on('uncaughtException', (error) => {
+    Logger.error('💥 Uncaught Exception:', error);
+    gracefulShutdown('uncaughtException');
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    Logger.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+    gracefulShutdown('unhandledRejection');
+  });
+
+  return server;
 }
 
 bootstrap().catch((error) => {

@@ -1,45 +1,7 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:7.0
-    container_name: adodad_mongodb
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: adodad_db
-    ports:
-      - '27017:27017'
-    volumes:
-      - mongodb_data:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    networks:
-      - adodad_network
-    healthcheck:
-      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis Cache
-  redis:
-    image: redis:7.2-alpine
-    container_name: adodad_redis
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis_data:/data
-    networks:
-      - adodad_network
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # NestJS Application
+  # NestJS Application (Production - External MongoDB Atlas & Redis)
   app:
     build:
       context: .
@@ -47,26 +9,73 @@ services:
       target: production
     container_name: adodad_app
     environment:
+      # ===========================================
+      # APPLICATION CONFIGURATION
+      # ===========================================
       NODE_ENV: production
-      APP_CONFIG__BACKEND_PORT: 5000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/adodad_db?authSource=admin
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_DB: 0
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
-      TOKEN_KEY: ${TOKEN_KEY:-your-token-key}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      APP_CONFIG__BACKEND_PORT: ${APP_CONFIG__BACKEND_PORT:-3000}
+
+      # ===========================================
+      # DATABASE CONFIGURATION
+      # ===========================================
+      # MongoDB Configuration
+      MONGODB_URI: ${MONGODB_URI}
+      MONGO_URI: ${MONGO_URI}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DATABASE: ${MONGO_DATABASE}
+
+      # ===========================================
+      # REDIS CONFIGURATION
+      # ===========================================
+      # Redis Configuration
+      REDIS_URL: ${REDIS_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: ${REDIS_DB:-0}
+
+      # ===========================================
+      # AUTHENTICATION & SECURITY
+      # ===========================================
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_KEY: ${TOKEN_KEY}
+      SALT_ROUNDS: ${SALT_ROUNDS:-10}
+      ACCESS_TOKEN_EXPIRY: ${ACCESS_TOKEN_EXPIRY:-86400000}
+      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-60d}
+
+      # ===========================================
+      # AWS CONFIGURATION
+      # ===========================================
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+
+      # ===========================================
+      # FIREBASE CONFIGURATION
+      # ===========================================
+      FIREBASE_SA_JSON: ${FIREBASE_SA_JSON}
+
+      # ===========================================
+      # EMAIL CONFIGURATION
+      # ===========================================
+      RESET_LINK: ${RESET_LINK}
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL}
+      FRONTEND_URL: ${FRONTEND_URL}
+
+      # ===========================================
+      # GOOGLE MAPS CONFIGURATION
+      # ===========================================
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      API_KEY_MAPS: ${API_KEY_MAPS}
+      API_SECRET_MAPS: ${API_SECRET_MAPS}
     ports:
-      - '5000:5000'
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - '3000:3000'
     networks:
       - adodad_network
     healthcheck:
@@ -76,48 +85,8 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
-
-  # MongoDB Express (Optional - for database management)
-  mongo-express:
-    image: mongo-express:1.0.0
-    container_name: adodad_mongo_express
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: password123
-    ports:
-      - '8081:8081'
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - adodad_network
-    profiles:
-      - development
-
-  # Redis Commander (Optional - for Redis management)
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: adodad_redis_commander
-    environment:
-      REDIS_HOSTS: local:redis:6379
-    ports:
-      - '8082:8081'
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - adodad_network
-    profiles:
-      - development
-
-volumes:
-  mongodb_data:
-    driver: local
-  redis_data:
-    driver: local
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
 
 networks:
   adodad_network:

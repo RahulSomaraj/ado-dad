@@ -1,5 +1,5 @@
 # Development Dockerfile for NestJS application
-FROM node:20-alpine
+FROM node:20.19.1-alpine
 
 # Set working directory
 WORKDIR /app
@@ -17,7 +17,7 @@ RUN npm i --legacy-peer-deps
 COPY . .
 
 # Expose ports
-EXPOSE 5000 9229
+EXPOSE 3000 9229
 
 # Start the application in development mode
 CMD ["npm", "run", "start:dev"] 
