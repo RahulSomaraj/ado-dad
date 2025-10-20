@@ -35,6 +35,10 @@ Dockerfile*
 docker-compose*.yml
 .dockerignore
 
+# PM2 logs (will be created in container)
+logs/
+*.log
+
 # Logs
 logs
 *.log
