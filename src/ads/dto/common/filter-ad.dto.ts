@@ -174,11 +174,13 @@ export class FilterAdDto {
   @ApiPropertyOptional({
     description: 'Property type filter',
     enum: PropertyTypeEnum,
-    example: PropertyTypeEnum.APARTMENT,
+    isArray: true,
+    example: [PropertyTypeEnum.APARTMENT, PropertyTypeEnum.VILLA],
   })
   @IsOptional()
-  @IsEnum(PropertyTypeEnum)
-  propertyType?: PropertyTypeEnum;
+  @IsArray()
+  @IsEnum(PropertyTypeEnum, { each: true })
+  propertyType?: PropertyTypeEnum[];
 
   @ApiPropertyOptional({
     description: 'Minimum number of bedrooms',
