@@ -32,16 +32,20 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
+# Install only production dependencies including PM2
 RUN npm ci --only=production --legacy-peer-deps && \
+    npm install -g pm2 && \
     npm cache clean --force && \
     rm -rf /tmp/*
 
 # Copy built application from builder stage
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
+# Copy PM2 configuration
+COPY --chown=nestjs:nodejs ecosystem.config.js ./
+
 # Copy any additional files needed (if they exist)
-RUN mkdir -p ./public || true
+RUN mkdir -p ./public ./logs || true
 
 # Create health check file with configurable port
 RUN echo 'const http = require("http"); const port = process.env.APP_CONFIG__BACKEND_PORT || 3000; const options = { hostname: "localhost", port: port, path: "/ads", method: "GET", timeout: 2000 }; const req = http.request(options, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on("error", () => process.exit(1)); req.on("timeout", () => process.exit(1)); req.end();' > healthcheck.js
@@ -61,6 +65,6 @@ LABEL maintainer="ado-dad-team" \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node healthcheck.js
 
-# Use dumb-init for proper signal handling and start the application
+# Use dumb-init for proper signal handling and start the application with PM2
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main"] 
+CMD ["pm2-runtime", "start", "ecosystem.config.js"] 

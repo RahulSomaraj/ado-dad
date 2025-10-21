@@ -26,6 +26,7 @@ The application uses a multi-stage Dockerfile for optimal image size and securit
 - Runs as non-root user (`nestjs:nodejs`)
 - Includes health checks
 - Uses `dumb-init` for proper signal handling
+- **PM2 Clustering**: Automatically spawns multiple workers (one per CPU core)
 
 ## 🚀 Quick Start
 
@@ -117,6 +118,14 @@ docker exec <container_name> node healthcheck.js
 - **Signal handling**: Proper SIGTERM handling with `dumb-init`
 - **Graceful shutdown**: 30-second grace period for clean shutdown
 - **Health checks**: Built-in application health monitoring
+
+## ⚡ Performance Features
+
+- **PM2 Clustering**: Automatically spawns multiple workers (one per CPU core)
+- **High Concurrency**: Each worker can handle requests independently
+- **Auto-restart**: Failed workers are automatically restarted
+- **Memory Management**: Workers restart if memory usage exceeds 1GB
+- **Load Balancing**: PM2 distributes requests across all workers
 
 ## 🌐 External Services Setup
 

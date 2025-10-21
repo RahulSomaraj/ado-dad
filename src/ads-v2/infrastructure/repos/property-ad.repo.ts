@@ -37,14 +37,14 @@ export class PropertyAdRepository {
       : propertyAd.save();
   }
 
-  async findByAdId(adId: Types.ObjectId): Promise<PropertyAdDocument | null> {
+  async findByAdId(adId: Types.ObjectId): Promise<any> {
     return this.model
       .findOne({ $or: [{ ad: adId }, { adId: adId }] })
       .lean()
       .exec();
   }
 
-  async findByAdIds(adIds: Types.ObjectId[]): Promise<PropertyAdDocument[]> {
+  async findByAdIds(adIds: Types.ObjectId[]): Promise<any[]> {
     return this.model
       .find({
         $or: [{ ad: { $in: adIds } }, { adId: { $in: adIds } }],

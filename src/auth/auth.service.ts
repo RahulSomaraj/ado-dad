@@ -108,7 +108,7 @@ export class AuthService {
       .findOne(query)
       .select('+password +otp +isDeleted')
       .lean()
-      .exec();
+      .exec() as any;
   }
 
   /**
