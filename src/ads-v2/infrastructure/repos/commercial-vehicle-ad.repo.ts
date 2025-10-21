@@ -51,7 +51,7 @@ export class CommercialVehicleAdRepository {
 
   async findByAdId(
     adId: Types.ObjectId,
-  ): Promise<CommercialVehicleAdDocument | null> {
+  ): Promise<any> {
     return this.model
       .findOne({ $or: [{ ad: adId }, { adId: adId }] })
       .lean()
@@ -60,7 +60,7 @@ export class CommercialVehicleAdRepository {
 
   async findByAdIds(
     adIds: Types.ObjectId[],
-  ): Promise<CommercialVehicleAdDocument[]> {
+  ): Promise<any[]> {
     return this.model
       .find({
         $or: [{ ad: { $in: adIds } }, { adId: { $in: adIds } }],

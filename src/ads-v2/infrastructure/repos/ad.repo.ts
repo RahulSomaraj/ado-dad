@@ -17,11 +17,11 @@ export class AdRepository {
     return options?.session ? ad.save({ session: options.session }) : ad.save();
   }
 
-  async findById(id: string | Types.ObjectId): Promise<AdDocument | null> {
+  async findById(id: string | Types.ObjectId): Promise<any> {
     return this.model.findById(id).lean().exec();
   }
 
-  async findByIds(ids: Types.ObjectId[]): Promise<AdDocument[]> {
+  async findByIds(ids: Types.ObjectId[]): Promise<any[]> {
     return this.model
       .find({ _id: { $in: ids }, isDeleted: { $ne: true } })
       .populate('postedBy', 'name email phone')

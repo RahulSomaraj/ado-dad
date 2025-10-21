@@ -146,7 +146,7 @@ export class UsersService {
       );
 
       const response: PaginatedUsersResponse = {
-        users,
+        users: users as any[],
         totalPages,
         currentPage: validatedPage,
         totalUsers,
@@ -199,7 +199,7 @@ export class UsersService {
         user,
         UsersService.CACHE_TTL.USER_BY_ID,
       );
-      return user;
+      return user as any;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
