@@ -61,7 +61,11 @@ export class ChatGateway
       const userId = payload.id || payload.sub;
       if (!userId) return false;
 
-      (client as any).user = { id: userId, roles: payload.roles };
+      (client as any).user = {
+        id: userId,
+        type: payload.userType,
+        roles: payload.userType,
+      };
       return true;
     } catch (e: any) {
       this.logger.warn(
@@ -472,6 +476,74 @@ export class ChatGateway
     } catch (e: any) {
       this.logger.error(`❌ [checkExistingChatRoom] Error: ${e.message}`);
       callback?.({ success: false, error: e.message });
+    }
+  }
+
+  // ---------- GET ROOM MESSAGES ----------
+  @SubscribeMessage('getRoomMessages')
+  async handleGetRoomMessages(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { roomId: string },
+  ) {
+    this.logger.log('🟢 [getRoomMessages] handler ENTER');
+    this.logger.log('🟢 [getRoomMessages] payload:', payload);
+
+    try {
+      const userId = (client as any).user?.id as string;
+      if (!userId) {
+        this.logger.error(
+          '❌ [getRoomMessages] No userId found in client.user',
+        );
+        client.emit('getRoomMessagesResponse', {
+          success: false,
+          error: 'User not authenticated',
+        });
+        return;
+      }
+
+      const { roomId } = payload;
+      if (!roomId) {
+        this.logger.error('❌ [getRoomMessages] No roomId provided');
+        client.emit('getRoomMessagesResponse', {
+          success: false,
+          error: 'Room ID is required',
+        });
+        return;
+      }
+
+      this.logger.log(
+        `🟢 [getRoomMessages] Getting messages for room: ${roomId}`,
+      );
+
+      const result = await this.chatService.getRoomMessages(
+        roomId,
+        undefined,
+        50,
+      );
+
+      this.logger.log(
+        `🟢 [getRoomMessages] Found ${result.messages.length} messages`,
+      );
+
+      const response = {
+        success: true,
+        roomId: roomId,
+        messages: result.messages,
+        total: result.total,
+        hasMore: result.hasMore,
+        nextCursor: result.nextCursor,
+      };
+
+      this.logger.log('🟢 [getRoomMessages] Sending response:', response);
+      client.emit('getRoomMessagesResponse', response);
+    } catch (e: any) {
+      this.logger.error(`❌ [getRoomMessages] Error: ${e.message}`);
+      this.logger.error(`❌ [getRoomMessages] Stack: ${e.stack}`);
+
+      client.emit('getRoomMessagesResponse', {
+        success: false,
+        error: e.message,
+      });
     }
   }
 

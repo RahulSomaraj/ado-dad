@@ -6,6 +6,7 @@ package-lock.json
 node_modules/
 .env
 .env.example
+.env.prod
 package-lock.json
 
 # Test reports and generated files
