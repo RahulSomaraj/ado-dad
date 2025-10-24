@@ -507,6 +507,11 @@ export class ChatController {
     description: 'Advertisement ID to check for existing chat room',
     example: '507f1f77bcf86cd799439011',
   })
+  @ApiParam({
+    name: 'otherUserId',
+    description: 'Other user ID to check for existing chat room',
+    example: '507f1f77bcf86cd799439022',
+  })
   @ApiResponse({
     status: 200,
     description: 'Chat room existence checked successfully',
@@ -515,21 +520,12 @@ export class ChatController {
         success: true,
         data: {
           exists: true,
-          room: {
-            roomId:
-              'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
-            initiatorId: '507f1f77bcf86cd799439021',
-            adId: '507f1f77bcf86cd799439011',
-            adPosterId: '507f1f77bcf86cd799439022',
-            participants: [
-              '507f1f77bcf86cd799439021',
-              '507f1f77bcf86cd799439022',
-            ],
-            status: 'active',
-            lastMessageAt: '2024-01-15T14:30:00.000Z',
-            messageCount: 5,
-            createdAt: '2024-01-15T10:30:00.000Z',
-          },
+          roomId:
+            'chat_507f1f77bcf86cd799439011_507f1f77bcf86cd799439021_507f1f77bcf86cd799439022',
+          participants: [
+            '507f1f77bcf86cd799439021',
+            '507f1f77bcf86cd799439022',
+          ],
         },
       },
     },
@@ -542,7 +538,11 @@ export class ChatController {
         success: true,
         data: {
           exists: false,
-          room: null,
+          roomId: null,
+          participants: [
+            '507f1f77bcf86cd799439021',
+            '507f1f77bcf86cd799439022',
+          ],
         },
       },
     },
@@ -582,6 +582,7 @@ export class ChatController {
   })
   async checkExistingChatRoom(
     @Param('adId') adId: string,
+    @Param('otherUserId') otherUserId: string,
     @Request() req: any,
   ) {
     const userId = req.user.id || req.user._id;
@@ -590,10 +591,15 @@ export class ChatController {
       throw new BadRequestException('User ID not found in request');
     }
 
+    if (!otherUserId) {
+      throw new BadRequestException('Other User ID is required');
+    }
+
     try {
       const existingRoom = await this.chatService.findExistingChatRoom(
         userId,
         adId,
+        otherUserId,
       );
 
       return {
@@ -601,6 +607,7 @@ export class ChatController {
         data: {
           exists: !!existingRoom,
           roomId: existingRoom?.roomId || null,
+          participants: [userId, otherUserId],
         },
       };
     } catch (error: any) {

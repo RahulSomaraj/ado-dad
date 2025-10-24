@@ -329,36 +329,48 @@ export class ChatService {
   async findExistingChatRoom(
     initiatorId: string | Types.ObjectId,
     adId: string | Types.ObjectId,
+    otherUserId: string | Types.ObjectId,
   ): Promise<ChatRoom | null> {
     this.validateObjectId(initiatorId, 'Initiator ID');
     this.validateObjectId(adId, 'Ad ID');
+    this.validateObjectId(otherUserId, 'Other User ID');
 
-    // Ensure IDs are strings for the query
-    const initiatorIdString =
-      typeof initiatorId === 'string' ? initiatorId : initiatorId.toString();
-    const adIdString = typeof adId === 'string' ? adId : adId.toString();
-
-    // First, get the ad to find the ad poster
-    const ad = await this.adModel.findById(adId).exec();
-    if (!ad) {
-      throw new Error('Ad not found');
-    }
-
-    const adPosterId = this.ensureStringId(ad.postedBy);
-
-    // Check if room already exists (either direction)
+    // Check if room exists where either user can be initiator or poster
     const existingRoom = await this.chatRoomModel
       .findOne({
         adId: new Types.ObjectId(adId),
         $or: [
-          { initiatorId: new Types.ObjectId(initiatorId) },
-          { initiatorId: new Types.ObjectId(adPosterId) },
+          // Case 1: initiatorId is initiator, otherUserId is poster
+          {
+            initiatorId: new Types.ObjectId(initiatorId),
+            adPosterId: new Types.ObjectId(otherUserId),
+          },
+          // Case 2: otherUserId is initiator, initiatorId is poster
+          {
+            initiatorId: new Types.ObjectId(otherUserId),
+            adPosterId: new Types.ObjectId(initiatorId),
+          },
         ],
         status: ChatRoomStatus.ACTIVE,
       })
       .exec();
 
+    if (existingRoom) {
+      this.logger.log(
+        `Found existing chat room: ${existingRoom.roomId} for users ${initiatorId} and ${otherUserId} with ad ${adId}`,
+      );
+    }
+
     return existingRoom;
+  }
+
+  /** Get ad by ID */
+  async getAdById(adId: string | Types.ObjectId): Promise<any> {
+    this.validateObjectId(adId, 'Ad ID');
+
+    const ad = await this.adModel.findById(adId).lean().exec();
+
+    return ad;
   }
 
   /** Deactivate all rooms for an ad (e.g., ad sold/removed) */

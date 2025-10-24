@@ -429,7 +429,7 @@ export class ChatGateway
   @SubscribeMessage('checkExistingChatRoom')
   async handleCheckExistingChatRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { adId: string },
+    @MessageBody() payload: { adId: string; otherUserId?: string },
     callback?: (response: any) => void,
   ) {
     try {
@@ -443,9 +443,27 @@ export class ChatGateway
         `🔍 Checking existing room for user ${userId} and ad ${payload.adId}`,
       );
 
+      // If otherUserId is provided, use it; otherwise get it from the ad
+      let otherUserId = payload.otherUserId;
+      if (!otherUserId) {
+        // Get the ad to find the adPosterId
+        const ad = await this.chatService.getAdById(payload.adId);
+        if (!ad) {
+          callback?.({ success: false, error: 'Ad not found' });
+          return;
+        }
+        otherUserId = ad.postedBy;
+      }
+
+      if (!otherUserId) {
+        callback?.({ success: false, error: 'Other user ID not found' });
+        return;
+      }
+
       const existingRoom = await this.chatService.findExistingChatRoom(
         userId,
         payload.adId,
+        otherUserId,
       );
 
       if (existingRoom) {
