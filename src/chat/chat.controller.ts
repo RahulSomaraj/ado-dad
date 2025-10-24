@@ -480,8 +480,8 @@ export class ChatController {
     }
   }
 
-  // Check if chat room exists for an ad
-  @Get('rooms/check/:adId')
+  // Check if chat room exists for an ad (new route with both params in path)
+  @Get('rooms/check/:adId/:otherUserId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.USER, UserType.SHOWROOM, UserType.ADMIN, UserType.SUPER_ADMIN)
@@ -506,11 +506,13 @@ export class ChatController {
     name: 'adId',
     description: 'Advertisement ID to check for existing chat room',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
   })
   @ApiParam({
     name: 'otherUserId',
     description: 'Other user ID to check for existing chat room',
     example: '507f1f77bcf86cd799439022',
+    type: 'string',
   })
   @ApiResponse({
     status: 200,
@@ -586,6 +588,9 @@ export class ChatController {
     @Request() req: any,
   ) {
     const userId = req.user.id || req.user._id;
+    console.log('userId', userId);
+    console.log('adId', adId);
+    console.log('otherUserId', otherUserId);
 
     if (!userId) {
       throw new BadRequestException('User ID not found in request');

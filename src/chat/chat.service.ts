@@ -361,6 +361,8 @@ export class ChatService {
       );
     }
 
+    console.log('existingRoom', existingRoom);
+
     return existingRoom;
   }
 
