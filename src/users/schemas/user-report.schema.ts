@@ -38,8 +38,8 @@ export class UserReport {
   })
   reason: ReportReason;
 
-  @Prop({ required: true, trim: true, maxlength: 1000 })
-  description: string;
+  @Prop({ required: false, trim: true, maxlength: 1000 })
+  description?: string;
 
   @Prop({
     type: String,

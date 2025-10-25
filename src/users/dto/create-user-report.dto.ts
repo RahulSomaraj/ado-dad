@@ -29,17 +29,17 @@ export class CreateUserReportDto {
   @IsEnum(ReportReason)
   reason: ReportReason;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Detailed description of the issue',
     example: 'This user is posting spam advertisements repeatedly',
     minLength: 10,
     maxLength: 1000,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MinLength(10, { message: 'Description must be at least 10 characters long' })
   @MaxLength(1000, { message: 'Description cannot exceed 1000 characters' })
-  description: string;
+  description?: string;
 
   @ApiPropertyOptional({
     description: 'URLs to evidence (screenshots, etc.)',

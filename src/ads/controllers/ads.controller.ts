@@ -1121,11 +1121,11 @@ export class AdsController {
 
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
-    summary: 'Get all advertisements (Admin only)',
+    summary: 'Get all advertisements',
     description: `
-      Retrieve all advertisements including unapproved ones. Only accessible by admin and super admin.
+      Retrieve all advertisements including unapproved ones. Accessible by all authenticated users.
       
       **Features:**
       - Returns all ads (approved and unapproved)
