@@ -144,7 +144,7 @@ export class UsersController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Get()
   @ApiResponse({ status: 200, description: 'List of users' })
   async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
