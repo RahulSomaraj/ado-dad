@@ -297,7 +297,7 @@ export class UsersService {
         user,
         UsersService.CACHE_TTL.USER_BY_ID,
       );
-      return user;
+      return user as Partial<User>;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
@@ -352,7 +352,7 @@ export class UsersService {
         user,
         UsersService.CACHE_TTL.USER_BY_ID,
       );
-      return user as any;
+      return user as Partial<User>;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
