@@ -33,7 +33,7 @@ class ConfigService {
    * Get application port
    */
   public getPort(): number {
-    return parseInt(this.getValue('BACKEND_PORT', false) || '3000', 10);
+    return parseInt(this.getValue('BACKEND_PORT', false) || '5000', 10);
   }
 
   /**

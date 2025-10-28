@@ -55,6 +55,9 @@ export class UsersService {
   private static readonly BASE_PROJECTION =
     '_id name email type phoneNumber profilePic createdAt updatedAt';
 
+  // Limited projection for unauthenticated users
+  private static readonly PUBLIC_PROJECTION = '_id name email type createdAt';
+
   // Deterministic cache key helper
   private key(obj: Record<string, unknown>): string {
     const parts = Object.keys(obj)
@@ -69,7 +72,7 @@ export class UsersService {
    */
   async getAllUsers(
     getUsersDto: GetUsersDto,
-    currentUser: User,
+    currentUser: User | null,
   ): Promise<PaginatedUsersResponse> {
     try {
       const cacheKey = `users:list:${this.key({
@@ -102,9 +105,12 @@ export class UsersService {
 
       // Role-based visibility (compose with explicit `type` filter if present)
       let allowedTypes: UserType[] | undefined;
-      if (currentUser?.type === UserType.SUPER_ADMIN) {
+      if (!currentUser) {
+        // No authentication - only show basic USER types with limited fields
+        allowedTypes = [UserType.USER];
+      } else if (currentUser.type === UserType.SUPER_ADMIN) {
         allowedTypes = undefined; // see all
-      } else if (currentUser?.type === UserType.ADMIN) {
+      } else if (currentUser.type === UserType.ADMIN) {
         allowedTypes = [UserType.ADMIN, UserType.USER, UserType.SHOWROOM];
       } else {
         allowedTypes = [UserType.USER];
@@ -126,6 +132,11 @@ export class UsersService {
       // Build sort options
       const sortOptions = this.buildSortOptions(sort);
 
+      // Choose projection based on authentication status
+      const projection = currentUser
+        ? UsersService.BASE_PROJECTION
+        : UsersService.PUBLIC_PROJECTION;
+
       // Execute query with pagination
       const [users, totalUsers] = await Promise.all([
         this.userModel
@@ -133,7 +144,7 @@ export class UsersService {
           .sort(sortOptions)
           .skip((validatedPage - 1) * validatedLimit)
           .limit(validatedLimit)
-          .select(UsersService.BASE_PROJECTION)
+          .select(projection)
           .lean()
           .exec(),
         this.userModel.countDocuments(query).exec(),
@@ -172,9 +183,12 @@ export class UsersService {
   }
 
   /**
-   * Get user by ID
+   * Get user by ID - supports optional authentication
    */
-  async getUserById(id: string): Promise<Partial<User>> {
+  async getUserById(
+    id: string,
+    currentUser?: User | null,
+  ): Promise<Partial<User>> {
     try {
       const cacheKey = `users:byId:${this.key({ id })}`;
       const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
@@ -183,10 +197,15 @@ export class UsersService {
         throw new BadRequestException('Invalid user ID format');
       }
 
+      // Choose projection based on authentication status
+      const projection = currentUser
+        ? UsersService.BASE_PROJECTION
+        : UsersService.PUBLIC_PROJECTION;
+
       // Ensure deleted users are excluded at query-time (bug fix)
       const user = await this.userModel
         .findOne({ _id: id, isDeleted: { $ne: true } })
-        .select(UsersService.BASE_PROJECTION)
+        .select(projection)
         .lean()
         .exec();
 

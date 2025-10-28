@@ -142,24 +142,98 @@ export class UsersController {
     return this.usersService.createUser(createUserDto);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Get()
-  @ApiResponse({ status: 200, description: 'List of users' })
+  @ApiOperation({
+    summary: 'Get all users with pagination and filtering',
+    description: `
+      Retrieve a paginated list of users with optional filtering and sorting.
+      
+      **Features:**
+      - Pagination support with configurable page size
+      - Filtering by user type, search terms, and other criteria
+      - Sorting by various fields
+      - **Authentication is optional** - works with or without user token
+      
+      **Behavior:**
+      - **With authentication**: Returns users based on current user's permissions
+      - **Without authentication**: Returns only basic user information (limited fields)
+      
+      **Query Parameters:**
+      - page: Page number (default: 1)
+      - limit: Items per page (default: 10, max: 100)
+      - search: Search term for name or email
+      - type: Filter by user type
+      - sort: Sort field and direction
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of users retrieved successfully',
+    schema: {
+      example: {
+        users: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            name: 'John Doe',
+            email: 'john@example.com',
+            type: 'USER',
+            isActive: true,
+            createdAt: '2024-01-15T10:30:00.000Z',
+          },
+        ],
+        totalPages: 5,
+        currentPage: 1,
+        totalUsers: 50,
+        hasNext: true,
+        hasPrev: false,
+      },
+    },
+  })
   async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
-    const { user } = req;
+    // Optional authentication - extract user if available
+    const user = req.user || null;
+    console.log(user);
     return this.usersService.getAllUsers(query, user);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Get(':id')
-  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiOperation({
+    summary: 'Get user by ID',
+    description: `
+      Retrieve a specific user by their ID.
+      
+      **Features:**
+      - Returns user information by ID
+      - **Authentication is optional** - works with or without user token
+      
+      **Behavior:**
+      - **With authentication**: Returns full user information based on permissions
+      - **Without authentication**: Returns only basic user information (limited fields)
+      
+      **Parameters:**
+      - id: User ID (MongoDB ObjectId)
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User found successfully',
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'John Doe',
+        email: 'john@example.com',
+        type: 'USER',
+        isActive: true,
+        createdAt: '2024-01-15T10:30:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserById(@Param('id') id: string) {
-    return this.usersService.getUserById(id);
+  async getUserById(@Param('id') id: string, @Request() req) {
+    // Optional authentication - extract user if available
+    const user = req.user || null;
+    console.log(user);
+    return this.usersService.getUserById(id, user as any);
   }
 
   @ApiBearerAuth()

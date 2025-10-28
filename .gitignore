@@ -7,6 +7,7 @@ node_modules/
 .env
 .env.example
 .env.prod
+env.prod.for.docker
 package-lock.json
 
 # Test reports and generated files
