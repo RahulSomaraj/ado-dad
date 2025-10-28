@@ -68,7 +68,93 @@ export class UsersService {
   }
 
   /**
-   * Get all users with pagination, filtering, and sorting
+   * Get all users with pagination, filtering, and sorting (Public API - No Authentication)
+   */
+  async getAllUsersPublic(
+    getUsersDto: GetUsersDto,
+  ): Promise<PaginatedUsersResponse> {
+    try {
+      const cacheKey = `users:public:list:${this.key({
+        page: getUsersDto.page ?? 1,
+        limit: getUsersDto.limit ?? 10,
+        search: (getUsersDto.search || '').trim(),
+        type: getUsersDto.type || 'any',
+        sort: getUsersDto.sort || 'createdAt:desc',
+      })}`;
+      const cached =
+        await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
+      if (cached) return cached;
+
+      const { page = 1, limit = 10, search, type, sort } = getUsersDto;
+
+      // Validate pagination parameters
+      const validatedPage = Math.max(1, page);
+      const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 users per page
+
+      // Build query with filters - PUBLIC API shows ALL users
+      const query: any = { isDeleted: { $ne: true } };
+
+      // Add search functionality
+      if (search?.trim()) {
+        query.$text = { $search: search.trim() } as any;
+      }
+
+      // Public API - show all user types if type filter is specified
+      if (type) {
+        query.type = type;
+      }
+
+      // Build sort options
+      const sortOptions = this.buildSortOptions(sort);
+
+      // Execute query with pagination - PUBLIC API uses full projection
+      const [users, totalUsers] = await Promise.all([
+        this.userModel
+          .find(query)
+          .sort(sortOptions)
+          .skip((validatedPage - 1) * validatedLimit)
+          .limit(validatedLimit)
+          .select(UsersService.BASE_PROJECTION)
+          .lean()
+          .exec(),
+        this.userModel.countDocuments(query).exec(),
+      ]);
+
+      const totalPages = Math.ceil(totalUsers / validatedLimit);
+
+      this.logger.debug(
+        `Retrieved ${users.length} users out of ${totalUsers} total (Public API)`,
+      );
+
+      const response: PaginatedUsersResponse = {
+        users: users as any[],
+        totalPages,
+        currentPage: validatedPage,
+        totalUsers,
+        hasNext: validatedPage < totalPages,
+        hasPrev: validatedPage > 1,
+      };
+
+      await this.redisService.cacheSet(
+        cacheKey,
+        response,
+        UsersService.CACHE_TTL.USER_LIST,
+      );
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to get users (Public API):', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve users',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get all users with pagination, filtering, and sorting (Authenticated)
    */
   async getAllUsers(
     getUsersDto: GetUsersDto,
@@ -183,7 +269,55 @@ export class UsersService {
   }
 
   /**
-   * Get user by ID - supports optional authentication
+   * Get user by ID (Public API - No Authentication)
+   */
+  async getUserByIdPublic(id: string): Promise<Partial<User>> {
+    try {
+      const cacheKey = `users:public:byId:${this.key({ id })}`;
+      const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
+      if (cached) return cached;
+
+      if (!this.isValidObjectId(id)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      // Public API - use full projection
+      const user = await this.userModel
+        .findOne({ _id: id, isDeleted: { $ne: true } })
+        .select(UsersService.BASE_PROJECTION)
+        .lean()
+        .exec();
+
+      if (!user) {
+        throw new NotFoundException('User not found or deleted');
+      }
+
+      await this.redisService.cacheSet(
+        cacheKey,
+        user,
+        UsersService.CACHE_TTL.USER_BY_ID,
+      );
+      return user;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error('Failed to get user by ID (Public API):', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get user by ID (Authenticated)
    */
   async getUserById(
     id: string,
