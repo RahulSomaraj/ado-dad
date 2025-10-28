@@ -271,7 +271,7 @@ export class UsersService {
   /**
    * Get user by ID (Public API - No Authentication)
    */
-  async getUserByIdPublic(id: string): Promise<Partial<User>> {
+  async getUserByIdPublic(id: string): Promise<any> {
     try {
       const cacheKey = `users:public:byId:${this.key({ id })}`;
       const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
@@ -297,7 +297,7 @@ export class UsersService {
         user,
         UsersService.CACHE_TTL.USER_BY_ID,
       );
-      return user as Partial<User>;
+      return user;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
@@ -319,10 +319,7 @@ export class UsersService {
   /**
    * Get user by ID (Authenticated)
    */
-  async getUserById(
-    id: string,
-    currentUser?: User | null,
-  ): Promise<Partial<User>> {
+  async getUserById(id: string, currentUser?: User | null): Promise<any> {
     try {
       const cacheKey = `users:byId:${this.key({ id })}`;
       const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
@@ -352,7 +349,7 @@ export class UsersService {
         user,
         UsersService.CACHE_TTL.USER_BY_ID,
       );
-      return user as Partial<User>;
+      return user;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
