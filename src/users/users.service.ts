@@ -19,6 +19,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserType } from './enums/user.types';
 import { RedisService } from '../shared/redis.service';
+import { AdDocument } from 'src/ads/schemas/ad.schema';
 
 interface PaginatedUsersResponse {
   users: Partial<User>[];
@@ -45,6 +46,7 @@ export class UsersService {
 
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
+    @InjectModel('Ad') private readonly adModel: Model<AdDocument>,
     private readonly emailService: EmailService,
     private readonly redisService: RedisService,
     @InjectModel(AuthTokens.name)
@@ -545,14 +547,19 @@ export class UsersService {
         throw new BadRequestException('User is already deleted');
       }
 
+
       user.isDeleted = true;
+      const inactiveAds=await this.adModel.updateMany({postedBy:user.id},{$set:{isActive:false}});
+
       await user.save();
 
       this.logger.log(`User soft deleted successfully: ${user.email}`);
-
+      this.logger.log(`soft deleted active ads`,);
+      
       await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
       await this.invalidateUsersListCaches();
-      return { message: 'User deleted successfully' };
+      return {message: 'User deleted successfully'};
+
     } catch (error) {
       if (
         error instanceof NotFoundException ||

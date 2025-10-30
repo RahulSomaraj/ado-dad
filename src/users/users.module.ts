@@ -10,11 +10,13 @@ import {
   AuthTokens,
   AuthTokensSchema,
 } from '../auth/schemas/schema.refresh-token';
+import { AdSchema } from 'src/ads/schemas/ad.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
+      { name: 'Ad', schema: AdSchema },
       { name: AuthTokens.name, schema: AuthTokensSchema },
     ]),
   ],

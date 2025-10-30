@@ -432,10 +432,18 @@ export class UsersController {
       body.newPassword,
     );
   }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deleteUser(@Param('id') id: string) {
+  async deleteUser(@Param('id') id: string,@Request() req) {
+    const actor = req.user;
+    const isAdmin =actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
+    if (!isAdmin && actor?.id !== id && actor?._id !== id) {
+      throw new ForbiddenException('You can delete only your own account');
+    }
     return this.usersService.deleteUser(id);
   }
 
