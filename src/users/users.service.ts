@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
@@ -51,6 +52,7 @@ export class UsersService {
     private readonly redisService: RedisService,
     @InjectModel(AuthTokens.name)
     private readonly authTokenModel: Model<AuthTokens>,
+    private readonly configService: ConfigService,
   ) {}
 
   // Reusable field sets
@@ -547,19 +549,20 @@ export class UsersService {
         throw new BadRequestException('User is already deleted');
       }
 
-
       user.isDeleted = true;
-      const inactiveAds=await this.adModel.updateMany({postedBy:user.id},{$set:{isActive:false}});
+      const inactiveAds = await this.adModel.updateMany(
+        { postedBy: user.id },
+        { $set: { isActive: false } },
+      );
 
       await user.save();
 
       this.logger.log(`User soft deleted successfully: ${user.email}`);
-      this.logger.log(`soft deleted active ads`,);
-      
+      this.logger.log(`soft deleted active ads`);
+
       await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
       await this.invalidateUsersListCaches();
-      return {message: 'User deleted successfully'};
-
+      return { message: 'User deleted successfully' };
     } catch (error) {
       if (
         error instanceof NotFoundException ||
@@ -581,13 +584,14 @@ export class UsersService {
   /**
    * Send OTP via email
    */
-  async sendOTP(email: string): Promise<{ message: string }> {
+  async sendOTP(identifier: string): Promise<{ message: string }> {
     try {
-      this.logger.log(`Sending OTP to: ${email}`);
+      this.logger.log(`Sending OTP to: ${identifier}`);
       // Throttle OTP sends per email (max 5 per 10 minutes)
       try {
+        const rateKeyId = (identifier || '').toString().toLowerCase();
         const count = await this.redisService.incrementRateLimit(
-          `send_otp:${email.toLowerCase()}`,
+          `send_otp:${rateKeyId}`,
           UsersService.CACHE_TTL.OTP_RATE_LIMIT,
         );
         if (count > 5) {
@@ -600,12 +604,28 @@ export class UsersService {
         this.logger.warn('Rate limit check failed (Redis down?)');
       }
 
-      const user = await this.userModel
-        .findOne({
-          email: email.toLowerCase(),
-          isDeleted: { $ne: true },
-        })
-        .exec();
+      const raw = (identifier || '').toString();
+      const identifierLower = raw.toLowerCase();
+      const identifierDigits = raw.replace(/\D/g, '');
+
+      const isEmail = /.+@.+\..+/.test(identifierLower);
+      let user: User | null = null;
+
+      if (isEmail) {
+        user = await this.userModel
+          .findOne({
+            email: identifierLower,
+            isDeleted: { $ne: true },
+          })
+          .exec();
+      } else {
+        user = await this.userModel
+          .findOne({
+            phoneNumber: identifierDigits,
+            isDeleted: { $ne: true },
+          })
+          .exec();
+      }
 
       if (!user) {
         throw new NotFoundException('User not found');
@@ -619,14 +639,26 @@ export class UsersService {
         { $set: { otp, otpExpires } },
       );
 
-      await this.emailService.sendOtp(user.email, otp);
-
-      this.logger.log(`OTP sent successfully to: ${email}`);
+      if (isEmail) {
+        await this.emailService.sendOtp(user.email, otp);
+        this.logger.log(`OTP sent via email to: ${user.email}`);
+      } else {
+        try {
+          await this.sendOtpSmsViaMsg91(
+            user.phoneNumber,
+            otp,
+            user.name || 'User',
+          );
+          this.logger.log(`OTP sent via SMS to: ${user.phoneNumber}`);
+        } catch (smsError) {
+          this.logger.error('Failed to send OTP via SMS:', smsError as any);
+        }
+      }
 
       await this.invalidateUsersListCaches();
       return { message: 'OTP sent successfully' };
     } catch (error) {
-      this.logger.error(`Failed to send OTP to ${email}:`, error);
+      this.logger.error(`Failed to send OTP to ${identifier}:`, error);
       if (error instanceof NotFoundException) {
         throw error;
       }
@@ -640,21 +672,108 @@ export class UsersService {
     }
   }
 
+  private async sendOtpSmsViaMsg91(
+    rawPhoneNumber: string,
+    otp: string,
+    name: string,
+  ): Promise<void> {
+    const https = await import('https');
+
+    const authKey = this.configService.get<string>('MSG91_AUTHKEY');
+    const templateId = this.configService.get<string>('MSG91_TEMPLATE_ID');
+    const shortUrl = this.configService.get<string>('MSG91_SHORT_URL') || '0';
+    const shortUrlExpiry = this.configService.get<string>(
+      'MSG91_SHORT_URL_EXPIRY',
+    );
+
+    if (!authKey || !templateId) {
+      this.logger.warn('MSG91 credentials not configured; skipping SMS send');
+      return;
+    }
+
+    const digits = rawPhoneNumber.replace(/\D/g, '');
+    const local10 = digits.slice(-10);
+    const mobiles = `91${local10}`;
+
+    const payload: Record<string, any> = {
+      template_id: templateId,
+      short_url: shortUrl,
+      realTimeResponse: '1',
+      recipients: [
+        {
+          mobiles,
+          OTP: otp,
+          NAME: name,
+        },
+      ],
+    };
+
+    if (shortUrl === '1' && shortUrlExpiry) {
+      payload.short_url_expiry = shortUrlExpiry;
+    }
+
+    const options = {
+      method: 'POST',
+      hostname: 'control.msg91.com',
+      port: 443,
+      path: '/api/v5/flow',
+      headers: {
+        accept: 'application/json',
+        authkey: authKey,
+        'content-type': 'application/json',
+      },
+    } as const;
+
+    await new Promise<void>((resolve, reject) => {
+      const req = (https as any).request(options, (res: any) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString();
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            this.logger.debug(`MSG91 response: ${body}`);
+            resolve();
+          } else {
+            this.logger.error(`MSG91 error ${res.statusCode}: ${body}`);
+            reject(new Error(`MSG91 responded with status ${res.statusCode}`));
+          }
+        });
+      });
+
+      req.on('error', (err: Error) => reject(err));
+      req.write(JSON.stringify(payload));
+      req.end();
+    });
+  }
+
   /**
    * Verify OTP
    */
-  async verifyOTP(email: string, otp: string): Promise<{ message: string }> {
+  async verifyOTP(
+    identifier: string,
+    otp: string,
+  ): Promise<{ message: string }> {
     try {
-      this.logger.log(`Verifying OTP for: ${email}`);
+      this.logger.log(`Verifying OTP for: ${identifier}`);
 
-      const user = await this.userModel
-        .findOne({
-          email: email.toLowerCase(),
-          otp,
-          otpExpires: { $gt: new Date() },
-          isDeleted: { $ne: true },
-        })
-        .exec();
+      const raw = (identifier || '').toString();
+      const identifierLower = raw.toLowerCase();
+      const identifierDigits = raw.replace(/\D/g, '');
+      const isEmail = /.+@.+\..+/.test(identifierLower);
+
+      const query: any = {
+        otp,
+        otpExpires: { $gt: new Date() },
+        isDeleted: { $ne: true },
+      };
+
+      if (isEmail) {
+        query.email = identifierLower;
+      } else {
+        query.phoneNumber = identifierDigits;
+      }
+
+      const user = await this.userModel.findOne(query).exec();
 
       if (!user) {
         throw new BadRequestException('Invalid OTP or OTP expired');
@@ -666,12 +785,12 @@ export class UsersService {
         { $unset: { otp: 1, otpExpires: 1 } },
       );
 
-      this.logger.log(`OTP verified successfully for: ${email}`);
+      this.logger.log(`OTP verified successfully for: ${identifier}`);
 
       await this.invalidateUsersListCaches();
       return { message: 'OTP verified successfully' };
     } catch (error) {
-      this.logger.error(`Failed to verify OTP for ${email}:`, error);
+      this.logger.error(`Failed to verify OTP for ${identifier}:`, error);
       if (error instanceof BadRequestException) {
         throw error;
       }

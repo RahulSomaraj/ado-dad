@@ -438,33 +438,61 @@ export class UsersController {
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deleteUser(@Param('id') id: string,@Request() req) {
+  async deleteUser(@Param('id') id: string, @Request() req) {
     const actor = req.user;
-    const isAdmin =actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
+    const isAdmin =
+      actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
     if (!isAdmin && actor?.id !== id && actor?._id !== id) {
       throw new ForbiddenException('You can delete only your own account');
     }
     return this.usersService.deleteUser(id);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('send-otp')
+  @ApiBody({
+    description: 'Email or phone number to receive OTP',
+    schema: {
+      type: 'object',
+      properties: {
+        identifier: {
+          type: 'string',
+          example: 'user@example.com or 9447414535',
+          description: 'Email address or phone number',
+        },
+      },
+      required: ['identifier'],
+    },
+  })
   @ApiResponse({ status: 200, description: 'OTP sent' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async sendOTP(@Body('email') email: string) {
-    return this.usersService.sendOTP(email);
+  async sendOTP(@Body('identifier') identifier: string) {
+    return this.usersService.sendOTP(identifier);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @Post('verify-otp')
+  @ApiBody({
+    description: 'Verify OTP for email or phone number',
+    schema: {
+      type: 'object',
+      properties: {
+        identifier: {
+          type: 'string',
+          example: 'user@example.com or 9447414535',
+          description: 'Email address or phone number',
+        },
+        otp: {
+          type: 'string',
+          example: '123456',
+          description: '6-digit OTP',
+        },
+      },
+      required: ['identifier', 'otp'],
+    },
+  })
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })
-  async verifyOTP(@Body() body: { email: string; otp: string }) {
-    return this.usersService.verifyOTP(body.email, body.otp);
+  async verifyOTP(@Body() body: { identifier: string; otp: string }) {
+    return this.usersService.verifyOTP(body.identifier, body.otp);
   }
 
   @Post('forgot-password')
