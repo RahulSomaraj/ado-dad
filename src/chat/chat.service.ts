@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, UpdateResult } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   ChatRoom,
   ChatRoomDocument,
@@ -88,8 +88,8 @@ export class ChatService {
   }
 
   /** Normalize update result check across mongoose versions */
-  private ensureUpdated(res: UpdateResult, notFoundMsg = 'Resource not found') {
-    const matched = (res as any).matchedCount ?? (res as any).n ?? 0;
+  private ensureUpdated(res: any, notFoundMsg = 'Resource not found') {
+    const matched = res?.matchedCount ?? res?.n ?? 0;
     if (!matched) throw new NotFoundException(notFoundMsg);
   }
 

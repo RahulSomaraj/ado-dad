@@ -123,10 +123,14 @@ class ConfigService {
    */
   private setupConnectionMonitoring(connection: mongoose.Connection): void {
     // Monitor connection pool
-    setInterval(() => {
-      const poolStatus = connection.db?.admin()?.listDatabases();
-      if (poolStatus) {
-        this.logger.debug('MongoDB pool status check completed');
+    setInterval(async () => {
+      try {
+        const poolStatus = await connection.db?.admin()?.listDatabases();
+        if (poolStatus) {
+          this.logger.debug('MongoDB pool status check completed');
+        }
+      } catch (error) {
+        this.logger.warn('MongoDB pool status check failed:', error);
       }
     }, 30000); // Check every 30 seconds
 
