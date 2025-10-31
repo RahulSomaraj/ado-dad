@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
@@ -29,6 +30,25 @@ interface PaginatedUsersResponse {
   totalUsers: number;
   hasNext: boolean;
   hasPrev: boolean;
+}
+
+interface LoginResponse {
+  id: string;
+  token: string;
+  refreshToken: string;
+  userName: string;
+  email: string;
+  userType: string;
+  phoneNumber: string;
+  profilePic?: string;
+}
+
+interface TokenPayload {
+  id: string;
+  email: string;
+  userType: string;
+  iat?: number;
+  exp?: number;
 }
 
 @Injectable()
@@ -53,6 +73,7 @@ export class UsersService {
     @InjectModel(AuthTokens.name)
     private readonly authTokenModel: Model<AuthTokens>,
     private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
   ) {}
 
   // Reusable field sets
@@ -749,34 +770,81 @@ export class UsersService {
   /**
    * Verify OTP
    */
-  async verifyOTP(
-    identifier: string,
-    otp: string,
-  ): Promise<{ message: string }> {
+  async verifyOTP(identifier: string, otp: string): Promise<LoginResponse> {
     try {
       this.logger.log(`Verifying OTP for: ${identifier}`);
 
-      const raw = (identifier || '').toString();
+      // Validate input
+      if (!identifier || !identifier.toString().trim()) {
+        throw new BadRequestException(
+          'Identifier (email or phone number) is required',
+        );
+      }
+
+      if (!otp || !otp.toString().trim()) {
+        throw new BadRequestException('OTP is required');
+      }
+
+      // Validate OTP format (should be 6 digits)
+      const otpString = otp.toString().trim();
+      if (!/^\d{6}$/.test(otpString)) {
+        throw new BadRequestException('OTP must be a 6-digit number');
+      }
+
+      const raw = identifier.toString().trim();
       const identifierLower = raw.toLowerCase();
       const identifierDigits = raw.replace(/\D/g, '');
       const isEmail = /.+@.+\..+/.test(identifierLower);
 
-      const query: any = {
-        otp,
-        otpExpires: { $gt: new Date() },
+      // Validate identifier format
+      if (isEmail && identifierLower.length < 5) {
+        throw new BadRequestException('Invalid email format');
+      }
+
+      if (!isEmail && identifierDigits.length < 10) {
+        throw new BadRequestException(
+          'Invalid phone number format. Must contain at least 10 digits',
+        );
+      }
+
+      // First, find user by identifier to check if user exists
+      const userQuery: any = {
         isDeleted: { $ne: true },
       };
 
       if (isEmail) {
-        query.email = identifierLower;
+        userQuery.email = identifierLower;
       } else {
-        query.phoneNumber = identifierDigits;
+        userQuery.phoneNumber = identifierDigits;
       }
 
-      const user = await this.userModel.findOne(query).exec();
+      const user = await this.userModel.findOne(userQuery).exec();
 
       if (!user) {
-        throw new BadRequestException('Invalid OTP or OTP expired');
+        throw new NotFoundException(
+          'User not found with the provided identifier',
+        );
+      }
+
+      // Check if user has an OTP stored
+      if (!user.otp) {
+        throw new BadRequestException(
+          'No OTP found. Please request a new OTP first',
+        );
+      }
+
+      // Check if OTP has expired
+      if (!user.otpExpires || user.otpExpires <= new Date()) {
+        throw new BadRequestException(
+          'OTP has expired. Please request a new OTP',
+        );
+      }
+
+      // Verify OTP matches
+      if (user.otp !== otpString) {
+        throw new BadRequestException(
+          'Invalid OTP. Please check and try again',
+        );
       }
 
       // Clear OTP after successful verification
@@ -785,23 +853,124 @@ export class UsersService {
         { $unset: { otp: 1, otpExpires: 1 } },
       );
 
-      this.logger.log(`OTP verified successfully for: ${identifier}`);
+      try {
+        // Generate tokens like login
+        const tokenPayload: TokenPayload = {
+          id: user._id?.toString() || '',
+          email: user.email,
+          userType: user.type,
+        };
 
-      await this.invalidateUsersListCaches();
-      return { message: 'OTP verified successfully' };
+        const [accessToken, refreshToken] = await Promise.all([
+          this.generateAccessToken(tokenPayload),
+          this.generateRefreshToken(tokenPayload),
+        ]);
+
+        // Extract 'iat' from the refresh token
+        const { iat } = await this.jwtService.verify(refreshToken, {
+          secret: this.configService.get('TOKEN_KEY'),
+        });
+
+        // Save refresh token
+        await this.saveRefreshToken(
+          user._id?.toString() || '',
+          refreshToken,
+          iat,
+        );
+
+        this.logger.log(`OTP verified successfully for: ${identifier}`);
+
+        await this.invalidateUsersListCaches();
+        return {
+          id: user._id?.toString() || '',
+          token: `Bearer ${accessToken}`,
+          refreshToken,
+          userName: user.name,
+          email: user.email,
+          userType: user.type,
+          phoneNumber: user.phoneNumber,
+          profilePic: user.profilePic,
+        };
+      } catch (tokenError) {
+        this.logger.error(
+          `Token generation failed for OTP verification: ${identifier}`,
+          tokenError,
+        );
+        throw new HttpException(
+          {
+            status: HttpStatus.INTERNAL_SERVER_ERROR,
+            error:
+              'OTP verified successfully but failed to generate authentication tokens. Please try again',
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to verify OTP for ${identifier}:`, error);
-      if (error instanceof BadRequestException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      if (error instanceof HttpException) {
         throw error;
       }
       throw new HttpException(
         {
           status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: 'Failed to verify OTP',
+          error:
+            'An unexpected error occurred while verifying OTP. Please try again later',
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  /**
+   * Generate access token
+   */
+  private async generateAccessToken(payload: TokenPayload): Promise<string> {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.get('TOKEN_KEY'),
+      expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
+    });
+  }
+
+  /**
+   * Generate refresh token
+   */
+  private async generateRefreshToken(payload: TokenPayload): Promise<string> {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.get('TOKEN_KEY'),
+      expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRY') || '60d',
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
+    });
+  }
+
+  /**
+   * Save refresh token to database
+   */
+  private async saveRefreshToken(
+    userId: string,
+    refreshToken: string,
+    iat: number,
+  ): Promise<void> {
+    // Clean up existing tokens with same iat
+    await this.authTokenModel.deleteMany({
+      userId,
+      iat,
+    });
+
+    // Save new refresh token
+    await new this.authTokenModel({
+      userId,
+      token: refreshToken,
+      iat,
+    }).save();
   }
 
   /**

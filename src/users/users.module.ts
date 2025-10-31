@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { JwtModule } from '@nestjs/jwt';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
@@ -19,6 +20,7 @@ import { AdSchema } from 'src/ads/schemas/ad.schema';
       { name: 'Ad', schema: AdSchema },
       { name: AuthTokens.name, schema: AuthTokensSchema },
     ]),
+    JwtModule.register({}),
   ],
   providers: [UsersService, EmailService, S3Service, RedisService],
   controllers: [UsersController],

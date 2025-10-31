@@ -39,6 +39,7 @@ import { Roles } from '../roles/roles.decorator';
 import { UserType } from './enums/user.types';
 import { RolesGuard } from '../roles/roles.guard';
 import { S3Service } from '../shared/s3.service';
+import { LoginResponse } from 'src/app.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -491,7 +492,9 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })
-  async verifyOTP(@Body() body: { identifier: string; otp: string }) {
+  async verifyOTP(
+    @Body() body: { identifier: string; otp: string },
+  ): Promise<LoginResponse> {
     return this.usersService.verifyOTP(body.identifier, body.otp);
   }
 
