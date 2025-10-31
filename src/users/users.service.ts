@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
   HttpException,
   HttpStatus,
   Logger,
@@ -19,6 +20,7 @@ import { AuthTokens } from '../auth/schemas/schema.refresh-token';
 import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { LoginResponse } from './dto/login-response.dto';
 import { UserType } from './enums/user.types';
 import { RedisService } from '../shared/redis.service';
 import { AdDocument } from 'src/ads/schemas/ad.schema';
@@ -30,17 +32,6 @@ interface PaginatedUsersResponse {
   totalUsers: number;
   hasNext: boolean;
   hasPrev: boolean;
-}
-
-interface LoginResponse {
-  id: string;
-  token: string;
-  refreshToken: string;
-  userName: string;
-  email: string;
-  userType: string;
-  phoneNumber: string;
-  profilePic?: string;
 }
 
 interface TokenPayload {
@@ -59,7 +50,7 @@ export class UsersService {
   private static readonly CACHE_TTL = {
     USER_BY_ID: 300, // 5 minutes for individual user
     USER_LIST: 300, // 5 minutes for user lists
-    OTP_RATE_LIMIT: 300, // 5 minutes for OTP rate limiting
+    OTP_RATE_LIMIT: 600, // 10 minutes for OTP rate limiting (max 5 per 10 minutes)
   };
 
   // Cache version for better invalidation
@@ -124,22 +115,30 @@ export class UsersService {
         query.$text = { $search: search.trim() } as any;
       }
 
-      // Public API - show all user types if type filter is specified
+      // Public API - validate and filter by user type if specified
       if (type) {
-        query.type = type;
+        // Validate type against UserType enum
+        const validTypes = Object.values(UserType);
+        if (validTypes.includes(type as UserType)) {
+          query.type = type;
+        } else {
+          throw new BadRequestException(
+            `Invalid user type. Valid types are: ${validTypes.join(', ')}`,
+          );
+        }
       }
 
       // Build sort options
       const sortOptions = this.buildSortOptions(sort);
 
-      // Execute query with pagination - PUBLIC API uses full projection
+      // Execute query with pagination - PUBLIC API uses limited projection (no PII)
       const [users, totalUsers] = await Promise.all([
         this.userModel
           .find(query)
           .sort(sortOptions)
           .skip((validatedPage - 1) * validatedLimit)
           .limit(validatedLimit)
-          .select(UsersService.BASE_PROJECTION)
+          .select(UsersService.PUBLIC_PROJECTION)
           .lean()
           .exec(),
         this.userModel.countDocuments(query).exec(),
@@ -306,10 +305,10 @@ export class UsersService {
         throw new BadRequestException('Invalid user ID format');
       }
 
-      // Public API - use full projection
+      // Public API - use limited projection (no PII)
       const user = await this.userModel
         .findOne({ _id: id, isDeleted: { $ne: true } })
-        .select(UsersService.BASE_PROJECTION)
+        .select(UsersService.PUBLIC_PROJECTION)
         .lean()
         .exec();
 
@@ -572,7 +571,7 @@ export class UsersService {
 
       user.isDeleted = true;
       const inactiveAds = await this.adModel.updateMany(
-        { postedBy: user.id },
+        { postedBy: user._id },
         { $set: { isActive: false } },
       );
 
@@ -976,10 +975,6 @@ export class UsersService {
   /**
    * Utility methods
    */
-  private escapeRegex(text: string): string {
-    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-  }
-
   private buildSortOptions(sort?: string): Record<string, 1 | -1> {
     const defaultSort: Record<string, 1 | -1> = { createdAt: -1 };
 
@@ -1100,10 +1095,26 @@ export class UsersService {
       this.cacheVersion++;
       this.logger.debug(`Cache version incremented to ${this.cacheVersion}`);
 
-      // Also clear existing keys for immediate invalidation
-      const keys = await this.redisService.keys('users:list:*');
-      if (keys?.length) {
-        await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+      // Clear existing keys for immediate invalidation (broader patterns)
+      const patterns = [
+        'users:list:*',
+        'users:public:list:*',
+        'users:*:byId:*',
+        'users:public:byId:*',
+      ];
+
+      for (const pattern of patterns) {
+        try {
+          const keys = await this.redisService.keys(pattern);
+          if (keys?.length) {
+            await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+          }
+        } catch (e) {
+          this.logger.warn(
+            `Failed to clear cache pattern ${pattern}`,
+            e as any,
+          );
+        }
       }
     } catch (e) {
       this.logger.warn('Failed to invalidate users list caches', e as any);
@@ -1317,10 +1328,9 @@ export class UsersService {
     newPassword: string,
   ): Promise<{ message: string }> {
     try {
-      // 1. Validate user exists
-      const user = await this.userModel.findById(userId);
-      if (!user) {
-        throw new Error('Invalid user ID');
+      // 1. Validate user ID format
+      if (!this.isValidObjectId(userId)) {
+        throw new BadRequestException('Invalid user ID format');
       }
 
       // 2. Check if token exists in cache
@@ -1328,22 +1338,41 @@ export class UsersService {
       const storedToken = await this.redisService.cacheGet(cacheKey);
 
       if (!storedToken || storedToken !== token) {
-        throw new Error('Invalid or expired reset token');
+        throw new UnauthorizedException(
+          'Invalid or expired reset token. Please request a new reset link.',
+        );
       }
 
-      // 3. Hash new password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      // 3. Validate user exists and is not deleted
+      const user = await this.userModel.findById(userId).exec();
+      if (!user || user.isDeleted) {
+        throw new NotFoundException('User not found or deleted');
+      }
 
-      // 4. Update user password
-      await this.userModel.findByIdAndUpdate(userId, {
-        password: hashedPassword,
-      });
+      // 4. Validate new password strength
+      this.assertStrongPassword(newPassword);
 
-      // 5. Remove token from cache (one-time use)
+      // 5. Update user password (use save() to trigger pre-save hook for hashing)
+      user.password = newPassword;
+      await user.save();
+
+      // 6. Revoke all refresh tokens (security best practice)
+      try {
+        await this.authTokenModel.deleteMany({ userId }).exec();
+      } catch (e) {
+        this.logger.warn(
+          'Failed to revoke refresh tokens after password reset',
+          e as any,
+        );
+      }
+
+      // 7. Remove token from cache (one-time use)
       await this.redisService.cacheDel(cacheKey);
 
-      // 6. Invalidate user cache
+      // 8. Invalidate user cache
+      await this.redisService.cacheDel(
+        `users:byId:${this.key({ id: userId })}`,
+      );
       await this.invalidateUsersListCaches();
 
       this.logger.log(`Password reset successfully for user ${userId}`);
@@ -1354,7 +1383,16 @@ export class UsersService {
       };
     } catch (error) {
       this.logger.error('Error in resetPassword:', error);
-      throw new Error(
+      // Re-throw HTTP exceptions as-is
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      // For unexpected errors, throw a generic BadRequestException
+      throw new BadRequestException(
         'Failed to reset password. Please request a new reset link.',
       );
     }

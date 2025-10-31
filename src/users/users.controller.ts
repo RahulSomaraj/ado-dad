@@ -39,7 +39,7 @@ import { Roles } from '../roles/roles.decorator';
 import { UserType } from './enums/user.types';
 import { RolesGuard } from '../roles/roles.guard';
 import { S3Service } from '../shared/s3.service';
-import { LoginResponse } from 'src/app.service';
+import { LoginResponse } from './dto/login-response.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -153,8 +153,8 @@ export class UsersController {
       
       **Features:**
       - No authentication required
-      - Returns all users regardless of type
-      - Full user information including sensitive fields
+      - Returns limited, non-PII fields only (name, email, type, createdAt)
+      - Phone numbers and profile pictures are excluded for privacy
       - Pagination support with configurable page size
       - Filtering by user type, search terms, and other criteria
       - Sorting by various fields
@@ -163,7 +163,7 @@ export class UsersController {
       - page: Page number (default: 1)
       - limit: Items per page (default: 10, max: 100)
       - search: Search term for name or email
-      - type: Filter by user type
+      - type: Filter by user type (valid values: SA, AD, NU, SR)
       - sort: Sort field and direction
     `,
   })
@@ -177,12 +177,8 @@ export class UsersController {
             _id: '507f1f77bcf86cd799439011',
             name: 'John Doe',
             email: 'john@example.com',
-            phoneNumber: '+1234567890',
-            type: 'USER',
-            profilePic: 'https://example.com/profile.jpg',
-            isActive: true,
+            type: 'NU',
             createdAt: '2024-01-15T10:30:00.000Z',
-            updatedAt: '2024-01-15T10:30:00.000Z',
           },
         ],
         totalPages: 5,
@@ -205,7 +201,8 @@ export class UsersController {
       
       **Features:**
       - No authentication required
-      - Returns full user information including sensitive fields
+      - Returns limited, non-PII fields only (name, email, type, createdAt)
+      - Phone numbers and profile pictures are excluded for privacy
       - Works for any user type
       
       **Parameters:**
@@ -215,19 +212,15 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: 'User found successfully',
-    schema: {
-      example: {
-        _id: '507f1f77bcf86cd799439011',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phoneNumber: '+1234567890',
-        type: 'USER',
-        profilePic: 'https://example.com/profile.jpg',
-        isActive: true,
-        createdAt: '2024-01-15T10:30:00.000Z',
-        updatedAt: '2024-01-15T10:30:00.000Z',
+      schema: {
+        example: {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'John Doe',
+          email: 'john@example.com',
+          type: 'NU',
+          createdAt: '2024-01-15T10:30:00.000Z',
+        },
       },
-    },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserByIdPublic(@Param('id') id: string) {
@@ -401,8 +394,6 @@ export class UsersController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id/password')
   @ApiBody({
     description: 'Change password',

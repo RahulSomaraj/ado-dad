@@ -10,18 +10,7 @@ import { LoginUserDto } from './common/dtos/userLoginDto';
 import { User } from './users/schemas/user.schema';
 import { AuthTokens } from './auth/schemas/schema.refresh-token';
 import { RefreshTokenDto } from './auth/dto/refresh-token.dto';
-
-// Types
-export interface LoginResponse {
-  id: string;
-  token: string;
-  refreshToken: string;
-  userName: string;
-  email: string;
-  userType: string;
-  phoneNumber: string;
-  profilePic?: string;
-}
+import { LoginResponse } from './users/dto/login-response.dto';
 
 interface TokenPayload {
   id: string;

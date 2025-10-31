@@ -12,7 +12,8 @@ import {
   Res,
   Header,
 } from '@nestjs/common';
-import { AppService, LoginResponse } from './app.service';
+import { AppService } from './app.service';
+import { LoginResponse } from './users/dto/login-response.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { RefreshTokenGuard } from './auth/guard/refresh-guard';
 import { RefreshTokenDto } from './auth/dto/refresh-token.dto';
