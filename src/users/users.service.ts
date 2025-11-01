@@ -107,7 +107,7 @@ export class UsersService {
       const validatedPage = Math.max(1, page);
       const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 users per page
 
-      // Build query with filters - PUBLIC API shows ALL users
+      // Build query with filters - PUBLIC API only shows USER types for security
       const query: any = { isDeleted: { $ne: true } };
 
       // Add search functionality
@@ -115,17 +115,18 @@ export class UsersService {
         query.$text = { $search: search.trim() } as any;
       }
 
-      // Public API - validate and filter by user type if specified
+      // Public API - only allow filtering to USER and SHOWROOM types (admin profiles should not be publicly accessible)
       if (type) {
-        // Validate type against UserType enum
-        const validTypes = Object.values(UserType);
-        if (validTypes.includes(type as UserType)) {
+        // Only allow USER and SHOWROOM types to be filtered in public API
+        if (type === UserType.USER || type === UserType.SHOWROOM) {
           query.type = type;
         } else {
-          throw new BadRequestException(
-            `Invalid user type. Valid types are: ${validTypes.join(', ')}`,
-          );
+          // For security, return empty results if trying to filter for ADMIN or SUPER_ADMIN types
+          query.type = { $in: [] };
         }
+      } else {
+        // Default to USER and SHOWROOM types when no type filter is specified
+        query.type = { $in: [UserType.USER, UserType.SHOWROOM] };
       }
 
       // Build sort options
@@ -218,11 +219,17 @@ export class UsersService {
       if (!currentUser) {
         // No authentication - only show basic USER types with limited fields
         allowedTypes = [UserType.USER];
-      } else if (currentUser.type === UserType.SUPER_ADMIN) {
+      } else if (
+        currentUser.type === UserType.SUPER_ADMIN ||
+        currentUser.type === UserType.ADMIN ||
+        currentUser.type === UserType.SHOWROOM
+      ) {
         allowedTypes = undefined; // see all
-      } else if (currentUser.type === UserType.ADMIN) {
-        allowedTypes = [UserType.ADMIN, UserType.USER, UserType.SHOWROOM];
+      } else if (currentUser.type === UserType.USER) {
+        // Normal users can see USER and SHOWROOM types only
+        allowedTypes = [UserType.USER, UserType.SHOWROOM];
       } else {
+        // Fallback: only USER types
         allowedTypes = [UserType.USER];
       }
       if (type && allowedTypes) {
@@ -306,8 +313,13 @@ export class UsersService {
       }
 
       // Public API - use limited projection (no PII)
+      // Only show USER and SHOWROOM types for security - admin profiles should not be publicly accessible
       const user = await this.userModel
-        .findOne({ _id: id, isDeleted: { $ne: true } })
+        .findOne({
+          _id: id,
+          isDeleted: { $ne: true },
+          type: { $in: [UserType.USER, UserType.SHOWROOM] },
+        })
         .select(UsersService.PUBLIC_PROJECTION)
         .lean()
         .exec();
@@ -357,9 +369,32 @@ export class UsersService {
         ? UsersService.BASE_PROJECTION
         : UsersService.PUBLIC_PROJECTION;
 
+      // Build query with role-based filtering
+      const query: any = { _id: id, isDeleted: { $ne: true } };
+
+      // Role-based visibility - restrict what user types normal users can see
+      if (currentUser) {
+        if (
+          currentUser.type === UserType.SUPER_ADMIN ||
+          currentUser.type === UserType.ADMIN ||
+          currentUser.type === UserType.SHOWROOM
+        ) {
+          // SUPER_ADMIN, ADMIN, and SHOWROOM can see all user types - no restriction
+        } else if (currentUser.type === UserType.USER) {
+          // Normal users can see USER and SHOWROOM types only
+          query.type = { $in: [UserType.USER, UserType.SHOWROOM] };
+        } else {
+          // Fallback: only USER types
+          query.type = UserType.USER;
+        }
+      } else {
+        // No authentication - only show USER types
+        query.type = UserType.USER;
+      }
+
       // Ensure deleted users are excluded at query-time (bug fix)
       const user = await this.userModel
-        .findOne({ _id: id, isDeleted: { $ne: true } })
+        .findOne(query)
         .select(projection)
         .lean()
         .exec();
