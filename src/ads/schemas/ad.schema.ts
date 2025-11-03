@@ -59,6 +59,13 @@ export class Ad {
 
   @Prop({ default: 0 })
   viewCount?: number;
+
+  // Soft delete fields
+  @Prop({ default: false })
+  isDeleted?: boolean;
+
+  @Prop({ type: Date, required: false })
+  deletedAt?: Date;
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);
@@ -86,6 +93,8 @@ AdSchema.index(
 );
 AdSchema.index({ approvedBy: 1, isApproved: 1 }, { background: true });
 AdSchema.index({ link: 1 }, { background: true });
+AdSchema.index({ isDeleted: 1 }, { background: true });
+AdSchema.index({ postedBy: 1, isDeleted: 1 }, { background: true });
 // Text index for search functionality - only description field exists
 AdSchema.index({ description: 'text' }, { background: true });
 // 2dsphere index for geographic queries

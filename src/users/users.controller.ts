@@ -440,6 +440,58 @@ export class UsersController {
     return this.usersService.deleteUser(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Post('delete-my-data')
+  @ApiOperation({
+    summary: 'Delete my data - Soft delete all ads',
+    description: `
+      Soft delete all ads belonging to the authenticated user. 
+      This will mark all ads as deleted (isDeleted: true) so they are not visible anywhere.
+      
+      **Features:**
+      - Authentication required
+      - Only deletes ads belonging to the authenticated user
+      - Performs soft delete (ads are marked as deleted, not permanently removed)
+      - Sets isActive to false and isDeleted to true
+      - Returns count of deleted ads
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All ads soft deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'All your ads have been soft deleted successfully',
+        },
+        deletedAdsCount: {
+          type: 'number',
+          example: 5,
+          description: 'Number of ads that were soft deleted',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  async deleteMyData(@Request() req) {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      throw new ForbiddenException('User not authenticated');
+    }
+    return this.usersService.deleteMyData(userId);
+  }
+
   @Post('send-otp')
   @ApiBody({
     description: 'Email or phone number to receive OTP',

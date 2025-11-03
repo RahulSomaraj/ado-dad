@@ -637,6 +637,54 @@ export class UsersService {
   }
 
   /**
+   * Delete my data - soft delete all ads of the user
+   */
+  async deleteMyData(
+    userId: string,
+  ): Promise<{ message: string; deletedAdsCount: number }> {
+    try {
+      if (!this.isValidObjectId(userId)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      this.logger.log(`Deleting all ads for user: ${userId}`);
+
+      // Soft delete all ads of the user by setting isDeleted to true and deletedAt timestamp
+      const deletedAt = new Date();
+      const result = await this.adModel.updateMany(
+        { postedBy: userId, isDeleted: { $ne: true } },
+        { $set: { isDeleted: true, isActive: false, deletedAt } },
+      );
+
+      const deletedAdsCount = result.modifiedCount || 0;
+
+      this.logger.log(
+        `Soft deleted ${deletedAdsCount} ads for user: ${userId}`,
+      );
+
+      // Invalidate ad-related caches
+      await this.invalidateUsersListCaches();
+
+      return {
+        message: 'All your ads have been soft deleted successfully',
+        deletedAdsCount,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to delete data for user ${userId}:`, error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to delete user data',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Send OTP via email
    */
   async sendOTP(identifier: string): Promise<{ message: string }> {
