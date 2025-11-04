@@ -217,44 +217,110 @@ export class AppService {
         );
       }
 
-      const jwtTokenDecode = this.jwtService.verify(
-        refreshTokenDto.refreshToken,
-        {
+      // Try to decode the token (may be expired, but we still want to clean it up)
+      let jwtTokenDecode: TokenPayload | null = null;
+      let tokenExpired = false;
+      let tokenInvalid = false;
+
+      try {
+        jwtTokenDecode = this.jwtService.verify(refreshTokenDto.refreshToken, {
           secret: this.configService.get('TOKEN_KEY'),
-        },
-      ) as TokenPayload;
-
-      const userSessions = await this.authTokenModel
-        .find({
-          userId: user._id,
-          iat: jwtTokenDecode.iat,
-        })
-        .lean()
-        .exec();
-
-      let storedRefreshToken: any = null;
-      for (const userSession of userSessions) {
-        if (
-          await bcrypt.compare(refreshTokenDto.refreshToken, userSession.token)
-        ) {
-          storedRefreshToken = userSession;
-          break;
+        }) as TokenPayload;
+      } catch (jwtError: any) {
+        // Token might be expired or invalid - still try to clean it up
+        if (jwtError.name === 'TokenExpiredError') {
+          tokenExpired = true;
+          this.logger.warn(
+            `Expired refresh token provided for logout: ${user.email}`,
+          );
+          // Try to decode without verification to get iat for cleanup
+          try {
+            const decoded = this.jwtService.decode(
+              refreshTokenDto.refreshToken,
+            );
+            if (decoded && typeof decoded === 'object') {
+              jwtTokenDecode = decoded as TokenPayload;
+            }
+          } catch (decodeError) {
+            tokenInvalid = true;
+          }
+        } else if (jwtError.name === 'JsonWebTokenError') {
+          tokenInvalid = true;
+          this.logger.warn(
+            `Invalid refresh token format for logout: ${user.email}`,
+          );
+        } else {
+          tokenInvalid = true;
+          this.logger.warn(
+            `JWT verification error for logout: ${jwtError.message}`,
+          );
         }
       }
 
-      if (storedRefreshToken?._id) {
-        const { deletedCount } = await this.authTokenModel
-          .deleteOne({ _id: storedRefreshToken._id })
+      // If we have a valid or expired token with iat, try to find and delete it
+      if (jwtTokenDecode?.iat) {
+        const userSessions = await this.authTokenModel
+          .find({
+            userId: user._id,
+            iat: jwtTokenDecode.iat,
+          })
+          .lean()
           .exec();
 
-        if (deletedCount > 0) {
-          this.logger.log(`Logout successful for user: ${user.email}`);
-          return { message: 'Logged out successfully' };
+        let storedRefreshToken: any = null;
+        for (const userSession of userSessions) {
+          try {
+            if (
+              await bcrypt.compare(
+                refreshTokenDto.refreshToken,
+                userSession.token,
+              )
+            ) {
+              storedRefreshToken = userSession;
+              break;
+            }
+          } catch (compareError) {
+            // Continue searching other sessions
+            continue;
+          }
+        }
+
+        if (storedRefreshToken?._id) {
+          const { deletedCount } = await this.authTokenModel
+            .deleteOne({ _id: storedRefreshToken._id })
+            .exec();
+
+          if (deletedCount > 0) {
+            this.logger.log(`Logout successful for user: ${user.email}`);
+            return {
+              message: tokenExpired
+                ? 'Session expired and logged out'
+                : 'Logged out successfully',
+            };
+          }
         }
       }
 
-      this.logger.warn(`No matching session found for user: ${user.email}`);
-      return { message: 'No matching session found' };
+      // If token is invalid (not expired, just malformed), return error
+      if (tokenInvalid && !tokenExpired) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'Invalid refresh token',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Token not found in database (might have been already deleted)
+      this.logger.warn(
+        `No matching session found for user: ${user.email} (token may have been already deleted)`,
+      );
+      return {
+        message: tokenExpired
+          ? 'Token expired and session not found'
+          : 'No matching session found',
+      };
     } catch (error) {
       this.logger.error(`Logout failed for user ${user.email}:`, error);
       if (error instanceof HttpException) {
