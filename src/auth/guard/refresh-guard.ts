@@ -32,7 +32,7 @@ export class RefreshTokenGuard implements CanActivate {
       throw new HttpException(
         {
           status: HttpStatus.UNAUTHORIZED,
-          error: 'Incorrect password for the user.',
+          error: 'Refresh token is required',
         },
         HttpStatus.UNAUTHORIZED,
       );
@@ -71,6 +71,9 @@ export class RefreshTokenGuard implements CanActivate {
       request.user = await this.userModel
         .findOne({ _id: storedRefreshToken.userId })
         .exec();
+
+      // Store the old refresh token ID for deletion after new token generation
+      request.storedRefreshTokenId = storedRefreshToken._id;
 
       return true;
     } catch (error) {

@@ -92,9 +92,30 @@ export class AppService {
   /**
    * Generate new access and refresh tokens
    */
-  async getRefreshToken(user: User): Promise<LoginResponse> {
+  async getRefreshToken(
+    user: User,
+    oldRefreshTokenId?: string,
+  ): Promise<LoginResponse> {
     try {
       this.logger.log(`Token refresh for user: ${user.email}`);
+
+      // Delete the old refresh token to prevent reuse (security best practice)
+      if (oldRefreshTokenId) {
+        try {
+          await this.authTokenModel
+            .deleteOne({ _id: oldRefreshTokenId })
+            .exec();
+          this.logger.log(
+            `Old refresh token invalidated for user: ${user.email}`,
+          );
+        } catch (deleteError) {
+          this.logger.warn(
+            `Failed to delete old refresh token for user ${user.email}:`,
+            deleteError,
+          );
+          // Continue with token generation even if deletion fails
+        }
+      }
 
       const tokenPayload: TokenPayload = {
         id: user._id?.toString() || '',

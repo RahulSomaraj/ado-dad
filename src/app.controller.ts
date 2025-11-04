@@ -318,7 +318,8 @@ export class AppController {
   @Post('/refresh-token')
   refreshToken(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
     const user = req.user;
-    return this.appService.getRefreshToken(user);
+    const oldRefreshTokenId = req.storedRefreshTokenId;
+    return this.appService.getRefreshToken(user, oldRefreshTokenId);
   }
 
   @ApiBearerAuth()

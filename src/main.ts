@@ -66,30 +66,80 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document, {
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDocument, {
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'list',
       filter: true,
       showRequestDuration: true,
+      onComplete: function () {
+        // Wait for Swagger UI to be fully initialized before accessing DOM
+        setTimeout(function () {
+          try {
+            var token = localStorage.getItem('ado-dad-token');
+            if (token) {
+              // Try multiple selectors to find the authorization input
+              var selectors = [
+                'input[placeholder*="Bearer"]',
+                'input[placeholder*="token"]',
+                'input[aria-label*="auth"]',
+                '.auth-btn-wrapper input',
+              ];
+
+              for (var i = 0; i < selectors.length; i++) {
+                var inp = document.querySelector(selectors[i]);
+                if (inp) {
+                  (inp as HTMLInputElement).value = token.replace(
+                    'Bearer ',
+                    '',
+                  );
+                  break;
+                }
+              }
+            }
+
+            // Save token when authorize button is clicked
+            var authorizeBtn = document.querySelector(
+              'button[class*="authorize"]',
+            );
+            if (authorizeBtn) {
+              authorizeBtn.addEventListener('click', function () {
+                setTimeout(function () {
+                  var selectors = [
+                    'input[placeholder*="Bearer"]',
+                    'input[placeholder*="token"]',
+                    'input[aria-label*="auth"]',
+                  ];
+
+                  for (var j = 0; j < selectors.length; j++) {
+                    var inp = document.querySelector(
+                      selectors[j],
+                    ) as HTMLInputElement;
+                    if (inp && inp.value) {
+                      localStorage.setItem('ado-dad-token', inp.value);
+                      break;
+                    }
+                  }
+                }, 100);
+              });
+            }
+          } catch (error) {
+            // Silently handle errors in browser context
+            console.warn('Swagger UI token initialization error:', error);
+          }
+        }, 500);
+      },
     },
     customSiteTitle: 'Ado-dad API Docs',
     customCss: '.swagger-ui .topbar { display: none }',
-    customJs: `
-      window.onload = () => {
-        const token = localStorage.getItem('ado-dad-token');
-        if (token) {
-          const inp = document.querySelector('input[placeholder="Bearer token"]');
-          if (inp) inp.value = token;
-        }
-        document.querySelector('button[class*="authorize"]')
-          ?.addEventListener('click', () => {
-            const inp = document.querySelector('input[placeholder="Bearer token"]');
-            if (inp) localStorage.setItem('ado-dad-token', inp.value);
-          });
-      };
-    `,
+    // Fix: Use CDN assets to avoid path issues
+    customCssUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.10.3/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.10.3/swagger-ui-bundle.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.10.3/swagger-ui-standalone-preset.min.js',
+    ],
   });
 
   // (d) Now mount only the **specific** static folders you actually need…
