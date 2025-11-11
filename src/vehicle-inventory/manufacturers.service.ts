@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import type { PipelineStage, SortOrder } from 'mongoose';
+import type { PipelineStage, Query, SortOrder } from 'mongoose';
 import {
   Manufacturer,
   ManufacturerDocument,
@@ -15,6 +15,7 @@ import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
 import { RedisService } from '../shared/redis.service';
+import { parseFile } from 'src/utils/file-parser.util'; 
 
 @Injectable()
 export class ManufacturersService {
@@ -468,4 +469,65 @@ export class ManufacturersService {
   async forceCacheInvalidation(): Promise<void> {
     await this.invalidateManufacturerCaches();
   }
+
+async createManufacturerFromCsv(buffer: Buffer, fileType: 'csv') {
+  const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
+
+  if (!rows || rows.length === 0) {
+    throw new BadRequestException("Empty or Invalid CSV file");
+  }
+
+  const seen = new Set<string>();
+  const uniqueRows: Record<string, any>[] = [];
+
+  for (const row of rows) {
+    if (!row.name || typeof row.name !== 'string') continue;
+    const key = row.name.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    uniqueRows.push(row);
+  }
+
+  const existing = await this.manufacturerModel
+    .find({ name: { $in: uniqueRows.map((r) => r.name) } })
+    .select('name')
+    .lean();
+
+  const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
+
+  const skipped: Record<string, any>[] = [];
+  const finalRows = uniqueRows.filter((r) => {
+    if (existingNames.has(r.name.toLowerCase())) {
+      skipped.push({ row: r, reason: 'Already exists in database' });
+      return false;
+    }
+    return true;
+  });
+
+  if (finalRows.length === 0) {
+    return {
+      totalRows: rows.length,
+      uniqueRows: uniqueRows.length,
+      insertedCount: 0,
+      skippedCount: skipped.length,
+      inserted: [],
+      skipped,
+      message: "All manufacturers already exist in the database.",
+    };
+  }
+
+  const insertedDocs = await this.manufacturerModel.insertMany(finalRows);
+
+  return {
+    totalRows: rows.length,
+    uniqueRows: uniqueRows.length,
+    insertedCount: insertedDocs.length,
+    skippedCount: skipped.length,
+    inserted: insertedDocs,
+    skipped,
+  };
+}
+
+
+
 }

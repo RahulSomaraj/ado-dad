@@ -9,6 +9,11 @@ import {
   Query,
   UseGuards,
   Request,
+  UploadedFile,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +21,8 @@ import {
   ApiResponse,
   ApiQuery,
   ApiBearerAuth,
+   ApiConsumes,
+    ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
@@ -28,6 +35,9 @@ import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { Manufacturer } from './schemas/manufacturer.schema';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
+import { error } from 'console';
+import * as path from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Vehicle Inventory Manufacturers')
 @Controller('vehicle-inventory')
@@ -201,4 +211,72 @@ export class ManufacturersController {
   ): Promise<{ message: string }> {
     return this.manufacturersService.deleteManufacturer(id);
   }
+
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Bulk upload manufacturers from CSV file',
+    description:
+      'Uploads a CSV file to bulk create manufacturer records. Each row should contain at least the `name` field. Duplicate and existing manufacturers will be skipped automatically.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'CSV file containing manufacturer data',
+    required: true,
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Upload a `.csv` file',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Manufacturers uploaded successfully',
+    schema: {
+      example: {
+        totalRows: 10,
+        uniqueRows: 8,
+        insertedCount: 5,
+        skippedCount: 3,
+        inserted: [
+          { name: 'maruti-suzuki', originCountry: 'India' },
+          { name: 'honda', originCountry: 'Japan' },
+        ],
+        skipped: [
+          { row: { name: 'tata' }, reason: 'Already exists in database' },
+        ],
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid or missing file',
+    schema: {
+      example: { statusCode: 400, message: 'Only CSV files are supported' },
+    },
+  })
+  async UploadManufacturerCdb(@UploadedFile() file:Express.Multer.File)
+  {
+    if(!file)
+    {
+      throw new HttpException({
+        status:HttpStatus.BAD_REQUEST,
+        error:"No file uploaded"
+      },HttpStatus.BAD_REQUEST);
+    }
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    
+    if (fileExt !== '.csv'){
+      throw new BadRequestException('Only CSV files are supported');
+    }
+
+    return await this.manufacturersService.createManufacturerFromCsv(file.buffer,'csv');
+  }
+
 }
