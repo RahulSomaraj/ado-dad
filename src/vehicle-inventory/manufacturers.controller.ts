@@ -261,6 +261,8 @@ export class ManufacturersController {
       example: { statusCode: 400, message: 'Only CSV files are supported' },
     },
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   async UploadManufacturerCdb(@UploadedFile() file:Express.Multer.File)
   {
     if(!file)
