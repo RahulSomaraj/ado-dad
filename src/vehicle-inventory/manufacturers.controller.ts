@@ -263,6 +263,7 @@ export class ManufacturersController {
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   async UploadManufacturerCdb(@UploadedFile() file:Express.Multer.File)
   {
     if(!file)
