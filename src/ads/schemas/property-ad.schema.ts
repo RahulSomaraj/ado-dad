@@ -22,10 +22,10 @@ export class PropertyAd {
   @Prop({ required: true, enum: PropertyTypeEnum })
   propertyType: PropertyTypeEnum;
 
-  @Prop({ required: true, min: 0 })
+  @Prop({ required: false, min: 0 })
   bedrooms: number;
 
-  @Prop({ required: true, min: 0 })
+  @Prop({ required: false, min: 0 })
   bathrooms: number;
 
   @Prop({ required: true, min: 0 })
