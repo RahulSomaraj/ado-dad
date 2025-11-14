@@ -399,6 +399,7 @@ export class AdsV2Controller {
         - Transmission type names (Manual, Automatic, CVT, etc.)
         - Property types (apartment, house, villa, etc.)
         - Property amenities (parking, garden, furnished, etc.)
+        - Property listing type (rent vs sell)
       - Location filtering (text-based and geographic coordinates)
       - Intelligent location filtering with automatic distance fallback (state-based with 50km→1000km expansion)
       - Price range filtering (minPrice, maxPrice - both optional)
@@ -481,6 +482,7 @@ export class AdsV2Controller {
         value: {
           search: 'apartment',
           category: 'property',
+          listingType: 'rent',
           location: 'Mumbai',
           latitude: 19.076,
           longitude: 72.8777,
@@ -612,6 +614,11 @@ export class AdsV2Controller {
                 description: 'Property-specific details (for property ads)',
                 properties: {
                   propertyType: { type: 'string' },
+                  listingType: {
+                    type: 'string',
+                    description: 'rent or sell',
+                    example: 'rent',
+                  },
                   bedrooms: { type: 'number' },
                   bathrooms: { type: 'number' },
                   areaSqft: { type: 'number' },

@@ -110,6 +110,7 @@ export class ListAdsUc {
       limit,
       sortBy,
       sortOrder,
+      listingType,
     } = filters;
 
     // Scenario 1: All ads (no filters except pagination and sort)
@@ -120,7 +121,8 @@ export class ListAdsUc {
       !minPrice &&
       !maxPrice &&
       !fuelTypeIds?.length &&
-      !transmissionTypeIds?.length
+      !transmissionTypeIds?.length &&
+      !listingType
     ) {
       return `ads:v2:list:all&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
@@ -133,7 +135,8 @@ export class ListAdsUc {
       !minPrice &&
       !maxPrice &&
       !fuelTypeIds?.length &&
-      !transmissionTypeIds?.length
+      !transmissionTypeIds?.length &&
+      !listingType
     ) {
       return `ads:v2:list:category=${category}&location=${location}&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
@@ -228,6 +231,7 @@ export class ListAdsUc {
       minYear,
       maxYear,
       propertyTypes,
+      listingType,
       minBedrooms,
       maxBedrooms,
       minArea,
@@ -354,6 +358,7 @@ export class ListAdsUc {
     // Property-specific filters
     if (
       propertyTypes ||
+      listingType ||
       minBedrooms !== undefined ||
       maxBedrooms !== undefined ||
       minArea !== undefined ||
@@ -368,6 +373,9 @@ export class ListAdsUc {
 
       if (propertyTypes && propertyTypes.length > 0) {
         propMatch['propertyDetails.propertyType'] = { $in: propertyTypes };
+      }
+      if (listingType) {
+        propMatch['propertyDetails.listingType'] = listingType;
       }
       if (minBedrooms !== undefined || maxBedrooms !== undefined) {
         propMatch['propertyDetails.bedrooms'] = {};

@@ -24,6 +24,7 @@ export class PropertyAdRepository {
       propertyType: propertyData.propertyType,
       bedrooms: propertyData.bedrooms,
       bathrooms: propertyData.bathrooms,
+      listingType: propertyData.listingType,
       areaSqft: propertyData.areaSqft,
       floor: propertyData.floor,
       isFurnished: !!propertyData.isFurnished,

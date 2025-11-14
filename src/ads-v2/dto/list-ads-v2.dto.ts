@@ -11,6 +11,7 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { AdCategoryV2 } from './create-ad-v2.dto';
+import { AdListingType } from '../../ads/schemas/property-ad.schema';
 
 export class ListAdsV2Dto {
   @ApiPropertyOptional({
@@ -207,6 +208,15 @@ export class ListAdsV2Dto {
   @IsArray()
   @IsString({ each: true })
   propertyTypes?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Listing type filter for property ads',
+    enum: AdListingType,
+    example: AdListingType.RENT,
+  })
+  @IsOptional()
+  @IsEnum(AdListingType)
+  listingType?: AdListingType;
 
   @ApiPropertyOptional({ description: 'Minimum bedrooms', example: 2 })
   @IsOptional()

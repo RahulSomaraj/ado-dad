@@ -12,7 +12,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AdCategory } from '../../schemas/ad.schema';
-import { PropertyTypeEnum } from '../../schemas/property-ad.schema';
+import { AdListingType, PropertyTypeEnum } from '../../schemas/property-ad.schema';
 import { VehicleTypeEnum } from '../../schemas/vehicle-ad.schema';
 import {
   CommercialVehicleTypeEnum,
@@ -22,6 +22,11 @@ import {
 // Comprehensive DTO for editing ads - all fields are optional for partial updates
 export class EditAdDataDto {
   // Base ad properties (common to all types) - all optional for editing
+  @ApiPropertyOptional({ description: 'Advertisement title',
+     example: 'This is an example title'})
+  @IsString()
+  title: string;
+
   @ApiPropertyOptional({
     description: 'Advertisement description',
     example: 'This is a detailed description of the advertisement',
@@ -78,6 +83,14 @@ export class EditAdDataDto {
   @IsOptional()
   @IsEnum(PropertyTypeEnum)
   propertyType?: PropertyTypeEnum;
+
+  @ApiPropertyOptional({
+  description: 'Listing type for property ads (rent or sell)',
+  enum: AdListingType,
+  example: AdListingType.RENT,})
+  @IsOptional()
+  @IsEnum(AdListingType)
+  listingType?: AdListingType;
 
   @ApiPropertyOptional({
     description: 'Number of bedrooms (for property ads)',

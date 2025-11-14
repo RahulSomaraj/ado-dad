@@ -28,6 +28,7 @@ export function mapToDetailedResponseDto(ad: any) {
           propertyType: ad.propertyDetails[0].propertyType,
           bedrooms: ad.propertyDetails[0].bedrooms,
           bathrooms: ad.propertyDetails[0].bathrooms,
+          listingType: ad.propertyDetails[0].listingType,
           areaSqft: ad.propertyDetails[0].areaSqft,
           floor: ad.propertyDetails[0].floor,
           isFurnished: ad.propertyDetails[0].isFurnished,

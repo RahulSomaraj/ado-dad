@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdCategory } from '../../schemas/ad.schema';
-import { PropertyTypeEnum } from '../../schemas/property-ad.schema';
+import {
+  PropertyTypeEnum,
+  AdListingType,
+} from '../../schemas/property-ad.schema';
 import { VehicleTypeEnum } from '../../schemas/vehicle-ad.schema';
 import {
   CommercialVehicleTypeEnum,
@@ -86,6 +89,9 @@ export class AdResponseDto {
 export class PropertyDetailsDto {
   @ApiProperty({ description: 'Property type', enum: PropertyTypeEnum })
   propertyType: PropertyTypeEnum;
+
+  @ApiPropertyOptional({ description: 'Listing type', enum: AdListingType })
+  listingType?: AdListingType;
 
   @ApiProperty({ description: 'Number of bedrooms' })
   bedrooms: number;

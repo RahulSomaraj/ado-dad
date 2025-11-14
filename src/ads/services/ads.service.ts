@@ -1344,7 +1344,7 @@ export class AdsService {
     userId: string,
   ): Promise<DetailedAdResponseDto> {
     const ad = new this.adModel({
-      title: '',
+      title: data.title,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
@@ -1389,7 +1389,7 @@ export class AdsService {
     const title = `${modelName} ${year}`.trim();
 
     const ad = new this.adModel({
-      title,
+      title:data.title,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
@@ -1444,7 +1444,7 @@ export class AdsService {
     session.startTransaction();
     try {
       const ad = new this.adModel({
-        title,
+        title:data.title,
         description: data.description,
         price: data.price,
         images: data.images ?? [],
@@ -2184,6 +2184,7 @@ export class AdsService {
   private mapToResponseDto(ad: any): DetailedAdResponseDto {
     return {
       id: (ad._id as any).toString(),
+      title: ad.title,
       description: ad.description,
       price: ad.price,
       images: ad.images,

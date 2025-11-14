@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AdListingType } from '../../ads/schemas/property-ad.schema';
 
 export enum AdCategoryV2 {
   PROPERTY = 'property',
@@ -118,6 +119,15 @@ export class PropertyData {
   @IsNumber()
   @Min(0)
   areaSqft!: number;
+
+  @ApiPropertyOptional({
+    description: 'Listing type (rent or sell)',
+    enum: AdListingType,
+    example: AdListingType.RENT,
+  })
+  @IsEnum(AdListingType)
+  @IsOptional()
+  listingType?: AdListingType;
 
   @ApiPropertyOptional({ description: 'Floor number', example: 8 })
   @IsNumber()

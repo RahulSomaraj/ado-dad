@@ -24,6 +24,10 @@ import { AdListingType } from '../../schemas/property-ad.schema';
 // Comprehensive DTO that includes all possible fields for all ad types
 export class CreateAdDataDto {
   // Base ad properties (common to all types)
+  @ApiProperty({ description: 'Advertisement title' })
+  @IsString()
+  title: string;
+  
   @ApiProperty({
     description: 'Advertisement description',
     example: 'This is a detailed description of the advertisement',
