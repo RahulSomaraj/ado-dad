@@ -1673,6 +1673,16 @@ export class AdsService {
       runValidators: true,
     });
 
+    if(isApproved === false)
+    {
+    const favoriteDeleted = await this.favoriteModel.deleteMany({
+      itemId:new Types.ObjectId(id)
+    });
+    console.log("favoritedeleted", favoriteDeleted);
+    }
+    
+
+
     // Invalidate cache to ensure fresh data
     await this.invalidateAdCache(id, approvedBy);
 
