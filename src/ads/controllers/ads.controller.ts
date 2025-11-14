@@ -280,6 +280,7 @@ export class AdsController {
               'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/property2.jpg',
             ],
             propertyType: 'apartment',
+            listingType: 'rent',   
             bedrooms: 2,
             bathrooms: 2,
             areaSqft: 1200,
