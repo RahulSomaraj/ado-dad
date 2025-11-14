@@ -14,6 +14,12 @@ export enum PropertyTypeEnum {
   WAREHOUSE = 'warehouse',
 }
 
+export enum AdListingType {
+  RENT = 'rent',
+  SELL = 'sell',
+}
+
+
 @Schema({ timestamps: true })
 export class PropertyAd {
   @Prop({ required: true, ref: 'Ad', type: Types.ObjectId })
@@ -27,6 +33,9 @@ export class PropertyAd {
 
   @Prop({ required: false, min: 0 })
   bathrooms: number;
+
+  @Prop({required:false})
+  listingType:AdListingType
 
   @Prop({ required: true, min: 0 })
   areaSqft: number;

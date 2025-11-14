@@ -18,6 +18,8 @@ import {
   CommercialVehicleTypeEnum,
   BodyTypeEnum,
 } from '../../schemas/commercial-vehicle-ad.schema';
+import { AdListingType } from '../../schemas/property-ad.schema';
+
 
 // Comprehensive DTO that includes all possible fields for all ad types
 export class CreateAdDataDto {
@@ -157,6 +159,15 @@ export class CreateAdDataDto {
   @IsOptional()
   @IsBoolean()
   hasGarden?: boolean;
+
+  @ApiPropertyOptional({
+  description: 'Listing type for property ads (rent or sell)',
+  enum: AdListingType,
+  example: AdListingType.RENT,})
+  @IsOptional()
+  @IsEnum(AdListingType)
+  listingType?: AdListingType;
+
 
   @ApiPropertyOptional({
     description: 'Amenities (optional for property ads)',

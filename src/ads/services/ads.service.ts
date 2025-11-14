@@ -1360,6 +1360,7 @@ export class AdsService {
     const propertyAd = new this.propertyAdModel({
       ad: savedAd._id as any,
       propertyType: data.propertyType,
+      listingType: data.listingType,
       bedrooms: data.bedrooms,
       bathrooms: data.bathrooms,
       areaSqft: data.areaSqft,
