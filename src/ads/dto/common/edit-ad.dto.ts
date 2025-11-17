@@ -22,10 +22,13 @@ import {
 // Comprehensive DTO for editing ads - all fields are optional for partial updates
 export class EditAdDataDto {
   // Base ad properties (common to all types) - all optional for editing
-  @ApiPropertyOptional({ description: 'Advertisement title',
-     example: 'This is an example title'})
+  @ApiPropertyOptional({
+    description: 'Advertisement title',
+    example: 'This is an example title',
+  })
+  @IsOptional()
   @IsString()
-  title: string;
+  title?: string;
 
   @ApiPropertyOptional({
     description: 'Advertisement description',

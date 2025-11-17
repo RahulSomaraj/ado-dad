@@ -1581,6 +1581,7 @@ export class AdsService {
       console.log('Empty data object provided, no updates to apply');
     }
 
+    if (typeof updateData.title === 'string') adUpdate.title = updateData.title;
     if (typeof updateData.description === 'string')
       adUpdate.description = updateData.description;
     if (typeof updateData.price === 'number') adUpdate.price = updateData.price;
@@ -2484,10 +2485,12 @@ export class AdsService {
 
   /** ---------- SUBDOC UPDATES ---------- */
   private async updatePropertyAd(id: string, updateDto: any): Promise<void> {
-    const doc = await this.propertyAdModel.findOne({ ad: id });
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.propertyAdModel.findOne({ ad: adObjectId });
     if (doc) {
       const allowed: any = {};
       if (updateDto.propertyType) allowed.propertyType = updateDto.propertyType;
+      if (updateDto.listingType) allowed.listingType = updateDto.listingType;
       if (typeof updateDto.bedrooms === 'number')
         allowed.bedrooms = updateDto.bedrooms;
       if (typeof updateDto.bathrooms === 'number')
@@ -2513,7 +2516,8 @@ export class AdsService {
     updateDto: any,
     ad: AdDocument,
   ): Promise<void> {
-    const doc = await this.vehicleAdModel.findOne({ ad: id });
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.vehicleAdModel.findOne({ ad: adObjectId });
     if (!doc) return;
 
     const update: any = {};
@@ -2582,7 +2586,8 @@ export class AdsService {
     updateDto: any,
     ad: AdDocument,
   ): Promise<void> {
-    const doc = await this.commercialVehicleAdModel.findOne({ ad: id });
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.commercialVehicleAdModel.findOne({ ad: adObjectId });
     if (!doc) return;
 
     const update: any = {};
