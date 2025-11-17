@@ -23,6 +23,7 @@ import {
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { CreateAdV2Dto } from './dto/create-ad-v2.dto';
 import { ListAdsV2Dto } from './dto/list-ads-v2.dto';
@@ -811,7 +812,6 @@ export class AdsV2Controller {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Get advertisement by ID with complete details and all relations (v2)',
@@ -843,6 +843,12 @@ export class AdsV2Controller {
       - Favorites and engagement metrics
       - View count and analytics data
     `,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Advertisement ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
   })
   @ApiHeader({
     name: 'Authorization',

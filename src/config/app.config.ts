@@ -8,8 +8,8 @@ export default registerAs('APP_CONFIG', () => ({
 
   // JWT Configuration
   TOKEN_KEY: process.env.TOKEN_KEY || 'default-secret-key-change-in-production',
-  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '8460000000',
-  REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || '60d',
+  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '1m',
+  REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || '4m',
 
   // Database Configuration
   MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/ado-dad',
