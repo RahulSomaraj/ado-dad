@@ -79,47 +79,58 @@ async function bootstrap() {
           try {
             var token = localStorage.getItem('ado-dad-token');
             if (token) {
-              // Try multiple selectors to find the authorization input
-              var selectors = [
-                'input[placeholder*="Bearer"]',
-                'input[placeholder*="token"]',
-                'input[aria-label*="auth"]',
-                '.auth-btn-wrapper input',
-              ];
-
-              for (var i = 0; i < selectors.length; i++) {
-                var inp = document.querySelector(selectors[i]);
-                if (inp) {
-                  (inp as HTMLInputElement).value = token.replace(
-                    'Bearer ',
-                    '',
-                  );
-                  break;
+              // Only target the global authorization input in the top bar, not path parameters
+              // Look for the authorization modal/dialog input specifically
+              var authModal = document.querySelector(
+                '.swagger-ui .auth-container input[type="text"]',
+              );
+              if (!authModal) {
+                // Try alternative selector for Swagger UI authorization
+                authModal = document.querySelector(
+                  '.swagger-ui .auth-btn-wrapper input',
+                );
+              }
+              if (!authModal) {
+                // Try the authorize button's associated input
+                var authSection = document.querySelector(
+                  '.swagger-ui .auth-wrapper',
+                );
+                if (authSection) {
+                  authModal = authSection.querySelector('input[type="text"]');
                 }
+              }
+
+              // Only set value if we found the actual authorization input
+              // Make sure it's not a path parameter input
+              if (
+                authModal &&
+                !authModal.closest('.parameters') &&
+                !authModal.hasAttribute('data-param-name')
+              ) {
+                (authModal as HTMLInputElement).value = token.replace(
+                  'Bearer ',
+                  '',
+                );
               }
             }
 
-            // Save token when authorize button is clicked
+            // Save token when authorize button is clicked (global authorize button only)
             var authorizeBtn = document.querySelector(
-              'button[class*="authorize"]',
+              '.swagger-ui .btn.authorize',
             );
             if (authorizeBtn) {
               authorizeBtn.addEventListener('click', function () {
                 setTimeout(function () {
-                  var selectors = [
-                    'input[placeholder*="Bearer"]',
-                    'input[placeholder*="token"]',
-                    'input[aria-label*="auth"]',
-                  ];
-
-                  for (var j = 0; j < selectors.length; j++) {
-                    var inp = document.querySelector(
-                      selectors[j],
-                    ) as HTMLInputElement;
-                    if (inp && inp.value) {
-                      localStorage.setItem('ado-dad-token', inp.value);
-                      break;
-                    }
+                  // Only get token from the authorization modal, not path parameters
+                  var authInput = document.querySelector(
+                    '.swagger-ui .auth-container input[type="text"]',
+                  ) as HTMLInputElement;
+                  if (
+                    authInput &&
+                    authInput.value &&
+                    !authInput.closest('.parameters')
+                  ) {
+                    localStorage.setItem('ado-dad-token', authInput.value);
                   }
                 }, 100);
               });
