@@ -1242,6 +1242,9 @@ export class AdsService {
 
     switch (category) {
       case AdCategory.PROPERTY:
+        if (!data.title || data.title.trim() === '') {
+          throw new BadRequestException('title is required');
+        }
         if(!data.propertyType) {
           throw new BadRequestException('propertyType is required');
         }
@@ -1387,9 +1390,10 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
+    const finalTitle=data.title && data.title.trim()!==""?data.title:title;
 
     const ad = new this.adModel({
-      title:data.title,
+      title:finalTitle,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
@@ -1439,12 +1443,13 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
+    const FinalTitle=data.title && data.title.trim()!==""?data.title:title;
 
     const session = await this.adModel.startSession();
     session.startTransaction();
     try {
       const ad = new this.adModel({
-        title:data.title,
+        title:FinalTitle,
         description: data.description,
         price: data.price,
         images: data.images ?? [],
@@ -1507,9 +1512,9 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
-
+    const FinalTitle=data.title && data.title.trim()!==""?data.title:title;
     const ad = new this.adModel({
-      title,
+      title:FinalTitle,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
