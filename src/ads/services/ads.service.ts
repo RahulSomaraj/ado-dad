@@ -2569,21 +2569,22 @@ export class AdsService {
     Object.assign(doc, update);
     await doc.save();
 
-    // Update ad title if model/year changed
-    if (updateDto.modelId || updateDto.year) {
-      const modelId = updateDto.modelId
-        ? updateDto.modelId
-        : (doc.modelId as any)?.toString?.();
-      if (modelId) {
-        const model =
-          await this.vehicleInventoryService.findVehicleModelById(modelId);
-        const modelName =
-          (model as any)?.displayName || (model as any)?.name || 'Vehicle';
-        const year = updateDto.year ?? doc.year ?? '';
-        const title = `${modelName} ${year}`.trim();
-        await this.adModel.updateOne({ _id: ad._id }, { title });
-      }
-    }
+    // Auto-update title disabled - title is only updated when user explicitly provides it
+    // // Update ad title if model/year changed
+    // if (updateDto.modelId || updateDto.year) {
+    //   const modelId = updateDto.modelId
+    //     ? updateDto.modelId
+    //     : (doc.modelId as any)?.toString?.();
+    //   if (modelId) {
+    //     const model =
+    //       await this.vehicleInventoryService.findVehicleModelById(modelId);
+    //     const modelName =
+    //       (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+    //     const year = updateDto.year ?? doc.year ?? '';
+    //     const title = `${modelName} ${year}`.trim();
+    //     await this.adModel.updateOne({ _id: ad._id }, { title });
+    //   }
+    // }
   }
 
   private async updateCommercialVehicleAdValidated(
@@ -2649,21 +2650,22 @@ export class AdsService {
     Object.assign(doc, update);
     await doc.save();
 
-    // Update ad title if model/year changed
-    if (updateDto.modelId || updateDto.year) {
-      const modelId = updateDto.modelId
-        ? updateDto.modelId
-        : (doc.modelId as any)?.toString?.();
-      if (modelId) {
-        const model =
-          await this.vehicleInventoryService.findVehicleModelById(modelId);
-        const modelName =
-          (model as any)?.displayName || (model as any)?.name || 'Vehicle';
-        const year = updateDto.year ?? doc.year ?? '';
-        const title = `${modelName} ${year}`.trim();
-        await this.adModel.updateOne({ _id: ad._id }, { title });
-      }
-    }
+    // Auto-update title disabled - title is only updated when user explicitly provides it
+    // // Update ad title if model/year changed
+    // if (updateDto.modelId || updateDto.year) {
+    //   const modelId = updateDto.modelId
+    //     ? updateDto.modelId
+    //     : (doc.modelId as any)?.toString?.();
+    //   if (modelId) {
+    //     const model =
+    //       await this.vehicleInventoryService.findVehicleModelById(modelId);
+    //     const modelName =
+    //       (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+    //     const year = updateDto.year ?? doc.year ?? '';
+    //     const title = `${modelName} ${year}`.trim();
+    //     await this.adModel.updateOne({ _id: ad._id }, { title });
+    //   }
+    // }
   }
 
   /** ---------- RATINGS AND REVIEWS ---------- */
