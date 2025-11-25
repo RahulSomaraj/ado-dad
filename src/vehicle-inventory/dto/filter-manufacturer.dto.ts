@@ -56,9 +56,19 @@ export class FilterManufacturerDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'boolean') return value;
+
+    const str = String(value).toLowerCase();
+    if (str === 'true' || str === '1') return true;
+    if (str === 'false' || str === '0') return false;
+
+    return undefined;
+  })
   @IsBoolean()
   isActive?: boolean;
+
 
   @ApiPropertyOptional({
     description: 'Sort by field',
