@@ -258,7 +258,10 @@ export class VehicleInventoryService {
     }
 
     // Add basic filters
-    const matchStage: any = { isActive: true, isDeleted: false };
+    const matchStage: any = { isDeleted: false };
+    if (!filters.includeInactive) {
+      matchStage.isActive = true;
+    }
 
     if (filters.manufacturerId) {
       matchStage.manufacturer = new Types.ObjectId(filters.manufacturerId);
@@ -1559,6 +1562,21 @@ export class VehicleInventoryService {
     {
       throw new BadRequestException('Empty or invalid CSV file');
     }
+
+    const allowedFields = ["name", "displayName", "vehicleType", "description", "launchYear",
+  "segment", "bodyType", "images", "brochureUrl", "isCommercialVehicle",
+  "commercialVehicleType", "commercialBodyType", "defaultPayloadCapacity",
+  "defaultAxleCount", "defaultPayloadUnit", "defaultSeatingCapacity",
+  "fuelTypes", "transmissionTypes", "isActive"];
+
+    const rawFields = Object.keys(rows[0]).map(f => f.trim());
+    const unknownFields = rawFields.filter(f => !allowedFields.includes(f));
+
+  if (unknownFields.length > 0) {
+    throw new BadRequestException(
+      `Invalid CSV field(s): ${unknownFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}`
+    );
+  }
 
     const seen=new Set<string>();
     const uniqueRows:Record<string,any>[]=[];

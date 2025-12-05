@@ -88,6 +88,15 @@ export class FilterVehicleModelDto {
   @IsBoolean()
   isActive?: boolean;
 
+  // Allow including inactive models when requested
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  includeInactive?: boolean;
   // @ApiPropertyOptional({
   //   description: 'Filter by manufacturer name',
   //   example: 'Maruti Suzuki',
