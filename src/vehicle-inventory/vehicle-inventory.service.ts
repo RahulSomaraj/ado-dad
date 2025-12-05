@@ -227,7 +227,8 @@ export class VehicleInventoryService {
       }
       return obj;
     };
-    const cacheKey = `vi:models:list:${JSON.stringify(normalize(filters))}`;
+    // Bump cache key version to avoid serving older cached payloads that missed manufacturer join
+    const cacheKey = `vi:models:list:v2:${JSON.stringify(normalize(filters))}`;
     const cached =
       await this.redisService.cacheGet<PaginatedVehicleModelResponseDto>(
         cacheKey,
@@ -294,6 +295,20 @@ export class VehicleInventoryService {
     }
 
     pipeline.push({ $match: matchStage });
+
+    // Normalize manufacturer to ObjectId so the lookup always works
+    pipeline.push({
+      $addFields: {
+        manufacturer: {
+          $cond: [
+            { $eq: [{ $type: '$manufacturer' }, 'string'] }, // if it's a string
+            { $toObjectId: '$manufacturer' },                // convert to ObjectId
+            '$manufacturer',                                // otherwise leave as-is
+          ],
+        },
+      },
+    });
+
 
     // Add manufacturer lookup
     pipeline.push({

@@ -1331,7 +1331,7 @@ export class FilterVehicleModelDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
   // @ApiPropertyOptional({
   //   description: 'Number of items per page',
@@ -1342,7 +1342,7 @@ export class FilterVehicleModelDto {
   @IsNumber()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  limit?: number ;
 
   // @ApiPropertyOptional({
   //   description: 'Sort by field',
@@ -1363,7 +1363,7 @@ export class FilterVehicleModelDto {
   // })
   @IsOptional()
   @IsString()
-  sortBy?: string = 'createdAt';
+  sortBy?: string;
 
   // @ApiPropertyOptional({
   //   description: 'Sort order',
@@ -1372,5 +1372,5 @@ export class FilterVehicleModelDto {
   // })
   @IsOptional()
   @IsString()
-  sortOrder?: 'ASC' | 'DESC' = 'DESC';
+  sortOrder?: 'ASC' | 'DESC';
 }
