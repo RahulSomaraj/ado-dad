@@ -273,7 +273,7 @@ export class ManufacturersService {
     }
 
     // Add basic filters
-    const matchStage: any = { isDeleted: false };
+    const matchStage: any = { isActive: true, isDeleted: false };
 
     if (filters.originCountry) {
       matchStage.originCountry = {
