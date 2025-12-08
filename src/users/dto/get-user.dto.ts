@@ -26,7 +26,6 @@ export class GetUsersDto {
 
   @ApiPropertyOptional({
     description: 'Search query to filter users',
-    example: 'john',
   })
   @IsOptional()
   @IsString()
@@ -34,7 +33,6 @@ export class GetUsersDto {
 
   @ApiPropertyOptional({
     description: 'User type filter',
-    example: UserType.USER,
   })
   @IsOptional()
   @IsString()

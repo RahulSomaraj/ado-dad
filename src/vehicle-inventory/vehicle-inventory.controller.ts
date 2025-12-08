@@ -459,58 +459,65 @@ export class VehicleInventoryController {
     summary: 'Get all vehicle variants with filters and pagination',
   })
   @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
     name: 'modelId',
     required: false,
+    type: String,
     description: 'Filter by vehicle model ID',
   })
   @ApiQuery({
     name: 'fuelTypeId',
     required: false,
+    type: String,
     description: 'Filter by fuel type ID',
   })
   @ApiQuery({
     name: 'transmissionTypeId',
     required: false,
+    type: String,
     description: 'Filter by transmission type ID',
   })
   @ApiQuery({
     name: 'minPrice',
     required: false,
+    type: Number,
     description: 'Filter by minimum price',
   })
   @ApiQuery({
     name: 'maxPrice',
     required: false,
+    type: Number,
     description: 'Filter by maximum price',
   })
   @ApiQuery({
     name: 'search',
     required: false,
+    type: String,
     description: 'Search term',
   })
   @ApiQuery({
     name: 'sortBy',
     required: false,
+    type: String,
     description: 'Sort by field',
     enum: ['price', 'name', 'createdAt', 'updatedAt'],
   })
   @ApiQuery({
     name: 'sortOrder',
     required: false,
-    description: 'Sort order',
-    enum: ['ASC', 'DESC'],
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Page number for pagination',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Number of items per page',
-    example: 20,
+    type: String,
+    description: 'Sort order (ASC or DESC)',
   })
   @ApiResponse({
     status: 200,
