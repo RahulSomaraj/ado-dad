@@ -110,9 +110,17 @@ export class UsersService {
       // Build query with filters - PUBLIC API only shows USER types for security
       const query: any = { isDeleted: { $ne: true } };
 
-      // Add search functionality
+      // Add search functionality - search across all fields
       if (search?.trim()) {
-        query.$text = { $search: search.trim() } as any;
+        const searchTerm = search.trim();
+        const searchRegex = new RegExp(searchTerm, 'i'); // case-insensitive
+        query.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { type: searchRegex },
+          { profilePic: searchRegex },
+        ];
       }
 
       // Public API - only allow filtering to USER and SHOWROOM types (admin profiles should not be publicly accessible)
@@ -209,9 +217,17 @@ export class UsersService {
       // Build query with filters
       const query: any = { isDeleted: { $ne: true } };
 
-      // Add search functionality
+      // Add search functionality - search across all fields
       if (search?.trim()) {
-        query.$text = { $search: search.trim() } as any;
+        const searchTerm = search.trim();
+        const searchRegex = new RegExp(searchTerm, 'i'); // case-insensitive
+        query.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { type: searchRegex },
+          { profilePic: searchRegex },
+        ];
       }
 
       // Role-based visibility (compose with explicit `type` filter if present)
