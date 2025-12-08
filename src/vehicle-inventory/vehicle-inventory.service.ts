@@ -1156,6 +1156,9 @@ export class VehicleInventoryService {
       sortOrder = 'ASC',
     } = filters;
 
+    // Ensure sortOrder is valid (safeguard in case validation didn't catch it)
+    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
+
     // Build the aggregation pipeline
     const pipeline: any[] = [];
 
@@ -1172,17 +1175,43 @@ export class VehicleInventoryService {
     const matchStage: any = { isActive: true, isDeleted: false };
 
     if (filters.modelId) {
-      matchStage.vehicleModel = new Types.ObjectId(filters.modelId);
+      // Validate ObjectId format before converting
+      if (!Types.ObjectId.isValid(filters.modelId)) {
+        throw new BadRequestException(
+          `Invalid modelId format: ${filters.modelId}. Expected a valid MongoDB ObjectId.`,
+        );
+      }
+      // Support both ObjectId and string comparison (in case data was stored as string)
+      const modelIdObj = new Types.ObjectId(filters.modelId);
+      matchStage.$and = [
+        { isActive: true, isDeleted: false },
+        {
+          $or: [
+            { vehicleModel: modelIdObj },
+            { vehicleModel: filters.modelId },
+          ],
+        },
+      ];
     }
 
     if (filters.fuelTypeId) {
-      matchStage.fuelType = new Types.ObjectId(filters.fuelTypeId);
+      const fuelTypeObj = new Types.ObjectId(filters.fuelTypeId);
+      if (matchStage.$and) {
+        matchStage.$and.push({ fuelType: fuelTypeObj });
+      } else {
+        matchStage.fuelType = fuelTypeObj;
+      }
     }
 
     if (filters.transmissionTypeId) {
-      matchStage.transmissionType = new Types.ObjectId(
+      const transmissionTypeObj = new Types.ObjectId(
         filters.transmissionTypeId,
       );
+      if (matchStage.$and) {
+        matchStage.$and.push({ transmissionType: transmissionTypeObj });
+      } else {
+        matchStage.transmissionType = transmissionTypeObj;
+      }
     }
 
     // Handle price range
@@ -1190,12 +1219,17 @@ export class VehicleInventoryService {
       typeof filters.minPrice === 'number' ||
       typeof filters.maxPrice === 'number'
     ) {
-      matchStage.price = {};
+      const priceFilter: any = {};
       if (typeof filters.minPrice === 'number') {
-        matchStage.price.$gte = filters.minPrice;
+        priceFilter.$gte = filters.minPrice;
       }
       if (typeof filters.maxPrice === 'number') {
-        matchStage.price.$lte = filters.maxPrice;
+        priceFilter.$lte = filters.maxPrice;
+      }
+      if (matchStage.$and) {
+        matchStage.$and.push({ price: priceFilter });
+      } else {
+        matchStage.price = priceFilter;
       }
     }
 
@@ -1208,7 +1242,7 @@ export class VehicleInventoryService {
       countResult.length > 0 ? (countResult[0] as { total: number }).total : 0;
 
     // Add sorting
-    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
+    const sortDirection = validSortOrder === 'ASC' ? 1 : -1;
     pipeline.push({ $sort: { [sortBy]: sortDirection } });
 
     // Add pagination
