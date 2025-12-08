@@ -1441,7 +1441,8 @@ export class VehicleInventoryService {
 
   private parseBoolean(value: any): boolean {
     if (value === undefined || value === null) return false;
-    return ['true', '1', 'yes', 'y'].includes(String(value).toLowerCase());
+    const normalized = String(value).trim().toLowerCase();
+    return ['true', '1', 'yes', 'y'].includes(normalized);
   }
 
   async createVehicleVariantCsv(
@@ -1525,8 +1526,7 @@ export class VehicleInventoryService {
     const skipped: any[] = [];
 
     // helpers
-    const parseBool = (v: any) =>
-      ['true', '1', 'yes', 'y'].includes(String(v).toLowerCase());
+    const parseBool = (v: any) => this.parseBoolean(v);
 
     const parseNumber = (v: any) =>
       v === undefined || v === null || v === '' ? undefined : Number(v);

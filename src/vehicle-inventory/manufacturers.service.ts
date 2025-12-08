@@ -102,6 +102,14 @@ export class ManufacturersService {
     return { field, dir };
   }
 
+  private parseBoolean(value: any): boolean {
+    if (value === undefined || value === null) return false;
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
+    return Boolean(value);
+  }
+
   // Manufacturer CRUD methods
   async createManufacturer(
     createManufacturerDto: CreateManufacturerDto,
@@ -516,7 +524,23 @@ async createManufacturerFromCsv(buffer: Buffer, fileType: 'csv') {
     };
   }
 
-  const insertedDocs = await this.manufacturerModel.insertMany(finalRows);
+  const normalizeBool = (val: any) =>
+    val === undefined || val === null || val === '' ? undefined : this.parseBoolean(val);
+
+  const normalizedRows = finalRows.map(r => ({
+    ...r,
+    name: typeof r.name === 'string' ? r.name.trim() : r.name,
+    displayName:
+      typeof r.displayName === 'string'
+        ? r.displayName.trim()
+        : typeof r.name === 'string'
+        ? r.name.trim()
+        : r.displayName,
+    isActive: normalizeBool(r.isActive),
+    isPremium: normalizeBool(r.isPremium),
+  }));
+
+  const insertedDocs = await this.manufacturerModel.insertMany(normalizedRows);
 
   return {
     totalRows: rows.length,
