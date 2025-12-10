@@ -264,40 +264,114 @@ export class VehicleInventoryService {
     }
 
     if (filters.manufacturerId) {
-      matchStage.manufacturer = new Types.ObjectId(filters.manufacturerId);
+      // Validate ObjectId format before converting
+      if (!Types.ObjectId.isValid(filters.manufacturerId)) {
+        throw new BadRequestException(
+          `Invalid manufacturerId format: ${filters.manufacturerId}. Expected a valid MongoDB ObjectId.`,
+        );
+      }
+      // Manufacturer is stored as string in DB, match as string directly
+      // Also support ObjectId format in case some documents have it stored as ObjectId
+      const manufacturerIdObj = new Types.ObjectId(filters.manufacturerId);
+      // Combine base filters with manufacturer filter using $and
+      const baseFilters: any = { isDeleted: false };
+      if (matchStage.isActive) {
+        baseFilters.isActive = true;
+      }
+      matchStage.$and = [
+        baseFilters,
+        {
+          $or: [
+            { manufacturer: filters.manufacturerId },
+            { manufacturer: manufacturerIdObj },
+          ],
+        },
+      ];
+      // Remove base filters since they're now in $and
+      delete matchStage.isDeleted;
+      delete matchStage.isActive;
     }
 
     if (filters.vehicleType) {
-      matchStage.vehicleType = filters.vehicleType;
+      if (matchStage.$and) {
+        matchStage.$and.push({ vehicleType: filters.vehicleType });
+      } else {
+        matchStage.vehicleType = filters.vehicleType;
+      }
     }
 
     if (filters.segment && filters.segment.trim() !== '') {
-      matchStage.segment = { $regex: filters.segment, $options: 'i' };
+      const segmentFilter = { segment: { $regex: filters.segment, $options: 'i' } };
+      if (matchStage.$and) {
+        matchStage.$and.push(segmentFilter);
+      } else {
+        matchStage.segment = segmentFilter.segment;
+      }
     }
 
     if (filters.bodyType && filters.bodyType.trim() !== '') {
-      matchStage.bodyType = { $regex: filters.bodyType, $options: 'i' };
+      const bodyTypeFilter = { bodyType: { $regex: filters.bodyType, $options: 'i' } };
+      if (matchStage.$and) {
+        matchStage.$and.push(bodyTypeFilter);
+      } else {
+        matchStage.bodyType = bodyTypeFilter.bodyType;
+      }
     }
 
-    if (filters.minLaunchYear !== undefined) {
-      matchStage.launchYear = {
-        ...matchStage.launchYear,
-        $gte: filters.minLaunchYear,
-      };
-    }
-
-    if (filters.maxLaunchYear !== undefined) {
-      matchStage.launchYear = {
-        ...matchStage.launchYear,
-        $lte: filters.maxLaunchYear,
-      };
+    if (filters.minLaunchYear !== undefined || filters.maxLaunchYear !== undefined) {
+      const launchYearFilter: any = {};
+      if (filters.minLaunchYear !== undefined) {
+        launchYearFilter.$gte = filters.minLaunchYear;
+      }
+      if (filters.maxLaunchYear !== undefined) {
+        launchYearFilter.$lte = filters.maxLaunchYear;
+      }
+      if (matchStage.$and) {
+        matchStage.$and.push({ launchYear: launchYearFilter });
+      } else {
+        matchStage.launchYear = launchYearFilter;
+      }
     }
 
     if (filters.isActive !== undefined) {
-      matchStage.isActive = filters.isActive;
+      if (matchStage.$and) {
+        matchStage.$and.push({ isActive: filters.isActive });
+      } else {
+        matchStage.isActive = filters.isActive;
+      }
     }
 
+    // Debug: Log the match stage for manufacturerId filter
+    if (filters.manufacturerId) {
+      console.log('🔍 Manufacturer filter matchStage:', JSON.stringify(matchStage, null, 2));
+      // Also log direct count queries for debugging
+      const directCountString = await this.vehicleModelModel.countDocuments({
+        manufacturer: filters.manufacturerId,
+        isDeleted: false,
+        isActive: true,
+      });
+      const directCountObjectId = await this.vehicleModelModel.countDocuments({
+        manufacturer: new Types.ObjectId(filters.manufacturerId),
+        isDeleted: false,
+        isActive: true,
+      });
+      const directCountNoFilters = await this.vehicleModelModel.countDocuments({
+        manufacturer: filters.manufacturerId,
+      });
+      console.log('🔍 Direct countDocuments (string):', directCountString);
+      console.log('🔍 Direct countDocuments (ObjectId):', directCountObjectId);
+      console.log('🔍 Direct countDocuments (no filters):', directCountNoFilters);
+    }
+    
     pipeline.push({ $match: matchStage });
+
+    // Get total count BEFORE any lookups or transformations
+    const countPipelineBeforeLookups = [...pipeline, { $count: 'total' }];
+    const countResultBeforeLookups = await this.vehicleModelModel.aggregate(countPipelineBeforeLookups);
+    const totalBeforeLookups =
+      countResultBeforeLookups.length > 0 ? (countResultBeforeLookups[0] as { total: number }).total : 0;
+    
+    console.log('🔍 Count before lookups:', totalBeforeLookups);
 
     // Normalize manufacturer to ObjectId so the lookup always works
     pipeline.push({
@@ -545,10 +619,16 @@ export class VehicleInventoryService {
     }
 
     // Get total count before pagination
-    const countPipeline = [...pipeline, { $count: 'total' }];
-    const countResult = await this.vehicleModelModel.aggregate(countPipeline);
-    const total =
-      countResult.length > 0 ? (countResult[0] as { total: number }).total : 0;
+    // Use the count before lookups for accuracy - this matches what Compass shows
+    const total = totalBeforeLookups;
+    
+    // Debug: Log both counts for comparison
+    if (filters.manufacturerId) {
+      const countAfterLookups = await this.vehicleModelModel.aggregate([...pipeline, { $count: 'total' }]);
+      const totalAfterLookups = countAfterLookups.length > 0 ? (countAfterLookups[0] as { total: number }).total : 0;
+      console.log('🔍 Count after lookups:', totalAfterLookups);
+      console.log('🔍 Using count before lookups:', total);
+    }
 
     // Add sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
