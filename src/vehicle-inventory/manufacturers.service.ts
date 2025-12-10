@@ -105,9 +105,9 @@ export class ManufacturersService {
   private parseBoolean(value: any): boolean {
     if (value === undefined || value === null) return false;
     const normalized = String(value).trim().toLowerCase();
-    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
-    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
-    return Boolean(value);
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    return false;
   }
 
   // Manufacturer CRUD methods

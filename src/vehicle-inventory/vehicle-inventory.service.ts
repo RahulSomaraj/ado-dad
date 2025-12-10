@@ -1362,7 +1362,9 @@ export class VehicleInventoryService {
   private parseBoolean(value: any): boolean {
     if (value === undefined || value === null) return false;
     const normalized = String(value).trim().toLowerCase();
-    return ['true', '1', 'yes', 'y'].includes(normalized);
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    return false;
   }
 
   async createVehicleVariantCsv(
