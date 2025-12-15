@@ -105,6 +105,12 @@ export class VehicleInventoryService {
     }
   }
 
+  // Case-insensitive prefix matcher that anchors at start or after separators
+  private buildPrefixRegex(term: string): RegExp {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[\\s_\\-])${escaped}`, 'i');
+  }
+
   // Vehicle Model methods
   async createVehicleModel(
     createVehicleModelDto: CreateVehicleModelDto,
@@ -248,11 +254,12 @@ export class VehicleInventoryService {
     // Build the aggregation pipeline
     const pipeline: any[] = [];
 
-    // Handle text search first (must be the first stage if present)
+    // Handle prefix search first (must be the first stage if present)
     if (filters.search && filters.search.trim()) {
+      const regex = this.buildPrefixRegex(filters.search.trim());
       pipeline.push({
         $match: {
-          $text: { $search: filters.search },
+          $or: [{ name: regex }, { displayName: regex }],
         },
       });
     }

@@ -86,6 +86,12 @@ export class ManufacturersService {
     return Math.max(min, Math.min(max, n));
   }
 
+  // Case-insensitive prefix matcher that anchors at start or after separators
+  private buildPrefixRegex(term: string): RegExp {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[\\s_\\-])${escaped}`, 'i');
+  }
+
   private coerceSort(
     sortBy?: string,
     sortOrder?: string,
@@ -271,14 +277,16 @@ export class ManufacturersService {
     // Build the aggregation pipeline
     const pipeline: PipelineStage[] = [];
 
-    // Handle text search first (must be the first stage if present)
+    // Handle prefix search first (must be the first stage if present)
     if (filters.search && filters.search.trim()) {
+      const regex = this.buildPrefixRegex(filters.search.trim());
       pipeline.push({
         $match: {
-          $text: { $search: filters.search },
+          $or: [{ name: regex }, { displayName: regex }],
         },
       });
     }
+
 
     // Add basic filters
     const matchStage: any = { isActive: true, isDeleted: false };
