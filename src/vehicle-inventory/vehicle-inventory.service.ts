@@ -1533,6 +1533,7 @@ export class VehicleInventoryService {
 
     const validVariants: any[] = [];
     const skipped: any[] = [];
+    const comboSeen = new Set<string>(); // track combinations within the same CSV
 
     // helpers
     const parseBool = (v: any) => this.parseBoolean(v);
@@ -1573,7 +1574,9 @@ export class VehicleInventoryService {
         fuelType: fuelDoc._id,
         transmissionType: transDoc._id,
 
-        featurePackage: row.featurePackage || null,
+        featurePackage: row.featurePackage
+          ? String(row.featurePackage).trim()
+          : row.name?.trim(),
 
         engineSpecs: {
           capacity: parseNumber(row.engine_capacity),
@@ -1621,32 +1624,57 @@ export class VehicleInventoryService {
         updatedAt: new Date(),
       };
 
+      // Avoid duplicate combinations inside this CSV (matches DB unique index)
+      const comboKey = `${normalizedModelId}-${String(fuelDoc._id)}-${String(
+        transDoc._id,
+      )}-${String(variant.featurePackage || '').toLowerCase()}`;
+      if (comboSeen.has(comboKey)) {
+        skipped.push({
+          row,
+          reason:
+            'Duplicate combination in CSV (vehicleModel + fuelType + transmissionType + featurePackage)',
+        });
+        continue;
+      }
+      comboSeen.add(comboKey);
+
       validVariants.push(variant);
     }
 
-    // --- Step 4: Prevent duplicates already in DB for THIS model ---
+    // --- Step 4: Skip combinations that already exist in DB to avoid unique index errors ---
     const existing = await this.vehicleVariantModel
       .find({
-        name: { $in: validVariants.map(v => v.name) },
-        vehicleModel: normalizedModelId, // ✅ only this model
+        vehicleModel: normalizedModelId,
         isDeleted: false,
       })
-      .select('name vehicleModel')
+      .select(
+        'vehicleModel fuelType transmissionType featurePackage',
+      )
       .lean();
 
-    const existingSet = new Set(
-      existing.map(v => `${v.name}-${String(v.vehicleModel)}`),
+    const existingComboSet = new Set(
+      existing.map(
+        v =>
+          `${String(v.vehicleModel)}-${String(v.fuelType)}-${String(
+            v.transmissionType,
+          )}-${String(v.featurePackage).toLowerCase()}`,
+      ),
     );
 
     const finalInsert = validVariants.filter(v => {
-      const key = `${v.name}-${v.vehicleModel}`;
-      if (existingSet.has(key)) {
-        skipped.push({ row: v, reason: 'Variant already exists for this model' });
+      const comboKey = `${v.vehicleModel}-${String(
+        v.fuelType,
+      )}-${String(v.transmissionType)}-${String(v.featurePackage).toLowerCase()}`;
+      if (existingComboSet.has(comboKey)) {
+        skipped.push({
+          row: v,
+          reason:
+            'Variant with same fuel/transmission/featurePackage already exists for this model (unique index)',
+        });
         return false;
       }
       return true;
     });
-
     // --- Step 5: Insert ---
     let insertedDocs: any[] = [];
     if (finalInsert.length > 0) {

@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { FeaturePackage } from '../../vehicles/enum/vehicle.type';
 import {
   VehicleFeatures,
   VehicleFeaturesSchema,
@@ -86,8 +85,8 @@ export class VehicleVariant {
   @Prop({ required: true, ref: 'TransmissionType', type: Types.ObjectId })
   transmissionType: Types.ObjectId;
 
-  @Prop({ required: true, enum: FeaturePackage })
-  featurePackage: FeaturePackage;
+  @Prop({ required: true, trim: true })
+  featurePackage: string;
 
   @Prop({ required: true, type: EngineSpecsSchema })
   engineSpecs: EngineSpecs;

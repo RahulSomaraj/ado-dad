@@ -4,13 +4,11 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
-  IsEnum,
   IsDateString,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { FeaturePackage } from '../../vehicles/enum/vehicle.type';
 import { VehicleFeaturesDto } from './vehicle-features.dto';
 
 export class EngineSpecsDto {
@@ -184,11 +182,10 @@ export class CreateVehicleVariantDto {
 
   @ApiProperty({
     description: 'The feature package/trim level.',
-    enum: FeaturePackage,
-    example: FeaturePackage.LX,
+    example: 'LXI',
   })
-  @IsEnum(FeaturePackage)
-  featurePackage: FeaturePackage;
+  @IsString()
+  featurePackage: string;
 
   @ApiProperty({
     description: 'Engine specifications.',
