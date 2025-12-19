@@ -1708,60 +1708,75 @@ export class VehicleInventoryService {
       throw new NotFoundException(`Manufacturer with ${id} not found`);
     }
 
-    const rows=(await parseFile(buffer,fileType)) as Record<string,any>[];
-    if(!rows || rows.length===0)
-    {
+    const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
+    if (!rows || rows.length === 0) {
       throw new BadRequestException('Empty or invalid CSV file');
     }
 
-    const allowedFields = ["name", "displayName", "vehicleType", "description", "launchYear",
-  "segment", "bodyType", "images", "brochureUrl", "isCommercialVehicle",
-  "commercialVehicleType", "commercialBodyType", "defaultPayloadCapacity",
-  "defaultAxleCount", "defaultPayloadUnit", "defaultSeatingCapacity",
-  "fuelTypes", "transmissionTypes", "isActive"];
+    // Normalize header keys to be whitespace/BOM-safe so we only gate on field names
+    const normalizeRowKeys = (row: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key.trim(), value]),
+      );
+    const normalizedRows = rows.map(normalizeRowKeys);
 
-    const rawFields = Object.keys(rows[0]).map(f => f.trim());
+    const allowedFields = [
+      'name',
+      'displayName',
+      'vehicleType',
+      'description',
+      'launchYear',
+      'segment',
+      'bodyType',
+      'images',
+      'brochureUrl',
+      'isCommercialVehicle',
+      'commercialVehicleType',
+      'commercialBodyType',
+      'defaultPayloadCapacity',
+      'defaultAxleCount',
+      'defaultPayloadUnit',
+      'defaultSeatingCapacity',
+      'fuelTypes',
+      'transmissionTypes',
+      'isActive',
+    ];
+
+    const rawFields = Object.keys(normalizedRows[0]);
     const unknownFields = rawFields.filter(f => !allowedFields.includes(f));
 
-  if (unknownFields.length > 0) {
-    throw new BadRequestException(
-      `Invalid CSV field(s): ${unknownFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}`
-    );
-  }
+    if (unknownFields.length > 0) {
+      throw new BadRequestException(
+        `Invalid CSV field(s): ${unknownFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}`
+      );
+    }
 
+    // Deduplicate but do not skip rows for missing/invalid names; fall back to row index
     const seen=new Set<string>();
     const uniqueRows:Record<string,any>[]=[];
 
-    for(const row of rows)
-    {
-      if(!row.name||typeof row.name!=='string') continue;
-      
-      const key=row.name.trim().toLowerCase();
-      if(!key||seen.has(key)) continue;
-
-      seen.add(key);
-      uniqueRows.push(row);
-    }
+    normalizedRows.forEach((row, idx) => {
+      const baseName = row.name ?? row.displayName ?? `model-${idx + 1}`;
+      const normalizedName = String(baseName).trim().toLowerCase();
+      const dedupKey = normalizedName || `row-${idx + 1}`;
+      if(seen.has(dedupKey)) return;
+      seen.add(dedupKey);
+      uniqueRows.push({
+        ...row,
+        name: normalizedName,
+        displayName: row.displayName?.trim() || String(baseName).trim(),
+      });
+    });
 
     const validModels:Record<string,any>[]=[];
-    const skipped:any=[];
+    const skipped:any[]=[];
 
     for(const row of uniqueRows)
     {
-      if(!row.name||typeof row.name!=='string')
-      {
-        skipped.push({row,reason:'missing or invalid model name'}); continue;
-      }
-
-      const name=row.name.trim().toLowerCase();
-      if(!name)
-      {
-        skipped.push({row,reason:"empty model name after trimming"}); continue;
-      }
 
       const modelDoc = {
-        name,
-        displayName: row.displayName?.trim() || row.name.trim(),
+        name: row.name,
+        displayName: row.displayName,
         manufacturer: id,
         vehicleType: row.vehicleType,
         description: row.description || '',
