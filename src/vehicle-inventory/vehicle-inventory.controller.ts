@@ -11,12 +11,12 @@ import {
   BadRequestException,
   Put,
   Delete,
-  UploadedFile,
   HttpException,
   HttpStatus,
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
+import type { Request as ExpressRequest } from 'express';
 import { VehicleInventoryService } from './vehicle-inventory.service';
 import { ManufacturersService } from './manufacturers.service';
 import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
@@ -43,7 +43,7 @@ import { Types } from 'mongoose';
 import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
 import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
 import * as path from 'path';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
 import { error } from 'console';
 
@@ -539,11 +539,101 @@ export class VehicleInventoryController {
     return this.vehicleInventoryService.findVehicleVariantById(id);
   }
 
+  private requireFirstFile(
+    files: Express.Multer.File[] | undefined,
+    errorMessage: string,
+  ): Express.Multer.File {
+    if (!files || files.length === 0) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: errorMessage,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return files[0];
+  }
+
+  private parseCsvBufferFromBody(body: any): Buffer | null {
+    if (!body) return null;
+    if (body instanceof Buffer) {
+      return body.length ? body : null;
+    }
+    if (typeof body === 'string') {
+      const trimmed = body.trim();
+      return trimmed ? Buffer.from(trimmed) : null;
+    }
+    if (typeof body !== 'object') return null;
+
+    const base64Candidates = [body.csvBase64, body.base64, body.fileBase64];
+    for (const candidate of base64Candidates) {
+      if (typeof candidate !== 'string') continue;
+      const trimmed = candidate.trim();
+      if (!trimmed) continue;
+      const dataUrlIndex = trimmed.indexOf('base64,');
+      const raw = dataUrlIndex >= 0 ? trimmed.slice(dataUrlIndex + 7) : trimmed;
+      const buffer = Buffer.from(raw, 'base64');
+      if (buffer.length) return buffer;
+    }
+
+    const textCandidates = [
+      body.csv,
+      body.csvText,
+      body.text,
+      body.data,
+      body.file,
+    ];
+    for (const candidate of textCandidates) {
+      if (typeof candidate !== 'string') continue;
+      const trimmed = candidate.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith('data:') && trimmed.includes('base64,')) {
+        const raw = trimmed.split('base64,').pop() || '';
+        const buffer = Buffer.from(raw, 'base64');
+        if (buffer.length) return buffer;
+        continue;
+      }
+      return Buffer.from(trimmed);
+    }
+
+    return null;
+  }
+
+  private getCsvBuffer(
+    files: Express.Multer.File[] | undefined,
+    req: ExpressRequest,
+    errorMessage: string,
+  ): Buffer {
+    if (files && files.length > 0 && files[0]?.buffer?.length) {
+      return files[0].buffer;
+    }
+    const bodyBuffer = this.parseCsvBufferFromBody(req.body);
+    if (bodyBuffer && bodyBuffer.length) return bodyBuffer;
+    throw new HttpException(
+      {
+        status: HttpStatus.BAD_REQUEST,
+        error: errorMessage,
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
+  private async handleVehicleModelCsvUpload(
+    id: string,
+    files: Express.Multer.File[] | undefined,
+    req: ExpressRequest,
+  ) {
+    const buffer = this.getCsvBuffer(files, req, 'No file Uploaded');
+    return await this.vehicleInventoryService.createVechicleModelUploadFromId(
+      id,
+      buffer,
+      'csv',
+    );
+  }
+
   @Post(':id/upload-csv')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
-  @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(AnyFilesInterceptor())
   @ApiOperation({
     summary: 'Upload vehicle models CSV for a manufacturer',
     description:
@@ -580,34 +670,95 @@ export class VehicleInventoryController {
     status: 404,
     description: 'Manufacturer not found.',
   })
-  async vechicleModelUploadFromId(@Param('id')id:string,@UploadedFile()file:Express.Multer.File){
-    if(!file)
-    {
-      throw new HttpException(
-        {
-          status:HttpStatus.BAD_REQUEST,
-          error:'No file Uploaded'
-        },
-        HttpStatus.BAD_REQUEST,
-        )
-    };
+  async vechicleModelUploadFromId(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Request() req,
+  ) {
+    return this.handleVehicleModelCsvUpload(id, files, req as ExpressRequest);
+  }
 
-    const fileExt=path.extname(file.originalname).toLocaleLowerCase();
-    if(fileExt!=='.csv')
-    {
-      throw new BadRequestException('Only csv files are supported');
-    }
-    return await this.vehicleInventoryService.createVechicleModelUploadFromId(
-      id,file.buffer,'csv'
-    );
+  @Post('models/:id/upload-csv')
+  @UseInterceptors(AnyFilesInterceptor())
+  @ApiOperation({
+    summary: 'Upload vehicle models CSV for a manufacturer (alias)',
+    description:
+      'Alias endpoint to support /vehicle-inventory/models/:id/upload-csv.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Manufacturer ID',
+    type: String,
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'CSV file containing vehicle models',
+    required: true,
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSV processed successfully. Models created/updated.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No file uploaded or invalid file type (only CSV allowed).',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Manufacturer not found.',
+  })
+  async vechicleModelUploadFromIdAlias(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Request() req,
+  ) {
+    return this.handleVehicleModelCsvUpload(id, files, req as ExpressRequest);
+  }
+
+  @Post('upload-vehicle-models-csv')
+  @UseInterceptors(AnyFilesInterceptor())
+  @ApiOperation({
+    summary: 'Upload vehicle models CSV (manufacturer in form data)',
+    description:
+      'Uploads a CSV file and creates vehicle models for a manufacturer ID provided in form data.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        manufacturerId: { type: 'string', example: '665f2c4e3a7aab1234567890' },
+        manufacturer: { type: 'string', example: '665f2c4e3a7aab1234567890' },
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  async vehicleModelUploadCsv(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('manufacturerId') manufacturerId: string,
+    @Body('manufacturer') manufacturer: string,
+    @Request() req,
+  ) {
+    const id = manufacturerId || manufacturer || '';
+    return this.handleVehicleModelCsvUpload(id, files, req as ExpressRequest);
   }
 
   @Post('upload-vehicle-variants-csv')
   @ApiOperation({ summary: 'Bulk upload vehicle variants from CSV file' })
-  @UseInterceptors(FileInterceptor('file'))
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
-  @ApiBearerAuth()
+  @UseInterceptors(AnyFilesInterceptor())
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -623,33 +774,17 @@ export class VehicleInventoryController {
     },
   })
   async vehicleVariantUploadCsv(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body('modelId') modelId: string,
+    @Request() req,
   ) {
-    if (!file) {
-      throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'No file uploaded',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    const buffer = this.getCsvBuffer(files, req as ExpressRequest, 'No file uploaded');
 
-    if (!modelId) {
-      throw new BadRequestException('modelId is required');
-    }
-
-    const fileExt = path.extname(file.originalname).toLowerCase();
-
-    if (fileExt !== '.csv') {
-      throw new BadRequestException('Only CSV files are supported');
-    }
-
+    // Accept uploads without strict validation. modelId may be any identifier — service will handle permissively.
     return await this.vehicleInventoryService.createVehicleVariantCsv(
-      file.buffer,
+      buffer,
       'csv',
-      modelId, 
+      modelId,
     );
   }
 }

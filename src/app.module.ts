@@ -1,4 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer, Logger } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -103,6 +105,7 @@ import { configService } from './config/mongo.config';
     }),
 
     // Feature modules
+    MulterModule.register({ storage: memoryStorage() }),
     AuthModule,
     UsersModule,
     UserReportModule,

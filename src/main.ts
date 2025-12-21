@@ -8,7 +8,7 @@ import { AppModule } from './app.module';
 import * as morgan from 'morgan';
 import helmet from 'helmet';
 import * as compression from 'compression';
-import { json, urlencoded } from 'express';
+import { json, urlencoded, text } from 'express';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -182,6 +182,12 @@ async function bootstrap() {
   // Limit JSON and urlencoded body sizes
   app.use(json({ limit: '1mb' }));
   app.use(urlencoded({ limit: '1mb', extended: true }));
+  app.use(
+    text({
+      type: ['text/csv', 'application/csv', 'text/plain'],
+      limit: '5mb',
+    }),
+  );
   app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   const server = await app.listen(PORT, '0.0.0.0', () => {

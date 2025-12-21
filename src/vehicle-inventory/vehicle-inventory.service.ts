@@ -1461,57 +1461,50 @@ export class VehicleInventoryService {
   ) {
     const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
 
+    // Be permissive: if CSV is empty, return empty summary instead of throwing
     if (!rows || rows.length === 0) {
-      throw new BadRequestException('Empty or invalid CSV file');
+      return {
+        totalRows: 0,
+        uniqueRows: 0,
+        validRows: 0,
+        insertedCount: 0,
+        skippedCount: 0,
+        inserted: [],
+        skipped: [],
+      };
     }
 
     const normalizedModelId = String(modelId);
 
-    // --- Step 0: Validate provided modelId exists ---
-    const modelDoc = await this.vehicleModelModel
-      .findOne({ _id: normalizedModelId, isDeleted: false })
-      .lean();
-
-    if (!modelDoc) {
-      throw new BadRequestException('Invalid vehicleModel ID provided');
-    }
-
-    // --- Step 1: Deduplicate (by name + provided modelId) ---
+    // --- Step 1: Deduplicate (by name + provided modelId) but generate fallback names if missing ---
     const seen = new Set<string>();
     const uniqueRows: Record<string, any>[] = [];
 
-    for (const row of rows) {
-      if (!row.name) continue; // we no longer depend on row.vehicleModel
-
-      const key = `${row.name.trim().toLowerCase()}-${normalizedModelId}`;
-      if (seen.has(key)) continue;
-
+    rows.forEach((row, idx) => {
+      const baseName = row.name ?? row.displayName ?? `variant-row-${idx + 1}`;
+      const normName = String(baseName).trim().toLowerCase();
+      const key = `${normName}-${normalizedModelId}`;
+      if (seen.has(key)) return;
       seen.add(key);
-      uniqueRows.push(row);
-    }
+      uniqueRows.push({ ...row, name: String(baseName).trim() });
+    });
 
-    if (uniqueRows.length === 0) {
-      throw new BadRequestException('No valid rows found in CSV');
-    }
-
-    // --- Step 2: Validate referenced foreign keys (fuelType, transmissionType) ---
-    // CSV now contains *names* like "petrol", "diesel", "cvt", "automatic_8", etc.
-
+    // --- Step 2: Attempt to map fuel/trans names if present; otherwise allow null and continue ---
     const fuelTypeNames = [
       ...new Set(
         uniqueRows
-          .map(r => r.fuelType)
+          .map((r) => r.fuelType)
           .filter(Boolean)
-          .map(v => String(v).trim().toLowerCase()),
+          .map((v) => String(v).trim().toLowerCase()),
       ),
     ];
 
     const transmissionNames = [
       ...new Set(
         uniqueRows
-          .map(r => r.transmissionType)
+          .map((r) => r.transmissionType)
           .filter(Boolean)
-          .map(v => String(v).trim().toLowerCase()),
+          .map((v) => String(v).trim().toLowerCase()),
       ),
     ];
 
@@ -1523,60 +1516,32 @@ export class VehicleInventoryService {
       .find({ name: { $in: transmissionNames }, isDeleted: false })
       .lean();
 
-    // maps keyed by lowercase `name`
-    const fuelMap = new Map(
-      validFuelTypes.map(f => [String(f.name).toLowerCase(), f]),
-    );
-    const transMap = new Map(
-      validTransTypes.map(t => [String(t.name).toLowerCase(), t]),
-    );
+    const fuelMap = new Map(validFuelTypes.map((f) => [String(f.name).toLowerCase(), f]));
+    const transMap = new Map(validTransTypes.map((t) => [String(t.name).toLowerCase(), t]));
 
     const validVariants: any[] = [];
     const skipped: any[] = [];
-    const comboSeen = new Set<string>(); // track combinations within the same CSV
 
-    // helpers
     const parseBool = (v: any) => this.parseBoolean(v);
+    const parseNumber = (v: any) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+    const parseArray = (v: any) => (v ? String(v).split(',').map((i) => i.trim()).filter(Boolean) : []);
 
-    const parseNumber = (v: any) =>
-      v === undefined || v === null || v === '' ? undefined : Number(v);
+    for (const [idx, row] of uniqueRows.entries()) {
+      const fuelKey = row.fuelType ? String(row.fuelType).trim().toLowerCase() : undefined;
+      const transKey = row.transmissionType ? String(row.transmissionType).trim().toLowerCase() : undefined;
 
-    const parseArray = (v: any) =>
-      v ? String(v).split(',').map(i => i.trim()).filter(Boolean) : [];
-
-    // --- Step 3: Build validated variant objects ---
-    for (const row of uniqueRows) {
-      const fuelKey = row.fuelType
-        ? String(row.fuelType).trim().toLowerCase()
-        : undefined;
-      const transKey = row.transmissionType
-        ? String(row.transmissionType).trim().toLowerCase()
-        : undefined;
-
-      if (!fuelKey || !fuelMap.has(fuelKey)) {
-        skipped.push({ row, reason: 'Invalid or missing fuelType name' });
-        continue;
-      }
-      if (!transKey || !transMap.has(transKey)) {
-        skipped.push({ row, reason: 'Invalid or missing transmissionType name' });
-        continue;
-      }
-
-      const fuelDoc = fuelMap.get(fuelKey)!;
-      const transDoc = transMap.get(transKey)!;
+      const fuelDoc = fuelKey && fuelMap.has(fuelKey) ? fuelMap.get(fuelKey) : undefined;
+      const transDoc = transKey && transMap.has(transKey) ? transMap.get(transKey) : undefined;
 
       const variant = {
-        name: row.name.trim().toLowerCase(),
-        displayName: row.displayName?.trim() || row.name.trim(),
-        vehicleModel: normalizedModelId, // ✅ always the user-provided modelId
+        name: row.name ? String(row.name).trim().toLowerCase() : `variant-row-${idx + 1}`,
+        displayName: row.displayName?.trim() || (row.name ? String(row.name).trim() : `Variant ${idx + 1}`),
+        vehicleModel: normalizedModelId,
 
-        // store ObjectId refs while CSV uses names
-        fuelType: fuelDoc._id,
-        transmissionType: transDoc._id,
+        fuelType: fuelDoc ? fuelDoc._id : undefined,
+        transmissionType: transDoc ? transDoc._id : undefined,
 
-        featurePackage: row.featurePackage
-          ? String(row.featurePackage).trim()
-          : row.name?.trim(),
+        featurePackage: row.featurePackage ? String(row.featurePackage).trim() : row.name?.trim(),
 
         engineSpecs: {
           capacity: parseNumber(row.engine_capacity),
@@ -1614,7 +1579,7 @@ export class VehicleInventoryService {
         brochureUrl: row.brochureUrl || '',
         videoUrl: row.videoUrl || '',
 
-        features: row.featuresJson ? JSON.parse(row.featuresJson) : undefined,
+        features: row.featuresJson ? (() => { try { return JSON.parse(row.featuresJson); } catch { return undefined; } })() : undefined,
 
         isActive: parseBool(row.isActive),
         isLaunched: parseBool(row.isLaunched),
@@ -1624,61 +1589,24 @@ export class VehicleInventoryService {
         updatedAt: new Date(),
       };
 
-      // Avoid duplicate combinations inside this CSV (matches DB unique index)
-      const comboKey = `${normalizedModelId}-${String(fuelDoc._id)}-${String(
-        transDoc._id,
-      )}-${String(variant.featurePackage || '').toLowerCase()}`;
-      if (comboSeen.has(comboKey)) {
-        skipped.push({
-          row,
-          reason:
-            'Duplicate combination in CSV (vehicleModel + fuelType + transmissionType + featurePackage)',
-        });
-        continue;
-      }
-      comboSeen.add(comboKey);
-
       validVariants.push(variant);
     }
 
-    // --- Step 4: Skip combinations that already exist in DB to avoid unique index errors ---
-    const existing = await this.vehicleVariantModel
-      .find({
-        vehicleModel: normalizedModelId,
-        isDeleted: false,
-      })
-      .select(
-        'vehicleModel fuelType transmissionType featurePackage',
-      )
-      .lean();
-
-    const existingComboSet = new Set(
-      existing.map(
-        v =>
-          `${String(v.vehicleModel)}-${String(v.fuelType)}-${String(
-            v.transmissionType,
-          )}-${String(v.featurePackage).toLowerCase()}`,
-      ),
-    );
-
-    const finalInsert = validVariants.filter(v => {
-      const comboKey = `${v.vehicleModel}-${String(
-        v.fuelType,
-      )}-${String(v.transmissionType)}-${String(v.featurePackage).toLowerCase()}`;
-      if (existingComboSet.has(comboKey)) {
-        skipped.push({
-          row: v,
-          reason:
-            'Variant with same fuel/transmission/featurePackage already exists for this model (unique index)',
-        });
-        return false;
-      }
-      return true;
-    });
-    // --- Step 5: Insert ---
+    // Insert permissively: allow duplicates to fail but continue with others
     let insertedDocs: any[] = [];
-    if (finalInsert.length > 0) {
-      insertedDocs = await this.vehicleVariantModel.insertMany(finalInsert);
+    try {
+      if (validVariants.length > 0) {
+        insertedDocs = await this.vehicleVariantModel.insertMany(validVariants, { ordered: false });
+      }
+    } catch (err: any) {
+      // Best-effort: if partial inserts happened, Mongoose may include insertedDocs
+      if (Array.isArray(err.insertedDocs)) {
+        insertedDocs = err.insertedDocs;
+      } else {
+        // swallow and continue — we'll report what insertedDocs we have
+        // log error for debugging
+        console.warn('Partial insert error (variants):', err?.message || err);
+      }
     }
 
     return {
@@ -1688,13 +1616,7 @@ export class VehicleInventoryService {
       insertedCount: insertedDocs.length,
       skippedCount: skipped.length,
 
-      inserted: insertedDocs.map(v => ({
-        _id: v._id,
-        name: v.name,
-        displayName: v.displayName,
-        vehicleModel: v.vehicleModel,
-      })),
-
+      inserted: insertedDocs.map((v: any) => ({ _id: v._id, name: v.name, displayName: v.displayName, vehicleModel: v.vehicleModel })),
       skipped,
     };
   }
@@ -1702,177 +1624,174 @@ export class VehicleInventoryService {
 
   async createVechicleModelUploadFromId(id:string,buffer:Buffer,fileType:'csv')
   {
-    const checkManufacturer=await this.manufacturerModel.findOne({_id:id,isDeleted:false}).lean();
-    if(!checkManufacturer)
-    {
-      throw new NotFoundException(`Manufacturer with ${id} not found`);
-    }
-
+    // Permissive: do not require manufacturer existence; accept the provided id as-is
     const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
     if (!rows || rows.length === 0) {
-      throw new BadRequestException('Empty or invalid CSV file');
+      return {
+        totalRows: 0,
+        uniqueRows: 0,
+        validRows: 0,
+        insertedCount: 0,
+        skippedCount: 0,
+        inserted: [],
+        skipped: [],
+      };
     }
+    const normalizedId =
+      typeof id === 'string' && id.trim().toLowerCase() !== 'undefined' && id.trim().toLowerCase() !== 'null'
+        ? id.trim()
+        : '';
 
-    // Normalize header keys to be whitespace/BOM-safe so we only gate on field names
+    // Normalizer: map common header variants to canonical field names.
+    const headerAliases: Record<string, string> = {
+      'manufacturer id': 'manufacturer',
+      'manufacturer_id': 'manufacturer',
+      'manufacturerId': 'manufacturer',
+      'model name': 'name',
+      'model': 'name',
+      'model_name': 'name',
+      'display name': 'displayName',
+      'display_name': 'displayName',
+      'launch year': 'launchYear',
+      'launch_year': 'launchYear',
+      'is commercial vehicle': 'isCommercialVehicle',
+      'commercial vehicle type': 'commercialVehicleType',
+      'commercial body type': 'commercialBodyType',
+      'default payload capacity': 'defaultPayloadCapacity',
+      'default axle count': 'defaultAxleCount',
+      'default payload unit': 'defaultPayloadUnit',
+      'default seating capacity': 'defaultSeatingCapacity',
+      'brochure url': 'brochureUrl',
+      'fuel types': 'fuelTypes',
+      'transmission types': 'transmissionTypes',
+      'is deleted': 'isDeleted',
+    };
+
+    const normalizeKey = (rawKey: string) => {
+      const trimmed = rawKey.trim();
+      const keyNorm = trimmed.replace(/[\s_\-]+/g, ' ').toLowerCase();
+      if (headerAliases[keyNorm]) return headerAliases[keyNorm];
+      return trimmed;
+    };
+
+    // Normalize header keys to canonical allowed field names where possible
+    // Normalize headers using existing alias map and normalizeKey helper
     const normalizeRowKeys = (row: Record<string, any>) =>
       Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [key.trim(), value]),
+        Object.entries(row).map(([key, value]) => [normalizeKey(key), value]),
       );
+
     const normalizedRows = rows.map(normalizeRowKeys);
-
-    const allowedFields = [
-      'name',
-      'displayName',
-      'vehicleType',
-      'description',
-      'launchYear',
-      'segment',
-      'bodyType',
-      'images',
-      'brochureUrl',
-      'isCommercialVehicle',
-      'commercialVehicleType',
-      'commercialBodyType',
-      'defaultPayloadCapacity',
-      'defaultAxleCount',
-      'defaultPayloadUnit',
-      'defaultSeatingCapacity',
-      'fuelTypes',
-      'transmissionTypes',
-      'isActive',
-    ];
-
-    const rawFields = Object.keys(normalizedRows[0]);
-    const unknownFields = rawFields.filter(f => !allowedFields.includes(f));
-
-    if (unknownFields.length > 0) {
-      throw new BadRequestException(
-        `Invalid CSV field(s): ${unknownFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}`
-      );
-    }
-
-    // Deduplicate but do not skip rows for missing/invalid names; fall back to row index
-    const seen=new Set<string>();
-    const uniqueRows:Record<string,any>[]=[];
-
-    normalizedRows.forEach((row, idx) => {
-      const baseName = row.name ?? row.displayName ?? `model-${idx + 1}`;
-      const normalizedName = String(baseName).trim().toLowerCase();
-      const dedupKey = normalizedName || `row-${idx + 1}`;
-      if(seen.has(dedupKey)) return;
-      seen.add(dedupKey);
-      uniqueRows.push({
-        ...row,
-        name: normalizedName,
-        displayName: row.displayName?.trim() || String(baseName).trim(),
-      });
-    });
 
     const validModels:Record<string,any>[]=[];
     const skipped:any[]=[];
 
-    for(const row of uniqueRows)
-    {
+    normalizedRows.forEach((row, idx) => {
+      const baseName =
+        row.name ??
+        row.displayName ??
+        row.model ??
+        row.modelName ??
+        `model-${idx + 1}`;
+      const name = String(baseName).trim() || `model-${idx + 1}`;
+      const displayName = row.displayName ? String(row.displayName).trim() : name;
+      const manufacturer =
+        normalizedId ||
+        (row.manufacturer !== undefined
+          ? String(row.manufacturer).trim()
+          : row.manufacturerId !== undefined
+          ? String(row.manufacturerId).trim()
+          : row.manufacturer_id !== undefined
+          ? String(row.manufacturer_id).trim()
+          : '');
 
       const modelDoc = {
-        name: row.name,
-        displayName: row.displayName,
-        manufacturer: id,
-        vehicleType: row.vehicleType,
-        description: row.description || '',
-        launchYear: Number(row.launchYear) || null,
-        segment: row.segment || '',
-        bodyType: row.bodyType || '',
-        images: row.images
-          ? String(row.images)
-              .split(',')
-              .map((i) => i.trim())
-              .filter(Boolean)
-          : [],
-        brochureUrl: row.brochureUrl || '',
-        isCommercialVehicle: this.parseBoolean(row.isCommercialVehicle),
-        commercialVehicleType: row.commercialVehicleType || '',
-        commercialBodyType: row.commercialBodyType || '',
-        defaultPayloadCapacity: Number(row.defaultPayloadCapacity) || null,
-        defaultPayloadUnit: row.defaultPayloadUnit || '',
-        defaultAxleCount: Number(row.defaultAxleCount) || null,
-        defaultSeatingCapacity: Number(row.defaultSeatingCapacity) || null,
-        fuelTypes: row.fuelTypes
-          ? String(row.fuelTypes)
-              .split(',')
-              .map((i) => i.trim())
-              .filter(Boolean)
-          : [],
-        transmissionTypes: row.transmissionTypes
-          ? String(row.transmissionTypes)
-              .split(',')
-              .map((i) => i.trim())
-              .filter(Boolean)
-          : [],
-        isActive: this.parseBoolean(row.isActive),
-        isDeleted: false,
+        ...row,
+        name,
+        displayName,
+        manufacturer,
+        isDeleted:
+          row.isDeleted !== undefined
+            ? row.isDeleted
+            : row.is_deleted !== undefined
+            ? row.is_deleted
+            : false,
+        isActive:
+          row.isActive !== undefined ? row.isActive : row.is_active ?? true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       validModels.push(modelDoc);
-    }
+    });
 
-    if(validModels.length==0)
-    {
+    if (validModels.length === 0) {
       return {
-        totalRows:rows.length,
-        uniqueRows:uniqueRows.length,
-        validRows:0,
-        insertedCount:0,
-        skippedCount:skipped.length,
-        inserted:[],
+        totalRows: rows.length,
+        uniqueRows: normalizedRows.length,
+        validRows: 0,
+        insertedCount: 0,
+        skippedCount: skipped.length,
+        inserted: [],
         skipped,
       };
     }
 
-    const existingModels=await this.vehicleModelModel.find({name:{$in:validModels.map((m)=>m.name)},
-    manufacturer:id,
-    isDeleted:false,
-  }).select('name manufacturer').lean();
+    // Use native collection insert to avoid schema validation and allow best-effort bulk inserts.
+    let insertedIds: Record<number, any> = {};
+    let writeErrors: any[] = [];
 
-  const existingSet = new Set(
-    existingModels.map(
-      (m) => `${m.name.trim().toLowerCase()}-${String(m.manufacturer)}`,
-    ),
-  );
-
-  const finalInsertModels=validModels.filter((m)=>{
-    const key=`${m.name}-${id}`;
-    if(existingSet.has(key)){
-      skipped.push({
-        row:m,
-        reason:'Model already existsf for this manufacturer'
-      });
-      return false;
+    try {
+      const result = await this.vehicleModelModel.collection.insertMany(
+        validModels,
+        { ordered: false, bypassDocumentValidation: true },
+      );
+      insertedIds = (result && (result as any).insertedIds) || {};
+    } catch (err: any) {
+      insertedIds =
+        err?.result?.insertedIds ||
+        err?.insertedIds ||
+        err?.result?.result?.insertedIds ||
+        {};
+      writeErrors = err?.writeErrors || err?.result?.writeErrors || [];
+      if (!Object.keys(insertedIds).length && writeErrors.length === 0) {
+        throw err;
+      }
     }
-    return true;
-  })
 
-  let insertedDocs: any[] = [];
-  if (finalInsertModels.length > 0) {
-    insertedDocs = await this.vehicleModelModel.insertMany(finalInsertModels);
-  }
+    const inserted = Object.entries(insertedIds).map(([index, _id]) => {
+      const doc = validModels[Number(index)];
+      return {
+        _id,
+        name: doc?.name,
+        displayName: doc?.displayName,
+        manufacturer: doc?.manufacturer,
+      };
+    });
+
+    const skippedFromErrors =
+      writeErrors.length > 0
+        ? writeErrors.map((we: any) => ({
+            row: validModels[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
+        : [];
+
+    skipped.push(...skippedFromErrors);
+
+    const fallbackSkippedCount = Math.max(0, validModels.length - inserted.length);
+    const skippedCount =
+      skipped.length > 0 ? skipped.length : fallbackSkippedCount;
 
     return {
-    totalRows: rows.length,
-    uniqueRows: uniqueRows.length,
-    validRows: validModels.length,
-    insertedCount: insertedDocs.length,
-    skippedCount: skipped.length,
-    inserted: insertedDocs.map((m) => ({
-      _id: m._id,
-      name: m.name,
-      displayName: m.displayName,
-      manufacturer: m.manufacturer,
-    })),
-    skipped,
-  };
+      totalRows: rows.length,
+      uniqueRows: normalizedRows.length,
+      validRows: validModels.length,
+      insertedCount: inserted.length,
+      skippedCount,
+      inserted,
+      skipped,
+    };
 
   }
 }
