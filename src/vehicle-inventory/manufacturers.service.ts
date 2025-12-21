@@ -15,7 +15,7 @@ import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
 import { RedisService } from '../shared/redis.service';
-import { parseFile } from 'src/utils/file-parser.util'; 
+import { parseFile } from 'src/utils/file-parser.util';
 
 @Injectable()
 export class ManufacturersService {
@@ -277,16 +277,18 @@ export class ManufacturersService {
     // Build the aggregation pipeline
     const pipeline: PipelineStage[] = [];
 
-    // Handle prefix search first (must be the first stage if present)
+    // Handle search (matches anywhere in the string, case insensitive)
     if (filters.search && filters.search.trim()) {
-      const regex = this.buildPrefixRegex(filters.search.trim());
+      const searchTerm = filters.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(searchTerm, 'i');
       pipeline.push({
         $match: {
           $or: [{ name: regex }, { displayName: regex }],
         },
       });
     }
-
 
     // Add basic filters
     const matchStage: any = { isActive: true, isDeleted: false };
@@ -486,80 +488,80 @@ export class ManufacturersService {
     await this.invalidateManufacturerCaches();
   }
 
-async createManufacturerFromCsv(buffer: Buffer, fileType: 'csv') {
-  const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
+  async createManufacturerFromCsv(buffer: Buffer, fileType: 'csv') {
+    const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
 
-  if (!rows || rows.length === 0) {
-    throw new BadRequestException("Empty or Invalid CSV file");
-  }
-
-  const seen = new Set<string>();
-  const uniqueRows: Record<string, any>[] = [];
-
-  for (const row of rows) {
-    if (!row.name || typeof row.name !== 'string') continue;
-    const key = row.name.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    uniqueRows.push(row);
-  }
-
-  const existing = await this.manufacturerModel
-    .find({ name: { $in: uniqueRows.map((r) => r.name) } })
-    .select('name')
-    .lean();
-
-  const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
-
-  const skipped: Record<string, any>[] = [];
-  const finalRows = uniqueRows.filter((r) => {
-    if (existingNames.has(r.name.toLowerCase())) {
-      skipped.push({ row: r, reason: 'Already exists in database' });
-      return false;
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('Empty or Invalid CSV file');
     }
-    return true;
-  });
 
-  if (finalRows.length === 0) {
+    const seen = new Set<string>();
+    const uniqueRows: Record<string, any>[] = [];
+
+    for (const row of rows) {
+      if (!row.name || typeof row.name !== 'string') continue;
+      const key = row.name.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      uniqueRows.push(row);
+    }
+
+    const existing = await this.manufacturerModel
+      .find({ name: { $in: uniqueRows.map((r) => r.name) } })
+      .select('name')
+      .lean();
+
+    const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
+
+    const skipped: Record<string, any>[] = [];
+    const finalRows = uniqueRows.filter((r) => {
+      if (existingNames.has(r.name.toLowerCase())) {
+        skipped.push({ row: r, reason: 'Already exists in database' });
+        return false;
+      }
+      return true;
+    });
+
+    if (finalRows.length === 0) {
+      return {
+        totalRows: rows.length,
+        uniqueRows: uniqueRows.length,
+        insertedCount: 0,
+        skippedCount: skipped.length,
+        inserted: [],
+        skipped,
+        message: 'All manufacturers already exist in the database.',
+      };
+    }
+
+    const normalizeBool = (val: any) =>
+      val === undefined || val === null || val === ''
+        ? undefined
+        : this.parseBoolean(val);
+
+    const normalizedRows = finalRows.map((r) => ({
+      ...r,
+      name: typeof r.name === 'string' ? r.name.trim() : r.name,
+      displayName:
+        typeof r.displayName === 'string'
+          ? r.displayName.trim()
+          : typeof r.name === 'string'
+            ? r.name.trim()
+            : r.displayName,
+      isActive: normalizeBool(r.isActive),
+      isPremium: normalizeBool(r.isPremium),
+    }));
+
+    const insertedDocs =
+      await this.manufacturerModel.insertMany(normalizedRows);
+
     return {
       totalRows: rows.length,
       uniqueRows: uniqueRows.length,
-      insertedCount: 0,
+      insertedCount: insertedDocs.length,
       skippedCount: skipped.length,
-      inserted: [],
+      inserted: insertedDocs,
       skipped,
-      message: "All manufacturers already exist in the database.",
     };
   }
-
-  const normalizeBool = (val: any) =>
-    val === undefined || val === null || val === '' ? undefined : this.parseBoolean(val);
-
-  const normalizedRows = finalRows.map(r => ({
-    ...r,
-    name: typeof r.name === 'string' ? r.name.trim() : r.name,
-    displayName:
-      typeof r.displayName === 'string'
-        ? r.displayName.trim()
-        : typeof r.name === 'string'
-        ? r.name.trim()
-        : r.displayName,
-    isActive: normalizeBool(r.isActive),
-    isPremium: normalizeBool(r.isPremium),
-  }));
-
-  const insertedDocs = await this.manufacturerModel.insertMany(normalizedRows);
-
-  return {
-    totalRows: rows.length,
-    uniqueRows: uniqueRows.length,
-    insertedCount: insertedDocs.length,
-    skippedCount: skipped.length,
-    inserted: insertedDocs,
-    skipped,
-  };
-}
-
-
-
 }
