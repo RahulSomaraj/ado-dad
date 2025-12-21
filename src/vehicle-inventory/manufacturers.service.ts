@@ -32,7 +32,7 @@ export class ManufacturersService {
     @InjectModel(Manufacturer.name)
     private readonly manufacturerModel: Model<ManufacturerDocument>,
     private readonly redisService: RedisService,
-  ) {}
+  ) { }
 
   // ---- helpers ------------------------------------------------------------
   private key(parts: Record<string, unknown>): string {
@@ -656,9 +656,9 @@ export class ManufacturersService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: docs[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: docs[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);
@@ -678,3 +678,4 @@ export class ManufacturersService {
       skipped,
     };
   }
+}
