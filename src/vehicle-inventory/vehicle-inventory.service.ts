@@ -1278,11 +1278,15 @@ export class VehicleInventoryService {
     // Build the aggregation pipeline
     const pipeline: any[] = [];
 
-    // Handle text search first (must be the first stage if present)
-    if (filters.search) {
+    // Handle search (matches anywhere in the string, case insensitive)
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = filters.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(searchTerm, 'i');
       pipeline.push({
         $match: {
-          $text: { $search: filters.search },
+          $or: [{ name: regex }, { displayName: regex }],
         },
       });
     }
