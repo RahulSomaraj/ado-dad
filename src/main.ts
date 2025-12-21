@@ -184,7 +184,15 @@ async function bootstrap() {
   app.use(urlencoded({ limit: '1mb', extended: true }));
   app.use(
     text({
-      type: ['text/csv', 'application/csv', 'text/plain'],
+      type: [
+        'text/csv',
+        'application/csv',
+        'text/plain',
+        'text/x-csv',
+        'text/comma-separated-values',
+        'application/x-csv',
+        'application/vnd.ms-excel',
+      ],
       limit: '5mb',
     }),
   );

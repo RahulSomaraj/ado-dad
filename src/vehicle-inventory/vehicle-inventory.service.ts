@@ -1479,18 +1479,19 @@ export class VehicleInventoryService {
     return this.manufacturersService.findManufacturersWithFilters(filters);
   }
 
-  private parseBoolean(value: any): boolean {
-    if (value === undefined || value === null) return false;
+  private parseBoolean(value: any, defaultValue = false): boolean {
+    if (value === undefined || value === null) return defaultValue;
     const normalized = String(value).trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-    return false;
+    if (!normalized) return defaultValue;
+    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
+    return defaultValue;
   }
 
   async createVehicleVariantCsv(
     buffer: Buffer,
     fileType: 'csv',
-    modelId: string, // ✅ model id provided by user
+    modelId: string, // ?. model id provided by user
   ) {
     const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
 
@@ -1507,19 +1508,136 @@ export class VehicleInventoryService {
       };
     }
 
-    const normalizedModelId = String(modelId);
+    const normalizeId = (value: any) => {
+      if (value === undefined || value === null) return '';
+      const trimmed = String(value).trim();
+      if (!trimmed) return '';
+      const lowered = trimmed.toLowerCase();
+      if (lowered === 'undefined' || lowered === 'null') return '';
+      return trimmed;
+    };
+
+    const normalizedModelId = normalizeId(modelId);
+
+    const toMaybeObjectId = (value: string) => {
+      if (!value) return value;
+      return Types.ObjectId.isValid(value) ? new Types.ObjectId(value) : value;
+    };
+
+    const headerAliases: Record<string, string> = {
+      variant_name: 'name',
+      variant: 'name',
+      display: 'display_name',
+      displayname: 'display_name',
+      display_name: 'display_name',
+      variant_display_name: 'display_name',
+      model_id: 'vehicle_model',
+      modelid: 'vehicle_model',
+      vehicle_model_id: 'vehicle_model',
+      vehicle_model: 'vehicle_model',
+      vehiclemodelid: 'vehicle_model',
+      vehiclemodel: 'vehicle_model',
+      fuel: 'fuel_type',
+      fueltype: 'fuel_type',
+      fuel_type: 'fuel_type',
+      transmission: 'transmission_type',
+      transmissiontype: 'transmission_type',
+      transmission_type: 'transmission_type',
+      gearbox: 'transmission_type',
+      feature: 'feature_package',
+      featurepackage: 'feature_package',
+      feature_package: 'feature_package',
+      engine_cc: 'engine_capacity',
+      engine_capacity: 'engine_capacity',
+      engine_displacement: 'engine_capacity',
+      engine_power: 'engine_max_power',
+      engine_max_power: 'engine_max_power',
+      engine_torque: 'engine_max_torque',
+      engine_max_torque: 'engine_max_torque',
+      engine_cylinders: 'engine_cylinders',
+      engine_turbocharged: 'engine_turbo',
+      engine_turbo: 'engine_turbo',
+      performance_mileage: 'perf_mileage',
+      perf_mileage: 'perf_mileage',
+      performance_acceleration: 'perf_acceleration',
+      perf_acceleration: 'perf_acceleration',
+      performance_top_speed: 'perf_top_speed',
+      perf_top_speed: 'perf_top_speed',
+      performance_fuel_capacity: 'perf_fuel_capacity',
+      perf_fuel_capacity: 'perf_fuel_capacity',
+      dimension_length: 'dim_length',
+      dim_length: 'dim_length',
+      dimension_width: 'dim_width',
+      dim_width: 'dim_width',
+      dimension_height: 'dim_height',
+      dim_height: 'dim_height',
+      dimension_wheelbase: 'dim_wheelbase',
+      dim_wheelbase: 'dim_wheelbase',
+      ground_clearance: 'dim_ground_clearance',
+      dim_ground_clearance: 'dim_ground_clearance',
+      boot_space: 'dim_boot_space',
+      dim_boot_space: 'dim_boot_space',
+      seating_capacity: 'seating_capacity',
+      ex_showroom_price: 'ex_showroom_price',
+      exshowroomprice: 'ex_showroom_price',
+      on_road_price: 'on_road_price',
+      onroadprice: 'on_road_price',
+      brochure_url: 'brochure_url',
+      brochure: 'brochure_url',
+      video_url: 'video_url',
+      video: 'video_url',
+      features_json: 'features_json',
+      features: 'features_json',
+      isdeleted: 'is_deleted',
+      is_active: 'is_active',
+      is_launched: 'is_launched',
+      launch_date: 'launch_date',
+    };
+
+    const toCamelCase = (value: string) =>
+      value.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
+
+    const normalizeKey = (rawKey: string) => {
+      const trimmed = rawKey.trim();
+      if (!trimmed) return trimmed;
+      const spaced = trimmed.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+      const snake = spaced
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase();
+      if (!snake) return trimmed;
+      const canonical = headerAliases[snake] ?? snake;
+      return toCamelCase(canonical);
+    };
+
+    const normalizeRowKeys = (row: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [normalizeKey(key), value]),
+      );
+
+    const normalizedRows = rows.map(normalizeRowKeys);
+
+    const skipped: any[] = [];
 
     // --- Step 1: Deduplicate (by name + provided modelId) but generate fallback names if missing ---
     const seen = new Set<string>();
     const uniqueRows: Record<string, any>[] = [];
 
-    rows.forEach((row, idx) => {
+    normalizedRows.forEach((row, idx) => {
       const baseName = row.name ?? row.displayName ?? `variant-row-${idx + 1}`;
       const normName = String(baseName).trim().toLowerCase();
-      const key = `${normName}-${normalizedModelId}`;
-      if (seen.has(key)) return;
+      const rowModelId = normalizeId(row.vehicleModel) || normalizedModelId;
+      const key = `${normName}-${rowModelId}`;
+      if (seen.has(key)) {
+        skipped.push({ row, reason: 'Duplicate in CSV' });
+        return;
+      }
       seen.add(key);
-      uniqueRows.push({ ...row, name: String(baseName).trim() });
+      uniqueRows.push({
+        ...row,
+        name: String(baseName).trim(),
+        vehicleModel: rowModelId,
+      });
     });
 
     // --- Step 2: Attempt to map fuel/trans names if present; otherwise allow null and continue ---
@@ -1557,11 +1675,14 @@ export class VehicleInventoryService {
     );
 
     const validVariants: any[] = [];
-    const skipped: any[] = [];
 
-    const parseBool = (v: any) => this.parseBoolean(v);
-    const parseNumber = (v: any) =>
-      v === undefined || v === null || v === '' ? undefined : Number(v);
+    const parseBool = (v: any, defaultValue = false) =>
+      this.parseBoolean(v, defaultValue);
+    const parseNumber = (v: any) => {
+      if (v === undefined || v === null || v === '') return undefined;
+      const parsed = Number(v);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    };
     const parseArray = (v: any) =>
       v
         ? String(v)
@@ -1582,45 +1703,57 @@ export class VehicleInventoryService {
         fuelKey && fuelMap.has(fuelKey) ? fuelMap.get(fuelKey) : undefined;
       const transDoc =
         transKey && transMap.has(transKey) ? transMap.get(transKey) : undefined;
+      const rawModelId = normalizeId(row.vehicleModel) || normalizedModelId;
+      const resolvedModelId = rawModelId
+        ? toMaybeObjectId(rawModelId)
+        : undefined;
+      const fuelValue = fuelDoc
+        ? fuelDoc._id
+        : row.fuelType
+        ? String(row.fuelType).trim()
+        : undefined;
+      const transValue = transDoc
+        ? transDoc._id
+        : row.transmissionType
+        ? String(row.transmissionType).trim()
+        : undefined;
 
       const variant = {
-        name: row.name
-          ? String(row.name).trim().toLowerCase()
-          : `variant-row-${idx + 1}`,
+        name: row.name ? String(row.name).trim() : `variant-row-${idx + 1}`,
         displayName:
           row.displayName?.trim() ||
           (row.name ? String(row.name).trim() : `Variant ${idx + 1}`),
-        vehicleModel: normalizedModelId,
+        vehicleModel: resolvedModelId,
 
-        fuelType: fuelDoc ? fuelDoc._id : undefined,
-        transmissionType: transDoc ? transDoc._id : undefined,
+        fuelType: fuelValue || undefined,
+        transmissionType: transValue || undefined,
 
         featurePackage: row.featurePackage
           ? String(row.featurePackage).trim()
           : row.name?.trim(),
 
         engineSpecs: {
-          capacity: parseNumber(row.engine_capacity),
-          maxPower: parseNumber(row.engine_maxPower),
-          maxTorque: parseNumber(row.engine_maxTorque),
-          cylinders: parseNumber(row.engine_cylinders),
-          turbocharged: row.engine_turbo ? parseBool(row.engine_turbo) : false,
+          capacity: parseNumber(row.engineCapacity),
+          maxPower: parseNumber(row.engineMaxPower),
+          maxTorque: parseNumber(row.engineMaxTorque),
+          cylinders: parseNumber(row.engineCylinders),
+          turbocharged: parseBool(row.engineTurbo, false),
         },
 
         performanceSpecs: {
-          mileage: parseNumber(row.perf_mileage),
-          acceleration: parseNumber(row.perf_acceleration),
-          topSpeed: parseNumber(row.perf_topSpeed),
-          fuelCapacity: parseNumber(row.perf_fuelCapacity),
+          mileage: parseNumber(row.perfMileage),
+          acceleration: parseNumber(row.perfAcceleration),
+          topSpeed: parseNumber(row.perfTopSpeed),
+          fuelCapacity: parseNumber(row.perfFuelCapacity),
         },
 
         dimensions: {
-          length: parseNumber(row.dim_length),
-          width: parseNumber(row.dim_width),
-          height: parseNumber(row.dim_height),
-          wheelbase: parseNumber(row.dim_wheelbase),
-          groundClearance: parseNumber(row.dim_groundClearance),
-          bootSpace: parseNumber(row.dim_bootSpace),
+          length: parseNumber(row.dimLength),
+          width: parseNumber(row.dimWidth),
+          height: parseNumber(row.dimHeight),
+          wheelbase: parseNumber(row.dimWheelbase),
+          groundClearance: parseNumber(row.dimGroundClearance),
+          bootSpace: parseNumber(row.dimBootSpace),
         },
 
         seatingCapacity: parseNumber(row.seatingCapacity),
@@ -1645,8 +1778,9 @@ export class VehicleInventoryService {
             })()
           : undefined,
 
-        isActive: parseBool(row.isActive),
-        isLaunched: parseBool(row.isLaunched),
+        isActive: parseBool(row.isActive, true),
+        isLaunched: parseBool(row.isLaunched, false),
+        isDeleted: parseBool(row.isDeleted, false),
         launchDate: row.launchDate || null,
 
         createdAt: new Date(),
@@ -1656,42 +1790,77 @@ export class VehicleInventoryService {
       validVariants.push(variant);
     }
 
-    // Insert permissively: allow duplicates to fail but continue with others
-    let insertedDocs: any[] = [];
+    if (validVariants.length === 0) {
+      return {
+        totalRows: rows.length,
+        uniqueRows: uniqueRows.length,
+        validRows: 0,
+        insertedCount: 0,
+        skippedCount: skipped.length,
+        inserted: [],
+        skipped,
+      };
+    }
+
+    let insertedIds: Record<number, any> = {};
+    let writeErrors: any[] = [];
+
     try {
-      if (validVariants.length > 0) {
-        insertedDocs = await this.vehicleVariantModel.insertMany(
-          validVariants,
-          { ordered: false },
-        );
-      }
+      const result = await this.vehicleVariantModel.collection.insertMany(
+        validVariants,
+        { ordered: false, bypassDocumentValidation: true },
+      );
+      insertedIds = (result && (result as any).insertedIds) || {};
     } catch (err: any) {
-      // Best-effort: if partial inserts happened, Mongoose may include insertedDocs
-      if (Array.isArray(err.insertedDocs)) {
-        insertedDocs = err.insertedDocs;
-      } else {
-        // swallow and continue — we'll report what insertedDocs we have
-        // log error for debugging
-        console.warn('Partial insert error (variants):', err?.message || err);
+      insertedIds =
+        err?.result?.insertedIds ||
+        err?.insertedIds ||
+        err?.result?.result?.insertedIds ||
+        {};
+      writeErrors = err?.writeErrors || err?.result?.writeErrors || [];
+      if (!Object.keys(insertedIds).length && writeErrors.length === 0) {
+        throw err;
       }
     }
+
+    const inserted = Object.entries(insertedIds).map(([index, _id]) => {
+      const doc = validVariants[Number(index)];
+      return {
+        _id,
+        name: doc?.name,
+        displayName: doc?.displayName,
+        vehicleModel: doc?.vehicleModel,
+      };
+    });
+
+    const skippedFromErrors =
+      writeErrors.length > 0
+        ? writeErrors.map((we: any) => ({
+            row: validVariants[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
+        : [];
+
+    skipped.push(...skippedFromErrors);
+
+    const fallbackSkippedCount = Math.max(0, validVariants.length - inserted.length);
+    const skippedCount =
+      skipped.length > 0 ? skipped.length : fallbackSkippedCount;
+
+    await this.invalidateInventoryCaches();
 
     return {
       totalRows: rows.length,
       uniqueRows: uniqueRows.length,
       validRows: validVariants.length,
-      insertedCount: insertedDocs.length,
-      skippedCount: skipped.length,
+      insertedCount: inserted.length,
+      skippedCount,
 
-      inserted: insertedDocs.map((v: any) => ({
-        _id: v._id,
-        name: v.name,
-        displayName: v.displayName,
-        vehicleModel: v.vehicleModel,
-      })),
+      inserted,
       skipped,
     };
   }
+
 
   async createVechicleModelUploadFromId(
     id: string,
@@ -1761,6 +1930,8 @@ export class VehicleInventoryService {
 
     const validModels: Record<string, any>[] = [];
     const skipped: any[] = [];
+    const parseBool = (v: any, defaultValue = false) =>
+      this.parseBoolean(v, defaultValue);
 
     normalizedRows.forEach((row, idx) => {
       const baseName =
@@ -1783,19 +1954,25 @@ export class VehicleInventoryService {
               ? String(row.manufacturer_id).trim()
               : '');
 
+      const isActiveValue =
+        row.isActive !== undefined ? row.isActive : row.is_active;
+      const isDeletedValue =
+        row.isDeleted !== undefined ? row.isDeleted : row.is_deleted;
+      const isCommercialValue =
+        row.isCommercialVehicle !== undefined
+          ? row.isCommercialVehicle
+          : row.is_commercial_vehicle;
+
       const modelDoc = {
         ...row,
         name,
         displayName,
         manufacturer,
-        isDeleted:
-          row.isDeleted !== undefined
-            ? row.isDeleted
-            : row.is_deleted !== undefined
-              ? row.is_deleted
-              : false,
-        isActive:
-          row.isActive !== undefined ? row.isActive : (row.is_active ?? true),
+        ...(isCommercialValue !== undefined
+          ? { isCommercialVehicle: parseBool(isCommercialValue, false) }
+          : {}),
+        isDeleted: parseBool(isDeletedValue, false),
+        isActive: parseBool(isActiveValue, true),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -1864,6 +2041,8 @@ export class VehicleInventoryService {
     const skippedCount =
       skipped.length > 0 ? skipped.length : fallbackSkippedCount;
 
+    await this.invalidateInventoryCaches();
+
     return {
       totalRows: rows.length,
       uniqueRows: normalizedRows.length,
@@ -1874,4 +2053,5 @@ export class VehicleInventoryService {
       skipped,
     };
   }
+
 }

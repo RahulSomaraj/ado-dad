@@ -108,12 +108,13 @@ export class ManufacturersService {
     return { field, dir };
   }
 
-  private parseBoolean(value: any): boolean {
-    if (value === undefined || value === null) return false;
+  private parseBoolean(value: any, defaultValue = false): boolean {
+    if (value === undefined || value === null) return defaultValue;
     const normalized = String(value).trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-    return false;
+    if (!normalized) return defaultValue;
+    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
+    return defaultValue;
   }
 
   // Manufacturer CRUD methods
@@ -492,19 +493,81 @@ export class ManufacturersService {
     const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
 
     if (!rows || rows.length === 0) {
-      throw new BadRequestException('Empty or Invalid CSV file');
+      return {
+        totalRows: 0,
+        uniqueRows: 0,
+        insertedCount: 0,
+        skippedCount: 0,
+        inserted: [],
+        skipped: [],
+      };
     }
+
+    const headerAliases: Record<string, string> = {
+      'manufacturer name': 'name',
+      'brand name': 'name',
+      displayname: 'displayName',
+      'display name': 'displayName',
+      origincountry: 'originCountry',
+      'origin country': 'originCountry',
+      origin: 'originCountry',
+      country: 'originCountry',
+      foundedyear: 'foundedYear',
+      'founded year': 'foundedYear',
+      'year founded': 'foundedYear',
+      headquarter: 'headquarters',
+      headquarters: 'headquarters',
+      'logo url': 'logo',
+      'website url': 'website',
+      isactive: 'isActive',
+      'is active': 'isActive',
+      active: 'isActive',
+      ispremium: 'isPremium',
+      'is premium': 'isPremium',
+      premium: 'isPremium',
+      isdeleted: 'isDeleted',
+      'is deleted': 'isDeleted',
+      deleted: 'isDeleted',
+    };
+
+    const normalizeKey = (rawKey: string) => {
+      const trimmed = rawKey.trim();
+      if (!trimmed) return trimmed;
+      const keyNorm = trimmed.replace(/[\s_\-]+/g, ' ').toLowerCase();
+      if (headerAliases[keyNorm]) return headerAliases[keyNorm];
+      return trimmed;
+    };
+
+    const normalizeRowKeys = (row: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [normalizeKey(key), value]),
+      );
+
+    const normalizedRows = rows.map(normalizeRowKeys);
 
     const seen = new Set<string>();
     const uniqueRows: Record<string, any>[] = [];
+    const skipped: Record<string, any>[] = [];
 
-    for (const row of rows) {
-      if (!row.name || typeof row.name !== 'string') continue;
-      const key = row.name.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
+    normalizedRows.forEach((row) => {
+      const baseName = row.name ?? row.displayName;
+      if (!baseName || typeof baseName !== 'string') {
+        skipped.push({ row, reason: 'Missing manufacturer name' });
+        return;
+      }
+      const trimmedName = baseName.trim();
+      if (!trimmedName) {
+        skipped.push({ row, reason: 'Missing manufacturer name' });
+        return;
+      }
+      const key = trimmedName.toLowerCase();
+      if (seen.has(key)) {
+        skipped.push({ row, reason: 'Duplicate in CSV' });
+        return;
+      }
       seen.add(key);
-      uniqueRows.push(row);
-    }
+      uniqueRows.push({ ...row, name: trimmedName });
+    });
 
     const existing = await this.manufacturerModel
       .find({ name: { $in: uniqueRows.map((r) => r.name) } })
@@ -513,10 +576,9 @@ export class ManufacturersService {
 
     const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
 
-    const skipped: Record<string, any>[] = [];
-    const finalRows = uniqueRows.filter((r) => {
-      if (existingNames.has(r.name.toLowerCase())) {
-        skipped.push({ row: r, reason: 'Already exists in database' });
+    const finalRows = uniqueRows.filter((row) => {
+      if (existingNames.has(String(row.name).toLowerCase())) {
+        skipped.push({ row, reason: 'Already exists in database' });
         return false;
       }
       return true;
@@ -534,34 +596,85 @@ export class ManufacturersService {
       };
     }
 
-    const normalizeBool = (val: any) =>
-      val === undefined || val === null || val === ''
-        ? undefined
-        : this.parseBoolean(val);
+    const parseBool = (val: any, defaultValue = false) =>
+      this.parseBoolean(val, defaultValue);
+    const parseNumber = (val: any) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const parsed = Number(val);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    };
+    const parseString = (val: any) =>
+      typeof val === 'string' ? val.trim() : val;
 
-    const normalizedRows = finalRows.map((r) => ({
-      ...r,
-      name: typeof r.name === 'string' ? r.name.trim() : r.name,
-      displayName:
-        typeof r.displayName === 'string'
-          ? r.displayName.trim()
-          : typeof r.name === 'string'
-            ? r.name.trim()
-            : r.displayName,
-      isActive: normalizeBool(r.isActive),
-      isPremium: normalizeBool(r.isPremium),
+    const docs = finalRows.map((row) => ({
+      name: parseString(row.name),
+      displayName: parseString(row.displayName) || parseString(row.name),
+      originCountry: parseString(row.originCountry),
+      description: parseString(row.description),
+      logo: parseString(row.logo),
+      website: parseString(row.website),
+      foundedYear: parseNumber(row.foundedYear),
+      headquarters: parseString(row.headquarters),
+      isActive: parseBool(row.isActive, true),
+      isPremium: parseBool(row.isPremium, false),
+      isDeleted: parseBool(row.isDeleted, false),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }));
 
-    const insertedDocs =
-      await this.manufacturerModel.insertMany(normalizedRows);
+    let insertedIds: Record<number, any> = {};
+    let writeErrors: any[] = [];
+
+    try {
+      const result = await this.manufacturerModel.collection.insertMany(docs, {
+        ordered: false,
+        bypassDocumentValidation: true,
+      });
+      insertedIds = (result && (result as any).insertedIds) || {};
+    } catch (err: any) {
+      insertedIds =
+        err?.result?.insertedIds ||
+        err?.insertedIds ||
+        err?.result?.result?.insertedIds ||
+        {};
+      writeErrors = err?.writeErrors || err?.result?.writeErrors || [];
+      if (!Object.keys(insertedIds).length && writeErrors.length === 0) {
+        throw err;
+      }
+    }
+
+    const inserted = Object.entries(insertedIds).map(([index, _id]) => {
+      const doc = docs[Number(index)];
+      return {
+        _id,
+        name: doc?.name,
+        displayName: doc?.displayName,
+        originCountry: doc?.originCountry,
+      };
+    });
+
+    const skippedFromErrors =
+      writeErrors.length > 0
+        ? writeErrors.map((we: any) => ({
+            row: docs[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
+        : [];
+
+    skipped.push(...skippedFromErrors);
+
+    const fallbackSkippedCount = Math.max(0, docs.length - inserted.length);
+    const skippedCount =
+      skipped.length > 0 ? skipped.length : fallbackSkippedCount;
+
+    await this.invalidateManufacturerCaches();
 
     return {
       totalRows: rows.length,
       uniqueRows: uniqueRows.length,
-      insertedCount: insertedDocs.length,
-      skippedCount: skipped.length,
-      inserted: insertedDocs,
+      insertedCount: inserted.length,
+      skippedCount,
+      inserted,
       skipped,
     };
   }
-}
