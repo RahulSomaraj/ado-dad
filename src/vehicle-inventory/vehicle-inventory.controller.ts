@@ -28,7 +28,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-   ApiConsumes,
+  ApiConsumes,
   ApiQuery,
   ApiBearerAuth,
   ApiBody,
@@ -78,229 +78,6 @@ export class VehicleInventoryController {
   }
 
   @Get('models')
-  @ApiOperation({
-    summary:
-      'Get all vehicle models with comprehensive filtering and pagination',
-    description:
-      'Retrieve vehicle models with advanced filtering options including search, manufacturer filters, vehicle specifications, features, and pagination support.',
-  })
-  // @ApiQuery({
-  //   name: 'search',
-  //   required: false,
-  //   description: 'Search vehicle models by name, display name, or description',
-  //   example: 'swift',
-  // // })
-  // @ApiQuery({
-  //   name: 'manufacturerId',
-  //   required: false,
-  //   description: 'Filter by manufacturer ID',
-  //   example: '507f1f77bcf86cd799439011',
-  // })
-  // @ApiQuery({
-  //   name: 'vehicleType',
-  //   required: false,
-  //   description: 'Filter by vehicle type',
-  //   enum: [
-  //     'SUV',
-  //     'Sedan',
-  //     'Truck',
-  //     'Coupe',
-  //     'Hatchback',
-  //     'Convertible',
-  //     'two-wheeler',
-  //     'MUV',
-  //     'Compact SUV',
-  //     'Sub-Compact SUV',
-  //   ],
-  //   example: 'SUV',
-  // })
-  // @ApiQuery({
-  //   name: 'segment',
-  //   required: false,
-  //   description: 'Filter by vehicle segment (A, B, C, D, E)',
-  //   example: 'B',
-  // })
-  // @ApiQuery({
-  //   name: 'bodyType',
-  //   required: false,
-  //   description: 'Filter by body type',
-  //   example: 'Hatchback',
-  // })
-  // @ApiQuery({
-  //   name: 'minLaunchYear',
-  //   required: false,
-  //   description: 'Filter by minimum launch year',
-  //   example: 2020,
-  // })
-  // @ApiQuery({
-  //   name: 'maxLaunchYear',
-  //   required: false,
-  //   description: 'Filter by maximum launch year',
-  //   example: 2024,
-  // })
-  // @ApiQuery({
-  //   name: 'manufacturerName',
-  //   required: false,
-  //   description: 'Filter by manufacturer name',
-  //   example: 'Maruti Suzuki',
-  // })
-  // @ApiQuery({
-  //   name: 'manufacturerCountry',
-  //   required: false,
-  //   description: 'Filter by manufacturer origin country',
-  //   example: 'Japan',
-  // })
-  // @ApiQuery({
-  //   name: 'manufacturerCategory',
-  //   required: false,
-  //   description: 'Filter by manufacturer category',
-  //   enum: [
-  //     'passenger_car',
-  //     'two_wheeler',
-  //     'commercial_vehicle',
-  //     'luxury',
-  //     'suv',
-  //   ],
-  //   example: 'passenger_car',
-  // })
-  // @ApiQuery({
-  //   name: 'manufacturerRegion',
-  //   required: false,
-  //   description: 'Filter by manufacturer region',
-  //   enum: [
-  //     'Asia',
-  //     'Europe',
-  //     'North America',
-  //     'South America',
-  //     'Africa',
-  //     'Oceania',
-  //   ],
-  //   example: 'Asia',
-  // })
-  // @ApiQuery({
-  //   name: 'minPrice',
-  //   required: false,
-  //   description: 'Filter by minimum price of variants',
-  //   example: 500000,
-  // })
-  // @ApiQuery({
-  //   name: 'maxPrice',
-  //   required: false,
-  //   description: 'Filter by maximum price of variants',
-  //   example: 2000000,
-  // })
-  // @ApiQuery({
-  //   name: 'fuelType',
-  //   required: false,
-  //   description: 'Filter by fuel type',
-  //   example: 'Petrol',
-  // })
-  // @ApiQuery({
-  //   name: 'transmissionType',
-  //   required: false,
-  //   description: 'Filter by transmission type',
-  //   example: 'Automatic',
-  // })
-  // @ApiQuery({
-  //   name: 'featurePackage',
-  //   required: false,
-  //   description: 'Filter by feature package',
-  //   enum: [
-  //     'Base',
-  //     'L',
-  //     'LX',
-  //     'V',
-  //     'VX',
-  //     'Z',
-  //     'ZX',
-  //     'ZX(O)',
-  //     'ZX+',
-  //     'Top End',
-  //     'Premium',
-  //     'Executive',
-  //     'Royale',
-  //   ],
-  //   example: 'VX',
-  // })
-  // @ApiQuery({
-  //   name: 'minSeatingCapacity',
-  //   required: false,
-  //   description: 'Filter by minimum seating capacity',
-  //   example: 5,
-  // })
-  // @ApiQuery({
-  //   name: 'maxSeatingCapacity',
-  //   required: false,
-  //   description: 'Filter by maximum seating capacity',
-  //   example: 7,
-  // })
-  // @ApiQuery({
-  //   name: 'minEngineCapacity',
-  //   required: false,
-  //   description: 'Filter by minimum engine capacity (cc)',
-  //   example: 1000,
-  // })
-  // @ApiQuery({
-  //   name: 'maxEngineCapacity',
-  //   required: false,
-  //   description: 'Filter by maximum engine capacity (cc)',
-  //   example: 2000,
-  // })
-  // @ApiQuery({
-  //   name: 'minMileage',
-  //   required: false,
-  //   description: 'Filter by minimum mileage (km/l)',
-  //   example: 15,
-  // })
-  // @ApiQuery({
-  //   name: 'maxMileage',
-  //   required: false,
-  //   description: 'Filter by maximum mileage (km/l)',
-  //   example: 25,
-  // })
-  // @ApiQuery({
-  //   name: 'sortBy',
-  //   required: false,
-  //   description: 'Sort by field',
-  //   enum: [
-  //     'name',
-  //     'displayName',
-  //     'vehicleType',
-  //     'segment',
-  //     'bodyType',
-  //     'launchYear',
-  //     'manufacturer.name',
-  //     'manufacturer.displayName',
-  //     'manufacturer.originCountry',
-  //     'createdAt',
-  //     'updatedAt',
-  //   ],
-  //   example: 'displayName',
-  // })
-  // @ApiQuery({
-  //   name: 'sortOrder',
-  //   required: false,
-  //   description: 'Sort order',
-  //   enum: ['ASC', 'DESC'],
-  //   example: 'ASC',
-  // })
-  // @ApiQuery({
-  //   name: 'page',
-  //   required: false,
-  //   description: 'Page number for pagination',
-  //   example: 1,
-  // })
-  // @ApiQuery({
-  //   name: 'limit',
-  //   required: false,
-  //   description: 'Number of items per page',
-  //   example: 20,
-  // })
-  @ApiResponse({
-    status: 200,
-    description: 'Vehicle models retrieved successfully',
-    type: PaginatedVehicleModelResponseDto,
-  })
   async findAllVehicleModels(@Query() filters: FilterVehicleModelDto) {
     // Check if any filters are provided
     const hasFilters = Object.keys(filters).some(
@@ -778,7 +555,11 @@ export class VehicleInventoryController {
     @Body('modelId') modelId: string,
     @Request() req,
   ) {
-    const buffer = this.getCsvBuffer(files, req as ExpressRequest, 'No file uploaded');
+    const buffer = this.getCsvBuffer(
+      files,
+      req as ExpressRequest,
+      'No file uploaded',
+    );
 
     // Accept uploads without strict validation. modelId may be any identifier — service will handle permissively.
     return await this.vehicleInventoryService.createVehicleVariantCsv(

@@ -29,7 +29,10 @@ import { ManufacturersService } from './manufacturers.service';
 import { PaginatedVehicleModelResponseDto } from './dto/vehicle-model-response.dto';
 import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
 import { parseFile } from 'src/utils/file-parser.util';
-import { Manufacturer, ManufacturerDocument } from './schemas/manufacturer.schema';
+import {
+  Manufacturer,
+  ManufacturerDocument,
+} from './schemas/manufacturer.schema';
 import { resolveHttpAuthSchemeConfig } from '@aws-sdk/client-ses/dist-types/auth/httpAuthSchemeProvider';
 
 @Injectable()
@@ -254,9 +257,12 @@ export class VehicleInventoryService {
     // Build the aggregation pipeline
     const pipeline: any[] = [];
 
-    // Handle prefix search first (must be the first stage if present)
+    // Handle search (matches anywhere in the string, case insensitive)
     if (filters.search && filters.search.trim()) {
-      const regex = this.buildPrefixRegex(filters.search.trim());
+      const searchTerm = filters.search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(searchTerm, 'i');
       pipeline.push({
         $match: {
           $or: [{ name: regex }, { displayName: regex }],
@@ -308,7 +314,9 @@ export class VehicleInventoryService {
     }
 
     if (filters.segment && filters.segment.trim() !== '') {
-      const segmentFilter = { segment: { $regex: filters.segment, $options: 'i' } };
+      const segmentFilter = {
+        segment: { $regex: filters.segment, $options: 'i' },
+      };
       if (matchStage.$and) {
         matchStage.$and.push(segmentFilter);
       } else {
@@ -317,7 +325,9 @@ export class VehicleInventoryService {
     }
 
     if (filters.bodyType && filters.bodyType.trim() !== '') {
-      const bodyTypeFilter = { bodyType: { $regex: filters.bodyType, $options: 'i' } };
+      const bodyTypeFilter = {
+        bodyType: { $regex: filters.bodyType, $options: 'i' },
+      };
       if (matchStage.$and) {
         matchStage.$and.push(bodyTypeFilter);
       } else {
@@ -325,7 +335,10 @@ export class VehicleInventoryService {
       }
     }
 
-    if (filters.minLaunchYear !== undefined || filters.maxLaunchYear !== undefined) {
+    if (
+      filters.minLaunchYear !== undefined ||
+      filters.maxLaunchYear !== undefined
+    ) {
       const launchYearFilter: any = {};
       if (filters.minLaunchYear !== undefined) {
         launchYearFilter.$gte = filters.minLaunchYear;
@@ -350,7 +363,10 @@ export class VehicleInventoryService {
 
     // Debug: Log the match stage for manufacturerId filter
     if (filters.manufacturerId) {
-      console.log('🔍 Manufacturer filter matchStage:', JSON.stringify(matchStage, null, 2));
+      console.log(
+        '🔍 Manufacturer filter matchStage:',
+        JSON.stringify(matchStage, null, 2),
+      );
       // Also log direct count queries for debugging
       const directCountString = await this.vehicleModelModel.countDocuments({
         manufacturer: filters.manufacturerId,
@@ -367,17 +383,24 @@ export class VehicleInventoryService {
       });
       console.log('🔍 Direct countDocuments (string):', directCountString);
       console.log('🔍 Direct countDocuments (ObjectId):', directCountObjectId);
-      console.log('🔍 Direct countDocuments (no filters):', directCountNoFilters);
+      console.log(
+        '🔍 Direct countDocuments (no filters):',
+        directCountNoFilters,
+      );
     }
-    
+
     pipeline.push({ $match: matchStage });
 
     // Get total count BEFORE any lookups or transformations
     const countPipelineBeforeLookups = [...pipeline, { $count: 'total' }];
-    const countResultBeforeLookups = await this.vehicleModelModel.aggregate(countPipelineBeforeLookups);
+    const countResultBeforeLookups = await this.vehicleModelModel.aggregate(
+      countPipelineBeforeLookups,
+    );
     const totalBeforeLookups =
-      countResultBeforeLookups.length > 0 ? (countResultBeforeLookups[0] as { total: number }).total : 0;
-    
+      countResultBeforeLookups.length > 0
+        ? (countResultBeforeLookups[0] as { total: number }).total
+        : 0;
+
     console.log('🔍 Count before lookups:', totalBeforeLookups);
 
     // Normalize manufacturer to ObjectId so the lookup always works
@@ -386,13 +409,12 @@ export class VehicleInventoryService {
         manufacturer: {
           $cond: [
             { $eq: [{ $type: '$manufacturer' }, 'string'] }, // if it's a string
-            { $toObjectId: '$manufacturer' },                // convert to ObjectId
-            '$manufacturer',                                // otherwise leave as-is
+            { $toObjectId: '$manufacturer' }, // convert to ObjectId
+            '$manufacturer', // otherwise leave as-is
           ],
         },
       },
     });
-
 
     // Add manufacturer lookup
     pipeline.push({
@@ -628,11 +650,17 @@ export class VehicleInventoryService {
     // Get total count before pagination
     // Use the count before lookups for accuracy - this matches what Compass shows
     const total = totalBeforeLookups;
-    
+
     // Debug: Log both counts for comparison
     if (filters.manufacturerId) {
-      const countAfterLookups = await this.vehicleModelModel.aggregate([...pipeline, { $count: 'total' }]);
-      const totalAfterLookups = countAfterLookups.length > 0 ? (countAfterLookups[0] as { total: number }).total : 0;
+      const countAfterLookups = await this.vehicleModelModel.aggregate([
+        ...pipeline,
+        { $count: 'total' },
+      ]);
+      const totalAfterLookups =
+        countAfterLookups.length > 0
+          ? (countAfterLookups[0] as { total: number }).total
+          : 0;
       console.log('🔍 Count after lookups:', totalAfterLookups);
       console.log('🔍 Using count before lookups:', total);
     }
@@ -1244,7 +1272,8 @@ export class VehicleInventoryService {
     } = filters;
 
     // Ensure sortOrder is valid (safeguard in case validation didn't catch it)
-    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
+    const validSortOrder =
+      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
 
     // Build the aggregation pipeline
     const pipeline: any[] = [];
@@ -1516,32 +1545,55 @@ export class VehicleInventoryService {
       .find({ name: { $in: transmissionNames }, isDeleted: false })
       .lean();
 
-    const fuelMap = new Map(validFuelTypes.map((f) => [String(f.name).toLowerCase(), f]));
-    const transMap = new Map(validTransTypes.map((t) => [String(t.name).toLowerCase(), t]));
+    const fuelMap = new Map(
+      validFuelTypes.map((f) => [String(f.name).toLowerCase(), f]),
+    );
+    const transMap = new Map(
+      validTransTypes.map((t) => [String(t.name).toLowerCase(), t]),
+    );
 
     const validVariants: any[] = [];
     const skipped: any[] = [];
 
     const parseBool = (v: any) => this.parseBoolean(v);
-    const parseNumber = (v: any) => (v === undefined || v === null || v === '' ? undefined : Number(v));
-    const parseArray = (v: any) => (v ? String(v).split(',').map((i) => i.trim()).filter(Boolean) : []);
+    const parseNumber = (v: any) =>
+      v === undefined || v === null || v === '' ? undefined : Number(v);
+    const parseArray = (v: any) =>
+      v
+        ? String(v)
+            .split(',')
+            .map((i) => i.trim())
+            .filter(Boolean)
+        : [];
 
     for (const [idx, row] of uniqueRows.entries()) {
-      const fuelKey = row.fuelType ? String(row.fuelType).trim().toLowerCase() : undefined;
-      const transKey = row.transmissionType ? String(row.transmissionType).trim().toLowerCase() : undefined;
+      const fuelKey = row.fuelType
+        ? String(row.fuelType).trim().toLowerCase()
+        : undefined;
+      const transKey = row.transmissionType
+        ? String(row.transmissionType).trim().toLowerCase()
+        : undefined;
 
-      const fuelDoc = fuelKey && fuelMap.has(fuelKey) ? fuelMap.get(fuelKey) : undefined;
-      const transDoc = transKey && transMap.has(transKey) ? transMap.get(transKey) : undefined;
+      const fuelDoc =
+        fuelKey && fuelMap.has(fuelKey) ? fuelMap.get(fuelKey) : undefined;
+      const transDoc =
+        transKey && transMap.has(transKey) ? transMap.get(transKey) : undefined;
 
       const variant = {
-        name: row.name ? String(row.name).trim().toLowerCase() : `variant-row-${idx + 1}`,
-        displayName: row.displayName?.trim() || (row.name ? String(row.name).trim() : `Variant ${idx + 1}`),
+        name: row.name
+          ? String(row.name).trim().toLowerCase()
+          : `variant-row-${idx + 1}`,
+        displayName:
+          row.displayName?.trim() ||
+          (row.name ? String(row.name).trim() : `Variant ${idx + 1}`),
         vehicleModel: normalizedModelId,
 
         fuelType: fuelDoc ? fuelDoc._id : undefined,
         transmissionType: transDoc ? transDoc._id : undefined,
 
-        featurePackage: row.featurePackage ? String(row.featurePackage).trim() : row.name?.trim(),
+        featurePackage: row.featurePackage
+          ? String(row.featurePackage).trim()
+          : row.name?.trim(),
 
         engineSpecs: {
           capacity: parseNumber(row.engine_capacity),
@@ -1579,7 +1631,15 @@ export class VehicleInventoryService {
         brochureUrl: row.brochureUrl || '',
         videoUrl: row.videoUrl || '',
 
-        features: row.featuresJson ? (() => { try { return JSON.parse(row.featuresJson); } catch { return undefined; } })() : undefined,
+        features: row.featuresJson
+          ? (() => {
+              try {
+                return JSON.parse(row.featuresJson);
+              } catch {
+                return undefined;
+              }
+            })()
+          : undefined,
 
         isActive: parseBool(row.isActive),
         isLaunched: parseBool(row.isLaunched),
@@ -1596,7 +1656,10 @@ export class VehicleInventoryService {
     let insertedDocs: any[] = [];
     try {
       if (validVariants.length > 0) {
-        insertedDocs = await this.vehicleVariantModel.insertMany(validVariants, { ordered: false });
+        insertedDocs = await this.vehicleVariantModel.insertMany(
+          validVariants,
+          { ordered: false },
+        );
       }
     } catch (err: any) {
       // Best-effort: if partial inserts happened, Mongoose may include insertedDocs
@@ -1616,14 +1679,21 @@ export class VehicleInventoryService {
       insertedCount: insertedDocs.length,
       skippedCount: skipped.length,
 
-      inserted: insertedDocs.map((v: any) => ({ _id: v._id, name: v.name, displayName: v.displayName, vehicleModel: v.vehicleModel })),
+      inserted: insertedDocs.map((v: any) => ({
+        _id: v._id,
+        name: v.name,
+        displayName: v.displayName,
+        vehicleModel: v.vehicleModel,
+      })),
       skipped,
     };
   }
 
-
-  async createVechicleModelUploadFromId(id:string,buffer:Buffer,fileType:'csv')
-  {
+  async createVechicleModelUploadFromId(
+    id: string,
+    buffer: Buffer,
+    fileType: 'csv',
+  ) {
     // Permissive: do not require manufacturer existence; accept the provided id as-is
     const rows = (await parseFile(buffer, fileType)) as Record<string, any>[];
     if (!rows || rows.length === 0) {
@@ -1638,22 +1708,24 @@ export class VehicleInventoryService {
       };
     }
     const normalizedId =
-      typeof id === 'string' && id.trim().toLowerCase() !== 'undefined' && id.trim().toLowerCase() !== 'null'
+      typeof id === 'string' &&
+      id.trim().toLowerCase() !== 'undefined' &&
+      id.trim().toLowerCase() !== 'null'
         ? id.trim()
         : '';
 
     // Normalizer: map common header variants to canonical field names.
     const headerAliases: Record<string, string> = {
       'manufacturer id': 'manufacturer',
-      'manufacturer_id': 'manufacturer',
-      'manufacturerId': 'manufacturer',
+      manufacturer_id: 'manufacturer',
+      manufacturerId: 'manufacturer',
       'model name': 'name',
-      'model': 'name',
-      'model_name': 'name',
+      model: 'name',
+      model_name: 'name',
       'display name': 'displayName',
-      'display_name': 'displayName',
+      display_name: 'displayName',
       'launch year': 'launchYear',
-      'launch_year': 'launchYear',
+      launch_year: 'launchYear',
       'is commercial vehicle': 'isCommercialVehicle',
       'commercial vehicle type': 'commercialVehicleType',
       'commercial body type': 'commercialBodyType',
@@ -1683,8 +1755,8 @@ export class VehicleInventoryService {
 
     const normalizedRows = rows.map(normalizeRowKeys);
 
-    const validModels:Record<string,any>[]=[];
-    const skipped:any[]=[];
+    const validModels: Record<string, any>[] = [];
+    const skipped: any[] = [];
 
     normalizedRows.forEach((row, idx) => {
       const baseName =
@@ -1694,16 +1766,18 @@ export class VehicleInventoryService {
         row.modelName ??
         `model-${idx + 1}`;
       const name = String(baseName).trim() || `model-${idx + 1}`;
-      const displayName = row.displayName ? String(row.displayName).trim() : name;
+      const displayName = row.displayName
+        ? String(row.displayName).trim()
+        : name;
       const manufacturer =
         normalizedId ||
         (row.manufacturer !== undefined
           ? String(row.manufacturer).trim()
           : row.manufacturerId !== undefined
-          ? String(row.manufacturerId).trim()
-          : row.manufacturer_id !== undefined
-          ? String(row.manufacturer_id).trim()
-          : '');
+            ? String(row.manufacturerId).trim()
+            : row.manufacturer_id !== undefined
+              ? String(row.manufacturer_id).trim()
+              : '');
 
       const modelDoc = {
         ...row,
@@ -1714,10 +1788,10 @@ export class VehicleInventoryService {
           row.isDeleted !== undefined
             ? row.isDeleted
             : row.is_deleted !== undefined
-            ? row.is_deleted
-            : false,
+              ? row.is_deleted
+              : false,
         isActive:
-          row.isActive !== undefined ? row.isActive : row.is_active ?? true,
+          row.isActive !== undefined ? row.isActive : (row.is_active ?? true),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -1779,7 +1853,10 @@ export class VehicleInventoryService {
 
     skipped.push(...skippedFromErrors);
 
-    const fallbackSkippedCount = Math.max(0, validModels.length - inserted.length);
+    const fallbackSkippedCount = Math.max(
+      0,
+      validModels.length - inserted.length,
+    );
     const skippedCount =
       skipped.length > 0 ? skipped.length : fallbackSkippedCount;
 
@@ -1792,6 +1869,5 @@ export class VehicleInventoryService {
       inserted,
       skipped,
     };
-
   }
 }
