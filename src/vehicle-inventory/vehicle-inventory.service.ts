@@ -148,8 +148,6 @@ export class VehicleInventoryService {
       filter.manufacturer = manufacturerId;
     }
 
-    console.log('🔍 Simple findAllVehicleModels filter:', filter);
-
     const cacheKey = `vi:models:simple:${manufacturerId || 'all'}`;
     const cached = await this.redisService.cacheGet<VehicleModel[]>(cacheKey);
     if (cached) return cached;
@@ -159,8 +157,6 @@ export class VehicleInventoryService {
       .populate('manufacturer', 'name displayName logo')
       .sort({ displayName: 1 })
       .exec();
-
-    console.log('🔍 Simple findAllVehicleModels result count:', models.length);
     await this.redisService.cacheSet(cacheKey, models, 300);
     return models;
   }
@@ -361,33 +357,7 @@ export class VehicleInventoryService {
       }
     }
 
-    // Debug: Log the match stage for manufacturerId filter
-    if (filters.manufacturerId) {
-      console.log(
-        '🔍 Manufacturer filter matchStage:',
-        JSON.stringify(matchStage, null, 2),
-      );
-      // Also log direct count queries for debugging
-      const directCountString = await this.vehicleModelModel.countDocuments({
-        manufacturer: filters.manufacturerId,
-        isDeleted: false,
-        isActive: true,
-      });
-      const directCountObjectId = await this.vehicleModelModel.countDocuments({
-        manufacturer: new Types.ObjectId(filters.manufacturerId),
-        isDeleted: false,
-        isActive: true,
-      });
-      const directCountNoFilters = await this.vehicleModelModel.countDocuments({
-        manufacturer: filters.manufacturerId,
-      });
-      console.log('🔍 Direct countDocuments (string):', directCountString);
-      console.log('🔍 Direct countDocuments (ObjectId):', directCountObjectId);
-      console.log(
-        '🔍 Direct countDocuments (no filters):',
-        directCountNoFilters,
-      );
-    }
+    // Debug logging removed to reduce noise in production
 
     pipeline.push({ $match: matchStage });
 
@@ -400,8 +370,6 @@ export class VehicleInventoryService {
       countResultBeforeLookups.length > 0
         ? (countResultBeforeLookups[0] as { total: number }).total
         : 0;
-
-    console.log('🔍 Count before lookups:', totalBeforeLookups);
 
     // Normalize manufacturer to ObjectId so the lookup always works
     pipeline.push({
@@ -615,55 +583,18 @@ export class VehicleInventoryService {
       },
     });
 
-    console.log('🔍 Variant filter check:', {
-      hasVariantFilters,
-      filters: {
-        minPrice: filters.minPrice,
-        maxPrice: filters.maxPrice,
-        fuelType: filters.fuelType,
-        transmissionType: filters.transmissionType,
-        featurePackage: filters.featurePackage,
-        minSeatingCapacity: filters.minSeatingCapacity,
-        maxSeatingCapacity: filters.maxSeatingCapacity,
-        minEngineCapacity: filters.minEngineCapacity,
-        maxEngineCapacity: filters.maxEngineCapacity,
-        minMileage: filters.minMileage,
-        maxMileage: filters.maxMileage,
-        turbocharged: filters.turbocharged,
-        featureFiltersCount: Object.keys(this.getFeatureFilters(filters))
-          .length,
-      },
-    });
-
     // Only apply variant filter if we have actual variant-based filters
     if (hasVariantFilters) {
-      console.log('🔍 Applying variant filter: variantCount > 0');
       pipeline.push({
         $match: {
           variantCount: { $gt: 0 },
         },
       });
-    } else {
-      console.log('🔍 No variant filters applied, including all models');
     }
 
     // Get total count before pagination
     // Use the count before lookups for accuracy - this matches what Compass shows
     const total = totalBeforeLookups;
-
-    // Debug: Log both counts for comparison
-    if (filters.manufacturerId) {
-      const countAfterLookups = await this.vehicleModelModel.aggregate([
-        ...pipeline,
-        { $count: 'total' },
-      ]);
-      const totalAfterLookups =
-        countAfterLookups.length > 0
-          ? (countAfterLookups[0] as { total: number }).total
-          : 0;
-      console.log('🔍 Count after lookups:', totalAfterLookups);
-      console.log('🔍 Using count before lookups:', total);
-    }
 
     // Add sorting
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
@@ -1099,30 +1030,20 @@ export class VehicleInventoryService {
     transmissionTypeId?: string | undefined,
     maxPrice?: number | undefined,
   ): Promise<VehicleVariant[]> {
-    console.log('findAllVehicleVariants called with:', {
-      modelId,
-      fuelTypeId,
-      transmissionTypeId,
-      maxPrice,
-    });
-
-    // Validation logs
+    // Validation
     if (modelId) {
-      console.log('Validating modelId:', modelId);
       if (!Types.ObjectId.isValid(modelId)) {
         console.error('Invalid modelId:', modelId);
         throw new BadRequestException(
           `Invalid modelId format: ${modelId}. Expected a valid MongoDB ObjectId.`,
         );
       } else if (fuelTypeId) {
-        console.log('Validating fuelTypeId:', fuelTypeId);
         if (!Types.ObjectId.isValid(fuelTypeId)) {
           console.error('Invalid fuelTypeId:', fuelTypeId);
           throw new BadRequestException(
             `Invalid fuelTypeId format: ${fuelTypeId}. Expected a valid MongoDB ObjectId.`,
           );
         } else if (transmissionTypeId) {
-          console.log('Validating transmissionTypeId:', transmissionTypeId);
           if (!Types.ObjectId.isValid(transmissionTypeId)) {
             console.error('Invalid transmissionTypeId:', transmissionTypeId);
             throw new BadRequestException(
@@ -1132,14 +1053,12 @@ export class VehicleInventoryService {
         }
       }
     } else if (fuelTypeId) {
-      console.log('Validating fuelTypeId:', fuelTypeId);
       if (!Types.ObjectId.isValid(fuelTypeId)) {
         console.error('Invalid fuelTypeId:', fuelTypeId);
         throw new BadRequestException(
           `Invalid fuelTypeId format: ${fuelTypeId}. Expected a valid MongoDB ObjectId.`,
         );
       } else if (transmissionTypeId) {
-        console.log('Validating transmissionTypeId:', transmissionTypeId);
         if (!Types.ObjectId.isValid(transmissionTypeId)) {
           console.error('Invalid transmissionTypeId:', transmissionTypeId);
           throw new BadRequestException(
@@ -1148,7 +1067,6 @@ export class VehicleInventoryService {
         }
       }
     } else if (transmissionTypeId) {
-      console.log('Validating transmissionTypeId:', transmissionTypeId);
       if (!Types.ObjectId.isValid(transmissionTypeId)) {
         console.error('Invalid transmissionTypeId:', transmissionTypeId);
         throw new BadRequestException(
@@ -1158,27 +1076,21 @@ export class VehicleInventoryService {
     }
 
     const filter: any = { isActive: true, isDeleted: false };
-    console.log('Initial filter:', filter);
 
     if (modelId) {
       filter.vehicleModel = new Types.ObjectId(modelId);
-      console.log('Added modelId to filter:', filter);
     }
     if (fuelTypeId) {
       filter.fuelType = new Types.ObjectId(fuelTypeId);
-      console.log('Added fuelTypeId to filter:', filter);
     }
     if (transmissionTypeId) {
       filter.transmissionType = new Types.ObjectId(transmissionTypeId);
-      console.log('Added transmissionTypeId to filter:', filter);
     }
     if (typeof maxPrice === 'number') {
       filter.price = { $lte: maxPrice };
-      console.log('Added maxPrice to filter:', filter);
     }
 
     try {
-      console.log('Querying vehicleVariantModel with filter:', filter);
       const result = await this.vehicleVariantModel
         .find(filter)
         .populate('vehicleModel', 'name displayName')
@@ -1186,7 +1098,6 @@ export class VehicleInventoryService {
         .populate('transmissionType', 'name displayName')
         .sort({ price: 1 })
         .exec();
-      console.log('Query successful, result count:', result.length);
       return result;
     } catch (error) {
       console.error('Error during vehicleVariantModel query:', error);

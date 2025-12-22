@@ -235,7 +235,6 @@ export class ChatService {
 
   /** Get all ACTIVE rooms for a user (as initiator or ad poster) sorted by recency with enhanced data */
   async getUserChatRooms(userId: string | Types.ObjectId): Promise<any[]> {
-    console.log('getUserChatRooms - userId:', userId, 'type:', typeof userId);
     this.validateObjectId(userId, 'User ID');
 
     // Convert userId to ObjectId for proper comparison
@@ -360,8 +359,6 @@ export class ChatService {
         `Found existing chat room: ${existingRoom.roomId} for users ${initiatorId} and ${otherUserId} with ad ${adId}`,
       );
     }
-
-    console.log('existingRoom', existingRoom);
 
     return existingRoom;
   }

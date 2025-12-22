@@ -16,7 +16,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const secret =
       configService.get('TOKEN_KEY') ||
       'default-secret-key-change-in-production';
-    console.log('JWT Strategy - Using secret:', secret ? 'Set' : 'Not set');
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

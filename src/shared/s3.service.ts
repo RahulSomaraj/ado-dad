@@ -76,7 +76,6 @@ export class S3Service {
    */
   async getPresignedUrl(fileName: string, fileType: string): Promise<string> {
     try {
-      console.log('here');
       // Create a unique file key with a UUID prefix
       const fileKey = `uploads/${uuidv4()}-${fileName}`;
 

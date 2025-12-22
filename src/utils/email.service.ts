@@ -39,8 +39,7 @@ export class EmailService {
     const command = new SendEmailCommand(input);
 
     try {
-      const response = await this.sesClient.send(command);
-      console.log(`OTP sent to ${email}, MessageId: ${response.MessageId}`);
+      await this.sesClient.send(command);
     } catch (error) {
       console.error(`Error sending OTP to ${email}:`, error);
       throw new Error('Unable to send OTP');
@@ -78,10 +77,7 @@ export class EmailService {
     const command = new SendEmailCommand(input);
 
     try {
-      const response = await this.sesClient.send(command);
-      console.log(
-        `Email sent to ${options.to}, MessageId: ${response.MessageId}`,
-      );
+      await this.sesClient.send(command);
     } catch (error) {
       console.error(`Error sending email to ${options.to}:`, error);
       throw new Error('Unable to send email');

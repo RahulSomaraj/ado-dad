@@ -77,7 +77,6 @@ export class RefreshTokenGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      console.log(error);
       if (error instanceof HttpException) {
         throw new HttpException(error.getResponse(), error.getStatus());
       } else {

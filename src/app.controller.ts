@@ -303,12 +303,6 @@ export class AppController {
     @Body() userLoginDto: LoginUserDto,
     @Request() req,
   ): Promise<LoginResponse> {
-    console.log('🚀 Login endpoint called with:', {
-      username: userLoginDto.username,
-      password: '***',
-    });
-    console.log('👤 User from request:', req.user);
-
     const user = req.user;
     return this.appService.login(userLoginDto, user);
   }
