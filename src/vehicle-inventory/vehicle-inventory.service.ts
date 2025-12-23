@@ -1178,13 +1178,13 @@ export class VehicleInventoryService {
     const {
       page = 1,
       limit = 20,
-      sortBy = 'price',
-      sortOrder = 'ASC',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
     } = filters;
 
     // Ensure sortOrder is valid (safeguard in case validation didn't catch it)
     const validSortOrder =
-      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
+      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
 
     // Build the aggregation pipeline
     const pipeline: any[] = [];
@@ -1280,10 +1280,37 @@ export class VehicleInventoryService {
     pipeline.push({ $skip: (page - 1) * limit });
     pipeline.push({ $limit: limit });
 
-    // Add population
+    // Normalize ObjectIds to ensure proper lookup matching
+    pipeline.push({
+      $addFields: {
+        vehicleModel: {
+          $cond: {
+            if: { $eq: [{ $type: '$vehicleModel' }, 'string'] },
+            then: { $toObjectId: '$vehicleModel' },
+            else: '$vehicleModel',
+          },
+        },
+        fuelType: {
+          $cond: {
+            if: { $eq: [{ $type: '$fuelType' }, 'string'] },
+            then: { $toObjectId: '$fuelType' },
+            else: '$fuelType',
+          },
+        },
+        transmissionType: {
+          $cond: {
+            if: { $eq: [{ $type: '$transmissionType' }, 'string'] },
+            then: { $toObjectId: '$transmissionType' },
+            else: '$transmissionType',
+          },
+        },
+      },
+    });
+
+    // Add population using actual collection names from models
     pipeline.push({
       $lookup: {
-        from: 'vehiclemodels',
+        from: this.vehicleModelModel.collection.name,
         localField: 'vehicleModel',
         foreignField: '_id',
         as: 'vehicleModel',
@@ -1291,7 +1318,7 @@ export class VehicleInventoryService {
     });
     pipeline.push({
       $lookup: {
-        from: 'fueltypes',
+        from: this.fuelTypeModel.collection.name,
         localField: 'fuelType',
         foreignField: '_id',
         as: 'fuelType',
@@ -1299,49 +1326,98 @@ export class VehicleInventoryService {
     });
     pipeline.push({
       $lookup: {
-        from: 'transmissiontypes',
+        from: this.transmissionTypeModel.collection.name,
         localField: 'transmissionType',
         foreignField: '_id',
         as: 'transmissionType',
       },
     });
 
-    // Unwind the arrays
-    pipeline.push({
-      $unwind: { path: '$vehicleModel', preserveNullAndEmptyArrays: true },
-    });
-    pipeline.push({
-      $unwind: { path: '$fuelType', preserveNullAndEmptyArrays: true },
-    });
-    pipeline.push({
-      $unwind: { path: '$transmissionType', preserveNullAndEmptyArrays: true },
-    });
-
-    // Project only needed fields
+    // Project only needed fields (using $arrayElemAt to get first element, returns null if array is empty)
     pipeline.push({
       $project: {
         _id: 1,
         name: 1,
         displayName: 1,
+        vehicleModel: {
+          $cond: {
+            if: { $gt: [{ $size: { $ifNull: ['$vehicleModel', []] } }, 0] },
+            then: {
+              $let: {
+                vars: {
+                  model: { $arrayElemAt: ['$vehicleModel', 0] },
+                },
+                in: {
+                  _id: '$$model._id',
+                  name: '$$model.name',
+                  displayName: '$$model.displayName',
+                },
+              },
+            },
+            else: null,
+          },
+        },
+        fuelType: {
+          $cond: {
+            if: { $gt: [{ $size: { $ifNull: ['$fuelType', []] } }, 0] },
+            then: {
+              $let: {
+                vars: {
+                  fuel: { $arrayElemAt: ['$fuelType', 0] },
+                },
+                in: {
+                  _id: '$$fuel._id',
+                  name: '$$fuel.name',
+                  displayName: '$$fuel.displayName',
+                },
+              },
+            },
+            else: null,
+          },
+        },
+        transmissionType: {
+          $cond: {
+            if: { $gt: [{ $size: { $ifNull: ['$transmissionType', []] } }, 0] },
+            then: {
+              $let: {
+                vars: {
+                  transmission: { $arrayElemAt: ['$transmissionType', 0] },
+                },
+                in: {
+                  _id: '$$transmission._id',
+                  name: '$$transmission.name',
+                  displayName: '$$transmission.displayName',
+                },
+              },
+            },
+            else: null,
+          },
+        },
         price: 1,
         isActive: 1,
         isDeleted: 1,
         createdAt: 1,
         updatedAt: 1,
-        'vehicleModel._id': 1,
-        'vehicleModel.name': 1,
-        'vehicleModel.displayName': 1,
-        'fuelType._id': 1,
-        'fuelType.name': 1,
-        'fuelType.displayName': 1,
-        'transmissionType._id': 1,
-        'transmissionType.name': 1,
-        'transmissionType.displayName': 1,
       },
     });
 
     // Execute the main query
     const vehicleVariants = await this.vehicleVariantModel.aggregate(pipeline);
+
+    // Reorder fields to ensure correct order in response
+    const reorderedVariants = vehicleVariants.map((variant: any) => ({
+      _id: variant._id,
+      name: variant.name,
+      displayName: variant.displayName,
+      vehicleModel: variant.vehicleModel,
+      fuelType: variant.fuelType,
+      transmissionType: variant.transmissionType,
+      price: variant.price,
+      isActive: variant.isActive,
+      isDeleted: variant.isDeleted,
+      createdAt: variant.createdAt,
+      updatedAt: variant.updatedAt,
+    })) as any[];
 
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);
@@ -1349,7 +1425,7 @@ export class VehicleInventoryService {
     const hasPrev = page > 1;
 
     return {
-      data: vehicleVariants,
+      data: reorderedVariants,
       total,
       page,
       limit,
