@@ -86,8 +86,6 @@ export class VehicleInventoryController {
     );
 
     if (hasFilters) {
-      console.log(hasFilters);
-      console.log(filters);
       return this.vehicleInventoryService.findVehicleModelsWithFilters(filters);
     } else {
       // Return simple list if no filters

@@ -41,9 +41,9 @@ export class UploadController {
       const fileUrl = await this.s3Service.uploadFile(file);
       return { fileUrl };
     } catch (error) {
-      console.log(
+      console.error(
         'S3 upload failed, falling back to local storage:',
-        error.message,
+        (error as any)?.message,
       );
       // Fallback to local storage
       const fileUrl = await this.uploadToLocal(file);
@@ -96,9 +96,9 @@ export class UploadController {
       const fileUrl = await this.s3Service.uploadFile(file);
       return { fileUrl };
     } catch (error) {
-      console.log(
+      console.error(
         'S3 upload failed, falling back to local storage:',
-        error.message,
+        (error as any)?.message,
       );
       // Fallback to local storage
       const fileUrl = await this.uploadToLocal(file);
@@ -119,9 +119,9 @@ export class UploadController {
       const url = await this.s3Service.getPresignedUrl(fileName, fileType);
       return { url };
     } catch (error) {
-      console.log(
+      console.error(
         'S3 presigned URL failed, using local endpoint:',
-        error.message,
+        (error as any)?.message,
       );
       // Return local upload endpoint as fallback
       const fileKey = `${uuidv4()}-${fileName}`;

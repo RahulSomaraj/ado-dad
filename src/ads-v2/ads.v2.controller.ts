@@ -360,10 +360,6 @@ export class AdsV2Controller {
       const userId = req.user.id;
       const userType = req.user.userType || req.user.role || 'USER';
 
-      console.log('Creating v2 advertisement for user:', userId);
-      console.log('Advertisement category:', dto.category);
-      console.log('Idempotency key:', idempotencyKey);
-
       const result = await this.createAdUc.exec({
         dto,
         userId,
@@ -371,10 +367,6 @@ export class AdsV2Controller {
         idempotencyKey,
       });
 
-      console.log(
-        'v2 Advertisement created successfully with ID:',
-        (result as any).id,
-      );
       return result as DetailedAdResponseDto;
     } catch (error) {
       console.error('Error creating v2 advertisement:', error);

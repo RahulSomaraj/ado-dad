@@ -33,58 +33,44 @@ export class AuthService {
     password: string,
   ): Promise<UserValidationResult | null> {
     try {
-      console.log('🔍 AuthService.validateUser() called with:', {
-        username,
-        password: '***',
-      });
       this.logger.debug(`Validating user: ${username}`);
 
       // Input validation
       if (!this.isValidInput(username) || !this.isValidInput(password)) {
-        console.log('❌ Invalid input provided for user validation');
         this.logger.warn('Invalid input provided for user validation');
         return null;
       }
 
       const trimmedUsername = username.trim().toLowerCase();
-      console.log('🔍 Searching for user with identifier:', trimmedUsername);
 
       // Find user with optimized query
       const user = await this.findUserByCredentials(trimmedUsername);
 
       if (!user) {
-        console.log('❌ User not found:', trimmedUsername);
         this.logger.debug(`User not found: ${trimmedUsername}`);
         return null;
       }
 
-      console.log('✅ User found:', { email: user.email, type: user.type });
-
       // Check if user is deleted
       if (user.isDeleted) {
-        console.log('❌ Attempted login for deleted user:', user.email);
         this.logger.warn(`Attempted login for deleted user: ${user.email}`);
         return null;
       }
 
       // Validate password
-      console.log('🔐 Validating password for user:', user.email);
       const isPasswordValid = await this.validatePassword(password, user);
 
       if (!isPasswordValid) {
-        console.log('❌ Invalid password for user:', user.email);
         this.logger.warn(`Invalid password for user: ${user.email}`);
         return null;
       }
 
-      console.log('✅ Password validation successful for:', user.email);
       this.logger.log(`User validation successful: ${user.email}`);
 
       // Return user data without sensitive information
       return this.sanitizeUserData(user);
     } catch (error) {
-      console.log('❌ User validation error:', error.message);
-      this.logger.error(`User validation failed for ${username}:`, error);
+      this.logger.error(`User validation failed for ${username}:`, error as any);
       return null;
     }
   }
@@ -119,26 +105,16 @@ export class AuthService {
     user: User,
   ): Promise<boolean> {
     try {
-      console.log(
-        '🔐 validatePassword() - checking password for user:',
-        user.email,
-      );
-
       // Check if password matches hashed password
       const isPasswordValid = await bcrypt.compare(password, user.password);
-      console.log('🔐 bcrypt.compare result:', isPasswordValid);
-
       if (isPasswordValid) {
-        console.log('✅ Password matches bcrypt hash');
         return true;
       }
-      console.log('❌ Password validation failed - no matches found');
       return false;
     } catch (error) {
-      console.log('❌ Password validation error:', error.message);
       this.logger.error(
         `Password validation error for user ${user.email}:`,
-        error,
+        error as any,
       );
       return false;
     }

@@ -49,10 +49,6 @@ export class CreateAdUc {
     if (idemKey) {
       const prior = await this.idem.get(idemKey);
       if (prior) {
-        console.log(
-          'Returning cached result for idempotency key:',
-          idempotencyKey,
-        );
         return prior;
       }
     }
@@ -192,10 +188,6 @@ export class CreateAdUc {
         await this.idem.set(idemKey, response, 15 * 60); // 15 minutes TTL
       }
 
-      console.log(
-        'Advertisement created successfully with ID:',
-        savedAd._id.toString(),
-      );
       return response;
     } catch (error) {
       await session.abortTransaction();

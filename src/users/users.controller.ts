@@ -108,9 +108,9 @@ export class UsersController {
       try {
         profilePicUrl = await this.s3Service.uploadFile(profilePic);
       } catch (error) {
-        console.log(
+        console.error(
           'S3 upload failed, falling back to local storage:',
-          error.message,
+          (error as any)?.message,
         );
         // Fallback to local storage
         const uploadsDir = require('path').join(
@@ -684,9 +684,9 @@ export class UsersController {
     try {
       profilePicUrl = await this.s3Service.uploadFile(profilePic);
     } catch (error) {
-      console.log(
+      console.error(
         'S3 upload failed, falling back to local storage:',
-        error.message,
+        (error as any)?.message,
       );
       // Fallback to local storage
       const uploadsDir = require('path').join(

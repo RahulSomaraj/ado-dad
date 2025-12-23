@@ -24,7 +24,6 @@ export class RolesGuard implements CanActivate {
     }
 
     // 🔹 Check if user's role matches any required role
-    const hasRole = requiredRoles.includes(user.type);
-    return hasRole;
+    return requiredRoles.includes(user.type);
   }
 }

@@ -1562,8 +1562,6 @@ export class AdsService {
     }
     // Allow if owner or Super Admin
     const ad = await this.adModel.findById(id);
-    console.log('id', id);
-    console.log('ad', ad);
     if (!ad) {
       throw new NotFoundException(`Advertisement with ID ${id} not found`);
     }
@@ -1679,15 +1677,11 @@ export class AdsService {
       runValidators: true,
     });
 
-    if(isApproved === false)
-    {
-    const favoriteDeleted = await this.favoriteModel.deleteMany({
-      itemId:new Types.ObjectId(id)
-    });
-    console.log("favoritedeleted", favoriteDeleted);
+    if (isApproved === false) {
+      await this.favoriteModel.deleteMany({
+        itemId: new Types.ObjectId(id),
+      });
     }
-    
-
 
     // Invalidate cache to ensure fresh data
     await this.invalidateAdCache(id, approvedBy);
@@ -2016,8 +2010,6 @@ export class AdsService {
         },
       ];
       await Promise.all(popularQueries.map((q) => this.findAll(q)));
-      // eslint-disable-next-line no-console
-      console.log('✅ Ads cache warmed up successfully');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('❌ Error warming up ads cache:', error);

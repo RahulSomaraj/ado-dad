@@ -588,9 +588,6 @@ export class ChatController {
     @Request() req: any,
   ) {
     const userId = req.user.id || req.user._id;
-    console.log('userId', userId);
-    console.log('adId', adId);
-    console.log('otherUserId', otherUserId);
 
     if (!userId) {
       throw new BadRequestException('User ID not found in request');

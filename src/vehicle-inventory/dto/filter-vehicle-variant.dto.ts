@@ -63,7 +63,7 @@ export class FilterVehicleVariantDto extends PaginationDto {
   })
   @IsOptional()
   @IsString()
-  sortBy?: string = 'price';
+  sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({
     type: String,
@@ -78,5 +78,5 @@ export class FilterVehicleVariantDto extends PaginationDto {
     return 'DESC'; // Default to DESC if invalid value
   })
   @IsEnum(['ASC', 'DESC'])
-  sortOrder?: 'ASC' | 'DESC' = 'ASC';
+  sortOrder?: 'ASC' | 'DESC' = 'DESC';
 }
