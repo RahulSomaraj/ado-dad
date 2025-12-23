@@ -1000,9 +1000,14 @@ export class VehicleInventoryService {
     createVehicleVariantDto: CreateVehicleVariantDto,
   ): Promise<VehicleVariant> {
     try {
-      const vehicleVariant = new this.vehicleVariantModel(
-        createVehicleVariantDto,
-      );
+      // Add dummy featurePackage if not provided
+      const variantData = {
+        ...createVehicleVariantDto,
+        featurePackage:
+          createVehicleVariantDto.featurePackage?.trim() || 'Base',
+      };
+
+      const vehicleVariant = new this.vehicleVariantModel(variantData);
       return await vehicleVariant.save();
     } catch (error) {
       if (error.code === 11000) {
@@ -1844,7 +1849,7 @@ export class VehicleInventoryService {
 
         featurePackage: row.featurePackage
           ? String(row.featurePackage).trim()
-          : row.name?.trim(),
+          : row.name?.trim() || 'Base',
 
         engineSpecs: {
           capacity: parseNumber(row.engineCapacity),

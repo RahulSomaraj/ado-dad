@@ -21,8 +21,8 @@ import {
   ApiResponse,
   ApiQuery,
   ApiBearerAuth,
-   ApiConsumes,
-    ApiBody,
+  ApiConsumes,
+  ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
@@ -195,23 +195,11 @@ export class ManufacturersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a manufacturer (soft delete)' })
-  @ApiParam({
-    name: 'id',
-    description: 'Manufacturer ID',
-    example: '507f1f77bcf86cd799439011',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Manufacturer deleted successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Manufacturer not found' })
   async deleteManufacturer(
     @Param('id') id: string,
   ): Promise<{ message: string }> {
     return this.manufacturersService.deleteManufacturer(id);
   }
-
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
@@ -264,22 +252,25 @@ export class ManufacturersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
-  async UploadManufacturerCdb(@UploadedFile() file:Express.Multer.File)
-  {
-    if(!file)
-    {
-      throw new HttpException({
-        status:HttpStatus.BAD_REQUEST,
-        error:"No file uploaded"
-      },HttpStatus.BAD_REQUEST);
+  async UploadManufacturerCdb(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'No file uploaded',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const fileExt = path.extname(file.originalname).toLowerCase();
-    
-    if (fileExt !== '.csv'){
+
+    if (fileExt !== '.csv') {
       throw new BadRequestException('Only CSV files are supported');
     }
 
-    return await this.manufacturersService.createManufacturerFromCsv(file.buffer,'csv');
+    return await this.manufacturersService.createManufacturerFromCsv(
+      file.buffer,
+      'csv',
+    );
   }
-
 }

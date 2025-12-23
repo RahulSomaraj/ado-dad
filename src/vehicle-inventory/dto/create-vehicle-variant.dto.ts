@@ -183,9 +183,11 @@ export class CreateVehicleVariantDto {
   @ApiProperty({
     description: 'The feature package/trim level.',
     example: 'LXI',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  featurePackage: string;
+  featurePackage?: string;
 
   @ApiProperty({
     description: 'Engine specifications.',

@@ -85,8 +85,8 @@ export class VehicleVariant {
   @Prop({ required: true, ref: 'TransmissionType', type: Types.ObjectId })
   transmissionType: Types.ObjectId;
 
-  @Prop({ required: true, trim: true })
-  featurePackage: string;
+  @Prop({ required: false, trim: true })
+  featurePackage?: string;
 
   @Prop({ required: true, type: EngineSpecsSchema })
   engineSpecs: EngineSpecs;
