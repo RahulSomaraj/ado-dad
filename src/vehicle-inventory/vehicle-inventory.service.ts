@@ -1130,6 +1130,24 @@ export class VehicleInventoryService {
     return vehicleVariant;
   }
 
+  async deleteVehicleVariant(id: string): Promise<{ message: string }> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid vehicle variant ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
+    const vehicleVariant = await this.vehicleVariantModel
+      .findByIdAndDelete(id)
+      .exec();
+
+    if (!vehicleVariant) {
+      throw new NotFoundException(`Vehicle variant with id ${id} not found`);
+    }
+
+    return { message: 'Vehicle variant deleted successfully' };
+  }
+
   async updateVehicleVariant(
     id: string,
     updateVehicleVariantDto: UpdateVehicleVariantDto,

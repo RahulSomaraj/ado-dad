@@ -265,6 +265,14 @@ export class VehicleInventoryController {
     );
   }
 
+  @Delete('variants/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
+  async deleteVehicleVariant(@Param('id') id: string) {
+    return this.vehicleInventoryService.deleteVehicleVariant(id);
+  }
+
   private requireFirstFile(
     files: Express.Multer.File[] | undefined,
     errorMessage: string,
