@@ -22,6 +22,7 @@ import {
 import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
 import { CreateVehicleVariantDto } from './dto/create-vehicle-variant.dto';
 import { UpdateVehicleModelDto } from './dto/update-vehicle-model.dto';
+import { UpdateVehicleVariantDto } from './dto/update-vehicle-variant.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
 import { FilterVehicleVariantDto } from './dto/filter-vehicle-variant.dto';
 import { RedisService } from '../shared/redis.service';
@@ -1213,6 +1214,132 @@ export class VehicleInventoryService {
     return vehicleVariant;
   }
 
+  async updateVehicleVariant(
+    id: string,
+    updateVehicleVariantDto: UpdateVehicleVariantDto,
+  ): Promise<VehicleVariant> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        `Invalid vehicle variant ID format: ${id}. Expected a valid MongoDB ObjectId.`,
+      );
+    }
+
+    try {
+      // Prepare update object, extracting _id from nested objects if provided
+      const updateData: any = { ...updateVehicleVariantDto };
+
+      // Handle vehicleModel - extract _id if it's an object
+      if (updateData.vehicleModel) {
+        if (
+          typeof updateData.vehicleModel === 'object' &&
+          updateData.vehicleModel._id
+        ) {
+          updateData.vehicleModel = updateData.vehicleModel._id;
+        }
+        if (!Types.ObjectId.isValid(updateData.vehicleModel)) {
+          throw new BadRequestException(
+            `Invalid vehicleModel ID format: ${updateData.vehicleModel}`,
+          );
+        }
+        // Validate that the model exists
+        const modelExists = await this.vehicleModelModel.findById(
+          updateData.vehicleModel,
+        );
+        if (!modelExists) {
+          throw new BadRequestException(
+            `Vehicle model with id ${updateData.vehicleModel} not found`,
+          );
+        }
+        updateData.vehicleModel = new Types.ObjectId(updateData.vehicleModel);
+      }
+
+      // Handle fuelType - extract _id if it's an object
+      if (updateData.fuelType) {
+        if (
+          typeof updateData.fuelType === 'object' &&
+          updateData.fuelType._id
+        ) {
+          updateData.fuelType = updateData.fuelType._id;
+        }
+        if (!Types.ObjectId.isValid(updateData.fuelType)) {
+          throw new BadRequestException(
+            `Invalid fuelType ID format: ${updateData.fuelType}`,
+          );
+        }
+        // Validate that the fuel type exists
+        const fuelExists = await this.fuelTypeModel.findById(
+          updateData.fuelType,
+        );
+        if (!fuelExists) {
+          throw new BadRequestException(
+            `Fuel type with id ${updateData.fuelType} not found`,
+          );
+        }
+        updateData.fuelType = new Types.ObjectId(updateData.fuelType);
+      }
+
+      // Handle transmissionType - extract _id if it's an object
+      if (updateData.transmissionType) {
+        if (
+          typeof updateData.transmissionType === 'object' &&
+          updateData.transmissionType._id
+        ) {
+          updateData.transmissionType = updateData.transmissionType._id;
+        }
+        if (!Types.ObjectId.isValid(updateData.transmissionType)) {
+          throw new BadRequestException(
+            `Invalid transmissionType ID format: ${updateData.transmissionType}`,
+          );
+        }
+        // Validate that the transmission type exists
+        const transExists = await this.transmissionTypeModel.findById(
+          updateData.transmissionType,
+        );
+        if (!transExists) {
+          throw new BadRequestException(
+            `Transmission type with id ${updateData.transmissionType} not found`,
+          );
+        }
+        updateData.transmissionType = new Types.ObjectId(
+          updateData.transmissionType,
+        );
+      }
+
+      const vehicleVariant = await this.vehicleVariantModel
+        .findOneAndUpdate(
+          { _id: id, isActive: true, isDeleted: false },
+          { $set: updateData },
+          { new: true, runValidators: true },
+        )
+        .populate('vehicleModel', 'name displayName')
+        .populate('fuelType', 'name displayName')
+        .populate('transmissionType', 'name displayName')
+        .exec();
+
+      if (!vehicleVariant) {
+        throw new NotFoundException(`Vehicle variant with id ${id} not found`);
+      }
+
+      return vehicleVariant;
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      if (error.code === 11000) {
+        throw new BadRequestException(
+          'Vehicle variant with this name already exists',
+        );
+      }
+      if (error.name === 'ValidationError') {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
   // Lookup methods
   async findFuelTypeById(id: string): Promise<FuelType> {
     if (!Types.ObjectId.isValid(id)) {
@@ -1710,13 +1837,13 @@ export class VehicleInventoryService {
       const fuelValue = fuelDoc
         ? fuelDoc._id
         : row.fuelType
-        ? String(row.fuelType).trim()
-        : undefined;
+          ? String(row.fuelType).trim()
+          : undefined;
       const transValue = transDoc
         ? transDoc._id
         : row.transmissionType
-        ? String(row.transmissionType).trim()
-        : undefined;
+          ? String(row.transmissionType).trim()
+          : undefined;
 
       const variant = {
         name: row.name ? String(row.name).trim() : `variant-row-${idx + 1}`,
@@ -1843,7 +1970,10 @@ export class VehicleInventoryService {
 
     skipped.push(...skippedFromErrors);
 
-    const fallbackSkippedCount = Math.max(0, validVariants.length - inserted.length);
+    const fallbackSkippedCount = Math.max(
+      0,
+      validVariants.length - inserted.length,
+    );
     const skippedCount =
       skipped.length > 0 ? skipped.length : fallbackSkippedCount;
 
@@ -1860,7 +1990,6 @@ export class VehicleInventoryService {
       skipped,
     };
   }
-
 
   async createVechicleModelUploadFromId(
     id: string,
@@ -2053,5 +2182,4 @@ export class VehicleInventoryService {
       skipped,
     };
   }
-
 }

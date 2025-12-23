@@ -22,6 +22,7 @@ import { ManufacturersService } from './manufacturers.service';
 import { CreateVehicleModelDto } from './dto/create-vehicle-model.dto';
 import { CreateVehicleVariantDto } from './dto/create-vehicle-variant.dto';
 import { UpdateVehicleModelDto } from './dto/update-vehicle-model.dto';
+import { UpdateVehicleVariantDto } from './dto/update-vehicle-variant.dto';
 import { FilterVehicleModelDto } from './dto/filter-vehicle-model.dto';
 import { PaginatedVehicleModelResponseDto } from './dto/vehicle-model-response.dto';
 import {
@@ -232,75 +233,6 @@ export class VehicleInventoryController {
   }
 
   @Get('variants')
-  @ApiOperation({
-    summary: 'Get all vehicle variants with filters and pagination',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number for pagination',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of items per page',
-  })
-  @ApiQuery({
-    name: 'modelId',
-    required: false,
-    type: String,
-    description: 'Filter by vehicle model ID',
-  })
-  @ApiQuery({
-    name: 'fuelTypeId',
-    required: false,
-    type: String,
-    description: 'Filter by fuel type ID',
-  })
-  @ApiQuery({
-    name: 'transmissionTypeId',
-    required: false,
-    type: String,
-    description: 'Filter by transmission type ID',
-  })
-  @ApiQuery({
-    name: 'minPrice',
-    required: false,
-    type: Number,
-    description: 'Filter by minimum price',
-  })
-  @ApiQuery({
-    name: 'maxPrice',
-    required: false,
-    type: Number,
-    description: 'Filter by maximum price',
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Search term',
-  })
-  @ApiQuery({
-    name: 'sortBy',
-    required: false,
-    type: String,
-    description: 'Sort by field',
-    enum: ['price', 'name', 'createdAt', 'updatedAt'],
-  })
-  @ApiQuery({
-    name: 'sortOrder',
-    required: false,
-    type: String,
-    description: 'Sort order (ASC or DESC)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Vehicle variants retrieved successfully',
-    type: PaginatedVehicleVariantResponseDto,
-  })
   async findAllVehicleVariants(@Query() filters: FilterVehicleVariantDto) {
     return this.vehicleInventoryService.findAllVehicleVariantsWithPagination(
       filters,
@@ -308,12 +240,31 @@ export class VehicleInventoryController {
   }
 
   @Get('variants/:id')
-  @ApiOperation({ summary: 'Get vehicle variant by ID' })
-  @ApiParam({ name: 'id', description: 'Vehicle variant ID' })
-  @ApiResponse({ status: 200, description: 'Vehicle variant found' })
-  @ApiResponse({ status: 404, description: 'Vehicle variant not found' })
   async findVehicleVariantById(@Param('id') id: string) {
     return this.vehicleInventoryService.findVehicleVariantById(id);
+  }
+
+  @Put('variants/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a vehicle variant' })
+  @ApiParam({ name: 'id', description: 'Vehicle variant ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Vehicle variant updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 404, description: 'Vehicle variant not found' })
+  async updateVehicleVariant(
+    @Param('id') id: string,
+    @Body() updateVehicleVariantDto: UpdateVehicleVariantDto,
+    @Request() req,
+  ) {
+    return this.vehicleInventoryService.updateVehicleVariant(
+      id,
+      updateVehicleVariantDto,
+    );
   }
 
   private requireFirstFile(
