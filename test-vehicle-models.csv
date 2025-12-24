@@ -1,0 +1,4 @@
+name,displayName,vehicleType,description,launchYear,segment,bodyType,manufacturerId,fuelTypes,transmissionTypes,isActive
+Swift,Maruti Swift,Hatchback,Popular compact hatchback,2005,Compact,Hatchback,REPLACE_WITH_MANUFACTURER_ID,petrol diesel,manual_5 automatic_5,true
+Camry,Toyota Camry,Sedan,Premium mid-size sedan,1982,Mid-Size,Sedan,REPLACE_WITH_MANUFACTURER_ID,petrol hybrid_petrol,automatic_6 cvt,true
+

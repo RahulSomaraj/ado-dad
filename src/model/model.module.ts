@@ -1,13 +1,17 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ModelService } from './model.service';  // Import your service
-import { ModelSchema,} from './schemas/schema.model'; // Import the schema
+import { ModelService } from './model.service';
+import { ModelController } from './model.controller';
+import { ModelSchema } from './schemas/schema.model';
+import { VehicleCompanySchema, VehicleCompany } from '../vehicle-company/schemas/schema.vehicle-company';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'Model', schema: ModelSchema }]), // Register the model schema here
+    MongooseModule.forFeature([{ name: 'Model', schema: ModelSchema }]),
+    MongooseModule.forFeature([{ name: VehicleCompany.name, schema: VehicleCompanySchema }]), // Register VehicleCompany schema for population
   ],
-  providers: [ModelService], // Register ModelService
-  exports: [ModelService], // If you want to use the service elsewhere, export it
+  controllers: [ModelController],
+  providers: [ModelService],
+  exports: [ModelService],
 })
 export class ModelModule {}

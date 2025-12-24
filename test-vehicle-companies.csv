@@ -1,0 +1,5 @@
+name,displayName,originCountry,description,logo,website,foundedYear,headquarters,isActive,isPremium
+Maruti Suzuki,Maruti Suzuki,India / Japan,India's largest passenger car manufacturer,https://upload.wikimedia.org/wikipedia/commons/6/6b/Maruti_Suzuki_Logo.png,https://www.marutisuzuki.com,1981,New Delhi India,true,false
+Toyota,Toyota Motor Corporation,Japan,Global automotive manufacturer,https://example.com/toyota.png,https://www.toyota.com,1937,Toyota City Japan,true,true
+Hyundai,Hyundai Motor Company,South Korea,South Korean automotive manufacturer,https://example.com/hyundai.png,https://www.hyundai.com,1967,Seoul South Korea,true,false
+

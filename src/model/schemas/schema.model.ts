@@ -1,66 +1,96 @@
-import { Schema, Document } from 'mongoose';
+import { Schema, Document, Types } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { VALID_FUEL_TYPES, VALID_TRANSMISSION_TYPES, VALID_VEHICLE_TYPES } from '../../common/constants/vehicle.constants';
 
 // Define the Schema
 export const ModelSchema = new mongoose.Schema(
   {
-    image: {
-      type: String,
-      required: [true, 'Image URL is required.'],
-      match: /^https?:\/\/.*\.(jpg|jpeg|png|webp|avif|gif|svg)$/,
-    },
     name: {
       type: String,
-      required: [true, 'Vehicle name is required.'],
+      required: [true, 'Model name is required.'],
+      unique: true,
     },
-    brandName: {
+    displayName: {
       type: String,
-      required: [true, 'Brand Name is required.'],
+      required: false,
     },
-    modelName: {
+    vehicleType: {
       type: String,
-      required: [true, 'Model Name is required.'],
+      enum: VALID_VEHICLE_TYPES,
+      required: false,
     },
-    fuelType: {
+    description: {
       type: String,
-      enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
-      required: [true, 'Fuel type is required.'],
+      required: false,
     },
-    details: {
-      modelYear: {
-        type: Number,
-        required: [true, 'Model year is required.'],
-        min: [1900, 'Year must be later than 1900.'],
-        max: [new Date().getFullYear(), 'Year cannot be in the future.'],
-      },
-      month: { 
-        type: String, 
-        required: [true, 'Month is required.'] 
-      },
-      kilometersDriven: {
-        type: Number,
-        required: [true, 'Kilometers driven is required.'],
-        min: [0, 'Kilometers driven cannot be negative.'],
-      },
-      transmissionType: {
-        type: String,
-        enum: ['Automatic', 'Manual', 'Semi-Automatic', 'CVT', 'Dual-Clutch'],
-        required: [true, 'Transmission type is required.'],
-      },
-      mileage: { 
-        type: String, 
-        required: [true, 'Mileage is required.'] 
-      },
+    launchYear: {
+      type: Number,
+      required: false,
     },
-    additionalInfo: {
-      abs: { type: Boolean, required: false },
-      accidental: { type: Boolean, required: false },
-      color: { type: String, required: false },
-      powerSteering: { type: Boolean, required: false },
-      powerWindows: { type: Boolean, required: false },
-      sunroof: { type: Boolean, required: false },
-      usbCompatibility: { type: Boolean, required: false },
-      insuranceType: { type: String, required: false },
+    segment: {
+      type: String,
+      required: false,
+    },
+    bodyType: {
+      type: String,
+      required: false,
+    },
+    images: {
+      type: [String],
+      required: false,
+    },
+    brochureUrl: {
+      type: String,
+      required: false,
+    },
+    isCommercialVehicle: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    commercialVehicleType: {
+      type: String,
+      required: false,
+    },
+    commercialBodyType: {
+      type: String,
+      required: false,
+    },
+    defaultPayloadCapacity: {
+      type: Number,
+      required: false,
+    },
+    defaultAxleCount: {
+      type: Number,
+      required: false,
+    },
+    defaultPayloadUnit: {
+      type: String,
+      required: false,
+    },
+    defaultSeatingCapacity: {
+      type: Number,
+      required: false,
+    },
+    fuelTypes: {
+      type: [String],
+      enum: VALID_FUEL_TYPES,
+      required: false,
+    },
+    transmissionTypes: {
+      type: [String],
+      enum: VALID_TRANSMISSION_TYPES,
+      required: false,
+    },
+    isActive: {
+      type: Boolean,
+      required: false,
+      default: true,
+    },
+    manufacturerId: {
+      type: Types.ObjectId,
+      ref: 'VehicleCompany',
+      required: true,
     },
   },
   { timestamps: true },
@@ -68,28 +98,26 @@ export const ModelSchema = new mongoose.Schema(
 
 // Create the Model Document interface
 export interface VehicleModelDocument extends Document {
-  image: string;
   name: string;
-  brandName: string;
-  modelName: string;
-  fuelType: string;
-  details: {
-    modelYear: number;
-    month: string;
-    kilometersDriven: number;
-    transmissionType: string;
-    mileage: string;
-  };
-  additionalInfo: {
-    abs?: boolean;
-    accidental?: boolean;
-    color?: string;
-    powerSteering?: boolean;
-    powerWindows?: boolean;
-    sunroof?: boolean;
-    usbCompatibility?: boolean;
-    insuranceType?: string;
-  };
+  displayName?: string;
+  vehicleType?: 'SUV' | 'Sedan' | 'Truck' | 'Coupe' | 'Hatchback' | 'Convertible' | 'two-wheeler' | 'MUV' | 'Compact SUV' | 'Sub-Compact SUV';
+  description?: string;
+  launchYear?: number;
+  segment?: string;
+  bodyType?: string;
+  images?: string[];
+  brochureUrl?: string;
+  isCommercialVehicle?: boolean;
+  commercialVehicleType?: string;
+  commercialBodyType?: string;
+  defaultPayloadCapacity?: number;
+  defaultAxleCount?: number;
+  defaultPayloadUnit?: string;
+  defaultSeatingCapacity?: number;
+  fuelTypes?: string[];
+  transmissionTypes?: string[];
+  isActive?: boolean;
+  manufacturerId: Types.ObjectId;
 }
 
 // Export the schema

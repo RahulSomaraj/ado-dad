@@ -1,0 +1,4 @@
+name,displayName,fuelType,transmissionType,featurePackage,modelId,engine_capacity,engine_maxPower,price,isActive
+Swift VDI,Swift VDI,diesel,manual_5,V,REPLACE_WITH_MODEL_ID,1248,75 bhp,550000,true
+Camry VX,Camry VX,petrol,automatic_6,VX,REPLACE_WITH_MODEL_ID,2494,203 bhp,3500000,true
+
