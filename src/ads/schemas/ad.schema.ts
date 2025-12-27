@@ -33,6 +33,23 @@ export class Ad {
   @Prop({ type: Number, required: false })
   longitude?: number;
 
+  // GeoJSON Point for geographic queries (coordinates: [longitude, latitude])
+  @Prop({
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number],
+      required: false,
+    },
+  })
+  geoLocation?: {
+    type: 'Point';
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+
   @Prop({ required: true, enum: AdCategory })
   category: AdCategory;
 
@@ -97,5 +114,7 @@ AdSchema.index({ isDeleted: 1 }, { background: true });
 AdSchema.index({ postedBy: 1, isDeleted: 1 }, { background: true });
 // Text index for search functionality - only description field exists
 AdSchema.index({ description: 'text' }, { background: true });
-// 2dsphere index for geographic queries
+// 2dsphere index for geographic queries (legacy latitude/longitude)
 AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });
+// 2dsphere index for GeoJSON location queries
+AdSchema.index({ geoLocation: '2dsphere' }, { background: true });

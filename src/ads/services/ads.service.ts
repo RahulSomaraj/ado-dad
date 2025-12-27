@@ -8,7 +8,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { Ad, AdDocument, AdCategory } from '../schemas/ad.schema';
-import { PropertyAd, PropertyAdDocument, PropertyTypeEnum } from '../schemas/property-ad.schema';
+import {
+  PropertyAd,
+  PropertyAdDocument,
+  PropertyTypeEnum,
+} from '../schemas/property-ad.schema';
 import { VehicleAd, VehicleAdDocument } from '../schemas/vehicle-ad.schema';
 import {
   CommercialVehicleAd,
@@ -1242,7 +1246,7 @@ export class AdsService {
 
     switch (category) {
       case AdCategory.PROPERTY:
-        if(!data.propertyType) {
+        if (!data.propertyType) {
           throw new BadRequestException('propertyType is required');
         }
 
@@ -1251,30 +1255,48 @@ export class AdsService {
         }
 
         if (!data.location) {
-            throw new BadRequestException('location is required');
+          throw new BadRequestException('location is required');
         }
 
         if (data.areaSqft == null) {
-            throw new BadRequestException('areaSqft is required');
-         }
+          throw new BadRequestException('areaSqft is required');
+        }
         if (!data.description) {
-            throw new BadRequestException('description is required');
-        } 
-        if(data.propertyType === PropertyTypeEnum.APARTMENT ||data.propertyType === PropertyTypeEnum.HOUSE ||
-          data.propertyType === PropertyTypeEnum.VILLA){
-            if(data.bedrooms==null)
-            {
-              throw new BadRequestException('bedrooms is required for Apartment, House, Villa',);
-            }
-            if (data.bathrooms == null) {
-              throw new BadRequestException('bathrooms is required for Apartment, House, Villa',);
-            }
+          throw new BadRequestException('description is required');
+        }
+        if (
+          data.propertyType === PropertyTypeEnum.APARTMENT ||
+          data.propertyType === PropertyTypeEnum.HOUSE ||
+          data.propertyType === PropertyTypeEnum.VILLA
+        ) {
+          if (data.bedrooms == null) {
+            throw new BadRequestException(
+              'bedrooms is required for Apartment, House, Villa',
+            );
           }
+          if (data.bathrooms == null) {
+            throw new BadRequestException(
+              'bathrooms is required for Apartment, House, Villa',
+            );
+          }
+        }
 
-        const nonResidentialTypes = ['plot', 'commercial', 'office', 'shop', 'warehouse'];
+        const nonResidentialTypes = [
+          'plot',
+          'commercial',
+          'office',
+          'shop',
+          'warehouse',
+        ];
         if (nonResidentialTypes.includes(data.propertyType)) {
-          if (data.bedrooms != null) throw new BadRequestException('bedrooms should not exist for Plot, Commercial, Office, Shop, Warehouse');
-           if (data.bathrooms != null) throw new BadRequestException('bathrooms should not exist for Plot, Commercial, Office, Shop, Warehouse');  
+          if (data.bedrooms != null)
+            throw new BadRequestException(
+              'bedrooms should not exist for Plot, Commercial, Office, Shop, Warehouse',
+            );
+          if (data.bathrooms != null)
+            throw new BadRequestException(
+              'bathrooms should not exist for Plot, Commercial, Office, Shop, Warehouse',
+            );
         }
         break;
 
@@ -1343,8 +1365,19 @@ export class AdsService {
     data: any,
     userId: string,
   ): Promise<DetailedAdResponseDto> {
-    const title=`${data.propertyType} ${data.areaSqft}Sqft ${data.location} `.trim();
-    const finalTitle=data.title && data.title.trim()!==""?data.title:title;
+    const title =
+      `${data.propertyType} ${data.areaSqft}Sqft ${data.location} `.trim();
+    const finalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+            type: 'Point' as const,
+            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+          }
+        : undefined;
 
     const ad = new this.adModel({
       title: finalTitle,
@@ -1352,6 +1385,9 @@ export class AdsService {
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
@@ -1390,14 +1426,27 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
-    const finalTitle=data.title && data.title.trim()!==""?data.title:title;
+    const finalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+            type: 'Point' as const,
+            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+          }
+        : undefined;
 
     const ad = new this.adModel({
-      title:finalTitle,
+      title: finalTitle,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
@@ -1443,17 +1492,30 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
-    const FinalTitle=data.title && data.title.trim()!==""?data.title:title;
+    const FinalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+            type: 'Point' as const,
+            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+          }
+        : undefined;
 
     const session = await this.adModel.startSession();
     session.startTransaction();
     try {
       const ad = new this.adModel({
-        title:FinalTitle,
+        title: FinalTitle,
         description: data.description,
         price: data.price,
         images: data.images ?? [],
         location: data.location,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        geoLocation,
         link: data.link,
         postedBy: new Types.ObjectId(userId),
         category: AdCategory.COMMERCIAL_VEHICLE,
@@ -1512,13 +1574,27 @@ export class AdsService {
       : 'Vehicle';
     const year = data.year ?? '';
     const title = `${modelName} ${year}`.trim();
-    const FinalTitle=data.title && data.title.trim()!==""?data.title:title;
+    const FinalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+            type: 'Point' as const,
+            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+          }
+        : undefined;
+
     const ad = new this.adModel({
-      title:FinalTitle,
+      title: FinalTitle,
       description: data.description,
       price: data.price,
       images: data.images ?? [],
       location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,

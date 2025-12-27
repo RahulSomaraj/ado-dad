@@ -100,6 +100,21 @@ export class CreateAdUc {
       // Title generation (for vehicles)
       const title = await buildTitle(enrichedDto, this.inventory);
 
+      // Prepare geoLocation if coordinates are provided
+      const geoLocation:
+        | { type: 'Point'; coordinates: [number, number] }
+        | undefined =
+        enrichedDto.data.latitude !== undefined &&
+        enrichedDto.data.longitude !== undefined
+          ? {
+              type: 'Point' as const,
+              coordinates: [
+                enrichedDto.data.longitude,
+                enrichedDto.data.latitude,
+              ] as [number, number], // [longitude, latitude]
+            }
+          : undefined;
+
       const savedAd = await this.adRepo.create(
         {
           title,
@@ -109,6 +124,7 @@ export class CreateAdUc {
           location: enrichedDto.data.location,
           latitude: enrichedDto.data.latitude,
           longitude: enrichedDto.data.longitude,
+          geoLocation,
           link: enrichedDto.data.link,
           postedBy: new Types.ObjectId(userId),
           category: enrichedDto.category as any, // Cast to match schema enum
