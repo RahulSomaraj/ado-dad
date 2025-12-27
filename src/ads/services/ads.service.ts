@@ -2145,6 +2145,35 @@ export class AdsService {
     }
   }
 
+  /** ---------- HELPER: Remove null values from objects ---------- */
+  private removeNullValues(obj: any): any {
+    if (obj === null || obj === undefined) return undefined;
+    if (Array.isArray(obj)) return obj;
+    if (typeof obj !== 'object') return obj;
+
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== null && value !== undefined) {
+        if (
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          !(value instanceof Date)
+        ) {
+          const cleanedValue = this.removeNullValues(value);
+          if (
+            cleanedValue !== undefined &&
+            Object.keys(cleanedValue).length > 0
+          ) {
+            cleaned[key] = cleanedValue;
+          }
+        } else {
+          cleaned[key] = value;
+        }
+      }
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+
   /** ---------- VEHICLE INVENTORY ENRICHMENT ---------- */
   private async populateVehicleInventoryDetails(
     detailedAd: DetailedAdResponseDto,
@@ -2187,12 +2216,29 @@ export class AdsService {
           const v = await this.vehicleInventoryService.findVehicleVariantById(
             vehicleDetails.variantId,
           );
-          inv.variant = {
+          const vehicleModel = (v as any).vehicleModel;
+          const variantData: any = {
             id: (v as any)._id?.toString?.() ?? '',
             name: (v as any).name,
-            modelId: (v as any).vehicleModel?.toString?.(),
             price: (v as any).price,
           };
+
+          // Only include vehicleModel if it's not null
+          if (vehicleModel) {
+            variantData.vehicleModel = this.removeNullValues({
+              _id: vehicleModel._id?.toString?.() || vehicleModel._id,
+              name: vehicleModel.name,
+              displayName: vehicleModel.displayName,
+            });
+            variantData.modelId =
+              vehicleModel._id?.toString?.() || vehicleModel._id;
+          }
+
+          // Only add variant if it has valid data
+          const cleanedVariant = this.removeNullValues(variantData);
+          if (cleanedVariant) {
+            inv.variant = cleanedVariant;
+          }
         } catch {}
       }
 
@@ -2339,13 +2385,35 @@ export class AdsService {
             : Promise.resolve(undefined),
         ]);
 
+      // Clean variant - remove vehicleModel field if null, or remove entire variant if no valid data
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          // Remove vehicleModel field if null, but keep variant if it has other fields
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
       processedVehicleDetails = {
         ...vehicleDetails,
-        manufacturer,
-        model,
-        variant,
-        fuelType,
-        transmissionType,
+        ...(manufacturer && {
+          manufacturer: this.removeNullValues(manufacturer),
+        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(transmissionType && {
+          transmissionType: this.removeNullValues(transmissionType),
+        }),
       };
     }
 
@@ -2409,13 +2477,35 @@ export class AdsService {
             : Promise.resolve(undefined),
         ]);
 
+      // Clean variant - remove vehicleModel field if null, or remove entire variant if no valid data
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          // Remove vehicleModel field if null, but keep variant if it has other fields
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
       processedCommercialVehicleDetails = {
         ...commercialVehicleDetails,
-        manufacturer,
-        model,
-        variant,
-        fuelType,
-        transmissionType,
+        ...(manufacturer && {
+          manufacturer: this.removeNullValues(manufacturer),
+        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(transmissionType && {
+          transmissionType: this.removeNullValues(transmissionType),
+        }),
       };
     }
 
