@@ -183,6 +183,20 @@ export class AdsService {
     page = this.clamp(Number(page) || 1, 1, 1e9);
     limit = this.clamp(Number(limit) || 20, 1, 100);
 
+    // Ensure latitude and longitude are numbers (handle string conversion)
+    if (latitude !== undefined) {
+      latitude =
+        typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
+      if (isNaN(latitude)) latitude = undefined;
+    }
+    if (longitude !== undefined) {
+      longitude =
+        typeof longitude === 'string'
+          ? parseFloat(longitude)
+          : Number(longitude);
+      if (isNaN(longitude)) longitude = undefined;
+    }
+
     // ------- Pipeline -------
     const pipeline: any[] = [];
 
@@ -198,25 +212,250 @@ export class AdsService {
       pipeline.push({ $match: { category: filters.category } });
     }
 
-    // Hierarchical location-based filtering
+    // Geospatial location-based filtering using geoLocation
     if (latitude !== undefined && longitude !== undefined) {
-      // Get location hierarchy pipeline stages
-      const locationPipeline =
-        this.locationHierarchyService.getLocationAggregationPipeline(
-          latitude,
-          longitude,
-        );
+      // Add distance calculation from geoLocation field
+      pipeline.push({
+        $addFields: {
+          distance: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$geoLocation', null] },
+                  { $ne: ['$geoLocation.coordinates', null] },
+                  { $eq: [{ $size: '$geoLocation.coordinates' }, 2] },
+                ],
+              },
+              then: {
+                // Calculate distance using Haversine formula (in km)
+                $let: {
+                  vars: {
+                    // Extract coordinates from geoLocation [longitude, latitude]
+                    adLon: { $arrayElemAt: ['$geoLocation.coordinates', 0] },
+                    adLat: { $arrayElemAt: ['$geoLocation.coordinates', 1] },
+                    // Convert to radians (pi ≈ 3.141592653589793)
+                    pi: 3.141592653589793,
+                  },
+                  in: {
+                    $let: {
+                      vars: {
+                        lat1Rad: {
+                          $multiply: [{ $divide: ['$$pi', 180] }, latitude],
+                        },
+                        lat2Rad: {
+                          $multiply: [
+                            { $divide: ['$$pi', 180] },
+                            { $toDouble: '$$adLat' },
+                          ],
+                        },
+                        deltaLat: {
+                          $multiply: [
+                            { $divide: ['$$pi', 180] },
+                            { $subtract: [latitude, { $toDouble: '$$adLat' }] },
+                          ],
+                        },
+                        deltaLon: {
+                          $multiply: [
+                            { $divide: ['$$pi', 180] },
+                            {
+                              $subtract: [longitude, { $toDouble: '$$adLon' }],
+                            },
+                          ],
+                        },
+                      },
+                      in: {
+                        $let: {
+                          vars: {
+                            a: {
+                              $add: [
+                                {
+                                  $multiply: [
+                                    { $sin: { $divide: ['$$deltaLat', 2] } },
+                                    { $sin: { $divide: ['$$deltaLat', 2] } },
+                                  ],
+                                },
+                                {
+                                  $multiply: [
+                                    {
+                                      $multiply: [
+                                        { $cos: '$$lat1Rad' },
+                                        { $cos: '$$lat2Rad' },
+                                      ],
+                                    },
+                                    {
+                                      $multiply: [
+                                        {
+                                          $sin: { $divide: ['$$deltaLon', 2] },
+                                        },
+                                        {
+                                          $sin: { $divide: ['$$deltaLon', 2] },
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                              ],
+                            },
+                          },
+                          in: {
+                            $multiply: [
+                              6371, // Earth radius in km
+                              2,
+                              {
+                                $atan2: [
+                                  { $sqrt: '$$a' },
+                                  { $sqrt: { $subtract: [1, '$$a'] } },
+                                ],
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              else: {
+                // Fallback: calculate distance from latitude/longitude if geoLocation not available
+                $cond: {
+                  if: {
+                    $and: [
+                      { $ne: ['$latitude', null] },
+                      { $ne: ['$longitude', null] },
+                    ],
+                  },
+                  then: {
+                    $let: {
+                      vars: {
+                        latDiff: {
+                          $abs: { $subtract: ['$latitude', latitude] },
+                        },
+                        lonDiff: {
+                          $abs: { $subtract: ['$longitude', longitude] },
+                        },
+                      },
+                      in: {
+                        $multiply: [
+                          111.32, // Approximate km per degree at equator
+                          { $add: ['$$latDiff', '$$lonDiff'] }, // Manhattan distance
+                        ],
+                      },
+                    },
+                  },
+                  else: null,
+                },
+              },
+            },
+          },
+        },
+      });
 
-      // Add location filtering stages to pipeline
-      pipeline.push(...locationPipeline);
+      // Get location filter to determine state for text-based matching
+      const locationFilter = this.locationHierarchyService.getLocationFilter(
+        latitude,
+        longitude,
+      );
+
+      // Filter by distance (50km default radius)
+      // Prioritize geoLocation, fallback to latitude/longitude
+      pipeline.push({
+        $match: {
+          $and: [
+            {
+              $or: [
+                { 'geoLocation.coordinates': { $exists: true, $ne: null } },
+                {
+                  $and: [
+                    { latitude: { $exists: true, $ne: null } },
+                    { longitude: { $exists: true, $ne: null } },
+                  ],
+                },
+              ],
+            },
+            {
+              $or: [
+                // Ads within 50km radius (using calculated distance)
+                { distance: { $lte: 50 } },
+                // Ads with state name in location text (if state is known)
+                ...(locationFilter.state
+                  ? [
+                      {
+                        location: {
+                          $regex: locationFilter.state,
+                          $options: 'i',
+                        },
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          ],
+        },
+      });
 
       // Add location scoring for prioritization
-      pipeline.push(
-        this.locationHierarchyService.getLocationScoringStage(
-          latitude,
-          longitude,
-        ),
-      );
+      pipeline.push({
+        $addFields: {
+          locationScore: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$distance', null] },
+                  { $ne: ['$distance', undefined] },
+                ],
+              },
+              then: {
+                $cond: {
+                  // Check if ad location text matches the state (if state is known)
+                  if: locationFilter.state
+                    ? {
+                        $regexMatch: {
+                          input: { $ifNull: ['$location', ''] },
+                          regex: locationFilter.state,
+                          options: 'i',
+                        },
+                      }
+                    : false,
+                  then: {
+                    // Higher score for ads in the same state, prioritized by distance
+                    $round: [
+                      {
+                        $add: [
+                          1000, // Base score for same state
+                          {
+                            $subtract: [
+                              100, // Distance bonus
+                              {
+                                $multiply: ['$distance', 1], // Subtract 1 point per km
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                      2,
+                    ],
+                  },
+                  else: {
+                    // Lower score for ads outside the state, still distance-based
+                    $round: [
+                      {
+                        $subtract: [
+                          100, // Base score for different state
+                          {
+                            $multiply: ['$distance', 2], // Subtract 2 points per km
+                          },
+                        ],
+                      },
+                      2,
+                    ],
+                  },
+                },
+              },
+              else: 0, // No location data
+            },
+          },
+        },
+      });
     }
 
     // user
@@ -466,11 +705,12 @@ export class AdsService {
     }
 
     // Clean up manufacturer lookup arrays from output
+    // Note: locationScore is automatically included in exclusion projection
     pipeline.push({
       $project: {
         manufacturerInfo: 0,
         commercialManufacturerInfo: 0,
-        locationScore: 1, // Include location score for sorting
+        // locationScore is included by default in exclusion projection
       },
     });
 
