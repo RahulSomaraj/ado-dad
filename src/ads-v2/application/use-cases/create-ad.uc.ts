@@ -10,6 +10,7 @@ import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { CommercialIntentService } from '../../infrastructure/services/commercial-intent.service';
 import { OutboxService } from '../../infrastructure/services/outbox.service';
 import { GeocodingService } from '../../../common/services/geocoding.service';
+import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
 import { CreateAdV2Dto, AdCategoryV2 } from '../../dto/create-ad-v2.dto';
 import {
   mapToDetailedResponseDto,
@@ -32,6 +33,7 @@ export class CreateAdUc {
     private readonly intent: CommercialIntentService,
     private readonly outbox: OutboxService,
     private readonly geocodingService: GeocodingService,
+    private readonly locationHierarchyService: LocationHierarchyService,
   ) {}
 
   async exec(input: {
@@ -59,7 +61,14 @@ export class CreateAdUc {
     // 3) Optional auto-detection for commercial
     const enrichedDto = await this.intent.applyIfCommercial(dto);
 
-    // 3.5) Auto-generate location from coordinates if not provided
+    // 3.5) Auto-generate location and hierarchy from coordinates if not provided
+    let locationHierarchy: {
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+    } = {};
+
     if (
       !enrichedDto.data.location &&
       enrichedDto.data.latitude &&
@@ -71,9 +80,47 @@ export class CreateAdUc {
           enrichedDto.data.longitude,
         );
         enrichedDto.data.location = geocodingResult.location;
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        // Get district from location hierarchy service
+        try {
+          const locationFilter = this.locationHierarchyService.getLocationFilter(
+            enrichedDto.data.latitude,
+            enrichedDto.data.longitude,
+          );
+          locationHierarchy.district = locationFilter.district;
+        } catch (error) {
+          // Silently fail if location hierarchy service fails
+        }
       } catch (error) {
         // If geocoding fails, use coordinates as fallback
         enrichedDto.data.location = `${enrichedDto.data.latitude.toFixed(4)}, ${enrichedDto.data.longitude.toFixed(4)}`;
+      }
+    } else if (enrichedDto.data.latitude && enrichedDto.data.longitude) {
+      // Location provided but still extract hierarchy for filtering
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          enrichedDto.data.latitude,
+          enrichedDto.data.longitude,
+        );
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        // Get district from location hierarchy service
+        try {
+          const locationFilter = this.locationHierarchyService.getLocationFilter(
+            enrichedDto.data.latitude,
+            enrichedDto.data.longitude,
+          );
+          locationHierarchy.district = locationFilter.district;
+        } catch (error) {
+          // Silently fail if location hierarchy service fails
+        }
+      } catch (error) {
+        // Silently fail - hierarchy is optional
       }
     }
 
@@ -125,6 +172,10 @@ export class CreateAdUc {
           latitude: enrichedDto.data.latitude,
           longitude: enrichedDto.data.longitude,
           geoLocation,
+          city: locationHierarchy.city,
+          district: locationHierarchy.district,
+          state: locationHierarchy.state,
+          country: locationHierarchy.country,
           link: enrichedDto.data.link,
           postedBy: new Types.ObjectId(userId),
           category: enrichedDto.category as any, // Cast to match schema enum

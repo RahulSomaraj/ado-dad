@@ -45,10 +45,43 @@ export class FilterAdDto {
   @IsString()
   location?: string;
 
+  // Location hierarchy filters
+  @ApiPropertyOptional({
+    description: 'Country filter',
+    example: 'India',
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiPropertyOptional({
+    description: 'State filter',
+    example: 'Kerala',
+  })
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional({
+    description: 'District filter',
+    example: 'Kottayam',
+  })
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @ApiPropertyOptional({
+    description: 'City filter',
+    example: 'Kottayam',
+  })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
   // Geographic location filters
   @ApiPropertyOptional({
     description:
-      'Latitude for geographic filtering (searches within 10km radius)',
+      'Latitude for geographic filtering (uses $geoNear with 50km radius)',
     example: 19.076,
   })
   @IsOptional()
@@ -60,7 +93,7 @@ export class FilterAdDto {
 
   @ApiPropertyOptional({
     description:
-      'Longitude for geographic filtering (searches within 10km radius)',
+      'Longitude for geographic filtering (uses $geoNear with 50km radius)',
     example: 72.8777,
   })
   @IsOptional()

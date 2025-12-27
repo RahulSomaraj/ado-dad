@@ -50,6 +50,19 @@ export class Ad {
     coordinates: [number, number]; // [longitude, latitude]
   };
 
+  // Location hierarchy for efficient filtering (auto-populated from reverse geocoding)
+  @Prop({ type: String, required: false, trim: true, index: true })
+  city?: string;
+
+  @Prop({ type: String, required: false, trim: true, index: true })
+  district?: string;
+
+  @Prop({ type: String, required: false, trim: true, index: true })
+  state?: string;
+
+  @Prop({ type: String, required: false, trim: true, index: true })
+  country?: string;
+
   @Prop({ required: true, enum: AdCategory })
   category: AdCategory;
 
@@ -116,5 +129,17 @@ AdSchema.index({ postedBy: 1, isDeleted: 1 }, { background: true });
 AdSchema.index({ description: 'text' }, { background: true });
 // 2dsphere index for geographic queries (legacy latitude/longitude)
 AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });
-// 2dsphere index for GeoJSON location queries
+// 2dsphere index for GeoJSON location queries (MUST be first for $geoNear)
 AdSchema.index({ geoLocation: '2dsphere' }, { background: true });
+// Location hierarchy indexes for efficient filtering
+AdSchema.index({ country: 1, state: 1, district: 1, city: 1 }, { background: true });
+AdSchema.index({ state: 1, district: 1 }, { background: true });
+AdSchema.index({ country: 1, state: 1 }, { background: true });
+// Compound index for location hierarchy + visibility
+AdSchema.index(
+  { isDeleted: 1, isApproved: 1, country: 1, state: 1, district: 1 },
+  { background: true },
+);
+// Note: Cannot create compound index with 2dsphere - MongoDB only allows ONE 2dsphere index per collection
+// The simple { geoLocation: '2dsphere' } index above is sufficient for $geoNear
+// Visibility filters (isDeleted, isApproved) are applied in $geoNear query itself

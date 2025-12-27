@@ -46,6 +46,20 @@ import { CommercialVehicleDetectionService } from './commercial-vehicle-detectio
 import { GeocodingService } from '../../common/services/geocoding.service';
 import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
 import { UserType } from '../../users/enums/user.types';
+import {
+  buildGeoNearStage,
+  buildLocationHierarchyMatch,
+  buildLocationScoreStage,
+  buildUserLookupStage,
+  buildManufacturerLookupStages,
+  buildPropertyAdLookupStages,
+  buildVehicleAdLookupStages,
+  buildCommercialVehicleAdLookupStages,
+  buildVehicleFilterMatcher,
+  normalizeFilters,
+  convertDistanceToKm,
+  LocationHierarchy,
+} from './ads.service.utils';
 
 @Injectable()
 export class AdsService {
@@ -141,23 +155,10 @@ export class AdsService {
     return `${AdsService.CACHE_PREFIX}${norm}`;
   }
 
-  /** ---------- FIND ALL (robust lookups + neutral defaults, all filters, all lists, all categories) ---------- */
+  /** ---------- FIND ALL (optimized with $geoNear and modular helpers) ---------- */
   async findAll(filters: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
-    // Build deterministic cache key
-    const normalize = (obj: any): any => {
-      if (obj == null) return obj;
-      if (Array.isArray(obj)) return obj.map(normalize);
-      if (typeof obj === 'object') {
-        const entries = Object.entries(obj)
-          .filter(([, v]) => v !== undefined && v !== null && v !== '')
-          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-          .map(([k, v]) => [k, normalize(v)]);
-        return Object.fromEntries(entries);
-      }
-      return obj;
-    };
-
-    const safeFilters = this.normalize(filters);
+    // Normalize filters for cache key
+    const safeFilters = normalizeFilters(filters);
     const cacheKey = this.key({ scope: 'findAll', ...safeFilters });
 
     // Try cache first
@@ -167,6 +168,7 @@ export class AdsService {
       );
     if (cached) return cached;
 
+    // Extract and validate parameters
     let {
       page = 1,
       limit = 20,
@@ -175,15 +177,14 @@ export class AdsService {
       search,
       latitude,
       longitude,
+      location,
+      country,
+      state,
+      district,
+      city,
     } = filters;
-    const { field: sortField, dir: sortDirection } = this.coerceSort(
-      sortBy,
-      sortOrder,
-    );
-    page = this.clamp(Number(page) || 1, 1, 1e9);
-    limit = this.clamp(Number(limit) || 20, 1, 100);
 
-    // Ensure latitude and longitude are numbers (handle string conversion)
+    // Normalize coordinates
     if (latitude !== undefined) {
       latitude =
         typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
@@ -197,468 +198,118 @@ export class AdsService {
       if (isNaN(longitude)) longitude = undefined;
     }
 
-    // ------- Pipeline -------
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // Build aggregation pipeline
     const pipeline: any[] = [];
 
-    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
-    // Store search term for later use
-    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+    // Base visibility filter (always first if not using $geoNear)
+    const baseMatch: any = {
+      isDeleted: { $ne: true },
+      isApproved: true,
+    };
+    if (filters.category) baseMatch.category = filters.category;
 
-    // Base visibility: show only approved ads (except soft-deleted)
-    pipeline.push({ $match: { isDeleted: { $ne: true }, isApproved: true } });
+    // Location hierarchy from coordinates or explicit filters
+    let locationHierarchy: LocationHierarchy = {};
+    let hasExplicitHierarchyFilters = false;
 
-    // Optional category filter
-    if (filters.category) {
-      pipeline.push({ $match: { category: filters.category } });
-    }
-
-    // Geospatial location-based filtering using geoLocation
-    if (latitude !== undefined && longitude !== undefined) {
-      // Add distance calculation from geoLocation field
-      pipeline.push({
-        $addFields: {
-          distance: {
-            $cond: {
-              if: {
-                $and: [
-                  { $ne: ['$geoLocation', null] },
-                  { $ne: ['$geoLocation.coordinates', null] },
-                  { $eq: [{ $size: '$geoLocation.coordinates' }, 2] },
-                ],
-              },
-              then: {
-                // Calculate distance using Haversine formula (in km)
-                $let: {
-                  vars: {
-                    // Extract coordinates from geoLocation [longitude, latitude]
-                    adLon: { $arrayElemAt: ['$geoLocation.coordinates', 0] },
-                    adLat: { $arrayElemAt: ['$geoLocation.coordinates', 1] },
-                    // Convert to radians (pi ≈ 3.141592653589793)
-                    pi: 3.141592653589793,
-                  },
-                  in: {
-                    $let: {
-                      vars: {
-                        lat1Rad: {
-                          $multiply: [{ $divide: ['$$pi', 180] }, latitude],
-                        },
-                        lat2Rad: {
-                          $multiply: [
-                            { $divide: ['$$pi', 180] },
-                            { $toDouble: '$$adLat' },
-                          ],
-                        },
-                        deltaLat: {
-                          $multiply: [
-                            { $divide: ['$$pi', 180] },
-                            { $subtract: [latitude, { $toDouble: '$$adLat' }] },
-                          ],
-                        },
-                        deltaLon: {
-                          $multiply: [
-                            { $divide: ['$$pi', 180] },
-                            {
-                              $subtract: [longitude, { $toDouble: '$$adLon' }],
-                            },
-                          ],
-                        },
-                      },
-                      in: {
-                        $let: {
-                          vars: {
-                            a: {
-                              $add: [
-                                {
-                                  $multiply: [
-                                    { $sin: { $divide: ['$$deltaLat', 2] } },
-                                    { $sin: { $divide: ['$$deltaLat', 2] } },
-                                  ],
-                                },
-                                {
-                                  $multiply: [
-                                    {
-                                      $multiply: [
-                                        { $cos: '$$lat1Rad' },
-                                        { $cos: '$$lat2Rad' },
-                                      ],
-                                    },
-                                    {
-                                      $multiply: [
-                                        {
-                                          $sin: { $divide: ['$$deltaLon', 2] },
-                                        },
-                                        {
-                                          $sin: { $divide: ['$$deltaLon', 2] },
-                                        },
-                                      ],
-                                    },
-                                  ],
-                                },
-                              ],
-                            },
-                          },
-                          in: {
-                            $multiply: [
-                              6371, // Earth radius in km
-                              2,
-                              {
-                                $atan2: [
-                                  { $sqrt: '$$a' },
-                                  { $sqrt: { $subtract: [1, '$$a'] } },
-                                ],
-                              },
-                            ],
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              else: {
-                // Fallback: calculate distance from latitude/longitude if geoLocation not available
-                $cond: {
-                  if: {
-                    $and: [
-                      { $ne: ['$latitude', null] },
-                      { $ne: ['$longitude', null] },
-                    ],
-                  },
-                  then: {
-                    $let: {
-                      vars: {
-                        latDiff: {
-                          $abs: { $subtract: ['$latitude', latitude] },
-                        },
-                        lonDiff: {
-                          $abs: { $subtract: ['$longitude', longitude] },
-                        },
-                      },
-                      in: {
-                        $multiply: [
-                          111.32, // Approximate km per degree at equator
-                          { $add: ['$$latDiff', '$$lonDiff'] }, // Manhattan distance
-                        ],
-                      },
-                    },
-                  },
-                  else: null,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      // Get location filter to determine state for text-based matching
+    if (country || state || district || city) {
+      // User explicitly provided hierarchy filters
+      locationHierarchy = { country, state, district, city };
+      hasExplicitHierarchyFilters = true;
+    } else if (latitude !== undefined && longitude !== undefined) {
+      // Auto-resolve hierarchy from coordinates (for scoring only, not filtering)
       const locationFilter = this.locationHierarchyService.getLocationFilter(
         latitude,
         longitude,
       );
+      locationHierarchy = {
+        country: locationFilter.country,
+        state: locationFilter.state,
+        district: locationFilter.district,
+        city: undefined, // City not available from locationHierarchyService yet
+      };
+      // Don't filter by auto-resolved hierarchy - only use for scoring
+      hasExplicitHierarchyFilters = false;
+    }
 
-      // Filter by distance (50km default radius)
-      // Prioritize geoLocation, fallback to latitude/longitude
-      pipeline.push({
-        $match: {
-          $and: [
-            {
-              $or: [
-                { 'geoLocation.coordinates': { $exists: true, $ne: null } },
-                {
-                  $and: [
-                    { latitude: { $exists: true, $ne: null } },
-                    { longitude: { $exists: true, $ne: null } },
-                  ],
-                },
-              ],
-            },
-            {
-              $or: [
-                // Ads within 50km radius (using calculated distance)
-                { distance: { $lte: 50 } },
-                // Ads with state name in location text (if state is known)
-                ...(locationFilter.state
-                  ? [
-                      {
-                        location: {
-                          $regex: locationFilter.state,
-                          $options: 'i',
-                        },
-                      },
-                    ]
-                  : []),
-              ],
-            },
-          ],
-        },
-      });
+    // Use $geoNear when coordinates provided (MUST be first stage)
+    if (latitude !== undefined && longitude !== undefined) {
+      pipeline.push(buildGeoNearStage(latitude, longitude, 50));
+      // Add base match after $geoNear
+      pipeline.push({ $match: baseMatch });
+    } else {
+      // No coordinates - use regular match
+      pipeline.push({ $match: baseMatch });
+    }
 
-      // Add location scoring for prioritization
-      pipeline.push({
-        $addFields: {
-          locationScore: {
-            $cond: {
-              if: {
+    // Location hierarchy filtering (city > district > state > country)
+    // Only apply if hierarchy filters were EXPLICITLY provided in query
+    // If auto-resolved from coordinates, don't filter (just use for scoring)
+    if (hasExplicitHierarchyFilters) {
+      const hierarchyConditions =
+        buildLocationHierarchyMatch(locationHierarchy);
+      if (hierarchyConditions.length > 0) {
+        // Explicit hierarchy filters provided - apply them
+        // But also include docs without hierarchy fields (for backward compatibility)
+        pipeline.push({
+          $match: {
+            $or: [
+              ...hierarchyConditions,
+              // Include documents without hierarchy fields (backward compatibility)
+              {
                 $and: [
-                  { $ne: ['$distance', null] },
-                  { $ne: ['$distance', undefined] },
+                  { city: { $exists: false } },
+                  { district: { $exists: false } },
+                  { state: { $exists: false } },
+                  { country: { $exists: false } },
                 ],
               },
-              then: {
-                $cond: {
-                  // Check if ad location text matches the state (if state is known)
-                  if: locationFilter.state
-                    ? {
-                        $regexMatch: {
-                          input: { $ifNull: ['$location', ''] },
-                          regex: locationFilter.state,
-                          options: 'i',
-                        },
-                      }
-                    : false,
-                  then: {
-                    // Higher score for ads in the same state, prioritized by distance
-                    $round: [
-                      {
-                        $add: [
-                          1000, // Base score for same state
-                          {
-                            $subtract: [
-                              100, // Distance bonus
-                              {
-                                $multiply: ['$distance', 1], // Subtract 1 point per km
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                      2,
-                    ],
-                  },
-                  else: {
-                    // Lower score for ads outside the state, still distance-based
-                    $round: [
-                      {
-                        $subtract: [
-                          100, // Base score for different state
-                          {
-                            $multiply: ['$distance', 2], // Subtract 2 points per km
-                          },
-                        ],
-                      },
-                      2,
-                    ],
-                  },
-                },
-              },
-              else: 0, // No location data
-            },
+            ],
           },
+        });
+      }
+    }
+
+    // Text-based location filter (fallback)
+    if (location) {
+      pipeline.push({
+        $match: {
+          location: { $regex: location, $options: 'i' },
         },
       });
     }
 
-    // user
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'postedBy',
-          foreignField: '_id',
-          as: 'user',
-          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
-        },
-      },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    );
+    // Add location scoring if coordinates provided
+    if (latitude !== undefined && longitude !== undefined) {
+      pipeline.push(buildLocationScoreStage(locationHierarchy));
+    }
 
-    // manufacturer lookup for premium filtering
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'manufacturers',
-          localField: 'vehicleDetails.manufacturerId',
-          foreignField: '_id',
-          as: 'manufacturerInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'manufacturers',
-          localField: 'commercialVehicleDetails.manufacturerId',
-          foreignField: '_id',
-          as: 'commercialManufacturerInfo',
-        },
-      },
-    );
+    // Add all lookup stages using helpers
+    pipeline.push(...buildUserLookupStage());
+    pipeline.push(...buildManufacturerLookupStages());
+    pipeline.push(...buildPropertyAdLookupStages());
+    pipeline.push(...buildVehicleAdLookupStages());
+    pipeline.push(...buildCommercialVehicleAdLookupStages());
 
-    // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
-    // Property
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'propertyads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: '_propA',
-        },
-      },
-      {
-        $lookup: {
-          from: 'propertyads',
-          localField: '_id',
-          foreignField: 'adId',
-          as: '_propB',
-        },
-      },
-      {
-        $addFields: { propertyDetails: { $setUnion: ['$_propA', '$_propB'] } },
-      },
-      { $project: { _propA: 0, _propB: 0 } },
-    );
+    // Apply vehicle filters using helper
+    const vehicleFilter = buildVehicleFilterMatcher(filters);
+    if (vehicleFilter) {
+      pipeline.push({ $match: vehicleFilter });
+    }
 
-    // Vehicle
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'vehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: '_vehA',
-        },
-      },
-      {
-        $lookup: {
-          from: 'vehicleads',
-          localField: '_id',
-          foreignField: 'adId',
-          as: '_vehB',
-        },
-      },
-      { $addFields: { vehicleDetails: { $setUnion: ['$_vehA', '$_vehB'] } } },
-      { $project: { _vehA: 0, _vehB: 0 } },
-    );
-
-    // Commercial vehicle
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: '_cvehA',
-        },
-      },
-      {
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'adId',
-          as: '_cvehB',
-        },
-      },
-      {
-        $addFields: {
-          commercialVehicleDetails: { $setUnion: ['$_cvehA', '$_cvehB'] },
-        },
-      },
-      { $project: { _cvehA: 0, _cvehB: 0 } },
-    );
-
-    // Optional vehicle filters (applies to vehicle subdocs only)
-    const vehMatch: any = {};
-    if (filters.vehicleType) vehMatch.vehicleType = filters.vehicleType;
-    if (filters.manufacturerId) {
-      const ids = Array.isArray(filters.manufacturerId)
-        ? filters.manufacturerId
-        : [filters.manufacturerId];
-      const objIds = ids
-        .map((id) => {
-          try {
-            return new Types.ObjectId(id);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-      if (objIds.length) vehMatch.manufacturerId = { $in: objIds };
-    }
-    if (filters.modelId) {
-      const ids = Array.isArray(filters.modelId)
-        ? filters.modelId
-        : [filters.modelId];
-      const objIds = ids
-        .map((id) => {
-          try {
-            return new Types.ObjectId(id);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-      if (objIds.length) vehMatch.modelId = { $in: objIds };
-    }
-    if (filters.variantId) {
-      const ids = Array.isArray(filters.variantId)
-        ? filters.variantId
-        : [filters.variantId];
-      const objIds = ids
-        .map((id) => {
-          try {
-            return new Types.ObjectId(id);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-      if (objIds.length) vehMatch.variantId = { $in: objIds };
-    }
-    if (filters.transmissionTypeId) {
-      const ids = Array.isArray(filters.transmissionTypeId)
-        ? filters.transmissionTypeId
-        : [filters.transmissionTypeId];
-      const objIds = ids
-        .map((id) => {
-          try {
-            return new Types.ObjectId(id);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-      if (objIds.length) vehMatch.transmissionTypeId = { $in: objIds };
-    }
-    if (filters.fuelTypeId) {
-      const ids = Array.isArray(filters.fuelTypeId)
-        ? filters.fuelTypeId
-        : [filters.fuelTypeId];
-      const objIds = ids
-        .map((id) => {
-          try {
-            return new Types.ObjectId(id);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-      if (objIds.length) vehMatch.fuelTypeId = { $in: objIds };
-    }
-    if (filters.color)
-      vehMatch.color = { $regex: filters.color, $options: 'i' };
-    if (filters.maxMileage != null)
-      vehMatch.mileage = { $lte: filters.maxMileage };
-    if (filters.isFirstOwner != null)
-      vehMatch.isFirstOwner = filters.isFirstOwner;
-    if (filters.hasInsurance != null)
-      vehMatch.hasInsurance = filters.hasInsurance;
-    if (filters.hasRcBook != null) vehMatch.hasRcBook = filters.hasRcBook;
-    if (filters.minYear != null || filters.maxYear != null) {
-      vehMatch.year = {};
-      if (filters.minYear != null) vehMatch.year.$gte = Number(filters.minYear);
-      if (filters.maxYear != null) vehMatch.year.$lte = Number(filters.maxYear);
-    }
-    if (Object.keys(vehMatch).length) {
-      pipeline.push({ $match: { vehicleDetails: { $elemMatch: vehMatch } } });
+    // Price filtering
+    if (filters.minPrice != null || filters.maxPrice != null) {
+      const priceMatch: any = {};
+      if (filters.minPrice != null) priceMatch.$gte = Number(filters.minPrice);
+      if (filters.maxPrice != null) priceMatch.$lte = Number(filters.maxPrice);
+      pipeline.push({ $match: { price: priceMatch } });
     }
 
     // Premium manufacturer filtering
@@ -666,7 +317,6 @@ export class AdsService {
       pipeline.push({
         $match: {
           $or: [
-            // For vehicle ads
             {
               $and: [
                 { vehicleDetails: { $exists: true, $ne: [] } },
@@ -675,7 +325,6 @@ export class AdsService {
                 },
               ],
             },
-            // For commercial vehicle ads
             {
               $and: [
                 { commercialVehicleDetails: { $exists: true, $ne: [] } },
@@ -690,31 +339,52 @@ export class AdsService {
       });
     }
 
-    // ----- Sorting -----
-    if (latitude !== undefined && longitude !== undefined) {
-      // Prioritize by location score first, then by requested sort field
+    // Text search (after lookups to search in manufacturer/model names)
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
       pipeline.push({
-        $sort: {
-          locationScore: -1, // Higher location score first (district > state > country)
-          [sortField]: sortDirection,
+        $match: {
+          $or: [
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { location: { $regex: searchTerm, $options: 'i' } },
+          ],
         },
       });
-    } else {
-      // Regular sorting when no location filtering
-      pipeline.push({ $sort: { [sortField]: sortDirection } });
     }
 
-    // Clean up manufacturer lookup arrays from output
-    // Note: locationScore is automatically included in exclusion projection
+    // Sorting: location score first if available, then requested field
+    const sortStage: any = {};
+    if (latitude !== undefined && longitude !== undefined) {
+      sortStage.locationScore = -1; // Higher score first
+    }
+    sortStage[sortField] = sortDirection;
+    pipeline.push({ $sort: sortStage });
+
+    // Clean up internal fields
     pipeline.push({
       $project: {
         manufacturerInfo: 0,
         commercialManufacturerInfo: 0,
-        // locationScore is included by default in exclusion projection
       },
     });
 
-    // ----- Pagination-only response (no filters) -----
+    // Convert distance from meters to km if using $geoNear
+    if (latitude !== undefined && longitude !== undefined) {
+      pipeline.push({
+        $addFields: {
+          distance: {
+            $cond: {
+              if: { $ne: ['$distance', null] },
+              then: { $divide: ['$distance', 1000] }, // Convert meters to km
+              else: null,
+            },
+          },
+        },
+      });
+    }
+
+    // Pagination
     pipeline.push({
       $facet: {
         data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
@@ -722,18 +392,25 @@ export class AdsService {
       },
     });
 
+    // Execute aggregation
     const result = await this.adModel
       .aggregate(pipeline)
       .collation({ locale: 'en', strength: 2 });
+
     const data = result?.[0]?.data ?? [];
     const total = result?.[0]?.total?.[0]?.count ?? 0;
 
+    // Map to DTOs
     const dtoData = data.map((ad: any) => {
       const dto = this.mapToResponseDto(ad);
       dto.year =
         ad.vehicleDetails?.[0]?.year ??
         ad.commercialVehicleDetails?.[0]?.year ??
         null;
+      // Add distance if available
+      if (ad.distance != null) {
+        dto.distance = ad.distance;
+      }
       return dto;
     });
 
@@ -1418,7 +1095,14 @@ export class AdsService {
       }
     }
 
-    // Auto-generate location from coordinates if not provided
+    // Auto-generate location and hierarchy from coordinates if not provided
+    let locationHierarchy: {
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+    } = {};
+
     if (
       !createDto.data.location &&
       createDto.data.latitude &&
@@ -1430,13 +1114,54 @@ export class AdsService {
           createDto.data.longitude,
         );
         createDto.data.location = geocodingResult.location;
+        // Extract location hierarchy from geocoding
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        // Get district from location hierarchy service
+        try {
+          const locationFilter =
+            this.locationHierarchyService.getLocationFilter(
+              createDto.data.latitude,
+              createDto.data.longitude,
+            );
+          locationHierarchy.district = locationFilter.district;
+        } catch (error) {
+          // Silently fail if location hierarchy service fails
+        }
       } catch (error) {
         // If geocoding fails, use coordinates as fallback
         createDto.data.location = `${createDto.data.latitude.toFixed(4)}, ${createDto.data.longitude.toFixed(4)}`;
       }
+    } else if (createDto.data.latitude && createDto.data.longitude) {
+      // Location provided but still extract hierarchy for filtering
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        const locationFilter = this.locationHierarchyService.getLocationFilter(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        locationHierarchy.district = locationFilter.district;
+      } catch (error) {
+        // Silently fail - hierarchy is optional
+      }
     }
 
     this.validateRequiredFields(createDto);
+
+    // Pass location hierarchy to create functions
+    (createDto.data as any).city = locationHierarchy.city;
+    (createDto.data as any).district = locationHierarchy.district;
+    (createDto.data as any).state = locationHierarchy.state;
+    (createDto.data as any).country = locationHierarchy.country;
 
     let result: AdResponseDto;
     switch (createDto.category) {
@@ -1628,6 +1353,10 @@ export class AdsService {
       latitude: data.latitude,
       longitude: data.longitude,
       geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PROPERTY,
@@ -1687,6 +1416,10 @@ export class AdsService {
       latitude: data.latitude,
       longitude: data.longitude,
       geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.PRIVATE_VEHICLE,
@@ -1756,6 +1489,10 @@ export class AdsService {
         latitude: data.latitude,
         longitude: data.longitude,
         geoLocation,
+        city: data.city,
+        district: data.district,
+        state: data.state,
+        country: data.country,
         link: data.link,
         postedBy: new Types.ObjectId(userId),
         category: AdCategory.COMMERCIAL_VEHICLE,
@@ -1835,6 +1572,10 @@ export class AdsService {
       latitude: data.latitude,
       longitude: data.longitude,
       geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
       link: data.link,
       postedBy: new Types.ObjectId(userId),
       category: AdCategory.TWO_WHEELER,

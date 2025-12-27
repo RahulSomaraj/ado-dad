@@ -74,25 +74,6 @@ export class AdsController {
   }
 
   @Get(':id')
-  @ApiOperation({
-    summary: 'Get advertisement by ID with complete details and all relations',
-    description:
-      'Retrieve a single advertisement with all its details including category-specific information, vehicle inventory data (for vehicle ads), favorites count, related chats, and ratings. This endpoint provides comprehensive information about the advertisement including user details, property details, vehicle details, commercial vehicle details, manufacturer information, model details, and all related documents.',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Advertisement ID',
-    example: '507f1f77bcf86cd799439011',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Advertisement retrieved successfully with all relations',
-    type: DetailedAdResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Advertisement not found',
-  })
   async getAdById(
     @Param('id') id: string,
     @Request() req?: any,
