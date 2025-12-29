@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -63,6 +64,7 @@ import {
 
 @Injectable()
 export class AdsService {
+  private readonly logger = new Logger(AdsService.name);
   private static readonly CACHE_PREFIX = 'ads:';
   private static readonly TTL = {
     LIST: 120, // list queries
@@ -1750,226 +1752,272 @@ export class AdsService {
   async getAllAdsForAdmin(
     filters: FilterAdDto,
   ): Promise<PaginatedDetailedAdResponseDto> {
-    // Build deterministic cache key
-    const normalize = (obj: any): any => {
-      if (obj == null) return obj;
-      if (Array.isArray(obj)) return obj.map(normalize);
-      if (typeof obj === 'object') {
-        const entries = Object.entries(obj)
-          .filter(([, v]) => v !== undefined && v !== null && v !== '')
-          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-          .map(([k, v]) => [k, normalize(v)]);
-        return Object.fromEntries(entries);
+    try {
+      this.logger.debug('getAllAdsForAdmin called with filters:', filters);
+      
+      // Build deterministic cache key
+      const normalize = (obj: any): any => {
+        if (obj == null) return obj;
+        if (Array.isArray(obj)) return obj.map(normalize);
+        if (typeof obj === 'object') {
+          const entries = Object.entries(obj)
+            .filter(([, v]) => v !== undefined && v !== null && v !== '')
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            .map(([k, v]) => [k, normalize(v)]);
+          return Object.fromEntries(entries);
+        }
+        return obj;
+      };
+
+      const safeFilters = this.normalize(filters);
+      const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
+
+      // Try cache first
+      let cached: PaginatedDetailedAdResponseDto | null = null;
+      try {
+        cached =
+          await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+            cacheKey,
+          );
+        if (cached) {
+          return cached;
+        }
+      } catch (redisError) {
+        this.logger.warn('Redis cache get failed, continuing without cache:', redisError);
       }
-      return obj;
-    };
 
-    const safeFilters = this.normalize(filters);
-    const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
-
-    // Try cache first
-    const cached =
-      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
-        cacheKey,
+      let {
+        page = 1,
+        limit = 20,
+        sortBy = 'createdAt',
+        sortOrder = 'DESC',
+        search,
+        latitude,
+        longitude,
+      } = filters;
+      const { field: sortField, dir: sortDirection } = this.coerceSort(
+        sortBy,
+        sortOrder,
       );
-    if (cached) return cached;
+      page = this.clamp(Number(page) || 1, 1, 1e9);
+      limit = this.clamp(Number(limit) || 20, 1, 100);
 
-    let {
-      page = 1,
-      limit = 20,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
-      search,
-      latitude,
-      longitude,
-    } = filters;
-    const { field: sortField, dir: sortDirection } = this.coerceSort(
-      sortBy,
-      sortOrder,
-    );
-    page = this.clamp(Number(page) || 1, 1, 1e9);
-    limit = this.clamp(Number(limit) || 20, 1, 100);
+      // ------- Pipeline -------
+      const pipeline: any[] = [];
 
-    // ------- Pipeline -------
-    const pipeline: any[] = [];
+      // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
+      // Store search term for later use
+      const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
 
-    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
-    // Store search term for later use
-    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+      // Base visibility: show all ads (including unapproved) except soft-deleted
+      pipeline.push({ $match: { isDeleted: { $ne: true } } });
 
-    // Base visibility: show all ads (including unapproved) except soft-deleted
-    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+      // Optional category filter
+      if (filters.category) {
+        pipeline.push({ $match: { category: filters.category } });
+      }
 
-    // Optional category filter
-    if (filters.category) {
-      pipeline.push({ $match: { category: filters.category } });
-    }
+      // Hierarchical location-based filtering
+      if (latitude !== undefined && longitude !== undefined) {
+        try {
+          // Get location hierarchy pipeline stages
+          const locationPipeline =
+            this.locationHierarchyService.getLocationAggregationPipeline(
+              latitude,
+              longitude,
+            );
 
-    // Hierarchical location-based filtering
-    if (latitude !== undefined && longitude !== undefined) {
-      // Get location hierarchy pipeline stages
-      const locationPipeline =
-        this.locationHierarchyService.getLocationAggregationPipeline(
-          latitude,
-          longitude,
-        );
+          // Add location filtering stages to pipeline
+          pipeline.push(...locationPipeline);
 
-      // Add location filtering stages to pipeline
-      pipeline.push(...locationPipeline);
+          // Add location scoring for prioritization
+          pipeline.push(
+            this.locationHierarchyService.getLocationScoringStage(
+              latitude,
+              longitude,
+            ),
+          );
+        } catch (locationError) {
+          this.logger.warn('Location hierarchy service error, continuing without location filtering:', locationError);
+        }
+      }
 
-      // Add location scoring for prioritization
+      // user
       pipeline.push(
-        this.locationHierarchyService.getLocationScoringStage(
-          latitude,
-          longitude,
-        ),
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'postedBy',
+            foreignField: '_id',
+            as: 'user',
+            pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
       );
-    }
 
-    // user
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'postedBy',
-          foreignField: '_id',
-          as: 'user',
-          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+      // Add approvedBy user lookup for admin view
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'approvedBy',
+            foreignField: '_id',
+            as: 'approvedByUser',
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+          },
         },
-      },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    );
+        {
+          $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+        },
+      );
 
-    // Add approvedBy user lookup for admin view
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'approvedBy',
-          foreignField: '_id',
-          as: 'approvedByUser',
-          pipeline: [{ $project: { name: 1, email: 1 } }],
+      // Add vehicle details lookup (unwind to get single object)
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'vehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'vehicleDetails',
+          },
         },
-      },
-      {
-        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
-      },
-    );
+        {
+          $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+        },
+      );
 
-    // Add vehicle details lookup (unwind to get single object)
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'vehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'vehicleDetails',
+      // Add commercial vehicle details lookup (unwind to get single object)
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
         },
-      },
-      {
-        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
-      },
-    );
+        {
+          $unwind: {
+            path: '$commercialVehicleDetails',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+      );
 
-    // Add commercial vehicle details lookup (unwind to get single object)
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'commercialVehicleDetails',
+      // Add property details lookup (unwind to get single object)
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'propertyads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'propertyDetails',
+          },
         },
-      },
-      {
-        $unwind: {
-          path: '$commercialVehicleDetails',
-          preserveNullAndEmptyArrays: true,
+        {
+          $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
         },
-      },
-    );
+      );
 
-    // Add property details lookup (unwind to get single object)
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'propertyads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'propertyDetails',
-        },
-      },
-      {
-        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
-      },
-    );
+      // Apply search filter if provided
+      if (searchTerm) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { description: { $regex: searchTerm, $options: 'i' } },
+              { title: { $regex: searchTerm, $options: 'i' } },
+              { location: { $regex: searchTerm, $options: 'i' } },
+              { 'user.name': { $regex: searchTerm, $options: 'i' } },
+              { 'user.email': { $regex: searchTerm, $options: 'i' } },
+            ],
+          },
+        });
+      }
 
-    // Apply search filter if provided
-    if (searchTerm) {
+      // Sort
+      if (latitude !== undefined && longitude !== undefined) {
+        // Prioritize by location score first, then by requested sort field
+        pipeline.push({
+          $sort: {
+            locationScore: -1, // Higher location score first (district > state > country)
+            [sortField]: sortDirection,
+          },
+        });
+      } else {
+        // Regular sorting when no location filtering
+        pipeline.push({ $sort: { [sortField]: sortDirection } });
+      }
+
+      // Facet for pagination
       pipeline.push({
-        $match: {
-          $or: [
-            { description: { $regex: searchTerm, $options: 'i' } },
-            { title: { $regex: searchTerm, $options: 'i' } },
-            { location: { $regex: searchTerm, $options: 'i' } },
-            { 'user.name': { $regex: searchTerm, $options: 'i' } },
-            { 'user.email': { $regex: searchTerm, $options: 'i' } },
-          ],
+        $facet: {
+          data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+          total: [{ $count: 'count' }],
         },
       });
+
+      let result: any = { data: [], total: [] };
+      try {
+        const aggregationResult = await this.adModel.aggregate(pipeline);
+        if (aggregationResult && aggregationResult.length > 0) {
+          result = aggregationResult[0];
+        }
+      } catch (aggregationError) {
+        this.logger.error('MongoDB aggregation failed:', aggregationError);
+        this.logger.error('Pipeline stages:', JSON.stringify(pipeline, null, 2));
+        throw new BadRequestException('Failed to retrieve ads: database query error');
+      }
+      
+      const data = result?.data || [];
+      const total = result?.total?.[0]?.count || 0;
+
+      // Map to response DTOs with inventory details
+      let dtoData: DetailedAdResponseDto[];
+      try {
+        dtoData = await Promise.all(
+          data.map(async (ad: any, index: number) => {
+            try {
+              const dto = await this.mapToResponseDtoWithInventory(ad);
+              dto.year =
+                ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
+              return dto;
+            } catch (mappingError) {
+              this.logger.error(`Error mapping ad at index ${index} (ID: ${ad._id}):`, mappingError);
+              // Return a basic DTO with error indication instead of failing completely
+              return this.mapToResponseDto(ad);
+            }
+          }),
+        );
+      } catch (mappingError) {
+        this.logger.error('Error during batch mapping:', mappingError);
+        throw new BadRequestException('Failed to process ad data: mapping error');
+      }
+
+      const totalPages = Math.ceil(total / limit);
+
+      const response: PaginatedDetailedAdResponseDto = {
+        data: dtoData,
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      };
+
+      // Cache the result
+      try {
+        await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+      } catch (redisError) {
+        this.logger.warn('Redis cache set failed, continuing without caching:', redisError);
+      }
+      
+      return response;
+    } catch (error) {
+      this.logger.error('Error in getAllAdsForAdmin:', error);
+      throw error;
     }
-
-    // Sort
-    if (latitude !== undefined && longitude !== undefined) {
-      // Prioritize by location score first, then by requested sort field
-      pipeline.push({
-        $sort: {
-          locationScore: -1, // Higher location score first (district > state > country)
-          [sortField]: sortDirection,
-        },
-      });
-    } else {
-      // Regular sorting when no location filtering
-      pipeline.push({ $sort: { [sortField]: sortDirection } });
-    }
-
-    // Facet for pagination
-    pipeline.push({
-      $facet: {
-        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-        total: [{ $count: 'count' }],
-      },
-    });
-
-    const [result] = await this.adModel.aggregate(pipeline);
-    const data = result.data || [];
-    const total = result.total[0]?.count || 0;
-
-    // Map to response DTOs with inventory details
-    const dtoData = await Promise.all(
-      data.map(async (ad: any) => {
-        const dto = await this.mapToResponseDtoWithInventory(ad);
-        dto.year =
-          ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
-        return dto;
-      }),
-    );
-
-    const totalPages = Math.ceil(total / limit);
-
-    const response: PaginatedDetailedAdResponseDto = {
-      data: dtoData,
-      total,
-      page,
-      limit,
-      totalPages,
-      hasNext: page < totalPages,
-      hasPrev: page > 1,
-    };
-
-    // Cache the result
-    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
-    return response;
   }
 
   /** ---------- REDIS / CACHING UTILS ---------- */
