@@ -954,11 +954,16 @@ export class UsersService {
         throw new BadRequestException('Invalid email format');
       }
 
-      if (!isEmail && identifierDigits.length < 10) {
-        throw new BadRequestException(
-          'Invalid phone number format. Must contain at least 10 digits',
-        );
-      }
+      // NOTE: Phone number validation for minimum 10 digits has been commented out
+      // to support international phone numbers. International phone numbers can have
+      // a minimum of 7 digits and a maximum of 15 digits according to ITU-T E.164 standard.
+      // The actual validation is now handled by the phone-validator.util.ts which uses
+      // google-libphonenumber library for country-specific validation.
+      // if (!isEmail && identifierDigits.length < 10) {
+      //   throw new BadRequestException(
+      //     'Invalid phone number format. Must contain at least 10 digits',
+      //   );
+      // }
 
       // First, find user by identifier to check if user exists
       const userQuery: any = {
