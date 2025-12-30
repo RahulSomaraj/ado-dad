@@ -20,7 +20,8 @@ export function mapToDetailedResponseDto(ad: any) {
           id: ad.user._id?.toString(),
           name: ad.user.name,
           email: ad.user.email,
-          phone: ad.user.phone,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
         }
       : undefined,
     propertyDetails: ad.propertyDetails?.[0]
@@ -159,7 +160,8 @@ export function mapToBasicResponseDto(ad: any) {
           id: ad.user._id?.toString(),
           name: ad.user.name,
           email: ad.user.email,
-          phone: ad.user.phone,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
         }
       : undefined,
   };

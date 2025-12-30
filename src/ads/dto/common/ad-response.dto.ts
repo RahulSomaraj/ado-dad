@@ -74,7 +74,8 @@ export class AdResponseDto {
     id: string;
     name: string;
     email: string;
-    phone?: string;
+    countryCode?: string;
+    phoneNumber?: string;
     profilePic?: string;
   };
 

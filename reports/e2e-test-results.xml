@@ -1,372 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="26" failures="26" errors="0" time="41.223">
-  <testsuite name="Vehicle Inventory API (e2e)" errors="0" failures="26" skipped="0" timestamp="2025-12-21T16:28:31" time="41.008" tests="26">
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › POST /vehicle-inventory/manufacturers" name="should create manufacturer successfully" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+<testsuites name="jest tests" tests="18" failures="7" errors="0" time="26.958">
+  <testsuite name="Phone Country Code API (e2e)" errors="0" failures="7" skipped="0" timestamp="2025-12-28T06:24:36" time="26.651" tests="18">
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should create user with +91 (India)" time="0.29">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with invalid data" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should create user with +971 (UAE)" time="0.221">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › POST /vehicle-inventory/manufacturers" name="should fail to create manufacturer with duplicate name" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should create user with +1 (US)" time="0.038">
+      <failure>Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 400
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:103:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers" name="should get all manufacturers successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should reject invalid phone country code format" time="0.014">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers" name="should get manufacturers with pagination" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should reject unsupported phone country code" time="0.013">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers" name="should filter manufacturers by origin country" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should reject invalid phone number for country" time="0.193">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: 400
+Received: 201
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:147:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers" name="should search manufacturers by name" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users - Phone Country Code Validation" name="should reject phone number with wrong length for country" time="0.011">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers/:id" name="should get manufacturer by ID successfully" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › PUT /users/:id - Update Phone Country Code" name="should update country code to +971" time="0.162">
+      <failure>Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 500
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:198:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers/:id" name="should fail to get manufacturer with invalid ID" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › PUT /users/:id - Update Phone Country Code" name="should update only phone number keeping same country code" time="0.206">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › GET /vehicle-inventory/manufacturers/:id" name="should fail to get non-existent manufacturer" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › PUT /users/:id - Update Phone Country Code" name="should reject update with invalid country code" time="0.226">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: 400
+Received: 200
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:225:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › PUT /vehicle-inventory/manufacturers/:id" name="should update manufacturer successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /auth/login - Phone Number Login" name="should login with phone number (10 digits)" time="0.265">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Manufacturers API › PUT /vehicle-inventory/manufacturers/:id" name="should fail to update manufacturer with invalid data" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /auth/login - Phone Number Login" name="should login with full phone number (+91 prefix)" time="0.017">
+      <failure>Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 401
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:264:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › POST /vehicle-inventory/vehicle-models" name="should create vehicle model successfully" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /auth/login - Phone Number Login" name="should login with email" time="0.278">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › POST /vehicle-inventory/vehicle-models" name="should fail to create vehicle model with invalid manufacturer" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users/send-otp - OTP with Phone Codes" name="should send OTP to phone number" time="1.221">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › GET /vehicle-inventory/vehicle-models" name="should get all vehicle models successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › POST /users/send-otp - OTP with Phone Codes" name="should send OTP to email" time="0.693">
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › GET /vehicle-inventory/vehicle-models" name="should filter vehicle models by manufacturer" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › GET /users - Response includes countryCode" name="should return countryCode in user list" time="0.015">
+      <failure>Error: expected 200 &quot;OK&quot;, got 401 &quot;Unauthorized&quot;
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:325:10)
+    at Promise.then.completed (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at _runTestsForDescribeBlock (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:121:9)
+    at run (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (c:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (c:\personal\personal\ado-dad-repo\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)
+----
+    at Test._assertStatus (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:309:14)
+    at C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:365:13
+    at Test._assertFunction (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:342:13)
+    at Test.assert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:195:23)
+    at localAssert (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:138:14)
+    at Server.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\node_modules\supertest\lib\test.js:152:11)
+    at Object.onceWrapper (node:events:638:28)
+    at Server.emit (node:events:536:35)
+    at emitCloseNT (node:net:2344:8)
+    at processTicksAndRejections (node:internal/process/task_queues:81:21)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › GET /vehicle-inventory/vehicle-models" name="should filter vehicle models by vehicle type" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+    <testcase classname="Phone Country Code API (e2e) › Edge Cases" name="should handle duplicate phone number with different country codes" time="0.171">
+      <failure>Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 400
+Received array: [200, 201]
+    at Object.&lt;anonymous&gt; (C:\personal\personal\ado-dad-repo\ado-dad\test\phone-country-code.e2e-spec.ts:366:26)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › GET /vehicle-inventory/vehicle-models" name="should filter vehicle models by segment" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Models API › GET /vehicle-inventory/vehicle-models/:id" name="should get vehicle model by ID successfully" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › POST /vehicle-inventory/vehicle-variants" name="should create vehicle variant successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › POST /vehicle-inventory/vehicle-variants" name="should fail to create vehicle variant with invalid model" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › GET /vehicle-inventory/vehicle-variants" name="should get all vehicle variants successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › GET /vehicle-inventory/vehicle-variants" name="should filter vehicle variants by model" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › GET /vehicle-inventory/vehicle-variants" name="should filter vehicle variants by fuel type" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › GET /vehicle-inventory/vehicle-variants" name="should filter vehicle variants by price range" time="0.001">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="Vehicle Inventory API (e2e) › Vehicle Variants API › GET /vehicle-inventory/vehicle-variants/:id" name="should get vehicle variant by ID successfully" time="0">
-      <failure>Error: thrown: &quot;Exceeded timeout of 30000 ms for a hook.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:18:3
-    at _dispatchDescribe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\Gamer\ado-dad\test\vehicle-inventory.e2e-spec.ts:10:1)
-    at Runtime._execModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\Gamer\ado-dad\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\Gamer\ado-dad\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\Gamer\ado-dad\node_modules\jest-runner\build\runTest.js:444:34)</failure>
-    </testcase>
-    <testcase classname="" name="Test execution failure: could be caused by test hooks like &apos;afterAll&apos;." time="0">
-      <failure>{&quot;message&quot;:&quot;&quot;,&quot;stack&quot;:&quot;TypeError: Cannot read properties of undefined (reading &apos;close&apos;)\n    at Object.&lt;anonymous&gt; (C:\\Users\\Gamer\\ado-dad\\test\\vehicle-inventory.e2e-spec.ts:31:15)&quot;}</failure>
+    <testcase classname="Phone Country Code API (e2e) › Edge Cases" name="should reject duplicate phone number with same country code" time="0.353">
     </testcase>
   </testsuite>
 </testsuites>

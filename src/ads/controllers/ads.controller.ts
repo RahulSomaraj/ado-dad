@@ -33,6 +33,7 @@ import { AdsService } from '../services/ads.service';
 import { DataValidationService } from '../services/data-validation.service';
 import {
   FilterAdDto,
+  AdminAllAdsFilterDto,
   FilterVehicleModelsDto,
   FilterVehicleVariantsDto,
 } from '../dto/common/filter-ad.dto';
@@ -729,34 +730,18 @@ export class AdsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN, UserType.USER, UserType.SHOWROOM)
   @ApiOperation({
-    summary: 'Get all advertisements',
-    description: `
-      Retrieve all advertisements including unapproved ones. Accessible by all authenticated users.
-      
-      **Features:**
-      - Returns all ads (approved and unapproved)
-      - Includes detailed ad information with approval status
-      - Supports pagination and filtering
-      - Shows who approved each ad
-      - Includes vehicle inventory details
-      - Enhanced search capabilities
-      
-      **Response includes:**
-      - Advertisement details with approval status
-      - Category-specific information
-      - User information (posted by)
-      - Approver information (approved by)
-      - Pagination metadata
-    `,
+    summary: 'Get all advertisements (Admin)',
+    description:
+      'Retrieve all advertisements including unapproved ones with pagination and search. Accessible by authenticated users.',
   })
   @ApiResponse({
     status: 200,
-    description: 'All advertisements retrieved successfully',
+    description: 'All advertisements retrieved successfully with pagination',
     type: PaginatedDetailedAdResponseDto,
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized - Admin access required',
+    description: 'Unauthorized - Authentication required',
   })
   @ApiResponse({
     status: 403,
@@ -764,26 +749,15 @@ export class AdsController {
   })
   @ApiBearerAuth()
   async getAllAdsForAdmin(
-    @Query()
-    query: {
-      page?: number;
-      limit?: number;
-      category?: string;
-      search?: string;
-      sortBy?: string;
-      sortOrder?: 'ASC' | 'DESC';
-    },
+    @Query() filterDto: AdminAllAdsFilterDto,
   ): Promise<PaginatedDetailedAdResponseDto> {
-    const filterDto: FilterAdDto = {
-      page: query.page,
-      limit: query.limit,
-      category: query.category as any,
-      search: query.search,
-      sortBy: query.sortBy as any,
-      sortOrder: query.sortOrder,
+    // Map to FilterAdDto for service compatibility
+    const serviceFilter: FilterAdDto = {
+      page: filterDto.page,
+      limit: filterDto.limit,
+      search: filterDto.search,
     };
-
-    return this.adsService.getAllAdsForAdmin(filterDto);
+    return this.adsService.getAllAdsForAdmin(serviceFilter);
   }
 
   @Put(':id/approval')

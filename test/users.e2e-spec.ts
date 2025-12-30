@@ -94,10 +94,11 @@ describe('Users API (e2e)', () => {
   describe('POST /users (create)', () => {
     it('creates a user (201, response shape)', async () => {
       const email = uniqueEmail('create');
-      const phone = `+91${Date.now().toString().slice(-10)}`;
+      const phone = Date.now().toString().slice(-10);
       const res = await http.post('/users').send({
         name: 'E2E Create User',
         email,
+        countryCode: '+91',
         phoneNumber: phone,
         password: 'testpassword123',
         type: 'NU',
@@ -106,6 +107,7 @@ describe('Users API (e2e)', () => {
       expect(res.body).toMatchObject({
         name: 'E2E Create User',
         email,
+        countryCode: '+91',
         phoneNumber: phone,
         type: 'NU',
       });
@@ -130,6 +132,7 @@ describe('Users API (e2e)', () => {
         .send({
           name: 'Bad',
           email: 'not-an-email',
+          countryCode: '+91',
           phoneNumber: '123',
           password: '',
           type: 'NU',

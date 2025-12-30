@@ -156,6 +156,7 @@ export class UserReportService {
                 _id: 1,
                 name: 1,
                 email: 1,
+                countryCode: 1,
                 phoneNumber: 1,
               },
             },
@@ -269,6 +270,7 @@ export class UserReportService {
                 _id: 1,
                 name: 1,
                 email: 1,
+                countryCode: 1,
                 phoneNumber: 1,
               },
             },
@@ -484,13 +486,15 @@ export class UserReportService {
             id: report.reportedUserDetails._id?.toString(),
             name: report.reportedUserDetails.name,
             email: report.reportedUserDetails.email,
-            phone: report.reportedUserDetails.phoneNumber,
+            countryCode: report.reportedUserDetails.countryCode,
+            phoneNumber: report.reportedUserDetails.phoneNumber,
           }
         : {
             id: '',
             name: 'Unknown User',
             email: 'unknown@example.com',
-            phone: 'N/A',
+            countryCode: '',
+            phoneNumber: 'N/A',
           },
       reportedBy: report.reportedBy?.toString(),
       reportedByDetails: report.reportedByDetails

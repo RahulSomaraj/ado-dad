@@ -69,7 +69,7 @@ export class UsersService {
 
   // Reusable field sets
   private static readonly BASE_PROJECTION =
-    '_id name email type phoneNumber profilePic createdAt updatedAt';
+    '_id name email type countryCode phoneNumber profilePic createdAt updatedAt';
 
   // Limited projection for unauthenticated users
   private static readonly PUBLIC_PROJECTION = '_id name email type createdAt';
@@ -118,6 +118,7 @@ export class UsersService {
           { name: searchRegex },
           { email: searchRegex },
           { phoneNumber: searchRegex },
+          { countryCode: searchRegex },
           { type: searchRegex },
           { profilePic: searchRegex },
         ];
@@ -225,6 +226,7 @@ export class UsersService {
           { name: searchRegex },
           { email: searchRegex },
           { phoneNumber: searchRegex },
+          { countryCode: searchRegex },
           { type: searchRegex },
           { profilePic: searchRegex },
         ];
@@ -454,7 +456,11 @@ export class UsersService {
       await this.validateUserData(userData);
 
       // Check for existing users
-      await this.checkExistingUser(userData.email, userData.phoneNumber);
+      await this.checkExistingUser(
+        userData.email,
+        userData.countryCode,
+        userData.phoneNumber,
+      );
 
       // Create new user
       const newUser = new this.userModel(userData);
@@ -470,6 +476,7 @@ export class UsersService {
         _id: (savedUser as any)._id.toString(),
         name: userResponse.name,
         email: userResponse.email,
+        countryCode: userResponse.countryCode,
         phoneNumber: userResponse.phoneNumber,
         type: userResponse.type,
         profilePic: userResponse.profilePic,
@@ -520,10 +527,14 @@ export class UsersService {
       }
 
       // Validate update data
-      if (updateData.email || updateData.phoneNumber) {
+      if (
+        updateData.email ||
+        (updateData.phoneNumber && updateData.countryCode)
+      ) {
         await this.checkExistingUserForUpdate(
           id,
           updateData.email,
+          updateData.countryCode,
           updateData.phoneNumber,
         );
       }
@@ -551,7 +562,9 @@ export class UsersService {
         // Fetch updated user without password field
         const updatedUser = await this.userModel
           .findById(id)
-          .select('_id name email type phoneNumber profilePic updatedAt')
+          .select(
+            '_id name email type countryCode phoneNumber profilePic updatedAt',
+          )
           .exec();
 
         if (!updatedUser) {
@@ -569,7 +582,8 @@ export class UsersService {
         .findByIdAndUpdate(id, updateData, {
           new: true,
           runValidators: true,
-          select: '_id name email type phoneNumber profilePic updatedAt',
+          select:
+            '_id name email type countryCode phoneNumber profilePic updatedAt',
         })
         .exec();
 
@@ -738,12 +752,31 @@ export class UsersService {
           })
           .exec();
       } else {
-        user = await this.userModel
-          .findOne({
-            phoneNumber: identifierDigits,
-            isDeleted: { $ne: true },
-          })
-          .exec();
+        // Try to parse phone number with country code
+        const { parsePhoneNumber } =
+          await import('../common/utils/phone-validator.util');
+        const parsed = parsePhoneNumber(identifierDigits);
+
+        if (parsed) {
+          // Search with country code and phone number
+          user = await this.userModel
+            .findOne({
+              countryCode: parsed.countryCode,
+              phoneNumber: parsed.phoneNumber,
+              isDeleted: { $ne: true },
+            })
+            .exec();
+        }
+
+        // Fallback: search by phone number only (for backward compatibility)
+        if (!user) {
+          user = await this.userModel
+            .findOne({
+              phoneNumber: identifierDigits,
+              isDeleted: { $ne: true },
+            })
+            .exec();
+        }
       }
 
       if (!user) {
@@ -763,12 +796,34 @@ export class UsersService {
         this.logger.log(`OTP sent via email to: ${user.email}`);
       } else {
         try {
+          // Format phone number with country code for SMS
+          // countryCode is now a phone code (e.g., '+91'), so we can use it directly
+          const { formatPhoneNumber, phoneCodeToIsoCode } =
+            await import('../common/utils/phone-validator.util');
+          let fullPhoneNumber: string;
+
+          if (user.countryCode) {
+            if (user.countryCode.startsWith('+')) {
+              // It's already a phone code (e.g., '+91')
+              fullPhoneNumber = `${user.countryCode}${user.phoneNumber}`;
+            } else {
+              // It's an ISO code (e.g., 'IN') - convert for backward compatibility
+              fullPhoneNumber = formatPhoneNumber(
+                user.countryCode,
+                user.phoneNumber,
+              );
+            }
+          } else {
+            // Fallback: assume India
+            fullPhoneNumber = `+91${user.phoneNumber}`;
+          }
+
           await this.sendOtpSmsViaMsg91(
-            user.phoneNumber,
+            fullPhoneNumber,
             otp,
             user.name || 'User',
           );
-          this.logger.log(`OTP sent via SMS to: ${user.phoneNumber}`);
+          this.logger.log(`OTP sent via SMS to: ${fullPhoneNumber}`);
         } catch (smsError) {
           this.logger.error('Failed to send OTP via SMS:', smsError as any);
         }
@@ -913,7 +968,19 @@ export class UsersService {
       if (isEmail) {
         userQuery.email = identifierLower;
       } else {
-        userQuery.phoneNumber = identifierDigits;
+        // Try to parse phone number with country code
+        const { parsePhoneNumber } =
+          await import('../common/utils/phone-validator.util');
+        const parsed = parsePhoneNumber(identifierDigits);
+
+        if (parsed) {
+          // Search with country code and phone number
+          userQuery.countryCode = parsed.countryCode;
+          userQuery.phoneNumber = parsed.phoneNumber;
+        } else {
+          // Fallback: search by phone number only (for backward compatibility)
+          userQuery.phoneNumber = identifierDigits;
+        }
       }
 
       const user = await this.userModel.findOne(userQuery).exec();
@@ -986,6 +1053,7 @@ export class UsersService {
           userName: user.name,
           email: user.email,
           userType: user.type,
+          countryCode: user.countryCode || 'IN', // Default to IN for backward compatibility
           phoneNumber: user.phoneNumber,
           profilePic: user.profilePic,
         };
@@ -1098,6 +1166,7 @@ export class UsersService {
     if (
       !userData.email ||
       !userData.phoneNumber ||
+      !userData.countryCode ||
       !userData.name ||
       !userData.password
     ) {
@@ -1110,19 +1179,42 @@ export class UsersService {
       throw new BadRequestException('Invalid email format');
     }
 
-    // Phone number validation (basic)
-    if (userData.phoneNumber.length < 10) {
-      throw new BadRequestException('Invalid phone number');
+    // Phone number validation with country code
+    // Convert phone code (e.g., '+91') to ISO code (e.g., 'IN') for validation
+    const {
+      validatePhoneNumber,
+      validatePhoneNumberWithPhoneCode,
+      phoneCodeToIsoCode,
+    } = await import('../common/utils/phone-validator.util');
+
+    let validation;
+    if (userData.countryCode.startsWith('+')) {
+      // It's a phone code (e.g., '+91')
+      validation = validatePhoneNumberWithPhoneCode(
+        userData.phoneNumber,
+        userData.countryCode,
+      );
+    } else {
+      // It's an ISO code (e.g., 'IN') - for backward compatibility
+      validation = validatePhoneNumber(
+        userData.phoneNumber,
+        userData.countryCode,
+      );
+    }
+
+    if (!validation.valid) {
+      throw new BadRequestException(validation.error || 'Invalid phone number');
     }
   }
 
   private async checkExistingUser(
     email: string,
+    countryCode: string,
     phoneNumber: string,
   ): Promise<void> {
     const existingUser = await this.userModel
       .findOne({
-        $or: [{ email: email.toLowerCase() }, { phoneNumber }],
+        $or: [{ email: email.toLowerCase() }, { countryCode, phoneNumber }],
         isDeleted: { $ne: true },
       })
       .exec();
@@ -1137,7 +1229,10 @@ export class UsersService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      if (existingUser.phoneNumber === phoneNumber) {
+      if (
+        existingUser.countryCode === countryCode &&
+        existingUser.phoneNumber === phoneNumber
+      ) {
         throw new HttpException(
           {
             status: HttpStatus.BAD_REQUEST,
@@ -1152,6 +1247,7 @@ export class UsersService {
   private async checkExistingUserForUpdate(
     userId: string,
     email?: string,
+    countryCode?: string,
     phoneNumber?: string,
   ): Promise<void> {
     const query: any = {
@@ -1161,7 +1257,9 @@ export class UsersService {
 
     const ors: any[] = [];
     if (email) ors.push({ email: email.toLowerCase() });
-    if (phoneNumber) ors.push({ phoneNumber });
+    if (phoneNumber && countryCode) {
+      ors.push({ countryCode, phoneNumber });
+    }
     if (ors.length > 0) query.$or = ors;
 
     const existingUser = await this.userModel.findOne(query).exec();
@@ -1176,7 +1274,12 @@ export class UsersService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      if (phoneNumber && existingUser.phoneNumber === phoneNumber) {
+      if (
+        phoneNumber &&
+        countryCode &&
+        existingUser.countryCode === countryCode &&
+        existingUser.phoneNumber === phoneNumber
+      ) {
         throw new HttpException(
           {
             status: HttpStatus.BAD_REQUEST,

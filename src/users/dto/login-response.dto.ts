@@ -9,6 +9,7 @@ export interface LoginResponse {
   userName: string;
   email: string;
   userType: string;
+  countryCode: string; // Phone country code (e.g., '+91', '+971')
   phoneNumber: string;
   profilePic?: string;
 }

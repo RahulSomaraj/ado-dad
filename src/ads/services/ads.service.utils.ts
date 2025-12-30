@@ -225,7 +225,7 @@ export function buildUserLookupStage(): any[] {
         localField: 'postedBy',
         foreignField: '_id',
         as: 'user',
-        pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+        pipeline: [{ $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } }],
       },
     },
     { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },

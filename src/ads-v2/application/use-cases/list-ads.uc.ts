@@ -331,6 +331,7 @@ export class ListAdsUc {
               _id: 1,
               name: 1,
               email: 1,
+              countryCode: 1,
               phoneNumber: 1,
               profilePic: 1,
               type: 1,
@@ -502,7 +503,8 @@ export class ListAdsUc {
           id: '$user._id',
           name: '$user.name',
           email: '$user.email',
-          phone: '$user.phoneNumber',
+          countryCode: '$user.countryCode',
+          phoneNumber: '$user.phoneNumber',
           profilePic: '$user.profilePic',
         },
         isFavorite: false, // Will be set per user
@@ -682,7 +684,8 @@ export class ListAdsUc {
             id: ad.user._id.toString(),
             name: ad.user.name,
             email: ad.user.email,
-            phone: ad.user.phone,
+            countryCode: ad.user.countryCode,
+            phoneNumber: ad.user.phoneNumber,
             profilePic: ad.user.profilePic,
           }
         : undefined,

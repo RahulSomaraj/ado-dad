@@ -21,14 +21,16 @@ export class UserReportResponseDto {
       id: { type: 'string', example: '507f1f77bcf86cd799439012' },
       name: { type: 'string', example: 'John Doe' },
       email: { type: 'string', example: 'john@example.com' },
-      phone: { type: 'string', example: '+1234567890' },
+      countryCode: { type: 'string', example: '+91' },
+      phoneNumber: { type: 'string', example: '9876543210' },
     },
   })
   reportedUserDetails: {
     id: string;
     name: string;
     email: string;
-    phone: string;
+    countryCode: string;
+    phoneNumber: string;
   };
 
   @ApiProperty({

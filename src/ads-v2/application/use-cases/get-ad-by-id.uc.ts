@@ -72,6 +72,7 @@ export class GetAdByIdUc {
                 _id: 1,
                 name: 1,
                 email: 1,
+                countryCode: 1,
                 phoneNumber: 1,
                 profilePic: 1,
                 type: 1,
@@ -237,7 +238,8 @@ export class GetAdByIdUc {
           id: ad.user._id.toString(),
           name: ad.user.name,
           email: ad.user.email,
-          phone: ad.user.phoneNumber,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
           profilePic: ad.user.profilePic,
         }
       : undefined;

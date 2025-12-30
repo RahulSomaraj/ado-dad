@@ -10,6 +10,7 @@ interface UserValidationResult {
   _id: string;
   name: string;
   email: string;
+  countryCode?: string;
   phoneNumber: string;
   type: string;
   profilePic?: string;
@@ -70,7 +71,10 @@ export class AuthService {
       // Return user data without sensitive information
       return this.sanitizeUserData(user);
     } catch (error) {
-      this.logger.error(`User validation failed for ${username}:`, error as any);
+      this.logger.error(
+        `User validation failed for ${username}:`,
+        error as any,
+      );
       return null;
     }
   }
@@ -81,10 +85,26 @@ export class AuthService {
   private async findUserByCredentials(
     identifier: string,
   ): Promise<User | null> {
+    // Try to parse phone number with country code
+    const { parsePhoneNumber } =
+      await import('../common/utils/phone-validator.util');
+    const parsed = parsePhoneNumber(identifier);
+
+    const phoneQuery: any[] = [];
+    if (parsed) {
+      // Search with country code and phone number
+      phoneQuery.push({
+        countryCode: parsed.countryCode,
+        phoneNumber: parsed.phoneNumber,
+      });
+    }
+    // Fallback: search by phone number only (for backward compatibility)
+    phoneQuery.push({ phoneNumber: identifier });
+
     const query = {
       $or: [
         { email: identifier },
-        { phoneNumber: identifier },
+        ...phoneQuery,
         { name: { $regex: new RegExp(`^${identifier}$`, 'i') } },
       ],
       isDeleted: { $ne: true },

@@ -59,7 +59,10 @@ export class UserResponseDto {
   @ApiProperty({ example: 'john@example.com' })
   email: string;
 
-  @ApiProperty({ example: '+123456789' })
+  @ApiProperty({ example: '+91', description: 'Phone country code with + prefix (e.g., +91, +971, +1)' })
+  countryCode: string;
+
+  @ApiProperty({ example: '9876543210', description: 'Phone number without country code' })
   phoneNumber: string;
 
   @ApiProperty({ example: 'NU', enum: UserType })

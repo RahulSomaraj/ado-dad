@@ -6,9 +6,17 @@ import {
   IsNotEmpty,
   IsOptional,
   IsUrl,
-  IsPhoneNumber,
+  IsIn,
+  Matches,
 } from 'class-validator';
 import { UserType } from '../enums/user.types';
+import { IsPhoneNumberWithCountry } from '../../common/decorators/phone-number-validator.decorator';
+import {
+  getSupportedPhoneCodes,
+  isValidPhoneCode,
+} from '../../common/utils/phone-validator.util';
+
+const supportedPhoneCodes = getSupportedPhoneCodes();
 
 export class CreateUserDto {
   @ApiProperty({ example: 'John Doe' })
@@ -16,9 +24,30 @@ export class CreateUserDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: '+123456789' })
+  @ApiProperty({
+    example: '+91',
+    description: 'Phone country code with + prefix (e.g., +91, +971, +1)',
+    enum: supportedPhoneCodes.slice(0, 50), // Show first 50 in Swagger
+  })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^\+\d{1,4}$/, {
+    message: 'Country code must be in format +XX (e.g., +91, +971, +1)',
+  })
+  @IsIn(supportedPhoneCodes, {
+    message: `Country code must be a valid phone country code (e.g., +91, +971, +1)`,
+  })
+  countryCode: string;
+
+  @ApiProperty({
+    example: '9876543210',
+    description: 'Phone number without country code',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumberWithCountry('+91', {
+    message: 'Invalid phone number format',
+  })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
@@ -53,9 +82,30 @@ export class CreateUserWithFileDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: '+123456789' })
-  @IsPhoneNumber('IN')
+  @ApiProperty({
+    example: '+91',
+    description: 'Phone country code with + prefix (e.g., +91, +971, +1)',
+    enum: supportedPhoneCodes.slice(0, 50), // Show first 50 in Swagger
+  })
+  @IsString()
   @IsNotEmpty()
+  @Matches(/^\+\d{1,4}$/, {
+    message: 'Country code must be in format +XX (e.g., +91, +971, +1)',
+  })
+  @IsIn(supportedPhoneCodes, {
+    message: `Country code must be a valid phone country code (e.g., +91, +971, +1)`,
+  })
+  countryCode: string;
+
+  @ApiProperty({
+    example: '9876543210',
+    description: 'Phone number without country code',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsPhoneNumberWithCountry('+91', {
+    message: 'Invalid phone number format',
+  })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })

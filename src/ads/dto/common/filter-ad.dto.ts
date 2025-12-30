@@ -541,6 +541,40 @@ export class FilterAdDto {
   maxSeatingCapacity?: number;
 }
 
+export class AdminAllAdsFilterDto {
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    minimum: 1,
+    example: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    minimum: 1,
+    maximum: 100,
+    example: 20,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @ApiPropertyOptional({
+    description: 'Search term for title and description (text search)',
+    example: 'innova',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
 export class FilterVehicleModelsDto {
   @ApiPropertyOptional({
     description: 'Filter by manufacturer ID',

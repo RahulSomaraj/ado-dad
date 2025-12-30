@@ -74,6 +74,7 @@ export class AppService {
         userName: user.name,
         email: user.email,
         userType: user.type,
+        countryCode: user.countryCode || '+91', // Default to +91 for backward compatibility
         phoneNumber: user.phoneNumber,
         profilePic: user.profilePic,
       };
@@ -147,6 +148,7 @@ export class AppService {
         userName: user.name,
         email: user.email,
         userType: user.type,
+        countryCode: user.countryCode || '+91', // Default to +91 for backward compatibility
         phoneNumber: user.phoneNumber,
         profilePic: user.profilePic,
       };

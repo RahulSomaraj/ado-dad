@@ -496,7 +496,9 @@ export class AdsService {
           localField: 'postedBy',
           foreignField: '_id',
           as: 'user',
-          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
@@ -825,7 +827,9 @@ export class AdsService {
           localField: 'postedBy',
           foreignField: '_id',
           as: 'user',
-          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
@@ -909,7 +913,7 @@ export class AdsService {
     const objectIds = uncachedIds.map((x) => new Types.ObjectId(x));
     const uncachedAds = await this.adModel
       .find({ _id: { $in: objectIds }, isDeleted: { $ne: true } })
-      .populate('postedBy', 'name email phone')
+      .populate('postedBy', 'name email countryCode phoneNumber')
       .exec();
 
     const adsToCache = uncachedAds.map((ad) => ({
@@ -956,6 +960,7 @@ export class AdsService {
                 _id: 1,
                 name: 1,
                 email: 1,
+                countryCode: 1,
                 phoneNumber: 1,
                 profilePic: 1,
                 type: 1,
@@ -1842,19 +1847,21 @@ export class AdsService {
         }
       }
 
-      // user
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'postedBy',
-            foreignField: '_id',
-            as: 'user',
-            pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
-          },
+    // user
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-      );
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
 
       // Add approvedBy user lookup for admin view
       pipeline.push(
@@ -2194,10 +2201,32 @@ export class AdsService {
   }
 
   /** ---------- HELPER: Remove null values from objects ---------- */
-  private removeNullValues(obj: any): any {
+  private removeNullValues(
+    obj: any,
+    visited: WeakSet<any> = new WeakSet(),
+  ): any {
     if (obj === null || obj === undefined) return undefined;
-    if (Array.isArray(obj)) return obj;
+    if (Array.isArray(obj)) {
+      // Handle arrays - process each element but don't track arrays in visited
+      return obj.map((item) => {
+        if (
+          typeof item === 'object' &&
+          item !== null &&
+          !(item instanceof Date)
+        ) {
+          return this.removeNullValues(item, visited);
+        }
+        return item;
+      });
+    }
     if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    // Check for circular reference
+    if (visited.has(obj)) {
+      return undefined; // Skip circular references
+    }
+    visited.add(obj);
 
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -2207,12 +2236,29 @@ export class AdsService {
           !Array.isArray(value) &&
           !(value instanceof Date)
         ) {
-          const cleanedValue = this.removeNullValues(value);
+          const cleanedValue = this.removeNullValues(value, visited);
           if (
             cleanedValue !== undefined &&
             Object.keys(cleanedValue).length > 0
           ) {
             cleaned[key] = cleanedValue;
+          }
+        } else if (Array.isArray(value)) {
+          // Handle arrays in object values
+          const cleanedArray = value
+            .map((item) => {
+              if (
+                typeof item === 'object' &&
+                item !== null &&
+                !(item instanceof Date)
+              ) {
+                return this.removeNullValues(item, visited);
+              }
+              return item;
+            })
+            .filter((item) => item !== null && item !== undefined);
+          if (cleanedArray.length > 0) {
+            cleaned[key] = cleanedArray;
           }
         } else {
           cleaned[key] = value;
@@ -2352,7 +2398,8 @@ export class AdsService {
             id: (ad.user._id as any)?.toString?.(),
             name: ad.user.name,
             email: ad.user.email,
-            phone: ad.user.phone,
+            countryCode: ad.user.countryCode,
+            phoneNumber: ad.user.phoneNumber,
           }
         : undefined,
       approvedByUser: ad.approvedByUser
