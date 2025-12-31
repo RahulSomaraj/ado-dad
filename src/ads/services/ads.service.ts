@@ -1346,9 +1346,9 @@ export class AdsService {
     const geoLocation =
       data.latitude !== undefined && data.longitude !== undefined
         ? {
-            type: 'Point' as const,
-            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
-          }
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
         : undefined;
 
     const ad = new this.adModel({
@@ -1409,9 +1409,9 @@ export class AdsService {
     const geoLocation =
       data.latitude !== undefined && data.longitude !== undefined
         ? {
-            type: 'Point' as const,
-            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
-          }
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
         : undefined;
 
     const ad = new this.adModel({
@@ -1479,9 +1479,9 @@ export class AdsService {
     const geoLocation =
       data.latitude !== undefined && data.longitude !== undefined
         ? {
-            type: 'Point' as const,
-            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
-          }
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
         : undefined;
 
     const session = await this.adModel.startSession();
@@ -1565,9 +1565,9 @@ export class AdsService {
     const geoLocation =
       data.latitude !== undefined && data.longitude !== undefined
         ? {
-            type: 'Point' as const,
-            coordinates: [data.longitude, data.latitude], // [longitude, latitude]
-          }
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
         : undefined;
 
     const ad = new this.adModel({
@@ -1657,7 +1657,32 @@ export class AdsService {
       adUpdate.location = updateData.location;
     if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
     if (typeof updateData.isActive === 'boolean')
-      adUpdate.isActive = updateData.isActive;
+    adUpdate.isActive = updateData.isActive;
+
+    // Handle latitude/longitude updates 
+    if (
+      updateData.latitude !== undefined ||
+      updateData.longitude !== undefined
+    ) {
+      if (updateData.latitude !== undefined)
+        adUpdate.latitude = updateData.latitude;
+      if (updateData.longitude !== undefined)
+        adUpdate.longitude = updateData.longitude;
+
+      // Re-calculate geoLocation if we have both coordinates (either from update or existing)
+      const lat =
+        updateData.latitude !== undefined ? updateData.latitude : ad.latitude;
+      const lon =
+        updateData.longitude !== undefined ? updateData.longitude : ad.longitude;
+
+      if (lat !== undefined && lon !== undefined) {
+        adUpdate.geoLocation = {
+          type: 'Point',
+          coordinates: [lon, lat],
+        };
+      }
+    }
+
     if (Object.keys(adUpdate).length) {
       Object.assign(ad, adUpdate);
       await ad.save();
@@ -1759,7 +1784,7 @@ export class AdsService {
   ): Promise<PaginatedDetailedAdResponseDto> {
     try {
       this.logger.debug('getAllAdsForAdmin called with filters:', filters);
-      
+
       // Build deterministic cache key
       const normalize = (obj: any): any => {
         if (obj == null) return obj;
@@ -1847,21 +1872,21 @@ export class AdsService {
         }
       }
 
-    // user
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'postedBy',
-          foreignField: '_id',
-          as: 'user',
-          pipeline: [
-            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
-          ],
+      // user
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'postedBy',
+            foreignField: '_id',
+            as: 'user',
+            pipeline: [
+              { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+            ],
+          },
         },
-      },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    );
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      );
 
       // Add approvedBy user lookup for admin view
       pipeline.push(
@@ -1975,7 +2000,7 @@ export class AdsService {
         this.logger.error('Pipeline stages:', JSON.stringify(pipeline, null, 2));
         throw new BadRequestException('Failed to retrieve ads: database query error');
       }
-      
+
       const data = result?.data || [];
       const total = result?.total?.[0]?.count || 0;
 
@@ -2019,7 +2044,7 @@ export class AdsService {
       } catch (redisError) {
         this.logger.warn('Redis cache set failed, continuing without caching:', redisError);
       }
-      
+
       return response;
     } catch (error) {
       this.logger.error('Error in getAllAdsForAdmin:', error);
@@ -2168,10 +2193,10 @@ export class AdsService {
             ],
             lastMessage: lastMessage
               ? {
-                  content: lastMessage.content,
-                  createdAt: (lastMessage as any).createdAt || new Date(),
-                  sender: (lastMessage as any).senderId?.name || 'Unknown',
-                }
+                content: lastMessage.content,
+                createdAt: (lastMessage as any).createdAt || new Date(),
+                sender: (lastMessage as any).senderId?.name || 'Unknown',
+              }
               : undefined,
             createdAt: room.createdAt || new Date(),
           };
@@ -2395,19 +2420,19 @@ export class AdsService {
       postedBy: ad.postedBy,
       user: ad.user
         ? {
-            id: (ad.user._id as any)?.toString?.(),
-            name: ad.user.name,
-            email: ad.user.email,
-            countryCode: ad.user.countryCode,
-            phoneNumber: ad.user.phoneNumber,
-          }
+          id: (ad.user._id as any)?.toString?.(),
+          name: ad.user.name,
+          email: ad.user.email,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
+        }
         : undefined,
       approvedByUser: ad.approvedByUser
         ? {
-            id: (ad.approvedByUser._id as any)?.toString?.(),
-            name: ad.approvedByUser.name,
-            email: ad.approvedByUser.email,
-          }
+          id: (ad.approvedByUser._id as any)?.toString?.(),
+          name: ad.approvedByUser.name,
+          email: ad.approvedByUser.email,
+        }
         : undefined,
       vehicleDetails: ad.vehicleDetails || [],
       commercialVehicleDetails: ad.commercialVehicleDetails || [],
@@ -2435,48 +2460,48 @@ export class AdsService {
         await Promise.all([
           vehicleDetails.manufacturerId
             ? this.vehicleInventoryService
-                .findManufacturerById(vehicleDetails.manufacturerId)
-                .catch(() => ({
-                  _id: vehicleDetails.manufacturerId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findManufacturerById(vehicleDetails.manufacturerId)
+              .catch(() => ({
+                _id: vehicleDetails.manufacturerId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           vehicleDetails.modelId
             ? this.vehicleInventoryService
-                .findVehicleModelById(vehicleDetails.modelId)
-                .catch(() => ({
-                  _id: vehicleDetails.modelId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleModelById(vehicleDetails.modelId)
+              .catch(() => ({
+                _id: vehicleDetails.modelId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           vehicleDetails.variantId
             ? this.vehicleInventoryService
-                .findVehicleVariantById(vehicleDetails.variantId)
-                .catch(() => ({
-                  _id: vehicleDetails.variantId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleVariantById(vehicleDetails.variantId)
+              .catch(() => ({
+                _id: vehicleDetails.variantId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           vehicleDetails.fuelTypeId
             ? this.vehicleInventoryService
-                .findFuelTypeById(vehicleDetails.fuelTypeId)
-                .catch(() => ({
-                  _id: vehicleDetails.fuelTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findFuelTypeById(vehicleDetails.fuelTypeId)
+              .catch(() => ({
+                _id: vehicleDetails.fuelTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           vehicleDetails.transmissionTypeId
             ? this.vehicleInventoryService
-                .findTransmissionTypeById(vehicleDetails.transmissionTypeId)
-                .catch(() => ({
-                  _id: vehicleDetails.transmissionTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findTransmissionTypeById(vehicleDetails.transmissionTypeId)
+              .catch(() => ({
+                _id: vehicleDetails.transmissionTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
         ]);
 
@@ -2525,50 +2550,50 @@ export class AdsService {
         await Promise.all([
           commercialVehicleDetails.manufacturerId
             ? this.vehicleInventoryService
-                .findManufacturerById(commercialVehicleDetails.manufacturerId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.manufacturerId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findManufacturerById(commercialVehicleDetails.manufacturerId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.manufacturerId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.modelId
             ? this.vehicleInventoryService
-                .findVehicleModelById(commercialVehicleDetails.modelId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.modelId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleModelById(commercialVehicleDetails.modelId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.modelId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.variantId
             ? this.vehicleInventoryService
-                .findVehicleVariantById(commercialVehicleDetails.variantId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.variantId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleVariantById(commercialVehicleDetails.variantId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.variantId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.fuelTypeId
             ? this.vehicleInventoryService
-                .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.fuelTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.fuelTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.transmissionTypeId
             ? this.vehicleInventoryService
-                .findTransmissionTypeById(
-                  commercialVehicleDetails.transmissionTypeId,
-                )
-                .catch(() => ({
-                  _id: commercialVehicleDetails.transmissionTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findTransmissionTypeById(
+                commercialVehicleDetails.transmissionTypeId,
+              )
+              .catch(() => ({
+                _id: commercialVehicleDetails.transmissionTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
         ]);
 
