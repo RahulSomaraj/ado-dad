@@ -45,9 +45,9 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsPhoneNumberWithCountry('+91', {
-    message: 'Invalid phone number format',
-  })
+  // @IsPhoneNumberWithCountry('+91', {
+  //   message: 'Invalid phone number format',
+  // })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
@@ -103,9 +103,9 @@ export class CreateUserWithFileDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsPhoneNumberWithCountry('+91', {
-    message: 'Invalid phone number format',
-  })
+  // @IsPhoneNumberWithCountry('+91', {
+  //   message: 'Invalid phone number format',
+  // })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })

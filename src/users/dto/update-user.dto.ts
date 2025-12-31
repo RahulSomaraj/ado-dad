@@ -43,9 +43,9 @@ export class UpdateUserDto {
   })
   @IsString()
   @IsOptional()
-  @IsPhoneNumberWithCountry('+91', {
-    message: 'Invalid phone number format',
-  })
+  // @IsPhoneNumberWithCountry('+91', {
+  //   message: 'Invalid phone number format',
+  // })
   phoneNumber?: string;
 
   @ApiPropertyOptional({ example: 'john@example.com' })
