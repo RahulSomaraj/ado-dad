@@ -729,24 +729,6 @@ export class AdsController {
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN, UserType.USER, UserType.SHOWROOM)
-  @ApiOperation({
-    summary: 'Get all advertisements (Admin)',
-    description:
-      'Retrieve all advertisements including unapproved ones with pagination and search. Accessible by authenticated users.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'All advertisements retrieved successfully with pagination',
-    type: PaginatedDetailedAdResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Authentication required',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Insufficient permissions',
-  })
   @ApiBearerAuth()
   async getAllAdsForAdmin(
     @Query() filterDto: AdminAllAdsFilterDto,
@@ -763,36 +745,6 @@ export class AdsController {
   @Put(':id/approval')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
-  @ApiOperation({
-    summary: 'Update advertisement approval status',
-    description:
-      'Approve or reject an advertisement. Only accessible by admin and super admin.',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        isApproved: {
-          type: 'boolean',
-          description: 'Set to true to approve, false to reject',
-        },
-      },
-      required: ['isApproved'],
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Advertisement approval status updated successfully',
-    type: DetailedAdResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Admin access required',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Advertisement not found',
-  })
   @ApiBearerAuth()
   async updateAdApproval(
     @Param('id') id: string,

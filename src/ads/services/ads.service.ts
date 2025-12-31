@@ -355,12 +355,19 @@ export class AdsService {
       });
     }
 
-    // Sorting: location score first if available, then requested field
+    // Sorting: distance first (closest first based on geolocation from DB), then newly created (most recent first)
     const sortStage: any = {};
     if (latitude !== undefined && longitude !== undefined) {
-      sortStage.locationScore = -1; // Higher score first
+      sortStage.distance = 1; // Closest first (ascending) - geolocation-based directly from DB
+      sortStage.createdAt = -1; // Newly created first (descending) - most recent first
+    } else {
+      // When no coordinates, prioritize newly created first
+      sortStage.createdAt = -1; // Newest first (descending)
+      // Add requested sort field only if it's different from createdAt
+      if (sortField !== 'createdAt') {
+        sortStage[sortField] = sortDirection;
+      }
     }
-    sortStage[sortField] = sortDirection;
     pipeline.push({ $sort: sortStage });
 
     // Clean up internal fields
@@ -1759,7 +1766,7 @@ export class AdsService {
   ): Promise<PaginatedDetailedAdResponseDto> {
     try {
       this.logger.debug('getAllAdsForAdmin called with filters:', filters);
-      
+
       // Build deterministic cache key
       const normalize = (obj: any): any => {
         if (obj == null) return obj;
@@ -1788,7 +1795,10 @@ export class AdsService {
           return cached;
         }
       } catch (redisError) {
-        this.logger.warn('Redis cache get failed, continuing without cache:', redisError);
+        this.logger.warn(
+          'Redis cache get failed, continuing without cache:',
+          redisError,
+        );
       }
 
       let {
@@ -1812,7 +1822,8 @@ export class AdsService {
 
       // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
       // Store search term for later use
-      const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+      const searchTerm =
+        search && `${search}`.trim() ? `${search}`.trim() : null;
 
       // Base visibility: show all ads (including unapproved) except soft-deleted
       pipeline.push({ $match: { isDeleted: { $ne: true } } });
@@ -1843,25 +1854,30 @@ export class AdsService {
             ),
           );
         } catch (locationError) {
-          this.logger.warn('Location hierarchy service error, continuing without location filtering:', locationError);
+          this.logger.warn(
+            'Location hierarchy service error, continuing without location filtering:',
+            locationError,
+          );
         }
       }
 
-    // user
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'postedBy',
-          foreignField: '_id',
-          as: 'user',
-          pipeline: [
-            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
-          ],
+      // user
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'postedBy',
+            foreignField: '_id',
+            as: 'user',
+            pipeline: [
+              {
+                $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 },
+              },
+            ],
+          },
         },
-      },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-    );
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      );
 
       // Add approvedBy user lookup for admin view
       pipeline.push(
@@ -1875,7 +1891,10 @@ export class AdsService {
           },
         },
         {
-          $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+          $unwind: {
+            path: '$approvedByUser',
+            preserveNullAndEmptyArrays: true,
+          },
         },
       );
 
@@ -1890,7 +1909,10 @@ export class AdsService {
           },
         },
         {
-          $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+          $unwind: {
+            path: '$vehicleDetails',
+            preserveNullAndEmptyArrays: true,
+          },
         },
       );
 
@@ -1923,7 +1945,10 @@ export class AdsService {
           },
         },
         {
-          $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+          $unwind: {
+            path: '$propertyDetails',
+            preserveNullAndEmptyArrays: true,
+          },
         },
       );
 
@@ -1942,18 +1967,23 @@ export class AdsService {
         });
       }
 
-      // Sort
+      // Sort: distance first (closest first), then newly created (most recent first)
       if (latitude !== undefined && longitude !== undefined) {
-        // Prioritize by location score first, then by requested sort field
+        // Distance is already calculated by locationHierarchyService.getLocationAggregationPipeline
+        // Prioritize by distance first, then newly created
         pipeline.push({
           $sort: {
-            locationScore: -1, // Higher location score first (district > state > country)
-            [sortField]: sortDirection,
+            distance: 1, // Closest first (ascending) - geolocation-based
+            createdAt: -1, // Newly created first (descending) - most recent first
           },
         });
       } else {
-        // Regular sorting when no location filtering
-        pipeline.push({ $sort: { [sortField]: sortDirection } });
+        // Regular sorting when no location filtering - newly created first
+        const sortStage: any = { createdAt: -1 };
+        if (sortField !== 'createdAt') {
+          sortStage[sortField] = sortDirection;
+        }
+        pipeline.push({ $sort: sortStage });
       }
 
       // Facet for pagination
@@ -1972,10 +2002,15 @@ export class AdsService {
         }
       } catch (aggregationError) {
         this.logger.error('MongoDB aggregation failed:', aggregationError);
-        this.logger.error('Pipeline stages:', JSON.stringify(pipeline, null, 2));
-        throw new BadRequestException('Failed to retrieve ads: database query error');
+        this.logger.error(
+          'Pipeline stages:',
+          JSON.stringify(pipeline, null, 2),
+        );
+        throw new BadRequestException(
+          'Failed to retrieve ads: database query error',
+        );
       }
-      
+
       const data = result?.data || [];
       const total = result?.total?.[0]?.count || 0;
 
@@ -1987,10 +2022,15 @@ export class AdsService {
             try {
               const dto = await this.mapToResponseDtoWithInventory(ad);
               dto.year =
-                ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
+                ad.vehicleDetails?.year ??
+                ad.commercialVehicleDetails?.year ??
+                null;
               return dto;
             } catch (mappingError) {
-              this.logger.error(`Error mapping ad at index ${index} (ID: ${ad._id}):`, mappingError);
+              this.logger.error(
+                `Error mapping ad at index ${index} (ID: ${ad._id}):`,
+                mappingError,
+              );
               // Return a basic DTO with error indication instead of failing completely
               return this.mapToResponseDto(ad);
             }
@@ -1998,7 +2038,9 @@ export class AdsService {
         );
       } catch (mappingError) {
         this.logger.error('Error during batch mapping:', mappingError);
-        throw new BadRequestException('Failed to process ad data: mapping error');
+        throw new BadRequestException(
+          'Failed to process ad data: mapping error',
+        );
       }
 
       const totalPages = Math.ceil(total / limit);
@@ -2015,11 +2057,18 @@ export class AdsService {
 
       // Cache the result
       try {
-        await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+        await this.redisService.cacheSet(
+          cacheKey,
+          response,
+          AdsService.TTL.LIST,
+        );
       } catch (redisError) {
-        this.logger.warn('Redis cache set failed, continuing without caching:', redisError);
+        this.logger.warn(
+          'Redis cache set failed, continuing without caching:',
+          redisError,
+        );
       }
-      
+
       return response;
     } catch (error) {
       this.logger.error('Error in getAllAdsForAdmin:', error);
