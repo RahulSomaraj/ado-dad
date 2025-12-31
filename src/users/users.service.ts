@@ -452,6 +452,15 @@ export class UsersService {
     try {
       this.logger.log(`Creating new user: ${userData.email}`);
 
+      // Normalize countryCode to ensure it has + prefix
+      if (userData.countryCode) {
+        let normalized = String(userData.countryCode).trim();
+        if (!normalized.startsWith('+')) {
+          normalized = '+' + normalized.replace(/^\+/, '');
+        }
+        userData.countryCode = normalized;
+      }
+
       // Validate input data
       await this.validateUserData(userData);
 
@@ -524,6 +533,15 @@ export class UsersService {
       const existingUser = await this.userModel.findById(id).exec();
       if (!existingUser || existingUser.isDeleted) {
         throw new NotFoundException('User not found or deleted');
+      }
+
+      // Normalize countryCode to ensure it has + prefix
+      if (updateData.countryCode) {
+        let normalized = String(updateData.countryCode).trim();
+        if (!normalized.startsWith('+')) {
+          normalized = '+' + normalized.replace(/^\+/, '');
+        }
+        updateData.countryCode = normalized;
       }
 
       // Validate update data

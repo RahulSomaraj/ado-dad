@@ -8,7 +8,7 @@ export class ManufacturerResponseDto {
   _id: string;
 
   @ApiProperty({
-    description: 'Manufacturer name (unique identifier)',
+    description: 'Manufacturer name (unique only in combination with vehicleCategory)',
     example: 'honda',
   })
   name: string;
@@ -67,6 +67,13 @@ export class ManufacturerResponseDto {
     example: false,
   })
   isPremium: boolean;
+
+  @ApiProperty({
+    description:
+      'Vehicle category for this manufacturer (e.g., passenger_car, two_wheeler, commercial_vehicle)',
+    example: 'passenger_car',
+  })
+  vehicleCategory: string;
 
   @ApiProperty({
     description: 'Creation timestamp',

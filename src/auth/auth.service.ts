@@ -42,7 +42,8 @@ export class AuthService {
         return null;
       }
 
-      const trimmedUsername = username.trim().toLowerCase();
+      // Trim username but don't convert to lowercase (phone numbers need to preserve + prefix)
+      const trimmedUsername = username.trim();
 
       // Find user with optimized query
       const user = await this.findUserByCredentials(trimmedUsername);
@@ -85,31 +86,49 @@ export class AuthService {
   private async findUserByCredentials(
     identifier: string,
   ): Promise<User | null> {
+    // Check if identifier is an email
+    const isEmail = /.+@.+\..+/.test(identifier);
+
+    if (isEmail) {
+      // If it's an email, search by email
+      const query = {
+        email: identifier.toLowerCase(),
+        isDeleted: { $ne: true },
+      };
+      console.log('Email query:', query);
+      return this.userModel
+        .findOne(query)
+        .select('+password +otp +isDeleted')
+        .lean()
+        .exec() as any;
+    }
+
     // Try to parse phone number with country code
     const { parsePhoneNumber } =
       await import('../common/utils/phone-validator.util');
     const parsed = parsePhoneNumber(identifier);
 
-    const phoneQuery: any[] = [];
     if (parsed) {
-      // Search with country code and phone number
-      phoneQuery.push({
+      // If phone number is successfully parsed, search by countryCode + phoneNumber
+      const query = {
         countryCode: parsed.countryCode,
         phoneNumber: parsed.phoneNumber,
-      });
+        isDeleted: { $ne: true },
+      };
+      console.log('Phone query:', query);
+      return this.userModel
+        .findOne(query)
+        .select('+password +otp +isDeleted')
+        .lean()
+        .exec() as any;
     }
-    // Fallback: search by phone number only (for backward compatibility)
-    phoneQuery.push({ phoneNumber: identifier });
 
+    // Fallback: search by phoneNumber only (for backward compatibility)
     const query = {
-      $or: [
-        { email: identifier },
-        ...phoneQuery,
-        { name: { $regex: new RegExp(`^${identifier}$`, 'i') } },
-      ],
+      phoneNumber: identifier,
       isDeleted: { $ne: true },
     };
-
+    console.log('Fallback query:', query);
     return this.userModel
       .findOne(query)
       .select('+password +otp +isDeleted')
@@ -232,7 +251,8 @@ export class AuthService {
    */
   async userExists(identifier: string): Promise<boolean> {
     try {
-      const user = await this.findUserByCredentials(identifier.toLowerCase());
+      // Don't convert to lowercase - let findUserByCredentials handle email/phone number detection
+      const user = await this.findUserByCredentials(identifier.trim());
       return !!user;
     } catch (error) {
       this.logger.error(

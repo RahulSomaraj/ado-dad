@@ -106,10 +106,10 @@ export function formatPhoneNumber(
  * Parse phone number from full format (e.g., +919876543210 or 919876543210)
  * Returns { countryCode, phoneNumber }
  * @param fullNumber - Full phone number with or without + prefix
- * @returns Parsed result with country code and phone number, or null if parsing fails
+ * @returns Parsed result with phone country code (e.g., '+91', '+971') and phone number, or null if parsing fails
  */
 export function parsePhoneNumber(fullNumber: string): {
-  countryCode: string;
+  countryCode: string; // Phone country code with + prefix (e.g., '+91', '+971', '+1')
   phoneNumber: string;
 } | null {
   try {
@@ -118,6 +118,7 @@ export function parsePhoneNumber(fullNumber: string): {
 
     // Try to parse as international number
     const parsedNumber = phoneUtil.parse(cleaned, 'ZZ'); // 'ZZ' means unknown region
+    console.log('parsedNumber', parsedNumber);
 
     if (!phoneUtil.isValidNumber(parsedNumber)) {
       // If parsing as international fails, try to extract country code manually
@@ -125,7 +126,7 @@ export function parsePhoneNumber(fullNumber: string): {
       if (cleaned.startsWith('+91') || cleaned.startsWith('91')) {
         const phoneNumber = cleaned.replace(/^\+?91/, '');
         if (phoneNumber.length === 10) {
-          return { countryCode: 'IN', phoneNumber };
+          return { countryCode: '+91', phoneNumber };
         }
       }
 
@@ -138,7 +139,7 @@ export function parsePhoneNumber(fullNumber: string): {
           digits.startsWith('8') ||
           digits.startsWith('9'))
       ) {
-        return { countryCode: 'IN', phoneNumber: digits };
+        return { countryCode: '+91', phoneNumber: digits };
       }
 
       return null;
@@ -150,11 +151,20 @@ export function parsePhoneNumber(fullNumber: string): {
       return null;
     }
 
+    // Convert ISO country code to phone code with + prefix (e.g., 'IN' -> '+91')
+    const phoneCode = isoCodeToPhoneCode(regionCode);
+    if (!phoneCode) {
+      return null;
+    }
+
     // Get national number (without country code)
     const nationalNumber = parsedNumber.getNationalNumber()?.toString() || '';
 
+    console.log('regionCode', regionCode);
+    console.log('phoneCode', phoneCode);
+    console.log('nationalNumber', nationalNumber);
     return {
-      countryCode: regionCode,
+      countryCode: phoneCode, // Return phone code with + prefix (e.g., '+91', '+971')
       phoneNumber: nationalNumber,
     };
   } catch (error) {
@@ -163,14 +173,14 @@ export function parsePhoneNumber(fullNumber: string): {
     if (cleaned.startsWith('+91') || cleaned.startsWith('91')) {
       const phoneNumber = cleaned.replace(/^\+?91/, '');
       if (phoneNumber.length === 10) {
-        return { countryCode: 'IN', phoneNumber };
+        return { countryCode: '+91', phoneNumber };
       }
     }
 
     // If it's just digits and 10 long, assume India
     const digits = cleaned.replace(/\D/g, '');
     if (digits.length === 10) {
-      return { countryCode: 'IN', phoneNumber: digits };
+      return { countryCode: '+91', phoneNumber: digits };
     }
 
     return null;

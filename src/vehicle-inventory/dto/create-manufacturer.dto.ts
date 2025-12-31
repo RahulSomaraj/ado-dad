@@ -4,6 +4,8 @@ import {
   IsUrl,
   IsBoolean,
   IsNumber,
+  IsArray,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -89,4 +91,22 @@ export class CreateManufacturerDto {
   @IsOptional()
   @IsBoolean()
   isPremium?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Vehicle category for this manufacturer. Same manufacturer name can be created for different categories (e.g., Honda for passenger_car and Honda for two_wheeler). Cannot create duplicate name + category combination. Defaults to passenger_car if not provided.',
+    example: 'passenger_car',
+    enum: [
+      'passenger_car',
+      'two_wheeler',
+      'commercial_vehicle',
+      'luxury',
+      'suv',
+    ],
+    default: 'passenger_car',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['passenger_car', 'two_wheeler', 'commercial_vehicle', 'luxury', 'suv'])
+  vehicleCategory?: string;
 }

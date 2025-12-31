@@ -5,8 +5,8 @@ export type ManufacturerDocument = Manufacturer & Document;
 
 @Schema({ timestamps: true })
 export class Manufacturer {
-  @Prop({ required: true, unique: true, trim: true })
-  name: string;
+  @Prop({ required: true, trim: true })
+  name: string; // Not unique alone - can have same name for different vehicle categories
 
   @Prop({ required: true })
   displayName: string;
@@ -39,6 +39,19 @@ export class Manufacturer {
   @Prop({ default: false })
   isPremium: boolean;
 
+  @Prop({
+    required: false,
+    enum: [
+      'passenger_car',
+      'two_wheeler',
+      'commercial_vehicle',
+      'luxury',
+      'suv',
+    ],
+    default: 'passenger_car',
+  })
+  vehicleCategory: string; // Single vehicle category - same manufacturer name can exist for different categories (default: passenger_car)
+
   // Soft delete fields
   @Prop({ default: false })
   isDeleted: boolean;
@@ -54,6 +67,9 @@ ManufacturerSchema.index({ isActive: 1, isDeleted: 1 });
 ManufacturerSchema.index({ originCountry: 1 });
 ManufacturerSchema.index({ foundedYear: 1 });
 ManufacturerSchema.index({ headquarters: 1 });
+ManufacturerSchema.index({ vehicleCategory: 1 }); // Index for category filtering
+// Compound unique index: same manufacturer name can exist but not for the same vehicle category
+ManufacturerSchema.index({ name: 1, vehicleCategory: 1 }, { unique: true });
 ManufacturerSchema.index({
   name: 'text',
   displayName: 'text',

@@ -49,7 +49,11 @@ export class ManufacturersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new manufacturer' })
+  @ApiOperation({
+    summary: 'Create a new manufacturer',
+    description:
+      'Create a manufacturer with a vehicle category. Same manufacturer name can be created for different categories (e.g., Honda for passenger_car and Honda for two_wheeler). Cannot create duplicate name + category combination.',
+  })
   @ApiResponse({
     status: 201,
     description: 'Manufacturer created successfully',

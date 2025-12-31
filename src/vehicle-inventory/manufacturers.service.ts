@@ -122,7 +122,13 @@ export class ManufacturersService {
     createManufacturerDto: CreateManufacturerDto,
   ): Promise<Manufacturer> {
     try {
-      const manufacturer = new this.manufacturerModel(createManufacturerDto);
+      // Apply default vehicleCategory if not provided
+      const manufacturerData = {
+        ...createManufacturerDto,
+        vehicleCategory:
+          createManufacturerDto.vehicleCategory || 'passenger_car',
+      };
+      const manufacturer = new this.manufacturerModel(manufacturerData);
       const savedManufacturer = await manufacturer.save();
 
       // Invalidate caches after creation
@@ -131,8 +137,14 @@ export class ManufacturersService {
       return savedManufacturer;
     } catch (error) {
       if (error.code === 11000) {
-        // Duplicate key error
-        const field = Object.keys(error.keyPattern)[0];
+        // Duplicate key error - could be name+vehicleCategory compound index
+        const keyPattern = error.keyPattern || {};
+        if (keyPattern.name && keyPattern.vehicleCategory) {
+          throw new BadRequestException(
+            `Manufacturer with name '${error.keyValue.name}' and vehicle category '${error.keyValue.vehicleCategory}' already exists`,
+          );
+        }
+        const field = Object.keys(keyPattern)[0];
         throw new BadRequestException(
           `Manufacturer with ${field} '${error.keyValue[field]}' already exists`,
         );
@@ -218,6 +230,13 @@ export class ManufacturersService {
       return manufacturer;
     } catch (error) {
       if (error.code === 11000) {
+        // Duplicate key error - could be name+vehicleCategory compound index
+        const keyPattern = error.keyPattern || {};
+        if (keyPattern.name && keyPattern.vehicleCategory) {
+          throw new BadRequestException(
+            `Manufacturer with name '${error.keyValue.name}' and vehicle category '${error.keyValue.vehicleCategory}' already exists`,
+          );
+        }
         throw new BadRequestException(
           'Manufacturer with this name already exists',
         );
@@ -331,12 +350,10 @@ export class ManufacturersService {
       matchStage.isActive = filters.isActive;
     }
 
-    // Add category filtering based on manufacturer characteristics
+    // Add category filtering based on manufacturer vehicleCategory field
     if (filters.category) {
-      const categoryFilters = this.getCategoryFilter(filters.category);
-      if (categoryFilters.length > 0) {
-        matchStage.$or = categoryFilters;
-      }
+      const categoryFilter = this.getCategoryFilter(filters.category);
+      Object.assign(matchStage, categoryFilter);
     }
 
     // Add region filtering
@@ -408,63 +425,12 @@ export class ManufacturersService {
   }
 
   // Helper methods for filtering
-  private getCategoryFilter(category: string): any[] {
-    const categoryMappings = {
-      passenger_car: [
-        {
-          name: {
-            $in: [
-              'maruti_suzuki',
-              'tata_motors',
-              'honda',
-              'toyota',
-              'hyundai',
-              'kia',
-              'volkswagen',
-              'ford',
-              'chevrolet',
-              'skoda',
-              'mg_motor',
-              'haval',
-            ],
-          },
-        },
-      ],
-      two_wheeler: [
-        {
-          name: {
-            $in: [
-              'hero_moto',
-              'bajaj_auto',
-              'tvs_motor',
-              'honda',
-              'yamaha',
-              'kawasaki',
-              'suzuki',
-            ],
-          },
-        },
-      ],
-      commercial_vehicle: [
-        {
-          name: {
-            $in: [
-              'ashok_leyland',
-              'eicher_motors',
-              'force_motors',
-              'bharat_benz',
-              'tata_daewoo',
-              'tata_motors',
-              'mahindra',
-            ],
-          },
-        },
-      ],
-      luxury: [{ name: { $in: ['bmw', 'mercedes_benz', 'audi', 'volvo'] } }],
-      suv: [{ name: { $in: ['mahindra', 'jeep', 'haval', 'mg_motor'] } }],
+  // Updated to use vehicleCategory field instead of hardcoded name mappings
+  private getCategoryFilter(category: string): any {
+    // Use the vehicleCategory field for filtering
+    return {
+      vehicleCategory: category,
     };
-
-    return categoryMappings[category] || [];
   }
 
   private getRegionCountries(region: string): string[] {

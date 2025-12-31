@@ -4,6 +4,8 @@ import {
   IsUrl,
   IsBoolean,
   IsNumber,
+  IsArray,
+  IsIn,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -87,4 +89,21 @@ export class UpdateManufacturerDto {
   @IsOptional()
   @IsBoolean()
   isPremium?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Vehicle category for this manufacturer. Same manufacturer name can exist for different categories. Cannot update to duplicate name + category combination.',
+    example: 'passenger_car',
+    enum: [
+      'passenger_car',
+      'two_wheeler',
+      'commercial_vehicle',
+      'luxury',
+      'suv',
+    ],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['passenger_car', 'two_wheeler', 'commercial_vehicle', 'luxury', 'suv'])
+  vehicleCategory?: string;
 }

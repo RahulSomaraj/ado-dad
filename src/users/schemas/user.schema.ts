@@ -58,8 +58,20 @@ UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ countryCode: 1, phoneNumber: 1 }, { unique: true });
 UserSchema.index({ name: 'text', email: 'text', phoneNumber: 'text' });
 
-// Pre-save hook to hash password before saving
+// Pre-save hook to normalize countryCode and hash password before saving
 UserSchema.pre('save', async function (next) {
+  // Normalize countryCode: ensure it has + prefix and is trimmed
+  if (this.countryCode) {
+    // Remove any whitespace
+    let normalized = String(this.countryCode).trim();
+    // Ensure it starts with + (if not already, add it)
+    if (!normalized.startsWith('+')) {
+      normalized = '+' + normalized.replace(/^\+/, ''); // Remove existing + if any, then add one
+    }
+    this.countryCode = normalized;
+  }
+
+  // Hash password before saving
   if (this.isModified('password') || this.isNew) {
     this.password = await bcrypt.hash(this.password, 10);
   }
