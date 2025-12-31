@@ -32,7 +32,7 @@ export class ManufacturersService {
     @InjectModel(Manufacturer.name)
     private readonly manufacturerModel: Model<ManufacturerDocument>,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   // ---- helpers ------------------------------------------------------------
   private key(parts: Record<string, unknown>): string {
@@ -122,12 +122,17 @@ export class ManufacturersService {
     createManufacturerDto: CreateManufacturerDto,
   ): Promise<Manufacturer> {
     try {
-      // Apply default vehicleCategory if not provided
-      const manufacturerData = {
-        ...createManufacturerDto,
-        vehicleCategory:
-          createManufacturerDto.vehicleCategory || 'passenger_car',
-      };
+      // Prepare manufacturer data - handle empty vehicleCategory string
+      const manufacturerData: any = { ...createManufacturerDto };
+
+      // If vehicleCategory is empty string or not provided, apply default
+      if (
+        !manufacturerData.vehicleCategory ||
+        manufacturerData.vehicleCategory === ''
+      ) {
+        manufacturerData.vehicleCategory = 'passenger_car';
+      }
+
       const manufacturer = new this.manufacturerModel(manufacturerData);
       const savedManufacturer = await manufacturer.save();
 
@@ -211,10 +216,19 @@ export class ManufacturersService {
     updateManufacturerDto: UpdateManufacturerDto,
   ): Promise<Manufacturer> {
     try {
+      // Prepare update data - ensure vehicleCategory is handled consistently
+      const updateData: any = { ...updateManufacturerDto };
+
+      // If vehicleCategory is being updated, ensure it's not empty
+      // (but don't apply default on update - only on create)
+      if (updateData.vehicleCategory === '') {
+        delete updateData.vehicleCategory; // Don't update if empty string
+      }
+
       const manufacturer = await this.manufacturerModel
         .findOneAndUpdate(
           { _id: this.oid(id), isDeleted: false },
-          { $set: updateManufacturerDto },
+          { $set: updateData },
           { new: true, runValidators: true },
         )
         .lean()
@@ -237,12 +251,19 @@ export class ManufacturersService {
             `Manufacturer with name '${error.keyValue.name}' and vehicle category '${error.keyValue.vehicleCategory}' already exists`,
           );
         }
+        const field = Object.keys(keyPattern)[0];
         throw new BadRequestException(
-          'Manufacturer with this name already exists',
+          `Manufacturer with ${field} '${error.keyValue[field]}' already exists`,
         );
       }
       if (error.name === 'ValidationError') {
-        throw new BadRequestException(error.message);
+        // Mongoose validation error
+        const validationErrors = Object.values(error.errors).map(
+          (err: any) => err.message,
+        );
+        throw new BadRequestException(
+          `Validation failed: ${validationErrors.join(', ')}`,
+        );
       }
       throw error;
     }
@@ -305,7 +326,12 @@ export class ManufacturersService {
       const regex = new RegExp(searchTerm, 'i');
       pipeline.push({
         $match: {
-          $or: [{ name: regex }, { displayName: regex }],
+          $or: [
+            { name: regex },
+            { displayName: regex },
+            { description: regex },
+            { vehicleCategory: regex },
+          ],
         },
       });
     }
@@ -622,9 +648,9 @@ export class ManufacturersService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-          row: docs[we.index] ?? we.op,
-          reason: we.errmsg || we.message || 'Insert failed',
-        }))
+            row: docs[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
         : [];
 
     skipped.push(...skippedFromErrors);

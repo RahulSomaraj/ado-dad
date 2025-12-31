@@ -10,7 +10,7 @@ import { Transform } from 'class-transformer';
 
 export class FilterManufacturerDto {
   @ApiPropertyOptional({
-    description: 'Search manufacturers by name, display name, or description',
+    description: 'Search manufacturers by name, display name, description, or vehicle category',
     example: 'honda',
   })
   @IsOptional()
@@ -123,7 +123,7 @@ export class FilterManufacturerDto {
   limit?: number;
 
   @ApiPropertyOptional({
-    description: 'Filter by manufacturer type/category',
+    description: 'Filter by vehicle category (vehicleCategory field). Filters manufacturers that match the specified category.',
     enum: [
       'passenger_car',
       'two_wheeler',

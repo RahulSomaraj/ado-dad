@@ -56,10 +56,9 @@ export class CreateManufacturerDto {
   @IsUrl()
   website?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Year when the manufacturer was founded.',
     example: 1981,
-    required: false,
   })
   @IsOptional()
   @IsNumber()

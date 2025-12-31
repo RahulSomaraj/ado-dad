@@ -104,8 +104,15 @@ export class ManufacturersController {
   @ApiQuery({
     name: 'category',
     required: false,
-    description: 'Filter by manufacturer category',
+    description: 'Filter by vehicle category (vehicleCategory field)',
     example: 'passenger_car',
+    enum: [
+      'passenger_car',
+      'two_wheeler',
+      'commercial_vehicle',
+      'luxury',
+      'suv',
+    ],
   })
   @ApiQuery({
     name: 'region',
