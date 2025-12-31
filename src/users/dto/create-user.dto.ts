@@ -8,6 +8,7 @@ import {
   IsUrl,
   IsIn,
   Matches,
+  IsNumberString,
 } from 'class-validator';
 import { UserType } from '../enums/user.types';
 import { IsPhoneNumberWithCountry } from '../../common/decorators/phone-number-validator.decorator';
@@ -48,6 +49,9 @@ export class CreateUserDto {
   // @IsPhoneNumberWithCountry('+91', {
   //   message: 'Invalid phone number format',
   // })
+  @IsNumberString({ no_symbols: true }, { 
+    message: 'Phone number must contain only numbers' 
+  })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
@@ -106,6 +110,9 @@ export class CreateUserWithFileDto {
   // @IsPhoneNumberWithCountry('+91', {
   //   message: 'Invalid phone number format',
   // })
+  @IsNumberString({ no_symbols: true }, { 
+    message: 'Phone number must contain only numbers' 
+  })
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
