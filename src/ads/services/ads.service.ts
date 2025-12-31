@@ -1665,6 +1665,33 @@ export class AdsService {
     if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
     if (typeof updateData.isActive === 'boolean')
       adUpdate.isActive = updateData.isActive;
+
+    // Handle latitude/longitude updates
+    if (
+      updateData.latitude !== undefined ||
+      updateData.longitude !== undefined
+    ) {
+      if (updateData.latitude !== undefined)
+        adUpdate.latitude = updateData.latitude;
+      if (updateData.longitude !== undefined)
+        adUpdate.longitude = updateData.longitude;
+
+      // Re-calculate geoLocation if we have both coordinates (either from update or existing)
+      const lat =
+        updateData.latitude !== undefined ? updateData.latitude : ad.latitude;
+      const lon =
+        updateData.longitude !== undefined
+          ? updateData.longitude
+          : ad.longitude;
+
+      if (lat !== undefined && lon !== undefined) {
+        adUpdate.geoLocation = {
+          type: 'Point',
+          coordinates: [lon, lat],
+        };
+      }
+    }
+
     if (Object.keys(adUpdate).length) {
       Object.assign(ad, adUpdate);
       await ad.save();
