@@ -292,161 +292,40 @@ export class ManufacturersService {
   async findManufacturersWithFilters(
     filters: FilterManufacturerDto,
   ): Promise<PaginatedManufacturerResponseDto> {
-    const cacheKey = this.key({ type: 'filtered', ...this.normalize(filters) });
-    const cached =
-      await this.redisService.cacheGet<PaginatedManufacturerResponseDto>(
-        cacheKey,
-      );
-    if (cached) return cached;
+    const query: any = { isDeleted: false };
 
-    let { page = 1, limit = 20, sortBy = 'name', sortOrder = 'ASC' } = filters;
-    const { field: sortField, dir: sortDir } = this.coerceSort(
-      sortBy,
-      sortOrder,
-    );
-    const pageNum = this.clamp(
-      typeof page === 'string' ? parseInt(page, 10) : page,
-      1,
-      1e9,
-    );
-    const limitNum = this.clamp(
-      typeof limit === 'string' ? parseInt(limit, 10) : limit,
-      1,
-      100,
-    );
-
-    // Build the aggregation pipeline
-    const pipeline: PipelineStage[] = [];
-
-    // Handle search (matches anywhere in the string, case insensitive)
     if (filters.search && filters.search.trim()) {
       const searchTerm = filters.search
         .trim()
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(searchTerm, 'i');
-      pipeline.push({
-        $match: {
-          $or: [
-            { name: regex },
-            { displayName: regex },
-            { description: regex },
-            { vehicleCategory: regex },
-          ],
-        },
-      });
+      query.$or = [
+        { name: regex },
+        { displayName: regex },
+        { description: regex },
+        { vehicleCategory: regex },
+      ];
     }
 
-    // Add basic filters
-    const matchStage: any = { isActive: true, isDeleted: false };
+    const manufacturers = await this.manufacturerModel
+      .find(query)
+      .collation({ locale: 'en', strength: 2 })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
 
-    if (filters.originCountry) {
-      matchStage.originCountry = {
-        $regex: filters.originCountry,
-        $options: 'i',
-      };
-    }
-
-    if (filters.minFoundedYear !== undefined) {
-      const minYear =
-        typeof filters.minFoundedYear === 'string'
-          ? parseInt(filters.minFoundedYear, 10)
-          : filters.minFoundedYear;
-      matchStage.foundedYear = {
-        ...matchStage.foundedYear,
-        $gte: minYear,
-      };
-    }
-
-    if (filters.maxFoundedYear !== undefined) {
-      const maxYear =
-        typeof filters.maxFoundedYear === 'string'
-          ? parseInt(filters.maxFoundedYear, 10)
-          : filters.maxFoundedYear;
-      matchStage.foundedYear = {
-        ...matchStage.foundedYear,
-        $lte: maxYear,
-      };
-    }
-
-    if (filters.headquarters) {
-      matchStage.headquarters = { $regex: filters.headquarters, $options: 'i' };
-    }
-
-    if (filters.isActive !== undefined) {
-      matchStage.isActive = filters.isActive;
-    }
-
-    // Add category filtering based on manufacturer vehicleCategory field
-    if (filters.category) {
-      const categoryFilter = this.getCategoryFilter(filters.category);
-      Object.assign(matchStage, categoryFilter);
-    }
-
-    // Add region filtering
-    if (filters.region) {
-      const regionCountries = this.getRegionCountries(filters.region);
-      if (regionCountries.length > 0) {
-        // If originCountry regex also provided, intersect via $and
-        if (matchStage.originCountry) {
-          pipeline.push({
-            $match: {
-              $and: [
-                { originCountry: { $in: regionCountries } },
-                { originCountry: matchStage.originCountry },
-              ],
-            },
-          });
-          delete matchStage.originCountry;
-        } else {
-          matchStage.originCountry = { $in: regionCountries };
-        }
-      }
-    }
-
-    pipeline.push({ $match: matchStage });
-
-    // Use $facet to get both data and total in a single aggregation
-    const facetPipeline: PipelineStage[] = [
-      {
-        $facet: {
-          data: [
-            { $sort: { [sortField]: sortDir } },
-            { $skip: (pageNum - 1) * limitNum },
-            { $limit: limitNum },
-          ],
-          total: [{ $count: 'count' }],
-        },
-      },
-    ];
-
-    // Execute the aggregation
-    const [result] = await this.manufacturerModel
-      .aggregate([...pipeline, ...facetPipeline])
-      .collation({ locale: 'en', strength: 2 });
-
-    const manufacturers = result.data || [];
-    const total = result.total?.[0]?.count || 0;
-
-    // Calculate pagination info
-    const totalPages = Math.ceil(total / limitNum);
-    const hasNext = pageNum < totalPages;
-    const hasPrev = pageNum > 1;
+    const total = manufacturers.length;
 
     const response: PaginatedManufacturerResponseDto = {
-      data: manufacturers,
+      data: manufacturers as any,
       total,
-      page: pageNum,
-      limit: limitNum,
-      totalPages,
-      hasNext,
-      hasPrev,
+      page: 1,
+      limit: total,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false,
     };
 
-    await this.redisService.cacheSet(
-      cacheKey,
-      response,
-      ManufacturersService.CACHE_TTL.LIST_MED,
-    );
     return response;
   }
 

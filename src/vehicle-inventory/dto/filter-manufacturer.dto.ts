@@ -19,40 +19,6 @@ export class FilterManufacturerDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by origin country',
-    example: 'Japan',
-  })
-  @IsOptional()
-  @IsString()
-  originCountry?: string;
-
-  @ApiPropertyOptional({
-    description: 'Filter by founded year (minimum)',
-    example: 1900,
-  })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  @IsNumber()
-  minFoundedYear?: number;
-
-  @ApiPropertyOptional({
-    description: 'Filter by founded year (maximum)',
-    example: 2000,
-  })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  @IsNumber()
-  maxFoundedYear?: number;
-
-  @ApiPropertyOptional({
-    description: 'Filter by headquarters location',
-    example: 'Tokyo',
-  })
-  @IsOptional()
-  @IsString()
-  headquarters?: string;
-
-  @ApiPropertyOptional({
     description: 'Filter by active status',
     example: true,
   })
@@ -137,27 +103,4 @@ export class FilterManufacturerDto {
   @IsOptional()
   @IsIn(['passenger_car', 'two_wheeler', 'commercial_vehicle', 'luxury', 'suv'])
   category?: string;
-
-  @ApiPropertyOptional({
-    description: 'Filter by region',
-    enum: [
-      'Asia',
-      'Europe',
-      'North America',
-      'South America',
-      'Africa',
-      'Oceania',
-    ],
-    example: 'Asia',
-  })
-  @IsOptional()
-  @IsIn([
-    'Asia',
-    'Europe',
-    'North America',
-    'South America',
-    'Africa',
-    'Oceania',
-  ])
-  region?: string;
 }
