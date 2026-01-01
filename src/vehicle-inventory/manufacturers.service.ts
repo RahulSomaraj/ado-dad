@@ -293,6 +293,7 @@ export class ManufacturersService {
     filters: FilterManufacturerDto,
   ): Promise<PaginatedManufacturerResponseDto> {
     const query: any = { isDeleted: false };
+    console.log(filters);
 
     if (filters.search && filters.search.trim()) {
       const searchTerm = filters.search
@@ -306,6 +307,12 @@ export class ManufacturersService {
         { vehicleCategory: regex },
       ];
     }
+
+    if (filters.isActive !== undefined && filters.isActive !== null) {
+      query.isActive = filters.isActive;
+    }
+
+    console.log(query);
 
     const manufacturers = await this.manufacturerModel
       .find(query)

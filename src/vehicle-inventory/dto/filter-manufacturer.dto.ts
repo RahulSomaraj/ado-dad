@@ -6,7 +6,7 @@ import {
   IsBoolean,
   IsIn,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class FilterManufacturerDto {
   @ApiPropertyOptional({
@@ -18,20 +18,12 @@ export class FilterManufacturerDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({
-    description: 'Filter by active status',
-    example: true,
-  })
+  @ApiPropertyOptional({})
   @IsOptional()
   @Transform(({ value }) => {
-    if (value === undefined || value === null || value === '') return undefined;
-    if (typeof value === 'boolean') return value;
-
-    const str = String(value).toLowerCase();
-    if (str === 'true' || str === '1') return true;
-    if (str === 'false' || str === '0') return false;
-
-    return undefined;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
   })
   @IsBoolean()
   isActive?: boolean;
@@ -101,6 +93,11 @@ export class FilterManufacturerDto {
     example: 'passenger_car',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    return value;
+  })
+  @IsString()
   @IsIn(['passenger_car', 'two_wheeler', 'commercial_vehicle', 'luxury', 'suv'])
   category?: string;
 }

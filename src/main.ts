@@ -172,10 +172,10 @@ async function bootstrap() {
   // (e) Global pipes, logging, etc.
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transformOptions: { enableImplicitConversion: true },
+      // transform: true,
+      // whitelist: true,
+      // forbidNonWhitelisted: true,
+      // transformOptions: { enableImplicitConversion: true },
       skipMissingProperties: true,
     }),
   );
