@@ -45,6 +45,8 @@ export class AuthService {
       // Trim username but don't convert to lowercase (phone numbers need to preserve + prefix)
       const trimmedUsername = username.trim();
 
+      console.log('trimmedUsername', trimmedUsername);
+
       // Find user with optimized query
       const user = await this.findUserByCredentials(trimmedUsername);
 
@@ -95,7 +97,7 @@ export class AuthService {
         email: identifier.toLowerCase(),
         isDeleted: { $ne: true },
       };
-      console.log('Email query:', query);
+      this.logger.debug('Email query:', query);
       return this.userModel
         .findOne(query)
         .select('+password +otp +isDeleted')
@@ -115,7 +117,7 @@ export class AuthService {
         phoneNumber: parsed.phoneNumber,
         isDeleted: { $ne: true },
       };
-      console.log('Phone query:', query);
+      this.logger.debug('Phone query:', query);
       return this.userModel
         .findOne(query)
         .select('+password +otp +isDeleted')
@@ -124,11 +126,24 @@ export class AuthService {
     }
 
     // Fallback: search by phoneNumber only (for backward compatibility)
+    // Try to extract just the phone number part (remove country code if present)
+    let phoneNumberOnly = identifier;
+    // Remove country code if present (e.g., +91, 91, +971, etc.)
+    // Pattern: optional +, 1-4 digits (country code), followed by phone number
+    const phoneCodeMatch = identifier.match(/^\+?(\d{1,4})(\d+)$/);
+    if (phoneCodeMatch) {
+      // Extract just the phone number part (after country code)
+      phoneNumberOnly = phoneCodeMatch[2];
+    } else {
+      // If no country code pattern, remove all non-digits
+      phoneNumberOnly = identifier.replace(/\D/g, '');
+    }
+
     const query = {
-      phoneNumber: identifier,
+      phoneNumber: phoneNumberOnly,
       isDeleted: { $ne: true },
     };
-    console.log('Fallback query:', query);
+    this.logger.debug('Fallback query:', query);
     return this.userModel
       .findOne(query)
       .select('+password +otp +isDeleted')

@@ -212,15 +212,15 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: 'User found successfully',
-      schema: {
-        example: {
-          _id: '507f1f77bcf86cd799439011',
-          name: 'John Doe',
-          email: 'john@example.com',
-          type: 'NU',
-          createdAt: '2024-01-15T10:30:00.000Z',
-        },
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'John Doe',
+        email: 'john@example.com',
+        type: 'NU',
+        createdAt: '2024-01-15T10:30:00.000Z',
       },
+    },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserByIdPublic(@Param('id') id: string) {
