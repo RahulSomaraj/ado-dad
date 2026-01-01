@@ -109,6 +109,7 @@ export class AuthService {
     const { parsePhoneNumber } =
       await import('../common/utils/phone-validator.util');
     const parsed = parsePhoneNumber(identifier);
+    console.log('parsed', parsed);
 
     if (parsed) {
       // If phone number is successfully parsed, search by countryCode + phoneNumber
@@ -179,6 +180,7 @@ export class AuthService {
    */
   private sanitizeUserData(user: User): UserValidationResult {
     const { password, otp, otpExpires, ...sanitizedUser } = user;
+    console.log('sanitizedUser', sanitizedUser);
     return sanitizedUser as UserValidationResult;
   }
 

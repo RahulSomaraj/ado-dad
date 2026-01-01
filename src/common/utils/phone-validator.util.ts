@@ -118,55 +118,65 @@ export function parsePhoneNumber(fullNumber: string): {
 
     // Try to parse as international number
     const parsedNumber = phoneUtil.parse(cleaned, 'ZZ'); // 'ZZ' means unknown region
-    console.log('parsedNumber', parsedNumber);
 
-    if (!phoneUtil.isValidNumber(parsedNumber)) {
-      // If parsing as international fails, try to extract country code manually
-      // Default: assume India (+91) if starts with +91 or just 10 digits
-      if (cleaned.startsWith('+91') || cleaned.startsWith('91')) {
-        const phoneNumber = cleaned.replace(/^\+?91/, '');
-        if (phoneNumber.length === 10) {
-          return { countryCode: '+91', phoneNumber };
+    // Try to get country code from parsed number (even if not strictly valid)
+    // We still want to extract the country code and number for login/lookup purposes
+    try {
+      // Get the country calling code directly from the parsed number
+      const countryCallingCode = parsedNumber.getCountryCode();
+      const nationalNumber = parsedNumber.getNationalNumber()?.toString() || '';
+      
+      if (countryCallingCode && nationalNumber) {
+        // Try to get region code for better accuracy (preferred method)
+        try {
+          const regionCode = phoneUtil.getRegionCodeForNumber(parsedNumber);
+          
+          if (regionCode) {
+            // Convert ISO country code to phone code with + prefix (e.g., 'IN' -> '+91')
+            const phoneCode = isoCodeToPhoneCode(regionCode);
+            if (phoneCode) {
+              return {
+                countryCode: phoneCode, // Return phone code with + prefix (e.g., '+91', '+971')
+                phoneNumber: nationalNumber,
+              };
+            }
+          }
+        } catch (regionError) {
+          // Region code lookup failed, use country calling code directly
         }
+        
+        // If region code lookup fails, use the country calling code directly
+        return {
+          countryCode: `+${countryCallingCode}`, // Return phone code with + prefix
+          phoneNumber: nationalNumber,
+        };
       }
+    } catch (extractionError) {
+      // If extraction fails, continue to fallback logic
+    }
 
-      // If it's just digits and 10 long, assume India
-      const digits = cleaned.replace(/\D/g, '');
-      if (
-        digits.length === 10 &&
-        (digits.startsWith('6') ||
-          digits.startsWith('7') ||
-          digits.startsWith('8') ||
-          digits.startsWith('9'))
-      ) {
-        return { countryCode: '+91', phoneNumber: digits };
+    // If region code extraction fails, try to extract country code manually
+    // Default: assume India (+91) if starts with +91 or just 10 digits
+    if (cleaned.startsWith('+91') || cleaned.startsWith('91')) {
+      const phoneNumber = cleaned.replace(/^\+?91/, '');
+      if (phoneNumber.length === 10) {
+        return { countryCode: '+91', phoneNumber };
       }
-
-      return null;
     }
 
-    // Get country code from parsed number
-    const regionCode = phoneUtil.getRegionCodeForNumber(parsedNumber);
-    if (!regionCode) {
-      return null;
+    // If it's just digits and 10 long, assume India
+    const digits = cleaned.replace(/\D/g, '');
+    if (
+      digits.length === 10 &&
+      (digits.startsWith('6') ||
+        digits.startsWith('7') ||
+        digits.startsWith('8') ||
+        digits.startsWith('9'))
+    ) {
+      return { countryCode: '+91', phoneNumber: digits };
     }
 
-    // Convert ISO country code to phone code with + prefix (e.g., 'IN' -> '+91')
-    const phoneCode = isoCodeToPhoneCode(regionCode);
-    if (!phoneCode) {
-      return null;
-    }
-
-    // Get national number (without country code)
-    const nationalNumber = parsedNumber.getNationalNumber()?.toString() || '';
-
-    console.log('regionCode', regionCode);
-    console.log('phoneCode', phoneCode);
-    console.log('nationalNumber', nationalNumber);
-    return {
-      countryCode: phoneCode, // Return phone code with + prefix (e.g., '+91', '+971')
-      phoneNumber: nationalNumber,
-    };
+    return null;
   } catch (error) {
     // Fallback: try to extract India number
     const cleaned = fullNumber.replace(/[\s\-\(\)]/g, '');
