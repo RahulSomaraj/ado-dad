@@ -312,6 +312,11 @@ export class ManufacturersService {
       query.isActive = filters.isActive;
     }
 
+    if (filters.category) {
+      const categoryFilter = this.getCategoryFilter(filters.category);
+      Object.assign(query, categoryFilter);
+    }
+
     console.log(query);
 
     const manufacturers = await this.manufacturerModel
