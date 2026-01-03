@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsEmail,
@@ -20,11 +20,11 @@ import {
 const supportedPhoneCodes = getSupportedPhoneCodes();
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'John Doe' })
+  @ApiPropertyOptional({ example: 'John Doe' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   name: string;
-
   @ApiProperty({
     example: '+91',
     description: 'Phone country code with + prefix (e.g., +91, +971, +1)',
@@ -49,9 +49,12 @@ export class CreateUserDto {
   // @IsPhoneNumberWithCountry('+91', {
   //   message: 'Invalid phone number format',
   // })
-  @IsNumberString({ no_symbols: true }, { 
-    message: 'Phone number must contain only numbers' 
-  })
+  @IsNumberString(
+    { no_symbols: true },
+    {
+      message: 'Phone number must contain only numbers',
+    },
+  )
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })
@@ -110,9 +113,12 @@ export class CreateUserWithFileDto {
   // @IsPhoneNumberWithCountry('+91', {
   //   message: 'Invalid phone number format',
   // })
-  @IsNumberString({ no_symbols: true }, { 
-    message: 'Phone number must contain only numbers' 
-  })
+  @IsNumberString(
+    { no_symbols: true },
+    {
+      message: 'Phone number must contain only numbers',
+    },
+  )
   phoneNumber: string;
 
   @ApiProperty({ example: 'john@example.com' })

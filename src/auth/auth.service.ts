@@ -160,6 +160,12 @@ export class AuthService {
     user: User,
   ): Promise<boolean> {
     try {
+      // Check if user has a password
+      if (!user.password) {
+        this.logger.warn(`User ${user.email} has no password set`);
+        return false;
+      }
+
       // Check if password matches hashed password
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (isPasswordValid) {

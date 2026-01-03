@@ -220,428 +220,47 @@ export class VehicleInventoryService {
   async findVehicleModelsWithFilters(
     filters: FilterVehicleModelDto,
   ): Promise<PaginatedVehicleModelResponseDto> {
-    // cache
-    const normalize = (obj: any): any => {
-      if (obj == null) return obj;
-      if (Array.isArray(obj)) return obj.map(normalize);
-      if (typeof obj === 'object') {
-        const entries = Object.entries(obj)
-          .filter(([, v]) => v !== undefined && v !== null && v !== '')
-          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-          .map(([k, v]) => [k, normalize(v)]);
-        return Object.fromEntries(entries);
-      }
-      return obj;
-    };
-    // Bump cache key version to avoid serving older cached payloads that missed manufacturer join
-    const cacheKey = `vi:models:list:v2:${JSON.stringify(normalize(filters))}`;
-    const cached =
-      await this.redisService.cacheGet<PaginatedVehicleModelResponseDto>(
-        cacheKey,
-      );
-    if (cached) return cached;
-    const {
-      page = 1,
-      limit = 20,
-      sortBy = 'createdAt', // Changed default to createdAt for newest first
-      sortOrder = 'DESC', // DESC for newest first
-    } = filters;
+    const query: any = { isDeleted: false };
 
-    // Convert string parameters to numbers
-    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
-    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
-
-    // Build the aggregation pipeline
-    const pipeline: any[] = [];
-
-    // Handle search (matches anywhere in the string, case insensitive)
     if (filters.search && filters.search.trim()) {
       const searchTerm = filters.search
         .trim()
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(searchTerm, 'i');
-      pipeline.push({
-        $match: {
-          $or: [{ name: regex }, { displayName: regex }],
-        },
-      });
+      query.$or = [
+        { name: regex },
+        { displayName: regex },
+        { description: regex },
+      ];
     }
 
-    // Add basic filters
-    const matchStage: any = { isDeleted: false };
-    if (!filters.includeInactive) {
-      matchStage.isActive = true;
+    if (filters.isActive !== undefined && filters.isActive !== null) {
+      query.isActive = filters.isActive;
     }
 
     if (filters.manufacturerId) {
-      // Validate ObjectId format before converting
-      if (!Types.ObjectId.isValid(filters.manufacturerId)) {
-        throw new BadRequestException(
-          `Invalid manufacturerId format: ${filters.manufacturerId}. Expected a valid MongoDB ObjectId.`,
-        );
-      }
-      // Manufacturer is stored as string in DB, match as string directly
-      // Also support ObjectId format in case some documents have it stored as ObjectId
-      const manufacturerIdObj = new Types.ObjectId(filters.manufacturerId);
-      // Combine base filters with manufacturer filter using $and
-      const baseFilters: any = { isDeleted: false };
-      if (matchStage.isActive) {
-        baseFilters.isActive = true;
-      }
-      matchStage.$and = [
-        baseFilters,
-        {
-          $or: [
-            { manufacturer: filters.manufacturerId },
-            { manufacturer: manufacturerIdObj },
-          ],
-        },
-      ];
-      // Remove base filters since they're now in $and
-      delete matchStage.isDeleted;
-      delete matchStage.isActive;
+      query.manufacturer = filters.manufacturerId;
     }
 
-    if (filters.vehicleType) {
-      if (matchStage.$and) {
-        matchStage.$and.push({ vehicleType: filters.vehicleType });
-      } else {
-        matchStage.vehicleType = filters.vehicleType;
-      }
-    }
+    const models = await this.vehicleModelModel
+      .find(query)
+      .collation({ locale: 'en', strength: 2 })
+      .sort({ name: 1 })
+      .lean()
+      .exec();
 
-    if (filters.segment && filters.segment.trim() !== '') {
-      const segmentFilter = {
-        segment: { $regex: filters.segment, $options: 'i' },
-      };
-      if (matchStage.$and) {
-        matchStage.$and.push(segmentFilter);
-      } else {
-        matchStage.segment = segmentFilter.segment;
-      }
-    }
-
-    if (filters.bodyType && filters.bodyType.trim() !== '') {
-      const bodyTypeFilter = {
-        bodyType: { $regex: filters.bodyType, $options: 'i' },
-      };
-      if (matchStage.$and) {
-        matchStage.$and.push(bodyTypeFilter);
-      } else {
-        matchStage.bodyType = bodyTypeFilter.bodyType;
-      }
-    }
-
-    if (
-      filters.minLaunchYear !== undefined ||
-      filters.maxLaunchYear !== undefined
-    ) {
-      const launchYearFilter: any = {};
-      if (filters.minLaunchYear !== undefined) {
-        launchYearFilter.$gte = filters.minLaunchYear;
-      }
-      if (filters.maxLaunchYear !== undefined) {
-        launchYearFilter.$lte = filters.maxLaunchYear;
-      }
-      if (matchStage.$and) {
-        matchStage.$and.push({ launchYear: launchYearFilter });
-      } else {
-        matchStage.launchYear = launchYearFilter;
-      }
-    }
-
-    if (filters.isActive !== undefined) {
-      if (matchStage.$and) {
-        matchStage.$and.push({ isActive: filters.isActive });
-      } else {
-        matchStage.isActive = filters.isActive;
-      }
-    }
-
-    // Debug logging removed to reduce noise in production
-
-    pipeline.push({ $match: matchStage });
-
-    // Get total count BEFORE any lookups or transformations
-    const countPipelineBeforeLookups = [...pipeline, { $count: 'total' }];
-    const countResultBeforeLookups = await this.vehicleModelModel.aggregate(
-      countPipelineBeforeLookups,
-    );
-    const totalBeforeLookups =
-      countResultBeforeLookups.length > 0
-        ? (countResultBeforeLookups[0] as { total: number }).total
-        : 0;
-
-    // Normalize manufacturer to ObjectId so the lookup always works
-    pipeline.push({
-      $addFields: {
-        manufacturer: {
-          $cond: [
-            { $eq: [{ $type: '$manufacturer' }, 'string'] }, // if it's a string
-            { $toObjectId: '$manufacturer' }, // convert to ObjectId
-            '$manufacturer', // otherwise leave as-is
-          ],
-        },
-      },
-    });
-
-    // Add manufacturer lookup
-    pipeline.push({
-      $lookup: {
-        from: 'manufacturers',
-        localField: 'manufacturer',
-        foreignField: '_id',
-        as: 'manufacturer',
-      },
-    });
-
-    pipeline.push({
-      $unwind: { path: '$manufacturer', preserveNullAndEmptyArrays: true },
-    });
-
-    // Add manufacturer filters
-    const manufacturerMatchStage: any = {};
-
-    if (filters.manufacturerName && filters.manufacturerName.trim() !== '') {
-      manufacturerMatchStage['manufacturer.name'] = {
-        $regex: filters.manufacturerName,
-        $options: 'i',
-      };
-    }
-
-    if (
-      filters.manufacturerCountry &&
-      filters.manufacturerCountry.trim() !== ''
-    ) {
-      manufacturerMatchStage['manufacturer.originCountry'] = {
-        $regex: filters.manufacturerCountry,
-        $options: 'i',
-      };
-    }
-
-    if (filters.manufacturerCategory) {
-      // Note: Manufacturer category filtering is now handled by ManufacturersService
-      // This would need to be implemented as a separate lookup or moved to a different approach
-      console.warn(
-        'Manufacturer category filtering is deprecated in VehicleInventoryService',
-      );
-    }
-
-    if (filters.manufacturerRegion) {
-      // Note: Manufacturer region filtering is now handled by ManufacturersService
-      // This would need to be implemented as a separate lookup or moved to a different approach
-      console.warn(
-        'Manufacturer region filtering is deprecated in VehicleInventoryService',
-      );
-    }
-
-    if (Object.keys(manufacturerMatchStage).length > 0) {
-      pipeline.push({ $match: manufacturerMatchStage });
-    }
-
-    // Add variant lookup for advanced filtering
-    pipeline.push({
-      $lookup: {
-        from: 'vehiclevariants',
-        localField: '_id',
-        foreignField: 'vehicleModel',
-        as: 'variants',
-      },
-    });
-
-    // Add fuel type lookup
-    pipeline.push({
-      $lookup: {
-        from: 'fueltypes',
-        localField: 'variants.fuelType',
-        foreignField: '_id',
-        as: 'fuelTypes',
-      },
-    });
-
-    // Add transmission type lookup
-    pipeline.push({
-      $lookup: {
-        from: 'transmissiontypes',
-        localField: 'variants.transmissionType',
-        foreignField: '_id',
-        as: 'transmissionTypes',
-      },
-    });
-
-    // Add variant-based filters ONLY if there are actual filters to apply
-    const variantMatchStage: any = {};
-    let hasVariantFilters = false;
-
-    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-      variantMatchStage['variants.price'] = {};
-      if (filters.minPrice !== undefined) {
-        variantMatchStage['variants.price'].$gte = filters.minPrice;
-      }
-      if (filters.maxPrice !== undefined) {
-        variantMatchStage['variants.price'].$lte = filters.maxPrice;
-      }
-      hasVariantFilters = true;
-    }
-
-    if (filters.fuelType && filters.fuelType.trim() !== '') {
-      variantMatchStage['fuelTypes.name'] = {
-        $regex: filters.fuelType,
-        $options: 'i',
-      };
-      hasVariantFilters = true;
-    }
-
-    if (filters.transmissionType && filters.transmissionType.trim() !== '') {
-      variantMatchStage['transmissionTypes.name'] = {
-        $regex: filters.transmissionType,
-        $options: 'i',
-      };
-      hasVariantFilters = true;
-    }
-
-    if (filters.featurePackage && filters.featurePackage.trim() !== '') {
-      variantMatchStage['variants.featurePackage'] = filters.featurePackage;
-      hasVariantFilters = true;
-    }
-
-    if (
-      filters.minSeatingCapacity !== undefined ||
-      filters.maxSeatingCapacity !== undefined
-    ) {
-      variantMatchStage['variants.seatingCapacity'] = {};
-      if (filters.minSeatingCapacity !== undefined) {
-        variantMatchStage['variants.seatingCapacity'].$gte =
-          filters.minSeatingCapacity;
-      }
-      if (filters.maxSeatingCapacity !== undefined) {
-        variantMatchStage['variants.seatingCapacity'].$lte =
-          filters.maxSeatingCapacity;
-      }
-      hasVariantFilters = true;
-    }
-
-    if (
-      filters.minEngineCapacity !== undefined ||
-      filters.maxEngineCapacity !== undefined
-    ) {
-      variantMatchStage['variants.engineSpecs.capacity'] = {};
-      if (filters.minEngineCapacity !== undefined) {
-        variantMatchStage['variants.engineSpecs.capacity'].$gte =
-          filters.minEngineCapacity;
-      }
-      if (filters.maxEngineCapacity !== undefined) {
-        variantMatchStage['variants.engineSpecs.capacity'].$lte =
-          filters.maxEngineCapacity;
-      }
-      hasVariantFilters = true;
-    }
-
-    if (filters.minMileage !== undefined || filters.maxMileage !== undefined) {
-      variantMatchStage['variants.performanceSpecs.mileage'] = {};
-      if (filters.minMileage !== undefined) {
-        variantMatchStage['variants.performanceSpecs.mileage'].$gte =
-          filters.minMileage;
-      }
-      if (filters.maxMileage !== undefined) {
-        variantMatchStage['variants.performanceSpecs.mileage'].$lte =
-          filters.maxMileage;
-      }
-      hasVariantFilters = true;
-    }
-
-    if (filters.turbocharged !== undefined) {
-      variantMatchStage['variants.engineSpecs.turbocharged'] =
-        filters.turbocharged;
-      hasVariantFilters = true;
-    }
-
-    // Add feature-based filters
-    const featureFilters = this.getFeatureFilters(filters);
-    if (Object.keys(featureFilters).length > 0) {
-      Object.assign(variantMatchStage, featureFilters);
-      hasVariantFilters = true;
-    }
-
-    // Only apply variant match stage if we have actual filters
-    if (hasVariantFilters) {
-      pipeline.push({ $match: variantMatchStage });
-    }
-
-    // Add computed fields
-    pipeline.push({
-      $addFields: {
-        variantCount: { $size: '$variants' },
-        priceRange: {
-          min: { $min: '$variants.price' },
-          max: { $max: '$variants.price' },
-        },
-        availableFuelTypes: { $setUnion: '$fuelTypes.name' },
-        availableTransmissionTypes: { $setUnion: '$transmissionTypes.name' },
-        // Include model-level fuel types and transmission types
-        fuelTypes: { $ifNull: ['$fuelTypes', []] },
-        transmissionTypes: { $ifNull: ['$transmissionTypes', []] },
-      },
-    });
-
-    // Only apply variant filter if we have actual variant-based filters
-    if (hasVariantFilters) {
-      pipeline.push({
-        $match: {
-          variantCount: { $gt: 0 },
-        },
-      });
-    }
-
-    // Get total count before pagination
-    // Use the count before lookups for accuracy - this matches what Compass shows
-    const total = totalBeforeLookups;
-
-    // Add sorting
-    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-    let sortField = sortBy;
-
-    // Handle nested sorting for manufacturer fields
-    if (sortBy.startsWith('manufacturer.')) {
-      sortField = sortBy;
-    }
-
-    pipeline.push({ $sort: { [sortField]: sortDirection } });
-
-    // Add pagination
-    pipeline.push({ $skip: (pageNum - 1) * limitNum });
-    pipeline.push({ $limit: limitNum });
-
-    // Clean up the output
-    pipeline.push({
-      $project: {
-        variants: 0, // Remove variants array from final output
-        // Keep the computed fuelTypes and transmissionTypes fields
-        // Remove the lookup fuelTypes and transmissionTypes arrays
-        'fuelTypes.name': 0,
-        'transmissionTypes.name': 0,
-      },
-    });
-
-    // Execute the main query
-    const vehicleModels = await this.vehicleModelModel.aggregate(pipeline);
-
-    // Calculate pagination info
-    const totalPages = Math.ceil(total / limitNum);
-    const hasNext = pageNum < totalPages;
-    const hasPrev = pageNum > 1;
+    const total = models.length;
 
     const response: PaginatedVehicleModelResponseDto = {
-      data: vehicleModels,
+      data: models as any,
       total,
-      page: pageNum,
-      limit: limitNum,
-      totalPages,
-      hasNext,
-      hasPrev,
+      page: 1,
+      limit: total,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false,
     };
 
-    await this.redisService.cacheSet(cacheKey, response, 180);
     return response;
   }
 

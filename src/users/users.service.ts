@@ -459,6 +459,8 @@ export class UsersService {
           normalized = '+' + normalized.replace(/^\+/, '');
         }
         userData.countryCode = normalized;
+      } else {
+        userData.countryCode = '+91';
       }
 
       // Validate input data
