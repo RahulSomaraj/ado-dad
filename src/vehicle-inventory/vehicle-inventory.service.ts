@@ -59,7 +59,7 @@ export class VehicleInventoryService {
     private readonly transmissionTypeModel: Model<TransmissionTypeDocument>,
     private readonly redisService: RedisService,
     private readonly manufacturersService: ManufacturersService,
-  ) {}
+  ) { }
 
   // ---- helpers ------------------------------------------------------------
   private key(parts: Record<string, unknown>): string {
@@ -244,6 +244,7 @@ export class VehicleInventoryService {
 
     const models = await this.vehicleModelModel
       .find(query)
+      .populate('manufacturer', 'name displayName logo')
       .collation({ locale: 'en', strength: 2 })
       .sort({ name: 1 })
       .lean()
@@ -1442,9 +1443,9 @@ export class VehicleInventoryService {
     const parseArray = (v: any) =>
       v
         ? String(v)
-            .split(',')
-            .map((i) => i.trim())
-            .filter(Boolean)
+          .split(',')
+          .map((i) => i.trim())
+          .filter(Boolean)
         : [];
 
     for (const [idx, row] of uniqueRows.entries()) {
@@ -1526,12 +1527,12 @@ export class VehicleInventoryService {
 
         features: row.featuresJson
           ? (() => {
-              try {
-                return JSON.parse(row.featuresJson);
-              } catch {
-                return undefined;
-              }
-            })()
+            try {
+              return JSON.parse(row.featuresJson);
+            } catch {
+              return undefined;
+            }
+          })()
           : undefined,
 
         isActive: parseBool(row.isActive, true),
@@ -1592,9 +1593,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: validVariants[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: validVariants[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);
@@ -1640,8 +1641,8 @@ export class VehicleInventoryService {
     }
     const normalizedId =
       typeof id === 'string' &&
-      id.trim().toLowerCase() !== 'undefined' &&
-      id.trim().toLowerCase() !== 'null'
+        id.trim().toLowerCase() !== 'undefined' &&
+        id.trim().toLowerCase() !== 'null'
         ? id.trim()
         : '';
 
@@ -1785,9 +1786,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: validModels[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: validModels[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);
