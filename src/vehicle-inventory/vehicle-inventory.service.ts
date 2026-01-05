@@ -220,6 +220,13 @@ export class VehicleInventoryService {
   async findVehicleModelsWithFilters(
     filters: FilterVehicleModelDto,
   ): Promise<PaginatedVehicleModelResponseDto> {
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'name',
+      sortOrder = 'ASC',
+    } = filters;
+
     const query: any = { isDeleted: false };
 
     if (filters.search && filters.search.trim()) {
@@ -242,24 +249,35 @@ export class VehicleInventoryService {
       query.manufacturer = filters.manufacturerId;
     }
 
-    const models = await this.vehicleModelModel
-      .find(query)
-      .populate('manufacturer', 'name displayName logo')
-      .collation({ locale: 'en', strength: 2 })
-      .sort({ name: 1 })
-      .lean()
-      .exec();
+    // Determine sort
+    const sort: any = {};
+    if (sortBy) {
+      sort[sortBy] = sortOrder === 'DESC' ? -1 : 1;
+    }
 
-    const total = models.length;
+    const [models, total] = await Promise.all([
+      this.vehicleModelModel
+        .find(query)
+        .populate('manufacturer', 'name displayName logo')
+        .collation({ locale: 'en', strength: 2 })
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.vehicleModelModel.countDocuments(query).exec(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
 
     const response: PaginatedVehicleModelResponseDto = {
       data: models as any,
       total,
-      page: 1,
-      limit: total,
-      totalPages: 1,
-      hasNext: false,
-      hasPrev: false,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
     };
 
     return response;

@@ -80,27 +80,7 @@ export class VehicleInventoryController {
 
   @Get('models')
   async findAllVehicleModels(@Query() filters: FilterVehicleModelDto) {
-    // Check if any filters are provided
-    const hasFilters = Object.keys(filters).some(
-      (key) => filters[key] !== undefined,
-    );
-
-    if (hasFilters) {
-      return this.vehicleInventoryService.findVehicleModelsWithFilters(filters);
-    } else {
-      // Return simple list if no filters
-      const vehicleModels =
-        await this.vehicleInventoryService.findAllVehicleModels();
-      return {
-        data: vehicleModels,
-        total: vehicleModels.length,
-        page: 1,
-        limit: vehicleModels.length,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      };
-    }
+    return this.vehicleInventoryService.findVehicleModelsWithFilters(filters);
   }
 
   @Get('models/debug')
