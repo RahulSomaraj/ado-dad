@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { VehicleVariant } from '../schemas/vehicle-variant.schema';
+import { VehicleVariant, EngineSpecs, PerformanceSpecs } from '../schemas/vehicle-variant.schema';
 
 export class PaginatedVehicleVariantResponseDto {
   @ApiProperty({ description: 'Array of vehicle variants' })
-  data: VehicleVariant[];
+  data: any[];
 
   @ApiProperty({ description: 'Total number of variants' })
   total: number;
