@@ -2577,13 +2577,40 @@ export class AdsService {
       processedVehicleDetails = {
         ...vehicleDetails,
         ...(manufacturer && {
-          manufacturer: this.removeNullValues(manufacturer),
+          manufacturer: {
+            id: (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
+            name: (manufacturer as any).name,
+            country: (manufacturer as any).originCountry,
+          },
         }),
-        ...(model && { model: this.removeNullValues(model) }),
-        ...(cleanedVariant && { variant: cleanedVariant }),
-        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(model && {
+          model: {
+            id: (model as any)._id?.toString() ?? (model as any).id,
+            name: (model as any).name,
+            manufacturerId: (model as any).manufacturer?.toString(),
+          },
+        }),
+        ...(cleanedVariant && {
+          variant: {
+            id: (cleanedVariant as any)._id?.toString() ?? (cleanedVariant as any).id,
+            name: (cleanedVariant as any).name,
+            modelId: (cleanedVariant as any).vehicleModel?.toString(),
+            price: (cleanedVariant as any).price,
+          },
+        }),
+        ...(fuelType && {
+          fuelType: {
+            id: (fuelType as any)._id?.toString() ?? (fuelType as any).id,
+            name: (fuelType as any).name,
+            description: (fuelType as any).description,
+          },
+        }),
         ...(transmissionType && {
-          transmissionType: this.removeNullValues(transmissionType),
+          transmissionType: {
+            id: (transmissionType as any)._id?.toString() ?? (transmissionType as any).id,
+            name: (transmissionType as any).name,
+            description: (transmissionType as any).description,
+          },
         }),
       };
     }
@@ -2601,50 +2628,50 @@ export class AdsService {
         await Promise.all([
           commercialVehicleDetails.manufacturerId
             ? this.vehicleInventoryService
-                .findManufacturerById(commercialVehicleDetails.manufacturerId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.manufacturerId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findManufacturerById(commercialVehicleDetails.manufacturerId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.manufacturerId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.modelId
             ? this.vehicleInventoryService
-                .findVehicleModelById(commercialVehicleDetails.modelId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.modelId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleModelById(commercialVehicleDetails.modelId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.modelId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.variantId
             ? this.vehicleInventoryService
-                .findVehicleVariantById(commercialVehicleDetails.variantId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.variantId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findVehicleVariantById(commercialVehicleDetails.variantId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.variantId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.fuelTypeId
             ? this.vehicleInventoryService
-                .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
-                .catch(() => ({
-                  _id: commercialVehicleDetails.fuelTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.fuelTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.transmissionTypeId
             ? this.vehicleInventoryService
-                .findTransmissionTypeById(
-                  commercialVehicleDetails.transmissionTypeId,
-                )
-                .catch(() => ({
-                  _id: commercialVehicleDetails.transmissionTypeId,
-                  name: 'Not Found',
-                  displayName: 'Not Found',
-                }))
+              .findTransmissionTypeById(
+                commercialVehicleDetails.transmissionTypeId,
+              )
+              .catch(() => ({
+                _id: commercialVehicleDetails.transmissionTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
             : Promise.resolve(undefined),
         ]);
 
@@ -2669,13 +2696,40 @@ export class AdsService {
       processedCommercialVehicleDetails = {
         ...commercialVehicleDetails,
         ...(manufacturer && {
-          manufacturer: this.removeNullValues(manufacturer),
+          manufacturer: {
+            id: (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
+            name: (manufacturer as any).name,
+            country: (manufacturer as any).originCountry,
+          },
         }),
-        ...(model && { model: this.removeNullValues(model) }),
-        ...(cleanedVariant && { variant: cleanedVariant }),
-        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(model && {
+          model: {
+            id: (model as any)._id?.toString() ?? (model as any).id,
+            name: (model as any).name,
+            manufacturerId: (model as any).manufacturer?.toString(),
+          },
+        }),
+        ...(cleanedVariant && {
+          variant: {
+            id: (cleanedVariant as any)._id?.toString() ?? (cleanedVariant as any).id,
+            name: (cleanedVariant as any).name,
+            modelId: (cleanedVariant as any).vehicleModel?.toString(),
+            price: (cleanedVariant as any).price,
+          },
+        }),
+        ...(fuelType && {
+          fuelType: {
+            id: (fuelType as any)._id?.toString() ?? (fuelType as any).id,
+            name: (fuelType as any).name,
+            description: (fuelType as any).description,
+          },
+        }),
         ...(transmissionType && {
-          transmissionType: this.removeNullValues(transmissionType),
+          transmissionType: {
+            id: (transmissionType as any)._id?.toString() ?? (transmissionType as any).id,
+            name: (transmissionType as any).name,
+            description: (transmissionType as any).description,
+          },
         }),
       };
     }
