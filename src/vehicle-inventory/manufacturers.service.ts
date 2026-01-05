@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import type { PipelineStage, Query, SortOrder } from 'mongoose';
+import type { PipelineStage, Query, SortOrder, FilterQuery } from 'mongoose';
 import {
   Manufacturer,
   ManufacturerDocument,
@@ -292,9 +292,9 @@ export class ManufacturersService {
   async findManufacturersWithFilters(
     filters: FilterManufacturerDto,
   ): Promise<PaginatedManufacturerResponseDto> {
-    const query: any = { isDeleted: false };
-    console.log(filters);
+    const query: FilterQuery<ManufacturerDocument> = { isDeleted: false };
 
+    // Search filter
     if (filters.search && filters.search.trim()) {
       const searchTerm = filters.search
         .trim()
@@ -308,35 +308,76 @@ export class ManufacturersService {
       ];
     }
 
+    // IsActive filter
     if (filters.isActive !== undefined && filters.isActive !== null) {
       query.isActive = filters.isActive;
     }
 
+    // Category filter
     if (filters.category) {
       const categoryFilter = this.getCategoryFilter(filters.category);
       Object.assign(query, categoryFilter);
     }
 
-    console.log(query);
+    // Sorting
+    const { field: sortBy, dir: sortDir } = this.coerceSort(
+      filters.sortBy,
+      filters.sortOrder,
+    );
+    const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
 
-    const manufacturers = await this.manufacturerModel
-      .find(query)
-      .collation({ locale: 'en', strength: 2 })
-      .sort({ name: 1 })
-      .lean()
-      .exec();
+    // Pagination
+    const limit = this.clamp(filters.limit || 10, 1, 100);
+    const page = this.clamp(filters.page || 1, 1, 1000);
+    const skip = (page - 1) * limit;
 
-    const total = manufacturers.length;
+    // Cache check
+    const cacheKey = this.key({
+      type: 'filtered',
+      query,
+      sort,
+      limit,
+      page,
+    });
+    const cached =
+      await this.redisService.cacheGet<PaginatedManufacturerResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    // Execute query
+    const [total, data] = await Promise.all([
+      this.manufacturerModel.countDocuments(query).exec(),
+      this.manufacturerModel
+        .find(query)
+        .collation({ locale: 'en', strength: 2 })
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
 
     const response: PaginatedManufacturerResponseDto = {
-      data: manufacturers as any,
+      data: data as any,
       total,
-      page: 1,
-      limit: total,
-      totalPages: 1,
-      hasNext: false,
-      hasPrev: false,
+      page,
+      limit,
+      totalPages,
+      hasNext,
+      hasPrev,
     };
+
+    // Cache result
+    await this.redisService.cacheSet(
+      cacheKey,
+      response,
+      ManufacturersService.CACHE_TTL.LIST_SHORT,
+    );
 
     return response;
   }
@@ -539,9 +580,9 @@ export class ManufacturersService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: docs[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: docs[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);
