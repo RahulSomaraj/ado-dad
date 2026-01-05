@@ -991,7 +991,7 @@ export class VehicleInventoryService {
     }
 
     // Add basic filters
-    const matchStage: any = { isActive: true, isDeleted: false };
+    const matchStage: any = { isDeleted: false }; // isActive: true,  removed
 
     if (filters.modelId) {
       // Validate ObjectId format before converting
@@ -1003,7 +1003,7 @@ export class VehicleInventoryService {
       // Support both ObjectId and string comparison (in case data was stored as string)
       const modelIdObj = new Types.ObjectId(filters.modelId);
       matchStage.$and = [
-        { isActive: true, isDeleted: false },
+        { isDeleted: false },// isActive: true, removed
         {
           $or: [
             { vehicleModel: modelIdObj },
