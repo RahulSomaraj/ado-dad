@@ -327,23 +327,9 @@ export class ManufacturersService {
     const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
 
     // Pagination
-    const limit = this.clamp(filters.limit || 10, 1, 100);
+    const limit = this.clamp(filters.limit || 10, 1, 50);
     const page = this.clamp(filters.page || 1, 1, 1000);
     const skip = (page - 1) * limit;
-
-    // Cache check
-    const cacheKey = this.key({
-      type: 'filtered',
-      query,
-      sort,
-      limit,
-      page,
-    });
-    const cached =
-      await this.redisService.cacheGet<PaginatedManufacturerResponseDto>(
-        cacheKey,
-      );
-    if (cached) return cached;
 
     // Execute query
     const [total, data] = await Promise.all([
@@ -380,13 +366,6 @@ export class ManufacturersService {
       hasNext,
       hasPrev,
     };
-
-    // Cache result
-    await this.redisService.cacheSet(
-      cacheKey,
-      response,
-      ManufacturersService.CACHE_TTL.LIST_SHORT,
-    );
 
     return response;
   }
