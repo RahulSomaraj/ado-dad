@@ -128,6 +128,11 @@ web_modules/
 .env.production.local
 .env.local
 
+# Firebase service account credentials (contains secrets)
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+*.firebase.json
+
 # temp directory
 .temp
 .tmp

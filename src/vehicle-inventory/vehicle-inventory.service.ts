@@ -59,7 +59,7 @@ export class VehicleInventoryService {
     private readonly transmissionTypeModel: Model<TransmissionTypeDocument>,
     private readonly redisService: RedisService,
     private readonly manufacturersService: ManufacturersService,
-  ) { }
+  ) {}
 
   // ---- helpers ------------------------------------------------------------
   private key(parts: Record<string, unknown>): string {
@@ -234,11 +234,7 @@ export class VehicleInventoryService {
         .trim()
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(searchTerm, 'i');
-      query.$or = [
-        { name: regex },
-        { displayName: regex },
-        { description: regex },
-      ];
+      query.$or = [{ name: regex }, { displayName: regex }];
     }
 
     if (filters.isActive !== undefined && filters.isActive !== null) {
@@ -1003,7 +999,7 @@ export class VehicleInventoryService {
       // Support both ObjectId and string comparison (in case data was stored as string)
       const modelIdObj = new Types.ObjectId(filters.modelId);
       matchStage.$and = [
-        { isDeleted: false },// isActive: true, removed
+        { isDeleted: false }, // isActive: true, removed
         {
           $or: [
             { vehicleModel: modelIdObj },
@@ -1467,9 +1463,9 @@ export class VehicleInventoryService {
     const parseArray = (v: any) =>
       v
         ? String(v)
-          .split(',')
-          .map((i) => i.trim())
-          .filter(Boolean)
+            .split(',')
+            .map((i) => i.trim())
+            .filter(Boolean)
         : [];
 
     for (const [idx, row] of uniqueRows.entries()) {
@@ -1551,12 +1547,12 @@ export class VehicleInventoryService {
 
         features: row.featuresJson
           ? (() => {
-            try {
-              return JSON.parse(row.featuresJson);
-            } catch {
-              return undefined;
-            }
-          })()
+              try {
+                return JSON.parse(row.featuresJson);
+              } catch {
+                return undefined;
+              }
+            })()
           : undefined,
 
         isActive: parseBool(row.isActive, true),
@@ -1617,9 +1613,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-          row: validVariants[we.index] ?? we.op,
-          reason: we.errmsg || we.message || 'Insert failed',
-        }))
+            row: validVariants[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
         : [];
 
     skipped.push(...skippedFromErrors);
@@ -1665,8 +1661,8 @@ export class VehicleInventoryService {
     }
     const normalizedId =
       typeof id === 'string' &&
-        id.trim().toLowerCase() !== 'undefined' &&
-        id.trim().toLowerCase() !== 'null'
+      id.trim().toLowerCase() !== 'undefined' &&
+      id.trim().toLowerCase() !== 'null'
         ? id.trim()
         : '';
 
@@ -1810,9 +1806,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-          row: validModels[we.index] ?? we.op,
-          reason: we.errmsg || we.message || 'Insert failed',
-        }))
+            row: validModels[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
         : [];
 
     skipped.push(...skippedFromErrors);

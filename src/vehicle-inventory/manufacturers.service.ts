@@ -179,10 +179,7 @@ export class ManufacturersService {
     // Apply collation for case-insensitive sort on name (supported by new index)
     query.collation({ locale: 'en', strength: 2 });
 
-    const data = await query
-      .sort({ name: 1 })
-      .lean()
-      .exec();
+    const data = await query.sort({ name: 1 }).lean().exec();
 
     await this.redisService.cacheSet(
       cacheKey,
@@ -307,7 +304,6 @@ export class ManufacturersService {
       query.$or = [
         { name: regex },
         { displayName: regex },
-        { description: regex },
         { vehicleCategory: regex },
       ];
     }
@@ -357,15 +353,17 @@ export class ManufacturersService {
         // Only apply collation if sorting by a string field where we want case-insensitivity
         // and ideally have an index. 'name' is now covered by { isDeleted: 1, name: 1 } with collation.
         // For date/number fields, avoid collation so standard indexes work efficiently.
-        const stringSortFields = ['name', 'displayName', 'originCountry', 'headquarters', 'vehicleCategory'];
+        const stringSortFields = [
+          'name',
+          'displayName',
+          'originCountry',
+          'headquarters',
+          'vehicleCategory',
+        ];
         if (stringSortFields.includes(sortBy)) {
           q.collation({ locale: 'en', strength: 2 });
         }
-        return q.sort(sort)
-          .skip(skip)
-          .limit(limit)
-          .lean()
-          .exec();
+        return q.sort(sort).skip(skip).limit(limit).lean().exec();
       })(),
     ]);
 
@@ -591,9 +589,9 @@ export class ManufacturersService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-          row: docs[we.index] ?? we.op,
-          reason: we.errmsg || we.message || 'Insert failed',
-        }))
+            row: docs[we.index] ?? we.op,
+            reason: we.errmsg || we.message || 'Insert failed',
+          }))
         : [];
 
     skipped.push(...skippedFromErrors);
