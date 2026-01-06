@@ -187,7 +187,10 @@ export class AuthService {
   private sanitizeUserData(user: User): UserValidationResult {
     const { password, otp, otpExpires, ...sanitizedUser } = user;
     console.log('sanitizedUser', sanitizedUser);
-    return sanitizedUser as UserValidationResult;
+    return {
+      ...sanitizedUser,
+      _id: sanitizedUser._id.toString(),
+    } as UserValidationResult;
   }
 
   /**
