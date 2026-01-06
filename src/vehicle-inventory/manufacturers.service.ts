@@ -172,10 +172,14 @@ export class ManufacturersService {
     const cached = await this.redisService.cacheGet<Manufacturer[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await this.manufacturerModel
+    const query = this.manufacturerModel
       // show ALL non-deleted by default (inactive included)
-      .find({ isDeleted: false })
-      .collation({ locale: 'en', strength: 2 })
+      .find({ isDeleted: false });
+
+    // Apply collation for case-insensitive sort on name (supported by new index)
+    query.collation({ locale: 'en', strength: 2 });
+
+    const data = await query
       .sort({ name: 1 })
       .lean()
       .exec();
@@ -348,14 +352,21 @@ export class ManufacturersService {
     // Execute query
     const [total, data] = await Promise.all([
       this.manufacturerModel.countDocuments(query).exec(),
-      this.manufacturerModel
-        .find(query)
-        .collation({ locale: 'en', strength: 2 })
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
+      (() => {
+        const q = this.manufacturerModel.find(query);
+        // Only apply collation if sorting by a string field where we want case-insensitivity
+        // and ideally have an index. 'name' is now covered by { isDeleted: 1, name: 1 } with collation.
+        // For date/number fields, avoid collation so standard indexes work efficiently.
+        const stringSortFields = ['name', 'displayName', 'originCountry', 'headquarters', 'vehicleCategory'];
+        if (stringSortFields.includes(sortBy)) {
+          q.collation({ locale: 'en', strength: 2 });
+        }
+        return q.sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec();
+      })(),
     ]);
 
     const totalPages = Math.ceil(total / limit);

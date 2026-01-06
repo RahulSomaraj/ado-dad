@@ -40,5 +40,5 @@ export const FirebaseProvider = {
 };
 
 function privateKeyIsValid(key: string): boolean {
-    return key && key.includes('BEGIN PRIVATE KEY') && key.includes('END PRIVATE KEY');
+    return !!(key && key.includes('BEGIN PRIVATE KEY') && key.includes('END PRIVATE KEY'));
 }

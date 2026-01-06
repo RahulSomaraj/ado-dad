@@ -77,3 +77,10 @@ ManufacturerSchema.index({
   originCountry: 'text',
   headquarters: 'text',
 });
+
+// Index for efficient case-insensitive sorting by name (default sort)
+// This matches the query: .find({ isDeleted: false }).sort({ name: 1 }).collation(...)
+ManufacturerSchema.index(
+  { isDeleted: 1, name: 1 },
+  { collation: { locale: 'en', strength: 2 } },
+);
