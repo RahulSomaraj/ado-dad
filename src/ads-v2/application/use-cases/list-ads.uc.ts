@@ -584,9 +584,19 @@ export class ListAdsUc {
     const total = countResult[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
 
-    // Map the data to include vehicle inventory details
-    const mappedData = await Promise.all(
-      data.map((ad) => this.mapToDetailedResponseDto(ad)),
+    // Batch fetch all inventory items to avoid N+1 queries
+    const inventoryMaps = await this.batchFetchInventoryItems(data);
+
+    // Map the data to include vehicle inventory details using pre-fetched data
+    const mappedData = data.map((ad) =>
+      this.mapToDetailedResponseDtoWithInventory(
+        ad,
+        inventoryMaps.manufacturers,
+        inventoryMaps.models,
+        inventoryMaps.variants,
+        inventoryMaps.fuelTypes,
+        inventoryMaps.transmissionTypes,
+      ),
     );
 
     return {
@@ -601,33 +611,406 @@ export class ListAdsUc {
     };
   }
 
-  private async mapToDetailedResponseDto(
+  /**
+   * Batch fetch all inventory items for all ads to avoid N+1 queries
+   */
+  private async batchFetchInventoryItems(data: any[]): Promise<{
+    manufacturers: Record<string, any>;
+    models: Record<string, any>;
+    variants: Record<string, any>;
+    fuelTypes: Record<string, any>;
+    transmissionTypes: Record<string, any>;
+  }> {
+    const manufacturerIds = new Set<string>();
+    const modelIds = new Set<string>();
+    const variantIds = new Set<string>();
+    const fuelTypeIds = new Set<string>();
+    const transmissionTypeIds = new Set<string>();
+
+    // Collect all unique IDs from all ads
+    for (const ad of data) {
+      if (ad.vehicleDetails) {
+        if (ad.vehicleDetails.manufacturerId)
+          manufacturerIds.add(ad.vehicleDetails.manufacturerId.toString());
+        if (ad.vehicleDetails.modelId)
+          modelIds.add(ad.vehicleDetails.modelId.toString());
+        if (ad.vehicleDetails.variantId)
+          variantIds.add(ad.vehicleDetails.variantId.toString());
+        if (ad.vehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.vehicleDetails.fuelTypeId.toString());
+        if (ad.vehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.vehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+      if (ad.commercialVehicleDetails) {
+        if (ad.commercialVehicleDetails.manufacturerId)
+          manufacturerIds.add(
+            ad.commercialVehicleDetails.manufacturerId.toString(),
+          );
+        if (ad.commercialVehicleDetails.modelId)
+          modelIds.add(ad.commercialVehicleDetails.modelId.toString());
+        if (ad.commercialVehicleDetails.variantId)
+          variantIds.add(ad.commercialVehicleDetails.variantId.toString());
+        if (ad.commercialVehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.commercialVehicleDetails.fuelTypeId.toString());
+        if (ad.commercialVehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.commercialVehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+    }
+
+    // Batch fetch all inventory items in parallel
+    const [
+      manufacturerResults,
+      modelResults,
+      variantResults,
+      fuelTypeResults,
+      transmissionTypeResults,
+    ] = await Promise.all([
+      manufacturerIds.size > 0
+        ? this.inventory.getManufacturersByIds(Array.from(manufacturerIds))
+        : Promise.resolve([]),
+      modelIds.size > 0
+        ? this.inventory.getModelsByIds(Array.from(modelIds))
+        : Promise.resolve([]),
+      variantIds.size > 0
+        ? this.inventory.getVariantsByIds(Array.from(variantIds))
+        : Promise.resolve([]),
+      fuelTypeIds.size > 0
+        ? this.inventory.getFuelTypesByIds(Array.from(fuelTypeIds))
+        : Promise.resolve([]),
+      transmissionTypeIds.size > 0
+        ? this.inventory.getTransmissionTypesByIds(
+            Array.from(transmissionTypeIds),
+          )
+        : Promise.resolve([]),
+    ]);
+
+    // Convert to maps keyed by ID string
+    const manufacturers: Record<string, any> = {};
+    manufacturerResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) manufacturers[id] = this.normalizeObjectIds(item);
+    });
+
+    const models: Record<string, any> = {};
+    modelResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) models[id] = this.normalizeObjectIds(item);
+    });
+
+    const variants: Record<string, any> = {};
+    variantResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) variants[id] = this.normalizeObjectIds(item);
+    });
+
+    const fuelTypes: Record<string, any> = {};
+    fuelTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) fuelTypes[id] = this.normalizeObjectIds(item);
+    });
+
+    const transmissionTypes: Record<string, any> = {};
+    transmissionTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) transmissionTypes[id] = this.normalizeObjectIds(item);
+    });
+
+    return {
+      manufacturers,
+      models,
+      variants,
+      fuelTypes,
+      transmissionTypes,
+    };
+  }
+
+  /**
+   * Extract ObjectId string from buffer object or other formats
+   */
+  private extractObjectIdString(value: any): string | null {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      // If it's already a string, validate it's a valid ObjectId format
+      if (Types.ObjectId.isValid(value)) {
+        return value;
+      }
+      return value; // Return as-is even if not valid ObjectId format
+    }
+
+    // Handle buffer objects (from .lean())
+    if (value && typeof value === 'object' && 'buffer' in value) {
+      try {
+        const buffer = (value as any).buffer;
+
+        // Case 1: Direct Buffer instance
+        if (Buffer.isBuffer(buffer)) {
+          return new Types.ObjectId(buffer).toString();
+        }
+
+        // Case 2: Nested buffer object like { buffer: { 0: 104, 1: 181, ... } }
+        if (
+          typeof buffer === 'object' &&
+          buffer !== null &&
+          !Array.isArray(buffer)
+        ) {
+          // Extract numeric values from the buffer object
+          const bufferArray: number[] = [];
+          for (let i = 0; i < 12; i++) {
+            if (buffer[i] !== undefined) {
+              const num = Number(buffer[i]);
+              if (!isNaN(num) && num >= 0 && num <= 255) {
+                bufferArray.push(num);
+              }
+            }
+          }
+
+          // If we have 12 bytes, create ObjectId
+          if (bufferArray.length === 12) {
+            return new Types.ObjectId(Buffer.from(bufferArray)).toString();
+          }
+
+          // Try alternative: get all numeric values in order
+          const allValues = Object.keys(buffer)
+            .map((k) => Number(k))
+            .filter((k) => !isNaN(k))
+            .sort((a, b) => a - b)
+            .map((k) => Number(buffer[k]))
+            .filter((v) => !isNaN(v) && v >= 0 && v <= 255);
+
+          if (allValues.length === 12) {
+            return new Types.ObjectId(Buffer.from(allValues)).toString();
+          }
+        }
+      } catch (error) {
+        // Fall through to other methods
+      }
+    }
+
+    // Try to validate and convert if it's a valid ObjectId format
+    if (Types.ObjectId.isValid(value)) {
+      try {
+        return new Types.ObjectId(value).toString();
+      } catch {
+        // Fall through
+      }
+    }
+
+    // Last resort: try toString if available
+    if (typeof (value as any).toString === 'function') {
+      const str = (value as any).toString();
+      if (str !== '[object Object]' && Types.ObjectId.isValid(str)) {
+        return str;
+      }
+    }
+
+    // Final fallback
+    return null;
+  }
+
+  /**
+   * Normalize ObjectIds to strings recursively
+   */
+  private normalizeObjectIds(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.normalizeObjectIds(item));
+    }
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    const normalized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Handle _id, ad, and all *Id fields (all are ObjectId fields)
+      if (
+        key === '_id' ||
+        key === 'ad' ||
+        key.endsWith('Id') ||
+        key.endsWith('_id')
+      ) {
+        if (value === null || value === undefined) {
+          normalized[key] = value;
+        } else if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          !(value instanceof Date)
+        ) {
+          // Check if it's a buffer object (from .lean())
+          if ('buffer' in value) {
+            try {
+              const buffer = (value as any).buffer;
+              if (Buffer.isBuffer(buffer)) {
+                const objectId = new Types.ObjectId(buffer);
+                normalized[key] = objectId.toString();
+              } else if (typeof buffer === 'object' && buffer !== null) {
+                // Handle nested buffer object like { buffer: { 0: 105, 1: 28, ... } }
+                const bufferArray = Object.values(
+                  buffer as Record<number, number>,
+                )
+                  .map((v) => Number(v))
+                  .filter((v) => !isNaN(v));
+                if (bufferArray.length === 12) {
+                  // ObjectId is 12 bytes
+                  const objectId = new Types.ObjectId(Buffer.from(bufferArray));
+                  normalized[key] = objectId.toString();
+                } else {
+                  // Try to convert anyway or fallback to string
+                  try {
+                    const objectId = new Types.ObjectId(
+                      Buffer.from(bufferArray),
+                    );
+                    normalized[key] = objectId.toString();
+                  } catch {
+                    normalized[key] = String(value);
+                  }
+                }
+              } else {
+                normalized[key] = String(value);
+              }
+            } catch {
+              normalized[key] = String(value);
+            }
+          } else {
+            // It's an object but not a buffer - might be an ObjectId instance or plain object
+            // Try to convert it
+            try {
+              if (Types.ObjectId.isValid(value as any)) {
+                const objectId = new Types.ObjectId(value as any);
+                normalized[key] = objectId.toString();
+              } else {
+                normalized[key] = String(value);
+              }
+            } catch {
+              normalized[key] = String(value);
+            }
+          }
+        } else if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
+          // Already a valid ObjectId string
+          normalized[key] = value;
+        } else if (typeof value === 'string') {
+          // Regular string
+          normalized[key] = value;
+        } else if (
+          (typeof value === 'string' || typeof value === 'number') &&
+          Types.ObjectId.isValid(value)
+        ) {
+          try {
+            const objectId = new Types.ObjectId(value);
+            normalized[key] = objectId.toString();
+          } catch {
+            normalized[key] = String(value);
+          }
+        } else if (typeof (value as any).toString === 'function') {
+          const str = (value as any).toString();
+          normalized[key] = str === '[object Object]' ? String(value) : str;
+        } else {
+          normalized[key] = String(value);
+        }
+      } else if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        !(value instanceof Date)
+      ) {
+        normalized[key] = this.normalizeObjectIds(value);
+      } else if (Array.isArray(value)) {
+        normalized[key] = value.map((item) => this.normalizeObjectIds(item));
+      } else {
+        normalized[key] = value;
+      }
+    }
+    return normalized;
+  }
+
+  /**
+   * Map ad to response DTO using pre-fetched inventory data
+   */
+  private mapToDetailedResponseDtoWithInventory(
     ad: any,
-  ): Promise<DetailedAdResponseDto> {
+    manufacturers: Record<string, any>,
+    models: Record<string, any>,
+    variants: Record<string, any>,
+    fuelTypes: Record<string, any>,
+    transmissionTypes: Record<string, any>,
+  ): DetailedAdResponseDto {
     // Process vehicle details with inventory information
     const vehicleDetails = ad.vehicleDetails;
     let processedVehicleDetails = vehicleDetails;
 
     if (vehicleDetails) {
-      // Fetch vehicle inventory details individually
-      const [manufacturer, model, variant, fuelType, transmissionType] =
-        await Promise.all([
-          this.inventory.getManufacturer(vehicleDetails.manufacturerId || ''),
-          this.inventory.getModel(vehicleDetails.modelId || ''),
-          this.inventory.getVariant(vehicleDetails.variantId || ''),
-          this.inventory.getFuelType(vehicleDetails.fuelTypeId || ''),
-          this.inventory.getTransmissionType(
-            vehicleDetails.transmissionTypeId || '',
-          ),
-        ]);
+      // First normalize all ObjectIds in vehicleDetails (including manufacturerId, modelId, etc.)
+      const normalizedVehicleDetails = this.normalizeObjectIds(vehicleDetails);
+
+      // Extract normalized IDs for lookup - ensure they are strings
+      // Use extractObjectIdString to handle buffer objects directly
+      const manufacturerIdStr = vehicleDetails.manufacturerId
+        ? this.extractObjectIdString(vehicleDetails.manufacturerId)
+        : null;
+      const modelIdStr = vehicleDetails.modelId
+        ? this.extractObjectIdString(vehicleDetails.modelId)
+        : null;
+      const variantIdStr = vehicleDetails.variantId
+        ? this.extractObjectIdString(vehicleDetails.variantId)
+        : null;
+      const fuelTypeIdStr = vehicleDetails.fuelTypeId
+        ? this.extractObjectIdString(vehicleDetails.fuelTypeId)
+        : null;
+      const transmissionTypeIdStr = vehicleDetails.transmissionTypeId
+        ? this.extractObjectIdString(vehicleDetails.transmissionTypeId)
+        : null;
+
+      const manufacturer = manufacturerIdStr
+        ? manufacturers[manufacturerIdStr] || {
+            _id: manufacturerIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const model = modelIdStr
+        ? models[modelIdStr] || {
+            _id: modelIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const variant = variantIdStr
+        ? variants[variantIdStr] || {
+            _id: variantIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const fuelType = fuelTypeIdStr
+        ? fuelTypes[fuelTypeIdStr] || {
+            _id: fuelTypeIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const transmissionType = transmissionTypeIdStr
+        ? transmissionTypes[transmissionTypeIdStr] || {
+            _id: transmissionTypeIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
 
       processedVehicleDetails = {
-        ...vehicleDetails,
-        manufacturer,
-        model,
-        variant,
-        fuelType,
-        transmissionType,
+        ...normalizedVehicleDetails,
+        manufacturerId: manufacturerIdStr || null,
+        modelId: modelIdStr || null,
+        variantId: variantIdStr || null,
+        fuelTypeId: fuelTypeIdStr || null,
+        transmissionTypeId: transmissionTypeIdStr || null,
+        manufacturer: manufacturer || null,
+        model: model || null,
+        variant: variant || null,
+        fuelType: fuelType || null,
+        transmissionType: transmissionType || null,
       };
     }
 
@@ -636,62 +1019,177 @@ export class ListAdsUc {
     let processedCommercialVehicleDetails = commercialVehicleDetails;
 
     if (commercialVehicleDetails) {
-      // Fetch commercial vehicle inventory details individually
-      const [manufacturer, model, variant, fuelType, transmissionType] =
-        await Promise.all([
-          this.inventory.getManufacturer(
-            commercialVehicleDetails.manufacturerId || '',
-          ),
-          this.inventory.getModel(commercialVehicleDetails.modelId || ''),
-          this.inventory.getVariant(commercialVehicleDetails.variantId || ''),
-          this.inventory.getFuelType(commercialVehicleDetails.fuelTypeId || ''),
-          this.inventory.getTransmissionType(
-            commercialVehicleDetails.transmissionTypeId || '',
-          ),
-        ]);
+      // First normalize all ObjectIds in commercialVehicleDetails
+      const normalizedCommercialVehicleDetails = this.normalizeObjectIds(
+        commercialVehicleDetails,
+      );
+
+      // Extract normalized IDs for lookup - ensure they are strings
+      // Use extractObjectIdString to handle buffer objects directly
+      const manufacturerIdStr = commercialVehicleDetails.manufacturerId
+        ? this.extractObjectIdString(commercialVehicleDetails.manufacturerId)
+        : null;
+      const modelIdStr = commercialVehicleDetails.modelId
+        ? this.extractObjectIdString(commercialVehicleDetails.modelId)
+        : null;
+      const variantIdStr = commercialVehicleDetails.variantId
+        ? this.extractObjectIdString(commercialVehicleDetails.variantId)
+        : null;
+      const fuelTypeIdStr = commercialVehicleDetails.fuelTypeId
+        ? this.extractObjectIdString(commercialVehicleDetails.fuelTypeId)
+        : null;
+      const transmissionTypeIdStr = commercialVehicleDetails.transmissionTypeId
+        ? this.extractObjectIdString(
+            commercialVehicleDetails.transmissionTypeId,
+          )
+        : null;
+
+      const manufacturer = manufacturerIdStr
+        ? manufacturers[manufacturerIdStr] || {
+            _id: manufacturerIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const model = modelIdStr
+        ? models[modelIdStr] || {
+            _id: modelIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const variant = variantIdStr
+        ? variants[variantIdStr] || {
+            _id: variantIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const fuelType = fuelTypeIdStr
+        ? fuelTypes[fuelTypeIdStr] || {
+            _id: fuelTypeIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
+      const transmissionType = transmissionTypeIdStr
+        ? transmissionTypes[transmissionTypeIdStr] || {
+            _id: transmissionTypeIdStr,
+            name: 'Not Found',
+            displayName: 'Not Found',
+          }
+        : null;
 
       processedCommercialVehicleDetails = {
-        ...commercialVehicleDetails,
-        manufacturer,
-        model,
-        variant,
-        fuelType,
-        transmissionType,
+        ...normalizedCommercialVehicleDetails,
+        manufacturerId: manufacturerIdStr || null,
+        modelId: modelIdStr || null,
+        variantId: variantIdStr || null,
+        fuelTypeId: fuelTypeIdStr || null,
+        transmissionTypeId: transmissionTypeIdStr || null,
+        manufacturer: manufacturer || null,
+        model: model || null,
+        variant: variant || null,
+        fuelType: fuelType || null,
+        transmissionType: transmissionType || null,
       };
     }
 
+    // Normalize propertyDetails - ensure all fields are present and match expected format
+    let propertyDetails = ad.propertyDetails;
+    if (propertyDetails) {
+      propertyDetails = this.normalizeObjectIds(propertyDetails);
+      // Build propertyDetails with all fields from the database
+      // Include optional fields only if they exist (bedrooms, bathrooms, floor may not exist for plot types)
+      const normalizedPropertyDetails: any = {
+        _id: propertyDetails._id || null,
+        ad: propertyDetails.ad || null,
+        propertyType: propertyDetails.propertyType || null,
+        listingType: propertyDetails.listingType || null,
+        areaSqft: propertyDetails.areaSqft ?? null,
+        isFurnished: propertyDetails.isFurnished ?? false,
+        hasParking: propertyDetails.hasParking ?? false,
+        hasGarden: propertyDetails.hasGarden ?? false,
+        amenities: Array.isArray(propertyDetails.amenities)
+          ? propertyDetails.amenities
+          : [],
+        createdAt: propertyDetails.createdAt || null,
+        updatedAt: propertyDetails.updatedAt || null,
+        __v: propertyDetails.__v ?? 0,
+      };
+
+      // Include optional fields only if they exist in the data
+      if (
+        propertyDetails.bedrooms !== undefined &&
+        propertyDetails.bedrooms !== null
+      ) {
+        normalizedPropertyDetails.bedrooms = propertyDetails.bedrooms;
+      }
+      if (
+        propertyDetails.bathrooms !== undefined &&
+        propertyDetails.bathrooms !== null
+      ) {
+        normalizedPropertyDetails.bathrooms = propertyDetails.bathrooms;
+      }
+      if (
+        propertyDetails.floor !== undefined &&
+        propertyDetails.floor !== null
+      ) {
+        normalizedPropertyDetails.floor = propertyDetails.floor;
+      }
+
+      propertyDetails = normalizedPropertyDetails;
+    }
+
+    // For property ads, vehicleDetails and commercialVehicleDetails should be undefined
+    const finalVehicleDetails =
+      ad.category === 'property' ? undefined : processedVehicleDetails;
+    const finalCommercialVehicleDetails =
+      ad.category === 'property'
+        ? undefined
+        : processedCommercialVehicleDetails;
+
     return {
-      id: ad._id.toString(),
+      id: ad._id?.toString() || String(ad._id),
       title: ad.title,
       description: ad.description,
       price: ad.price,
       images: ad.images || [],
       location: ad.location,
-      latitude: ad.latitude || 9.3311,
-      longitude: ad.longitude || 76.9222,
-      distance: ad.distance || 0, // Distance in kilometers from search location
+      latitude:
+        ad.latitude !== null && ad.latitude !== undefined
+          ? Number(ad.latitude)
+          : (null as any),
+      longitude:
+        ad.longitude !== null && ad.longitude !== undefined
+          ? Number(ad.longitude)
+          : (null as any),
+      distance:
+        ad.distance !== null && ad.distance !== undefined
+          ? Number(ad.distance)
+          : (null as any),
       link: ad.link || '',
       category: ad.category,
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
       isApproved: ad.isApproved || false,
-      approvedBy: ad.approvedBy ? ad.approvedBy.toString() : undefined,
+      approvedBy: ad.approvedBy ? ad.approvedBy.toString() : null,
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,
-      postedBy: ad.postedBy.toString(),
+      postedBy: ad.postedBy?.toString() || String(ad.postedBy),
       user: ad.user
         ? {
-            id: ad.user._id.toString(),
+            id: ad.user._id?.toString() || String(ad.user._id),
             name: ad.user.name,
             email: ad.user.email,
             countryCode: ad.user.countryCode,
             phoneNumber: ad.user.phoneNumber,
-            profilePic: ad.user.profilePic,
+            profilePic: ad.user.profilePic || 'default-profile-pic-url',
           }
         : undefined,
-      propertyDetails: ad.propertyDetails || undefined,
-      vehicleDetails: processedVehicleDetails,
-      commercialVehicleDetails: processedCommercialVehicleDetails,
+      propertyDetails: propertyDetails || undefined,
+      vehicleDetails: finalVehicleDetails,
+      commercialVehicleDetails: finalCommercialVehicleDetails,
       isFavorite: ad.isFavorite || false,
     };
   }

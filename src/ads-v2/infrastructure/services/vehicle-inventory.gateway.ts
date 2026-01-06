@@ -187,4 +187,30 @@ export class VehicleInventoryGateway {
       return { _id: fuelTypeId, name: 'Not Found', displayName: 'Not Found' };
     }
   }
+
+  // Batch fetch methods for optimization
+  async getManufacturersByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    return this.inventory.findManufacturersByIds(ids);
+  }
+
+  async getModelsByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    return this.inventory.findVehicleModelsByIds(ids);
+  }
+
+  async getVariantsByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    return this.inventory.findVehicleVariantsByIds(ids);
+  }
+
+  async getFuelTypesByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    return this.inventory.findFuelTypesByIds(ids);
+  }
+
+  async getTransmissionTypesByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    return this.inventory.findTransmissionTypesByIds(ids);
+  }
 }
