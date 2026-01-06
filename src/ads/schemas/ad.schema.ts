@@ -131,7 +131,10 @@ AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });
 // 2dsphere index for GeoJSON location queries (MUST be first for $geoNear)
 AdSchema.index({ geoLocation: '2dsphere' }, { background: true });
 // Location hierarchy indexes for efficient filtering
-AdSchema.index({ country: 1, state: 1, district: 1, city: 1 }, { background: true });
+AdSchema.index(
+  { country: 1, state: 1, district: 1, city: 1 },
+  { background: true },
+);
 AdSchema.index({ state: 1, district: 1 }, { background: true });
 AdSchema.index({ country: 1, state: 1 }, { background: true });
 // Compound index for location hierarchy + visibility
@@ -139,6 +142,8 @@ AdSchema.index(
   { isDeleted: 1, isApproved: 1, country: 1, state: 1, district: 1 },
   { background: true },
 );
+// Compound index for admin queries (isDeleted + createdAt sort)
+AdSchema.index({ isDeleted: 1, createdAt: -1 }, { background: true });
 // Note: Cannot create compound index with 2dsphere - MongoDB only allows ONE 2dsphere index per collection
 // The simple { geoLocation: '2dsphere' } index above is sufficient for $geoNear
 // Visibility filters (isDeleted, isApproved) are applied in $geoNear query itself

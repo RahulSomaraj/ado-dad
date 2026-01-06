@@ -1832,4 +1832,79 @@ export class VehicleInventoryService {
       skipped,
     };
   }
+
+  // ========== BULK FIND METHODS FOR OPTIMIZATION ==========
+  // These methods use $in queries to fetch multiple items in a single database call
+  // instead of individual findOne calls, significantly improving performance
+
+  async findManufacturersByIds(ids: string[]): Promise<Manufacturer[]> {
+    if (!ids || ids.length === 0) return [];
+    const validIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (validIds.length === 0) return [];
+
+    return this.manufacturerModel
+      .find({ _id: { $in: validIds }, isDeleted: false })
+      .lean()
+      .exec();
+  }
+
+  async findVehicleModelsByIds(ids: string[]): Promise<VehicleModel[]> {
+    if (!ids || ids.length === 0) return [];
+    const validIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (validIds.length === 0) return [];
+
+    return this.vehicleModelModel
+      .find({ _id: { $in: validIds }, isActive: true, isDeleted: false })
+      .populate('manufacturer', 'name displayName logo')
+      .lean()
+      .exec();
+  }
+
+  async findVehicleVariantsByIds(ids: string[]): Promise<VehicleVariant[]> {
+    if (!ids || ids.length === 0) return [];
+    const validIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (validIds.length === 0) return [];
+
+    return this.vehicleVariantModel
+      .find({ _id: { $in: validIds }, isActive: true, isDeleted: false })
+      .populate('vehicleModel', 'name displayName')
+      .populate('fuelType', 'name displayName')
+      .populate('transmissionType', 'name displayName')
+      .lean()
+      .exec();
+  }
+
+  async findFuelTypesByIds(ids: string[]): Promise<FuelType[]> {
+    if (!ids || ids.length === 0) return [];
+    const validIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (validIds.length === 0) return [];
+
+    return this.fuelTypeModel
+      .find({ _id: { $in: validIds }, isActive: true, isDeleted: false })
+      .lean()
+      .exec();
+  }
+
+  async findTransmissionTypesByIds(
+    ids: string[],
+  ): Promise<TransmissionType[]> {
+    if (!ids || ids.length === 0) return [];
+    const validIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (validIds.length === 0) return [];
+
+    return this.transmissionTypeModel
+      .find({ _id: { $in: validIds }, isActive: true, isDeleted: false })
+      .lean()
+      .exec();
+  }
 }

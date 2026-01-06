@@ -205,38 +205,78 @@ async function bootstrap() {
   });
 
   // Graceful shutdown handling
+  let isShuttingDown = false;
   const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      Logger.warn('⚠️  Shutdown already in progress, ignoring signal');
+      return;
+    }
+    isShuttingDown = true;
+
     Logger.log(`🛑 Received ${signal}. Starting graceful shutdown...`);
 
-    // Stop accepting new connections
-    server.close(async () => {
-      Logger.log('🔒 HTTP server closed');
-
-      try {
-        // Close MongoDB connections
-        const mongoose = await import('mongoose');
-        if (mongoose.connection.readyState === 1) {
-          await mongoose.connection.close();
-          Logger.log('🔒 MongoDB connection closed');
-        }
-
-        // Close the NestJS application (this will trigger OnModuleDestroy for Redis)
-        await app.close();
-        Logger.log('🔒 Application closed');
-
-        Logger.log('✅ Graceful shutdown completed');
-        process.exit(0);
-      } catch (error) {
-        Logger.error('❌ Error during graceful shutdown:', error);
-        process.exit(1);
-      }
-    });
-
-    // Force close after 30 seconds
-    setTimeout(() => {
+    // Set a timeout for the entire shutdown process
+    const shutdownTimeout = setTimeout(() => {
       Logger.error('⏰ Graceful shutdown timeout. Forcing exit...');
       process.exit(1);
-    }, 30000);
+    }, 10000); // Reduced to 10 seconds
+
+    try {
+      // Stop accepting new connections
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            Logger.warn('⚠️  Error closing HTTP server:', err);
+          } else {
+            Logger.log('🔒 HTTP server closed');
+          }
+          resolve();
+        });
+
+        // Force close server after 5 seconds if it doesn't close gracefully
+        setTimeout(() => {
+          Logger.warn('⚠️  HTTP server close timeout, forcing close');
+          resolve();
+        }, 5000);
+      });
+
+      // Close the NestJS application (this will trigger OnModuleDestroy for Redis)
+      try {
+        await Promise.race([
+          app.close(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('App close timeout')), 5000),
+          ),
+        ]);
+        Logger.log('🔒 Application closed');
+      } catch (error) {
+        Logger.warn('⚠️  Error closing application:', error);
+      }
+
+      // Close MongoDB connections
+      try {
+        const mongoose = await import('mongoose');
+        if (mongoose.connection.readyState === 1) {
+          await Promise.race([
+            mongoose.connection.close(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('MongoDB close timeout')), 3000),
+            ),
+          ]);
+          Logger.log('🔒 MongoDB connection closed');
+        }
+      } catch (error) {
+        Logger.warn('⚠️  Error closing MongoDB:', error);
+      }
+
+      clearTimeout(shutdownTimeout);
+      Logger.log('✅ Graceful shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      clearTimeout(shutdownTimeout);
+      Logger.error('❌ Error during graceful shutdown:', error);
+      process.exit(1);
+    }
   };
 
   // Handle different termination signals

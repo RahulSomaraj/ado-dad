@@ -3,7 +3,6 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -64,7 +63,6 @@ import {
 
 @Injectable()
 export class AdsService {
-  private readonly logger = new Logger(AdsService.name);
   private static readonly CACHE_PREFIX = 'ads:';
   private static readonly TTL = {
     LIST: 120, // list queries
@@ -355,19 +353,12 @@ export class AdsService {
       });
     }
 
-    // Sorting: distance first (closest first based on geolocation from DB), then newly created (most recent first)
+    // Sorting: location score first if available, then requested field
     const sortStage: any = {};
     if (latitude !== undefined && longitude !== undefined) {
-      sortStage.distance = 1; // Closest first (ascending) - geolocation-based directly from DB
-      sortStage.createdAt = -1; // Newly created first (descending) - most recent first
-    } else {
-      // When no coordinates, prioritize newly created first
-      sortStage.createdAt = -1; // Newest first (descending)
-      // Add requested sort field only if it's different from createdAt
-      if (sortField !== 'createdAt') {
-        sortStage[sortField] = sortDirection;
-      }
+      sortStage.locationScore = -1; // Higher score first
     }
+    sortStage[sortField] = sortDirection;
     pipeline.push({ $sort: sortStage });
 
     // Clean up internal fields
@@ -920,7 +911,7 @@ export class AdsService {
     const objectIds = uncachedIds.map((x) => new Types.ObjectId(x));
     const uncachedAds = await this.adModel
       .find({ _id: { $in: objectIds }, isDeleted: { $ne: true } })
-      .populate('postedBy', 'name email countryCode phoneNumber')
+      .populate('postedBy', 'name email phone')
       .exec();
 
     const adsToCache = uncachedAds.map((ad) => ({
@@ -967,7 +958,6 @@ export class AdsService {
                 _id: 1,
                 name: 1,
                 email: 1,
-                countryCode: 1,
                 phoneNumber: 1,
                 profilePic: 1,
                 type: 1,
@@ -1665,33 +1655,6 @@ export class AdsService {
     if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
     if (typeof updateData.isActive === 'boolean')
       adUpdate.isActive = updateData.isActive;
-
-    // Handle latitude/longitude updates
-    if (
-      updateData.latitude !== undefined ||
-      updateData.longitude !== undefined
-    ) {
-      if (updateData.latitude !== undefined)
-        adUpdate.latitude = updateData.latitude;
-      if (updateData.longitude !== undefined)
-        adUpdate.longitude = updateData.longitude;
-
-      // Re-calculate geoLocation if we have both coordinates (either from update or existing)
-      const lat =
-        updateData.latitude !== undefined ? updateData.latitude : ad.latitude;
-      const lon =
-        updateData.longitude !== undefined
-          ? updateData.longitude
-          : ad.longitude;
-
-      if (lat !== undefined && lon !== undefined) {
-        adUpdate.geoLocation = {
-          type: 'Point',
-          coordinates: [lon, lat],
-        };
-      }
-    }
-
     if (Object.keys(adUpdate).length) {
       Object.assign(ad, adUpdate);
       await ad.save();
@@ -1791,268 +1754,344 @@ export class AdsService {
   async getAllAdsForAdmin(
     filters: FilterAdDto,
   ): Promise<PaginatedDetailedAdResponseDto> {
-    try {
-      this.logger.debug('getAllAdsForAdmin called with filters:', filters);
-
-      let {
-        page = 1,
-        limit = 20,
-        sortBy = 'createdAt',
-        sortOrder = 'DESC',
-        search,
-        latitude,
-        longitude,
-      } = filters;
-      const { field: sortField, dir: sortDirection } = this.coerceSort(
-        sortBy,
-        sortOrder,
-      );
-      page = this.clamp(Number(page) || 1, 1, 1e9);
-      limit = this.clamp(Number(limit) || 20, 1, 100);
-
-      // ------- Pipeline -------
-      const pipeline: any[] = [];
-
-      // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
-      // Store search term for later use
-      const searchTerm =
-        search && `${search}`.trim() ? `${search}`.trim() : null;
-
-      // Base visibility: show all ads (including unapproved) except soft-deleted
-      pipeline.push({ $match: { isDeleted: { $ne: true } } });
-
-      // Optional category filter
-      if (filters.category) {
-        pipeline.push({ $match: { category: filters.category } });
+    // Build deterministic cache key
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
       }
+      return obj;
+    };
 
-      // Hierarchical location-based filtering
-      if (latitude !== undefined && longitude !== undefined) {
-        try {
-          // Get location hierarchy pipeline stages
-          const locationPipeline =
-            this.locationHierarchyService.getLocationAggregationPipeline(
-              latitude,
-              longitude,
-            );
+    const safeFilters = this.normalize(filters);
+    const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
 
-          // Add location filtering stages to pipeline
-          pipeline.push(...locationPipeline);
-
-          // Add location scoring for prioritization
-          pipeline.push(
-            this.locationHierarchyService.getLocationScoringStage(
-              latitude,
-              longitude,
-            ),
-          );
-        } catch (locationError) {
-          this.logger.warn(
-            'Location hierarchy service error, continuing without location filtering:',
-            locationError,
-          );
-        }
-      }
-
-      // user
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'postedBy',
-            foreignField: '_id',
-            as: 'user',
-            pipeline: [
-              {
-                $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 },
-              },
-            ],
-          },
-        },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
       );
+    if (cached) return cached;
 
-      // Add approvedBy user lookup for admin view
+    let {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      search,
+      latitude,
+      longitude,
+    } = filters;
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // ------- Pipeline -------
+    const pipeline: any[] = [];
+
+    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
+    // Store search term for later use
+    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+
+    // Base visibility: show all ads (including unapproved) except soft-deleted
+    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+
+    // Optional category filter
+    if (filters.category) {
+      pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // Hierarchical location-based filtering
+    if (latitude !== undefined && longitude !== undefined) {
+      // Get location hierarchy pipeline stages
+      const locationPipeline =
+        this.locationHierarchyService.getLocationAggregationPipeline(
+          latitude,
+          longitude,
+        );
+
+      // Add location filtering stages to pipeline
+      pipeline.push(...locationPipeline);
+
+      // Add location scoring for prioritization
       pipeline.push(
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'approvedBy',
-            foreignField: '_id',
-            as: 'approvedByUser',
-            pipeline: [{ $project: { name: 1, email: 1 } }],
-          },
-        },
-        {
-          $unwind: {
-            path: '$approvedByUser',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
+        this.locationHierarchyService.getLocationScoringStage(
+          latitude,
+          longitude,
+        ),
       );
+    }
 
-      // Add vehicle details lookup (unwind to get single object)
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'vehicleads',
-            localField: '_id',
-            foreignField: 'ad',
-            as: 'vehicleDetails',
-          },
+    // user
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
         },
-        {
-          $unwind: {
-            path: '$vehicleDetails',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-      );
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
 
-      // Add commercial vehicle details lookup (unwind to get single object)
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'commercialvehicleads',
-            localField: '_id',
-            foreignField: 'ad',
-            as: 'commercialVehicleDetails',
-          },
+    // Add approvedBy user lookup for admin view
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'approvedBy',
+          foreignField: '_id',
+          as: 'approvedByUser',
+          pipeline: [{ $project: { name: 1, email: 1 } }],
         },
-        {
-          $unwind: {
-            path: '$commercialVehicleDetails',
-            preserveNullAndEmptyArrays: true,
-          },
+      },
+      {
+        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Add vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
         },
-      );
+      },
+      {
+        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
 
-      // Add property details lookup (unwind to get single object)
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'propertyads',
-            localField: '_id',
-            foreignField: 'ad',
-            as: 'propertyDetails',
-          },
+    // Add commercial vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
         },
-        {
-          $unwind: {
-            path: '$propertyDetails',
-            preserveNullAndEmptyArrays: true,
-          },
+      },
+      {
+        $unwind: {
+          path: '$commercialVehicleDetails',
+          preserveNullAndEmptyArrays: true,
         },
-      );
+      },
+    );
 
-      // Apply search filter if provided
-      if (searchTerm) {
-        pipeline.push({
-          $match: {
-            $or: [
-              { description: { $regex: searchTerm, $options: 'i' } },
-              { title: { $regex: searchTerm, $options: 'i' } },
-              { location: { $regex: searchTerm, $options: 'i' } },
-              { 'user.name': { $regex: searchTerm, $options: 'i' } },
-              { 'user.email': { $regex: searchTerm, $options: 'i' } },
-            ],
-          },
-        });
-      }
+    // Add property details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+      {
+        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
 
-      // Sort: distance first (closest first), then newly created (most recent first)
-      if (latitude !== undefined && longitude !== undefined) {
-        // Distance is already calculated by locationHierarchyService.getLocationAggregationPipeline
-        // Prioritize by distance first, then newly created
-        pipeline.push({
-          $sort: {
-            distance: 1, // Closest first (ascending) - geolocation-based
-            createdAt: -1, // Newly created first (descending) - most recent first
-          },
-        });
-      } else {
-        // Regular sorting when no location filtering - newly created first
-        const sortStage: any = { createdAt: -1 };
-        if (sortField !== 'createdAt') {
-          sortStage[sortField] = sortDirection;
-        }
-        pipeline.push({ $sort: sortStage });
-      }
-
-      // Facet for pagination
+    // Apply search filter if provided
+    if (searchTerm) {
       pipeline.push({
-        $facet: {
-          data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-          total: [{ $count: 'count' }],
+        $match: {
+          $or: [
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { location: { $regex: searchTerm, $options: 'i' } },
+            { 'user.name': { $regex: searchTerm, $options: 'i' } },
+            { 'user.email': { $regex: searchTerm, $options: 'i' } },
+          ],
         },
       });
-
-      let result: any = { data: [], total: [] };
-      try {
-        const aggregationResult = await this.adModel.aggregate(pipeline);
-        if (aggregationResult && aggregationResult.length > 0) {
-          result = aggregationResult[0];
-        }
-      } catch (aggregationError) {
-        this.logger.error('MongoDB aggregation failed:', aggregationError);
-        this.logger.error(
-          'Pipeline stages:',
-          JSON.stringify(pipeline, null, 2),
-        );
-        throw new BadRequestException(
-          'Failed to retrieve ads: database query error',
-        );
-      }
-
-      const data = result?.data || [];
-      const total = result?.total?.[0]?.count || 0;
-
-      // Map to response DTOs with inventory details
-      let dtoData: DetailedAdResponseDto[];
-      try {
-        dtoData = await Promise.all(
-          data.map(async (ad: any, index: number) => {
-            try {
-              const dto = await this.mapToResponseDtoWithInventory(ad);
-              dto.year =
-                ad.vehicleDetails?.year ??
-                ad.commercialVehicleDetails?.year ??
-                null;
-              return dto;
-            } catch (mappingError) {
-              this.logger.error(
-                `Error mapping ad at index ${index} (ID: ${ad._id}):`,
-                mappingError,
-              );
-              // Return a basic DTO with error indication instead of failing completely
-              return this.mapToResponseDto(ad);
-            }
-          }),
-        );
-      } catch (mappingError) {
-        this.logger.error('Error during batch mapping:', mappingError);
-        throw new BadRequestException(
-          'Failed to process ad data: mapping error',
-        );
-      }
-
-      const totalPages = Math.ceil(total / limit);
-
-      const response: PaginatedDetailedAdResponseDto = {
-        data: dtoData,
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
-      };
-
-      return response;
-    } catch (error) {
-      this.logger.error('Error in getAllAdsForAdmin:', error);
-      throw error;
     }
+
+    // Sort
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortField]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({ $sort: { [sortField]: sortDirection } });
+    }
+
+    // Facet for pagination
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const [result] = await this.adModel.aggregate(pipeline);
+    const data = result.data || [];
+    const total = result.total[0]?.count || 0;
+
+    // OPTIMIZATION: Batch fetch all inventory items to avoid N+1 queries
+    const manufacturerIds = new Set<string>();
+    const modelIds = new Set<string>();
+    const variantIds = new Set<string>();
+    const fuelTypeIds = new Set<string>();
+    const transmissionTypeIds = new Set<string>();
+
+    // Collect all unique IDs from all ads
+    data.forEach((ad: any) => {
+      if (ad.vehicleDetails && typeof ad.vehicleDetails === 'object') {
+        if (ad.vehicleDetails.manufacturerId)
+          manufacturerIds.add(ad.vehicleDetails.manufacturerId.toString());
+        if (ad.vehicleDetails.modelId)
+          modelIds.add(ad.vehicleDetails.modelId.toString());
+        if (ad.vehicleDetails.variantId)
+          variantIds.add(ad.vehicleDetails.variantId.toString());
+        if (ad.vehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.vehicleDetails.fuelTypeId.toString());
+        if (ad.vehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.vehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+      if (
+        ad.commercialVehicleDetails &&
+        typeof ad.commercialVehicleDetails === 'object'
+      ) {
+        if (ad.commercialVehicleDetails.manufacturerId)
+          manufacturerIds.add(
+            ad.commercialVehicleDetails.manufacturerId.toString(),
+          );
+        if (ad.commercialVehicleDetails.modelId)
+          modelIds.add(ad.commercialVehicleDetails.modelId.toString());
+        if (ad.commercialVehicleDetails.variantId)
+          variantIds.add(ad.commercialVehicleDetails.variantId.toString());
+        if (ad.commercialVehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.commercialVehicleDetails.fuelTypeId.toString());
+        if (ad.commercialVehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.commercialVehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+    });
+
+    // Bulk fetch all inventory items in parallel
+    const [
+      manufacturerResults,
+      modelResults,
+      variantResults,
+      fuelTypeResults,
+      transmissionTypeResults,
+    ] = await Promise.all([
+      manufacturerIds.size > 0
+        ? this.vehicleInventoryService
+            .findManufacturersByIds(Array.from(manufacturerIds))
+            .catch(() => [])
+        : Promise.resolve([]),
+      modelIds.size > 0
+        ? this.vehicleInventoryService
+            .findVehicleModelsByIds(Array.from(modelIds))
+            .catch(() => [])
+        : Promise.resolve([]),
+      variantIds.size > 0
+        ? this.vehicleInventoryService
+            .findVehicleVariantsByIds(Array.from(variantIds))
+            .catch(() => [])
+        : Promise.resolve([]),
+      fuelTypeIds.size > 0
+        ? this.vehicleInventoryService
+            .findFuelTypesByIds(Array.from(fuelTypeIds))
+            .catch(() => [])
+        : Promise.resolve([]),
+      transmissionTypeIds.size > 0
+        ? this.vehicleInventoryService
+            .findTransmissionTypesByIds(Array.from(transmissionTypeIds))
+            .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    // Convert to maps for O(1) lookup
+    const manufacturers: Record<string, any> = {};
+    manufacturerResults.forEach((item: any) => {
+      console.log('manufacturerResults', item);
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) manufacturers[id] = item;
+    });
+
+    const models: Record<string, any> = {};
+    modelResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) models[id] = item;
+    });
+
+    const variants: Record<string, any> = {};
+    variantResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) variants[id] = item;
+    });
+
+    const fuelTypes: Record<string, any> = {};
+    fuelTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) fuelTypes[id] = item;
+    });
+
+    const transmissionTypes: Record<string, any> = {};
+    transmissionTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) transmissionTypes[id] = item;
+    });
+
+    // Map to response DTOs using pre-fetched inventory data
+    const dtoData = data.map((ad: any) => {
+      const dto = this.mapToResponseDtoWithInventoryBatched(
+        ad,
+        manufacturers,
+        models,
+        variants,
+        fuelTypes,
+        transmissionTypes,
+      );
+      dto.year =
+        ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
+      return dto;
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    // Cache the result
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
   }
 
   /** ---------- REDIS / CACHING UTILS ---------- */
@@ -2229,32 +2268,10 @@ export class AdsService {
   }
 
   /** ---------- HELPER: Remove null values from objects ---------- */
-  private removeNullValues(
-    obj: any,
-    visited: WeakSet<any> = new WeakSet(),
-  ): any {
+  private removeNullValues(obj: any): any {
     if (obj === null || obj === undefined) return undefined;
-    if (Array.isArray(obj)) {
-      // Handle arrays - process each element but don't track arrays in visited
-      return obj.map((item) => {
-        if (
-          typeof item === 'object' &&
-          item !== null &&
-          !(item instanceof Date)
-        ) {
-          return this.removeNullValues(item, visited);
-        }
-        return item;
-      });
-    }
+    if (Array.isArray(obj)) return obj;
     if (typeof obj !== 'object') return obj;
-    if (obj instanceof Date) return obj;
-
-    // Check for circular reference
-    if (visited.has(obj)) {
-      return undefined; // Skip circular references
-    }
-    visited.add(obj);
 
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -2264,29 +2281,12 @@ export class AdsService {
           !Array.isArray(value) &&
           !(value instanceof Date)
         ) {
-          const cleanedValue = this.removeNullValues(value, visited);
+          const cleanedValue = this.removeNullValues(value);
           if (
             cleanedValue !== undefined &&
             Object.keys(cleanedValue).length > 0
           ) {
             cleaned[key] = cleanedValue;
-          }
-        } else if (Array.isArray(value)) {
-          // Handle arrays in object values
-          const cleanedArray = value
-            .map((item) => {
-              if (
-                typeof item === 'object' &&
-                item !== null &&
-                !(item instanceof Date)
-              ) {
-                return this.removeNullValues(item, visited);
-              }
-              return item;
-            })
-            .filter((item) => item !== null && item !== undefined);
-          if (cleanedArray.length > 0) {
-            cleaned[key] = cleanedArray;
           }
         } else {
           cleaned[key] = value;
@@ -2294,6 +2294,99 @@ export class AdsService {
       }
     }
     return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+
+  /** ---------- HELPER: Convert ObjectId fields to strings ---------- */
+  private normalizeObjectIds(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.normalizeObjectIds(item));
+    }
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    const normalized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Convert _id fields to strings
+      if (key === '_id') {
+        if (value === null || value === undefined) {
+          normalized[key] = value;
+        } else if (value && typeof value === 'object' && 'buffer' in value) {
+          // Handle ObjectId buffer format from .lean() - most common case
+          try {
+            const buffer = (value as any).buffer;
+            if (Buffer.isBuffer(buffer)) {
+              const objectId = new Types.ObjectId(buffer);
+              normalized[key] = objectId.toString();
+            } else if (typeof buffer === 'object' && buffer !== null) {
+              // Handle nested buffer object (like { buffer: { 0: 104, 1: 181, ... } })
+              const bufferArray = Object.values(
+                buffer as Record<number, number>,
+              )
+                .map((v) => Number(v))
+                .filter((v) => !isNaN(v));
+              if (bufferArray.length === 12) {
+                // ObjectId is 12 bytes
+                const objectId = new Types.ObjectId(Buffer.from(bufferArray));
+                normalized[key] = objectId.toString();
+              } else {
+                normalized[key] = String(value);
+              }
+            } else {
+              normalized[key] = String(value);
+            }
+          } catch {
+            normalized[key] = String(value);
+          }
+        } else if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
+          // Already a string ObjectId
+          normalized[key] = value;
+        } else if (typeof value === 'string') {
+          // Already a string (not ObjectId format)
+          normalized[key] = value;
+        } else if (
+          (typeof value === 'string' || typeof value === 'number') &&
+          Types.ObjectId.isValid(value)
+        ) {
+          // Valid ObjectId format (string or number)
+          try {
+            const objectId = new Types.ObjectId(value);
+            normalized[key] = objectId.toString();
+          } catch {
+            normalized[key] = String(value);
+          }
+        } else if (typeof (value as any).toString === 'function') {
+          // Try toString method
+          const str = (value as any).toString();
+          // Only use toString result if it's not "[object Object]"
+          normalized[key] = str === '[object Object]' ? String(value) : str;
+        } else {
+          normalized[key] = String(value);
+        }
+      } else if (
+        key === 'id' &&
+        value &&
+        typeof value === 'object' &&
+        '_id' in value
+      ) {
+        // Handle nested id fields that might be objects
+        normalized[key] =
+          (value as any)._id?.toString() || (value as any).toString();
+      } else if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        !(value instanceof Date)
+      ) {
+        // Recursively normalize nested objects
+        normalized[key] = this.normalizeObjectIds(value);
+      } else if (Array.isArray(value)) {
+        normalized[key] = value.map((item) => this.normalizeObjectIds(item));
+      } else {
+        normalized[key] = value;
+      }
+    }
+    return normalized;
   }
 
   /** ---------- VEHICLE INVENTORY ENRICHMENT ---------- */
@@ -2529,45 +2622,13 @@ export class AdsService {
       processedVehicleDetails = {
         ...vehicleDetails,
         ...(manufacturer && {
-          manufacturer: {
-            id:
-              (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
-            name: (manufacturer as any).name,
-            country: (manufacturer as any).originCountry,
-          },
+          manufacturer: this.removeNullValues(manufacturer),
         }),
-        ...(model && {
-          model: {
-            id: (model as any)._id?.toString() ?? (model as any).id,
-            name: (model as any).name,
-            manufacturerId: (model as any).manufacturer?.toString(),
-          },
-        }),
-        ...(cleanedVariant && {
-          variant: {
-            id:
-              (cleanedVariant as any)._id?.toString() ??
-              (cleanedVariant as any).id,
-            name: (cleanedVariant as any).name,
-            modelId: (cleanedVariant as any).vehicleModel?.toString(),
-            price: (cleanedVariant as any).price,
-          },
-        }),
-        ...(fuelType && {
-          fuelType: {
-            id: (fuelType as any)._id?.toString() ?? (fuelType as any).id,
-            name: (fuelType as any).name,
-            description: (fuelType as any).description,
-          },
-        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
         ...(transmissionType && {
-          transmissionType: {
-            id:
-              (transmissionType as any)._id?.toString() ??
-              (transmissionType as any).id,
-            name: (transmissionType as any).name,
-            description: (transmissionType as any).description,
-          },
+          transmissionType: this.removeNullValues(transmissionType),
         }),
       };
     }
@@ -2653,45 +2714,163 @@ export class AdsService {
       processedCommercialVehicleDetails = {
         ...commercialVehicleDetails,
         ...(manufacturer && {
-          manufacturer: {
-            id:
-              (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
-            name: (manufacturer as any).name,
-            country: (manufacturer as any).originCountry,
-          },
+          manufacturer: this.removeNullValues(manufacturer),
+        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(transmissionType && {
+          transmissionType: this.removeNullValues(transmissionType),
+        }),
+      };
+    }
+
+    return {
+      ...base,
+      vehicleDetails: processedVehicleDetails || undefined,
+      commercialVehicleDetails: processedCommercialVehicleDetails || undefined,
+    };
+  }
+
+  /**
+   * Optimized version that uses pre-fetched inventory data (batched)
+   * This avoids N+1 queries by using data fetched in bulk
+   */
+  private mapToResponseDtoWithInventoryBatched(
+    ad: any,
+    manufacturers: Record<string, any>,
+    models: Record<string, any>,
+    variants: Record<string, any>,
+    fuelTypes: Record<string, any>,
+    transmissionTypes: Record<string, any>,
+  ): DetailedAdResponseDto {
+    const base = this.mapToResponseDto(ad);
+
+    // Process vehicle details with pre-fetched inventory
+    const vehicleDetails = ad.vehicleDetails;
+    let processedVehicleDetails = vehicleDetails;
+
+    if (vehicleDetails && Object.keys(vehicleDetails).length > 0) {
+      const manufacturer = vehicleDetails.manufacturerId
+        ? manufacturers[vehicleDetails.manufacturerId.toString()]
+        : undefined;
+      const model = vehicleDetails.modelId
+        ? models[vehicleDetails.modelId.toString()]
+        : undefined;
+      const variant = vehicleDetails.variantId
+        ? variants[vehicleDetails.variantId.toString()]
+        : undefined;
+      const fuelType = vehicleDetails.fuelTypeId
+        ? fuelTypes[vehicleDetails.fuelTypeId.toString()]
+        : undefined;
+      const transmissionType = vehicleDetails.transmissionTypeId
+        ? transmissionTypes[vehicleDetails.transmissionTypeId.toString()]
+        : undefined;
+
+      // Clean variant
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedVehicleDetails = {
+        ...vehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.normalizeObjectIds(
+            this.removeNullValues(manufacturer),
+          ),
         }),
         ...(model && {
-          model: {
-            id: (model as any)._id?.toString() ?? (model as any).id,
-            name: (model as any).name,
-            manufacturerId: (model as any).manufacturer?.toString(),
-          },
+          model: this.normalizeObjectIds(this.removeNullValues(model)),
         }),
         ...(cleanedVariant && {
-          variant: {
-            id:
-              (cleanedVariant as any)._id?.toString() ??
-              (cleanedVariant as any).id,
-            name: (cleanedVariant as any).name,
-            modelId: (cleanedVariant as any).vehicleModel?.toString(),
-            price: (cleanedVariant as any).price,
-          },
+          variant: this.normalizeObjectIds(cleanedVariant),
         }),
         ...(fuelType && {
-          fuelType: {
-            id: (fuelType as any)._id?.toString() ?? (fuelType as any).id,
-            name: (fuelType as any).name,
-            description: (fuelType as any).description,
-          },
+          fuelType: this.normalizeObjectIds(this.removeNullValues(fuelType)),
         }),
         ...(transmissionType && {
-          transmissionType: {
-            id:
-              (transmissionType as any)._id?.toString() ??
-              (transmissionType as any).id,
-            name: (transmissionType as any).name,
-            description: (transmissionType as any).description,
-          },
+          transmissionType: this.normalizeObjectIds(
+            this.removeNullValues(transmissionType),
+          ),
+        }),
+      };
+    }
+
+    // Process commercial vehicle details with pre-fetched inventory
+    const commercialVehicleDetails = ad.commercialVehicleDetails;
+    let processedCommercialVehicleDetails = commercialVehicleDetails;
+
+    if (
+      commercialVehicleDetails &&
+      Object.keys(commercialVehicleDetails).length > 0
+    ) {
+      const manufacturer = commercialVehicleDetails.manufacturerId
+        ? manufacturers[commercialVehicleDetails.manufacturerId.toString()]
+        : undefined;
+      const model = commercialVehicleDetails.modelId
+        ? models[commercialVehicleDetails.modelId.toString()]
+        : undefined;
+      const variant = commercialVehicleDetails.variantId
+        ? variants[commercialVehicleDetails.variantId.toString()]
+        : undefined;
+      const fuelType = commercialVehicleDetails.fuelTypeId
+        ? fuelTypes[commercialVehicleDetails.fuelTypeId.toString()]
+        : undefined;
+      const transmissionType = commercialVehicleDetails.transmissionTypeId
+        ? transmissionTypes[
+            commercialVehicleDetails.transmissionTypeId.toString()
+          ]
+        : undefined;
+
+      // Clean variant
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedCommercialVehicleDetails = {
+        ...commercialVehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.normalizeObjectIds(
+            this.removeNullValues(manufacturer),
+          ),
+        }),
+        ...(model && {
+          model: this.normalizeObjectIds(this.removeNullValues(model)),
+        }),
+        ...(cleanedVariant && {
+          variant: this.normalizeObjectIds(cleanedVariant),
+        }),
+        ...(fuelType && {
+          fuelType: this.normalizeObjectIds(this.removeNullValues(fuelType)),
+        }),
+        ...(transmissionType && {
+          transmissionType: this.normalizeObjectIds(
+            this.removeNullValues(transmissionType),
+          ),
         }),
       };
     }

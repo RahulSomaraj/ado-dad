@@ -40,7 +40,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private async _connect() {
     try {
       const redisConfig = this.configService.get('REDIS_CONFIG');
-      const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID;
+      const isTestEnvironment =
+        process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID;
 
       this.redisClient = createClient({
         socket: {
@@ -49,8 +50,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           connectTimeout: redisConfig.connectTimeout,
           reconnectStrategy: (retries) => {
             if (retries >= this.maxRetries) {
-              this.logger.warn('⚠️  Redis connection failed after maximum retries. Application will run without caching.');
-              this.logger.warn('   To enable Redis caching, ensure Redis is running on localhost:6379');
+              this.logger.warn(
+                '⚠️  Redis connection failed after maximum retries. Application will run without caching.',
+              );
+              this.logger.warn(
+                '   To enable Redis caching, ensure Redis is running on localhost:6379',
+              );
               return false; // Stop retrying
             }
             return Math.min(retries * 100, 3000); // Exponential backoff, max 3 seconds
@@ -63,8 +68,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.redisClient.on('error', (err) => {
         // Only log the first error to avoid spam
         if (!this.isConnected && this.connectionAttempts === 0) {
-          this.logger.warn('⚠️  Redis connection failed. Application will run without caching.');
-          this.logger.warn('   To enable Redis caching, ensure Redis is running on localhost:6379');
+          this.logger.warn(
+            '⚠️  Redis connection failed. Application will run without caching.',
+          );
+          this.logger.warn(
+            '   To enable Redis caching, ensure Redis is running on localhost:6379',
+          );
         }
         this.isConnected = false;
         this.connectionAttempts++;
@@ -99,16 +108,43 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         );
       }
     } catch (error) {
-      this.logger.warn('⚠️  Redis connection failed. Application will run without caching.');
-      this.logger.warn('   To enable Redis caching, ensure Redis is running on localhost:6379');
+      this.logger.warn(
+        '⚠️  Redis connection failed. Application will run without caching.',
+      );
+      this.logger.warn(
+        '   To enable Redis caching, ensure Redis is running on localhost:6379',
+      );
       this.isConnected = false;
       // Do not crash app if Redis is down; continue in degraded mode.
     }
   }
 
   private async disconnect() {
-    if (this.redisClient) {
-      await this.redisClient.quit();
+    if (this.redisClient && this.isConnected) {
+      try {
+        // Add timeout to prevent hanging
+        await Promise.race([
+          this.redisClient.quit(),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Redis disconnect timeout')),
+              3000,
+            ),
+          ),
+        ]);
+        this.logger.log('Redis client disconnected');
+      } catch (error) {
+        this.logger.warn('Error disconnecting Redis client:', error);
+        // Force disconnect if quit() fails
+        try {
+          if (this.redisClient) {
+            this.redisClient.removeAllListeners();
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      this.isConnected = false;
     }
   }
 
@@ -119,7 +155,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   // Basic Redis Operations
   async set(key: string, value: string, ttl?: number): Promise<void> {
     if (!this.isConnected || !this.redisClient) {
-      this.logger.debug(`Redis not connected, skipping set operation for key: ${key}`);
+      this.logger.debug(
+        `Redis not connected, skipping set operation for key: ${key}`,
+      );
       return;
     }
     try {
@@ -300,21 +338,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async brPop(key: string, timeout: number = 0): Promise<[string, string] | null> {
+  async brPop(
+    key: string,
+    timeout: number = 0,
+  ): Promise<[string, string] | null> {
     if (!this.isConnected) {
       this.logger.debug(`Redis not connected, skipping brPop for ${key}`);
       return null;
     }
     try {
       const fullKey = this.getKey(key);
-      // brpop returns { key, element } or null in newer redis versions, 
+      // brpop returns { key, element } or null in newer redis versions,
       // but the type RedisClientType expects [string, string] or null usually
       const result = await this.redisClient.brPop(fullKey, timeout);
       if (!result) return null;
       // Result in node-redis v4 is { key: string, element: string }
       return [result.key, result.element];
     } catch (error) {
-      if (error.message === 'The client is closed' || error.name === 'ClientClosedError') {
+      if (
+        error.message === 'The client is closed' ||
+        error.name === 'ClientClosedError'
+      ) {
         this.logger.debug(`Redis client is closed, skipping brPop for ${key}`);
         return null;
       } else {
@@ -378,7 +422,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   // Cache Operations
   async cacheGet<T>(key: string): Promise<T | null> {
     if (!this.isConnected || !this.redisClient) {
-      this.logger.debug(`Redis not connected, returning null for cache key: ${key}`);
+      this.logger.debug(
+        `Redis not connected, returning null for cache key: ${key}`,
+      );
       return null;
     }
     try {
@@ -391,7 +437,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async cacheSet<T>(key: string, value: T, ttl: number = 3600): Promise<void> {
     if (!this.isConnected || !this.redisClient) {
-      this.logger.debug(`Redis not connected, skipping cache set for key: ${key}`);
+      this.logger.debug(
+        `Redis not connected, skipping cache set for key: ${key}`,
+      );
       return;
     }
     try {
