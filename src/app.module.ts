@@ -9,6 +9,7 @@ import helmet from 'helmet';
 // Configuration imports
 import appConfig from './config/app.config';
 import redisConfig from './config/redis.config';
+import fcmConfig from './config/fcm.config';
 
 // Core modules
 import { AppController } from './app.controller';
@@ -31,11 +32,13 @@ import { VehicleInventoryModule } from './vehicle-inventory/vehicle-inventory.mo
 import { VehicleModule } from './vehicles/vehicle.module';
 import { ChatModule } from './chat/chat.module';
 import { UserReportModule } from './users/user-report.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 // Services
 import { EmailService } from './utils/email.service';
 import { RefreshTokenService } from './auth/auth.refresh.service';
 import { RedisService } from './shared/redis.service';
+import { AdminNotificationController } from './admin/admin-notification.controller';
 
 // Schemas
 import {
@@ -51,7 +54,7 @@ import { configService } from './config/mongo.config';
   imports: [
     // Configuration
     ConfigModule.forRoot({
-      load: [appConfig, redisConfig],
+      load: [appConfig, redisConfig, fcmConfig],
       isGlobal: true,
       cache: true,
       envFilePath: ['.env.local', '.env'],
@@ -122,9 +125,10 @@ import { configService } from './config/mongo.config';
     UploadModule,
     VehicleInventoryModule,
     VehicleModule,
+    NotificationsModule,
   ],
   providers: [AppService, RefreshTokenService, EmailService, RedisService],
-  controllers: [AppController],
+  controllers: [AppController, AdminNotificationController],
   exports: [JwtModule],
 })
 export class AppModule implements NestModule {

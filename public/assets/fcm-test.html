@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Web Push Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #f68b1e;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        input,
+        button {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+
+        button {
+            background-color: #f68b1e;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #e07a1b;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #eee;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .token-box {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 FCM Web Push Test</h1>
+        <p>This page helps you verify the end-to-end flow of Web Push notifications.</p>
+
+        <div id="status" class="status pending">Initializing...</div>
+
+        <div id="step-1" class="step">
+            <h3>Step 1: Get Permissions & Generate Token</h3>
+            <button id="btn-generate">Generate FCM Token</button>
+        </div>
+
+        <div id="step-2" class="token-box" style="display:none;">
+            <h3>Step 2: Your FCM Token</h3>
+            <p>Compare this with the value in MongoDB or use it in the Firebase Console.</p>
+            <pre id="token-display"></pre>
+            <button id="btn-copy">Copy to Clipboard</button>
+        </div>
+
+        <div id="step-3" class="token-box" style="display:none;">
+            <h3>Step 3: Register with Backend</h3>
+            <p>Optionally register this token to your user account (requires JWT).</p>
+            <input type="text" id="jwt-input" placeholder="Bearer <JWT TOKEN>">
+            <button id="btn-register">Register Token</button>
+        </div>
+
+        <div id="step-4" class="token-box" style="display:none;">
+            <h3>Step 4: Send Test Push</h3>
+            <p>Trigger a notification from the backend to this device.</p>
+            <button id="btn-trigger" style="background-color: #28a745;">🚀 Send Test Push</button>
+        </div>
+
+        <hr>
+        <h3>Configuration Details</h3>
+        <pre id="config-display">Loading config from /fcm/config...</pre>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const configDisplay = document.getElementById('config-display');
+        const tokenDisplay = document.getElementById('token-display');
+        const btnGenerate = document.getElementById('btn-generate');
+        const btnRegister = document.getElementById('btn-register');
+        const btnCopy = document.getElementById('btn-copy');
+
+        let fcmConfig = null;
+        let messaging = null;
+        let currentToken = null;
+
+        async function init() {
+            try {
+                const response = await fetch('/fcm/config');
+                fcmConfig = await response.json();
+                configDisplay.textContent = JSON.stringify(fcmConfig, null, 2);
+
+                if (!fcmConfig.apiKey) {
+                    throw new Error('Missing FCM configuration in backend.');
+                }
+
+                firebase.initializeApp({
+                    apiKey: fcmConfig.apiKey,
+                    authDomain: `${fcmConfig.projectId}.firebaseapp.com`,
+                    projectId: fcmConfig.projectId,
+                    messagingSenderId: fcmConfig.messagingSenderId,
+                    appId: fcmConfig.appId,
+                });
+
+                messaging = firebase.messaging();
+
+                // Handle foreground messages
+                messaging.onMessage((payload) => {
+                    console.log('Message received. ', payload);
+                    const { title, body } = payload.notification;
+
+                    // Show a visible alert or update UI
+                    const note = document.createElement('div');
+                    note.style.cssText = 'position:fixed;top:20px;right:20px;background:#333;color:white;padding:15px;border-radius:5px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1);animation:slideIn 0.5s ease-out;';
+                    note.innerHTML = `<strong>${title}</strong><br>${body}`;
+                    document.body.appendChild(note);
+
+                    setTimeout(() => note.remove(), 5000);
+                });
+
+                statusEl.textContent = 'Ready to generate token.';
+                statusEl.className = 'status success';
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'status error';
+                btnGenerate.disabled = true;
+            }
+        }
+
+        btnGenerate.onclick = async () => {
+            try {
+                statusEl.textContent = 'Requesting permission...';
+                statusEl.className = 'status pending';
+
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    throw new Error('Permission not granted for notifications.');
+                }
+
+                currentToken = await messaging.getToken({ vapidKey: fcmConfig.vapidKey });
+                tokenDisplay.textContent = currentToken;
+                document.getElementById('step-2').style.display = 'block';
+                document.getElementById('step-3').style.display = 'block';
+                document.getElementById('step-4').style.display = 'block';
+
+                statusEl.textContent = 'Token generated successfully!';
+                statusEl.className = 'status success';
+                console.log('FCM Token:', currentToken);
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'status error';
+            }
+        };
+
+        btnCopy.onclick = () => {
+            navigator.clipboard.writeText(currentToken);
+            alert('Token copied!');
+        };
+
+        btnRegister.onclick = async () => {
+            const jwt = document.getElementById('jwt-input').value;
+            if (!jwt) {
+                alert('Please provide a JWT token.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/fcm/register-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': jwt.startsWith('Bearer ') ? jwt : `Bearer ${jwt}`
+                    },
+                    body: JSON.stringify({
+                        token: currentToken,
+                        platform: 'WEB'
+                    })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Token registered successfully!');
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        };
+
+        const btnTrigger = document.getElementById('btn-trigger');
+        btnTrigger.onclick = async () => {
+            const jwt = document.getElementById('jwt-input').value;
+            if (!jwt) {
+                alert('Please provide a JWT token (in Step 3) to authenticate the request.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/fcm/test-push', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': jwt.startsWith('Bearer ') ? jwt : `Bearer ${jwt}`
+                    }
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Test push sent! Watch for the notification.');
+                } else {
+                    alert(`Error sending push: ${result.message}`);
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        };
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+
+</html>

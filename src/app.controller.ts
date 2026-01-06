@@ -22,6 +22,7 @@ import { LocalAuthGuard } from './auth/guard/local-auth-guard';
 import { LoginUserDto } from './common/dtos/userLoginDto';
 import { HttpExceptionFilter } from './shared/exception-service';
 import { RedisService } from './shared/redis.service';
+import { FcmService } from './notifications/fcm/fcm.service';
 import { Response } from 'express';
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
@@ -32,11 +33,34 @@ export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly fcmService: FcmService,
+  ) { }
 
   @Get()
   getHello(): string {
     return this.appService.getHello();
+  }
+
+  @Get('fcm-test')
+  getFcmTestPage(@Res() res: Response) {
+    const path = join(
+      process.cwd(),
+      'public',
+      'assets',
+      'fcm-test.html',
+    );
+    if (existsSync(path)) {
+      res.sendFile(path);
+    } else {
+      res.status(404).send('fcm-test.html not found');
+    }
+  }
+
+  @Get('firebase-messaging-sw.js')
+  getServiceWorker(@Res() res: Response) {
+    res.setHeader('Content-Type', 'application/javascript');
+    const content = this.fcmService.getServiceWorkerContent();
+    res.send(content);
   }
 
   @Get('health')
