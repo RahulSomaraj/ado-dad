@@ -1794,40 +1794,6 @@ export class AdsService {
     try {
       this.logger.debug('getAllAdsForAdmin called with filters:', filters);
 
-      // Build deterministic cache key
-      const normalize = (obj: any): any => {
-        if (obj == null) return obj;
-        if (Array.isArray(obj)) return obj.map(normalize);
-        if (typeof obj === 'object') {
-          const entries = Object.entries(obj)
-            .filter(([, v]) => v !== undefined && v !== null && v !== '')
-            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-            .map(([k, v]) => [k, normalize(v)]);
-          return Object.fromEntries(entries);
-        }
-        return obj;
-      };
-
-      const safeFilters = this.normalize(filters);
-      const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
-
-      // Try cache first
-      let cached: PaginatedDetailedAdResponseDto | null = null;
-      try {
-        cached =
-          await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
-            cacheKey,
-          );
-        if (cached) {
-          return cached;
-        }
-      } catch (redisError) {
-        this.logger.warn(
-          'Redis cache get failed, continuing without cache:',
-          redisError,
-        );
-      }
-
       let {
         page = 1,
         limit = 20,
@@ -2081,20 +2047,6 @@ export class AdsService {
         hasNext: page < totalPages,
         hasPrev: page > 1,
       };
-
-      // Cache the result
-      try {
-        await this.redisService.cacheSet(
-          cacheKey,
-          response,
-          AdsService.TTL.LIST,
-        );
-      } catch (redisError) {
-        this.logger.warn(
-          'Redis cache set failed, continuing without caching:',
-          redisError,
-        );
-      }
 
       return response;
     } catch (error) {
@@ -2578,7 +2530,8 @@ export class AdsService {
         ...vehicleDetails,
         ...(manufacturer && {
           manufacturer: {
-            id: (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
+            id:
+              (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
             name: (manufacturer as any).name,
             country: (manufacturer as any).originCountry,
           },
@@ -2592,7 +2545,9 @@ export class AdsService {
         }),
         ...(cleanedVariant && {
           variant: {
-            id: (cleanedVariant as any)._id?.toString() ?? (cleanedVariant as any).id,
+            id:
+              (cleanedVariant as any)._id?.toString() ??
+              (cleanedVariant as any).id,
             name: (cleanedVariant as any).name,
             modelId: (cleanedVariant as any).vehicleModel?.toString(),
             price: (cleanedVariant as any).price,
@@ -2607,7 +2562,9 @@ export class AdsService {
         }),
         ...(transmissionType && {
           transmissionType: {
-            id: (transmissionType as any)._id?.toString() ?? (transmissionType as any).id,
+            id:
+              (transmissionType as any)._id?.toString() ??
+              (transmissionType as any).id,
             name: (transmissionType as any).name,
             description: (transmissionType as any).description,
           },
@@ -2628,50 +2585,50 @@ export class AdsService {
         await Promise.all([
           commercialVehicleDetails.manufacturerId
             ? this.vehicleInventoryService
-              .findManufacturerById(commercialVehicleDetails.manufacturerId)
-              .catch(() => ({
-                _id: commercialVehicleDetails.manufacturerId,
-                name: 'Not Found',
-                displayName: 'Not Found',
-              }))
+                .findManufacturerById(commercialVehicleDetails.manufacturerId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.manufacturerId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.modelId
             ? this.vehicleInventoryService
-              .findVehicleModelById(commercialVehicleDetails.modelId)
-              .catch(() => ({
-                _id: commercialVehicleDetails.modelId,
-                name: 'Not Found',
-                displayName: 'Not Found',
-              }))
+                .findVehicleModelById(commercialVehicleDetails.modelId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.modelId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.variantId
             ? this.vehicleInventoryService
-              .findVehicleVariantById(commercialVehicleDetails.variantId)
-              .catch(() => ({
-                _id: commercialVehicleDetails.variantId,
-                name: 'Not Found',
-                displayName: 'Not Found',
-              }))
+                .findVehicleVariantById(commercialVehicleDetails.variantId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.variantId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.fuelTypeId
             ? this.vehicleInventoryService
-              .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
-              .catch(() => ({
-                _id: commercialVehicleDetails.fuelTypeId,
-                name: 'Not Found',
-                displayName: 'Not Found',
-              }))
+                .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
+                .catch(() => ({
+                  _id: commercialVehicleDetails.fuelTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
             : Promise.resolve(undefined),
           commercialVehicleDetails.transmissionTypeId
             ? this.vehicleInventoryService
-              .findTransmissionTypeById(
-                commercialVehicleDetails.transmissionTypeId,
-              )
-              .catch(() => ({
-                _id: commercialVehicleDetails.transmissionTypeId,
-                name: 'Not Found',
-                displayName: 'Not Found',
-              }))
+                .findTransmissionTypeById(
+                  commercialVehicleDetails.transmissionTypeId,
+                )
+                .catch(() => ({
+                  _id: commercialVehicleDetails.transmissionTypeId,
+                  name: 'Not Found',
+                  displayName: 'Not Found',
+                }))
             : Promise.resolve(undefined),
         ]);
 
@@ -2697,7 +2654,8 @@ export class AdsService {
         ...commercialVehicleDetails,
         ...(manufacturer && {
           manufacturer: {
-            id: (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
+            id:
+              (manufacturer as any)._id?.toString() ?? (manufacturer as any).id,
             name: (manufacturer as any).name,
             country: (manufacturer as any).originCountry,
           },
@@ -2711,7 +2669,9 @@ export class AdsService {
         }),
         ...(cleanedVariant && {
           variant: {
-            id: (cleanedVariant as any)._id?.toString() ?? (cleanedVariant as any).id,
+            id:
+              (cleanedVariant as any)._id?.toString() ??
+              (cleanedVariant as any).id,
             name: (cleanedVariant as any).name,
             modelId: (cleanedVariant as any).vehicleModel?.toString(),
             price: (cleanedVariant as any).price,
@@ -2726,7 +2686,9 @@ export class AdsService {
         }),
         ...(transmissionType && {
           transmissionType: {
-            id: (transmissionType as any)._id?.toString() ?? (transmissionType as any).id,
+            id:
+              (transmissionType as any)._id?.toString() ??
+              (transmissionType as any).id,
             name: (transmissionType as any).name,
             description: (transmissionType as any).description,
           },
