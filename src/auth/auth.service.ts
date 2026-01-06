@@ -189,7 +189,7 @@ export class AuthService {
     console.log('sanitizedUser', sanitizedUser);
     return {
       ...sanitizedUser,
-      _id: sanitizedUser._id.toString(),
+      _id: user._id.toString(),
     } as UserValidationResult;
   }
 
