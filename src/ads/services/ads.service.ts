@@ -2268,28 +2268,75 @@ export class AdsService {
   }
 
   /** ---------- HELPER: Remove null values from objects ---------- */
-  private removeNullValues(obj: any): any {
+  private removeNullValues(obj: any, visited = new WeakSet<any>()): any {
     if (obj === null || obj === undefined) return undefined;
-    if (Array.isArray(obj)) return obj;
+
+    // Handle Mongoose Documents - convert to plain object
+    if (typeof obj.toObject === 'function') {
+      obj = obj.toObject({ virtuals: true, versionKey: false });
+    }
+
+    if (Array.isArray(obj)) {
+      return obj
+        .map((item) => this.removeNullValues(item, visited))
+        .filter((item) => item !== undefined);
+    }
+
+    // Convert ObjectId-like objects with buffer to string or remove them
+    if (obj && typeof obj === 'object') {
+      if (obj.buffer && obj.buffer instanceof Buffer) {
+        return undefined;
+      }
+      if (obj._id && obj._id.buffer && obj._id.buffer instanceof Buffer) {
+        // It's a BSON ObjectId structure leaked as a plain object
+        return undefined;
+      }
+    }
+
+    // Handle Mongoose ObjectID or similar objects that should be strings
+    if (obj && typeof obj === 'object' && obj.toString && Types.ObjectId.isValid(obj.toString())) {
+      // if it's the _id field value itself (checking if it is strictly an ObjectId type might be better but checking string validity is safe)
+      if (obj._bsontype === 'ObjectID') {
+        return obj.toString();
+      }
+    }
+
     if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    // Detect circular references
+    if (visited.has(obj)) return undefined;
+    visited.add(obj);
 
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
+      // Skip internal properties, version key, and raw buffer/binary IDs if they appear as keys
+      if (key.startsWith('$') || key === '__v' || (key.startsWith('_') && key !== '_id')) {
+        continue;
+      }
+
+      // Specifically fix the _id containing buffer issue
+      if (key === '_id' && value && typeof value === 'object' && (value as any).buffer) {
+        if ((value as any).toString) cleaned[key] = (value as any).toString();
+        continue;
+      }
+
+      if (key === '_id' && value && typeof value === 'object' && (value as any)._bsontype === 'ObjectID') {
+        cleaned[key] = value.toString();
+        continue;
+      }
+
       if (value !== null && value !== undefined) {
-        if (
-          typeof value === 'object' &&
-          !Array.isArray(value) &&
-          !(value instanceof Date)
-        ) {
-          const cleanedValue = this.removeNullValues(value);
-          if (
-            cleanedValue !== undefined &&
-            Object.keys(cleanedValue).length > 0
-          ) {
-            cleaned[key] = cleanedValue;
+        const cleanedValue = this.removeNullValues(value, visited);
+        if (cleanedValue !== undefined) {
+          // If it's an empty object, don't include it (mimics original behavior)
+          if (typeof cleanedValue === 'object' &&
+            !Array.isArray(cleanedValue) &&
+            !(cleanedValue instanceof Date) &&
+            Object.keys(cleanedValue).length === 0) {
+            continue;
           }
-        } else {
-          cleaned[key] = value;
+          cleaned[key] = cleanedValue;
         }
       }
     }

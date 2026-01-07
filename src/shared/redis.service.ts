@@ -329,6 +329,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async rPop(key: string): Promise<string | null> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.warn(`Redis not connected, returning null for rPop: ${key}`);
+      return null;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.rPop(fullKey);

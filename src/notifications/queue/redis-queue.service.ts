@@ -14,6 +14,6 @@ export class RedisQueueService {
     async pop(): Promise<any | null> {
         //const result = await this.redis.brPop(QUEUE_KEY, 0);
         const result = await this.redis.rPop(QUEUE_KEY);
-        return result ? JSON.parse(result[1]) : null;
+        return result ? JSON.parse(result) : null;
     }
 }
