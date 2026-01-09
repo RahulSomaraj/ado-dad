@@ -22,6 +22,7 @@ export interface PaginatedAdsResponse {
   totalPages: number;
   hasNext: boolean;
   hasPrev: boolean;
+  appliedRadiusKm?: number | null; // The radius that was actually used for geospatial query
 }
 
 export interface CachedListData {
@@ -33,11 +34,13 @@ export interface CachedListData {
   hasNext: boolean;
   hasPrev: boolean;
   cachedAt: number;
+  appliedRadiusKm?: number | null; // The radius that was actually used for geospatial query
 }
 
 @Injectable()
 export class ListAdsUc {
   private static readonly CACHE_TTL = 300; // 5 minutes
+  private static readonly MIN_RESULTS_BEFORE_EXPAND = 5; // Minimum results before stopping radius expansion
 
   constructor(
     private readonly adRepo: AdRepository,
@@ -89,6 +92,7 @@ export class ListAdsUc {
       totalPages: baseData.totalPages,
       hasNext: baseData.hasNext,
       hasPrev: baseData.hasPrev,
+      appliedRadiusKm: baseData.appliedRadiusKm ?? null,
     };
   }
 
@@ -161,38 +165,40 @@ export class ListAdsUc {
   }
 
   /**
-   * Fetch with automatic distance fallback when no results found
+   * Fetch with automatic distance fallback when results are insufficient
+   * Expands radius until we have enough results or reach max radius
    */
   private async fetchWithDistanceFallback(
     filters: ListAdsV2Dto,
   ): Promise<CachedListData> {
     const distanceThresholds = [50, 100, 200, 500, 1000]; // km
-    let lastResult: CachedListData | null = null;
+    let bestResult: CachedListData | null = null;
 
     for (const distance of distanceThresholds) {
       try {
         const result = await this.fetchWithSpecificDistance(filters, distance);
 
-        // If we found results, return them
-        if (result.total > 0) {
-          return result;
+        // First non-empty result becomes baseline
+        if (!bestResult && result.total > 0) {
+          bestResult = result;
         }
 
-        // Store the last result (even if empty) for fallback
-        lastResult = result;
+        // ✅ Stop expanding if we have "enough" results
+        if (result.total >= ListAdsUc.MIN_RESULTS_BEFORE_EXPAND) {
+          return result;
+        }
       } catch (error) {
         console.warn(`Failed to fetch with distance ${distance}km:`, error);
         // Continue to next distance threshold
       }
     }
 
-    // If no results found with any distance, return the last attempt
-    // or fetch without location filtering as final fallback
-    if (lastResult) {
-      return lastResult;
+    // If we never hit minimum, return the best available result
+    if (bestResult) {
+      return bestResult;
     }
 
-    // Final fallback: fetch without location filtering
+    // Final fallback: no geo filtering at all
     const { latitude, longitude, ...filtersWithoutLocation } = filters;
     return await this.fetchWithOriginalLogic(filtersWithoutLocation);
   }
@@ -205,7 +211,7 @@ export class ListAdsUc {
     distanceKm: number,
   ): Promise<CachedListData> {
     const modifiedFilters = { ...filters };
-    // We'll pass the distance to the location hierarchy service
+    // Pass the distance to $geoNear for geospatial filtering
     return await this.fetchWithOriginalLogic(modifiedFilters, distanceKm);
   }
 
@@ -247,36 +253,41 @@ export class ListAdsUc {
     // Build simplified aggregation pipeline
     const pipeline: any[] = [];
 
-    // Base match - exclude deleted ads and only show approved ads
-    pipeline.push({
-      $match: {
-        isDeleted: { $ne: true },
-        isActive: true,
-        isApproved: true, // Only show approved ads in listings
-        soldOut: { $ne: true }, // Exclude sold-out ads from listings (include null/undefined)
-      },
-    });
-
-    // Hierarchical location-based filtering
+    // Use $geoNear when coordinates are provided (MUST be first stage)
     if (latitude !== undefined && longitude !== undefined) {
-      // Get location hierarchy pipeline stages with custom distance if provided
-      const locationPipeline =
-        this.locationHierarchyService.getLocationAggregationPipeline(
-          latitude,
-          longitude,
-          customDistanceKm, // Pass custom distance for fallback mechanism
-        );
+      const maxDistanceKm = customDistanceKm ?? 50; // Default 50km radius
 
-      // Add location filtering stages to pipeline
-      pipeline.push(...locationPipeline);
-
-      // Add location scoring for prioritization
-      pipeline.push(
-        this.locationHierarchyService.getLocationScoringStage(
-          latitude,
-          longitude,
-        ),
-      );
+      pipeline.push({
+        $geoNear: {
+          near: {
+            type: 'Point',
+            coordinates: [longitude, latitude], // [longitude, latitude] for GeoJSON
+          },
+          key: 'geoLocation', // Use the 2dsphere indexed field
+          distanceField: 'distance', // Add distance field to each document
+          spherical: true, // Use spherical geometry for accurate distance calculation
+          distanceMultiplier: 0.001, // Convert meters to kilometers
+          maxDistance: maxDistanceKm * 1000, // Convert km to meters for MongoDB
+          query: {
+            // Base filters applied within $geoNear
+            isDeleted: { $ne: true },
+            isActive: true,
+            isApproved: true,
+            soldOut: { $ne: true },
+            geoLocation: { $exists: true, $ne: null }, // Only ads with valid geoLocation
+          },
+        },
+      });
+    } else {
+      // No coordinates - use regular match for base filters
+      pipeline.push({
+        $match: {
+          isDeleted: { $ne: true },
+          isActive: true,
+          isApproved: true,
+          soldOut: { $ne: true },
+        },
+      });
     }
 
     // Category filter
@@ -544,36 +555,44 @@ export class ListAdsUc {
         propertyDetails: 1,
         vehicleDetails: 1,
         commercialVehicleDetails: 1,
-        locationScore: 1, // Include location score for sorting
+        // distance field is already included above (added by $geoNear when coordinates are provided)
       },
     });
 
-    // Sort with location priority
-    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-
+    // Sort: nearest first, then newest within same distance
     if (latitude !== undefined && longitude !== undefined) {
-      // Prioritize by location score first, then by requested sort field
+      // Geospatial sorting: distance first (nearest), then createdAt (newest)
+      // Note: $geoNear ensures all results have a distance field
       pipeline.push({
         $sort: {
-          locationScore: -1, // Higher location score first (district > state > country)
-          [sortBy]: sortDirection,
+          distance: 1, // Nearest first (ascending distance)
+          createdAt: -1, // Newest first within same distance
+          _id: -1, // Final tie-breaker for deterministic ordering
         },
       });
     } else {
       // Regular sorting when no location filtering
+      const sortDirection = sortOrder === 'ASC' ? 1 : -1;
       pipeline.push({
-        $sort: { [sortBy]: sortDirection },
+        $sort: {
+          [sortBy]: sortDirection,
+          _id: -1, // Tie-breaker for deterministic ordering
+        },
       });
     }
-
-    // Count total documents
-    const countPipeline = [...pipeline];
-    countPipeline.push({ $count: 'total' });
 
     // Add pagination
     const skip = (page - 1) * limit;
     pipeline.push({ $skip: skip });
     pipeline.push({ $limit: limit });
+
+    // Count total documents (BEFORE pagination stages)
+    // Filter out pagination and sort stages to get accurate total count
+    const countPipeline = pipeline.filter(
+      (stage) =>
+        !('$skip' in stage) && !('$limit' in stage) && !('$sort' in stage),
+    );
+    countPipeline.push({ $count: 'total' });
 
     // Execute queries
     const [data, countResult] = await Promise.all([
@@ -608,6 +627,10 @@ export class ListAdsUc {
       hasNext: page < totalPages,
       hasPrev: page > 1,
       cachedAt: Date.now(),
+      appliedRadiusKm:
+        latitude !== undefined && longitude !== undefined
+          ? (customDistanceKm ?? 50)
+          : null,
     };
   }
 
