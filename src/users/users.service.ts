@@ -999,9 +999,22 @@ export class UsersService {
         const parsed = parsePhoneNumber(identifierDigits);
 
         if (parsed) {
-          // Search with country code and phone number
-          userQuery.countryCode = parsed.countryCode;
-          userQuery.phoneNumber = parsed.phoneNumber;
+          // If the raw input started with +, the user likely intended a specific country code
+          if (raw.startsWith('+')) {
+            userQuery.countryCode = parsed.countryCode;
+            userQuery.phoneNumber = parsed.phoneNumber;
+          } else {
+            // Otherwise, search broadly: either strictly as parsed (e.g. India default) OR just by phone number
+            // This handles cases where a 10-digit number from another country (e.g. Afghanistan)
+            // is parsed as strict India (+91) but should match the +93 user.
+            userQuery.$or = [
+              {
+                countryCode: parsed.countryCode,
+                phoneNumber: parsed.phoneNumber,
+              },
+              { phoneNumber: parsed.phoneNumber },
+            ];
+          }
         } else {
           // Fallback: search by phone number only (for backward compatibility)
           userQuery.phoneNumber = identifierDigits;

@@ -329,6 +329,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async rPop(key: string): Promise<string | null> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.warn(`Redis not connected, returning null for rPop: ${key}`);
+      return null;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.rPop(fullKey);
@@ -338,35 +342,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async brPop(
-    key: string,
-    timeout: number = 0,
-  ): Promise<[string, string] | null> {
-    if (!this.isConnected) {
-      this.logger.debug(`Redis not connected, skipping brPop for ${key}`);
-      return null;
-    }
-    try {
-      const fullKey = this.getKey(key);
-      // brpop returns { key, element } or null in newer redis versions,
-      // but the type RedisClientType expects [string, string] or null usually
-      const result = await this.redisClient.brPop(fullKey, timeout);
-      if (!result) return null;
-      // Result in node-redis v4 is { key: string, element: string }
-      return [result.key, result.element];
-    } catch (error) {
-      if (
-        error.message === 'The client is closed' ||
-        error.name === 'ClientClosedError'
-      ) {
-        this.logger.debug(`Redis client is closed, skipping brPop for ${key}`);
-        return null;
-      } else {
-        this.logger.error(`Error blocking popping from list ${key}:`, error);
-      }
-      throw error;
-    }
-  }
+  //brPop removed
 
   async lRange(key: string, start: number, stop: number): Promise<string[]> {
     try {

@@ -123,52 +123,77 @@ export class GetAdByIdUc {
       },
     ];
 
-    const results = await this.adRepo.aggregate(pipeline);
-    if (results.length === 0) {
+    // EXECUTE PARALLEL QUERIES
+    // We launch all independent read operations concurrently to reduce total latency.
+    const [
+      adResults,
+      favoritesCount,
+      userFavorite,
+      chatData,
+      ratings,
+    ] = await Promise.all([
+      // 1. Main Ad Fetch
+      this.adRepo.aggregate(pipeline),
+
+      // 2. Favorites Count
+      this.favoriteModel.countDocuments({
+        itemId: new Types.ObjectId(adId),
+      }),
+
+      // 3. User Favorite Status (if logged in)
+      userId
+        ? this.favoriteModel.findOne({
+          userId: new Types.ObjectId(userId),
+          itemId: new Types.ObjectId(adId),
+        })
+        : Promise.resolve(null),
+
+      // 4. Chat Data (Refactored to return data instead of mutating DTO)
+      this.getChatData(adId, userId),
+
+      // 5. Ratings
+      this.getAdRatings(adId),
+    ]);
+
+    // Check if ad exists
+    if (adResults.length === 0) {
       throw new NotFoundException(`Advertisement with ID ${adId} not found`);
     }
 
-    const ad = results[0];
+    const ad = adResults[0];
 
-    // Increment view count
-    await this.adRepo.updateOne(
-      { _id: new Types.ObjectId(adId) },
-      { $inc: { viewCount: 1 } },
-    );
+    // Fire-and-forget view count increment (don't await)
+    // We catch errors to prevent unhandled promise rejections
+    this.adRepo
+      .updateOne(
+        { _id: new Types.ObjectId(adId) },
+        { $inc: { viewCount: 1 } },
+      )
+      .catch((err) => console.error('Error incrementing view count:', err));
 
-    // Map to detailed response DTO with individual vehicle inventory lookups
+    // Map to detailed response DTO
+    // This involves inventory lookups which are internally parallelized
     const detailed = await this.mapToDetailedResponseDto(ad);
 
-    // Get favorites count
-    const favoritesCount = await this.favoriteModel.countDocuments({
-      itemId: new Types.ObjectId(adId),
-    });
+    // Populate the auxiliary data we fetched in parallel
     detailed.favoritesCount = favoritesCount;
+    detailed.isFavorite = !!userFavorite;
 
-    // Check if current user has favorited this ad
+    // Populate chat data
+    detailed.chats = chatData.chats;
+    detailed.chatsCount = chatData.chatsCount;
     if (userId) {
-      const userFavorite = await this.favoriteModel.findOne({
-        userId: new Types.ObjectId(userId),
-        itemId: new Types.ObjectId(adId),
-      });
-      detailed.isFavorited = !!userFavorite;
-      detailed.isFavorite = !!userFavorite; // For consistency with list endpoint
-    } else {
-      detailed.isFavorite = false; // For unauthenticated users
+      detailed.hasUserChat = chatData.hasUserChat;
     }
 
-    // Get chat relations
-    await this.populateChatRelations(detailed, userId);
-
-    // Get ratings and reviews (placeholder for future implementation)
-    const ratings = await this.getAdRatings(adId);
+    // Populate ratings
     if (ratings) {
       detailed.averageRating = ratings.averageRating;
       detailed.ratingsCount = ratings.ratingsCount;
       detailed.reviews = ratings.reviews;
     }
 
-    // Add view count to response
+    // Add locally incremented view count for immediate feedback
     detailed.viewCount = (ad.viewCount || 0) + 1;
 
     return detailed;
@@ -269,21 +294,40 @@ export class GetAdByIdUc {
     };
   }
 
-  private async populateChatRelations(
-    detailedAd: DetailedAdResponseDto,
+  private async getChatData(
+    adId: string,
     userId?: string,
-  ): Promise<void> {
+  ): Promise<{
+    chats: any[];
+    chatsCount: number;
+    hasUserChat?: boolean;
+  }> {
     try {
-      // Get chat rooms related to this ad
-      const chatRooms = await this.chatRoomModel
-        .find({ adId: new Types.ObjectId(detailedAd.id) })
+      // Start both queries in parallel
+      const chatRoomsPromise = this.chatRoomModel
+        .find({ adId: new Types.ObjectId(adId) })
         .populate('initiatorId', 'name email profilePic')
         .populate('adPosterId', 'name email profilePic')
         .sort({ lastMessageAt: -1 })
         .limit(10)
         .lean();
 
-      // Get last message for each chat room
+      const userChatPromise = userId
+        ? this.chatRoomModel.findOne({
+          adId: new Types.ObjectId(adId),
+          $or: [
+            { initiatorId: new Types.ObjectId(userId) },
+            { adPosterId: new Types.ObjectId(userId) },
+          ],
+        })
+        : Promise.resolve(null);
+
+      const [chatRooms, userChatRoom] = await Promise.all([
+        chatRoomsPromise,
+        userChatPromise,
+      ]);
+
+      // Get last message for each chat room (parallelized map)
       const chatRoomsWithMessages = await Promise.all(
         chatRooms.map(async (room: any) => {
           const lastMessage = await this.messageModel
@@ -308,35 +352,28 @@ export class GetAdByIdUc {
             ],
             lastMessage: lastMessage
               ? {
-                  content: lastMessage.content,
-                  createdAt: (lastMessage as any).createdAt || new Date(),
-                  sender: (lastMessage as any).senderId?.name || 'Unknown',
-                }
+                content: lastMessage.content,
+                createdAt: (lastMessage as any).createdAt || new Date(),
+                sender: (lastMessage as any).senderId?.name || 'Unknown',
+              }
               : undefined,
             createdAt: room.createdAt || new Date(),
           };
         }),
       );
 
-      detailedAd.chats = chatRoomsWithMessages;
-      detailedAd.chatsCount = chatRooms.length;
-
-      // Check if current user has an active chat with this ad
-      if (userId) {
-        const userChatRoom = await this.chatRoomModel.findOne({
-          adId: new Types.ObjectId(detailedAd.id),
-          $or: [
-            { initiatorId: new Types.ObjectId(userId) },
-            { adPosterId: new Types.ObjectId(userId) },
-          ],
-        });
-        detailedAd.hasUserChat = !!userChatRoom;
-      }
+      return {
+        chats: chatRoomsWithMessages,
+        chatsCount: chatRooms.length,
+        hasUserChat: !!userChatRoom,
+      };
     } catch (error) {
-      console.error('Error populating chat relations:', error);
-      // Don't throw error, just set empty values
-      detailedAd.chats = [];
-      detailedAd.chatsCount = 0;
+      console.error('Error fetching chat data:', error);
+      return {
+        chats: [],
+        chatsCount: 0,
+        hasUserChat: false,
+      };
     }
   }
 
