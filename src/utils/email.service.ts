@@ -16,9 +16,22 @@ export class EmailService {
     },
   });
 
+  /**
+   * Get formatted sender email with display name
+   */
+  private getFormattedSender(): string {
+    const fromEmail = process.env.SES_FROM_EMAIL || process.env.EMAIL_USER;
+    const senderName = process.env.EMAIL_SENDER_NAME || 'AdoDad';
+    
+    if (fromEmail) {
+      return `${senderName} <${fromEmail}>`;
+    }
+    return senderName;
+  }
+
   async sendOtp(email: string, otp: string): Promise<void> {
     const input = {
-      Source: process.env.SES_FROM_EMAIL || process.env.EMAIL_USER,
+      Source: this.getFormattedSender(),
       Destination: {
         ToAddresses: [email],
       },
@@ -48,7 +61,7 @@ export class EmailService {
 
   async sendEmail(options: EmailOptions): Promise<void> {
     const input = {
-      Source: process.env.SES_FROM_EMAIL || process.env.EMAIL_USER,
+      Source: this.getFormattedSender(),
       Destination: {
         ToAddresses: [options.to],
       },
