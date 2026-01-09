@@ -40,7 +40,6 @@ export interface CachedListData {
 @Injectable()
 export class ListAdsUc {
   private static readonly CACHE_TTL = 300; // 5 minutes
-  private static readonly MIN_RESULTS_BEFORE_EXPAND = 5; // Minimum results before stopping radius expansion
 
   constructor(
     private readonly adRepo: AdRepository,
@@ -100,6 +99,9 @@ export class ListAdsUc {
    * Generate cache key only for specific scenarios:
    * 1. All ads (no filters except pagination and sort)
    * 2. Category + Location only (no other filters)
+   *
+   * IMPORTANT: Geo queries (latitude/longitude) are NOT cached
+   * because radius expansion makes results unpredictable
    */
   private generateListCacheKey(filters: ListAdsV2Dto): string | null {
     const {
@@ -115,7 +117,15 @@ export class ListAdsUc {
       sortBy,
       sortOrder,
       listingType,
+      latitude,
+      longitude,
     } = filters;
+
+    // 🔴 CRITICAL: Disable caching for geo queries
+    // Geo queries use dynamic radius expansion, making results unpredictable
+    if (latitude !== undefined && longitude !== undefined) {
+      return null;
+    }
 
     // Scenario 1: All ads (no filters except pagination and sort)
     if (
@@ -183,8 +193,13 @@ export class ListAdsUc {
           bestResult = result;
         }
 
-        // ✅ Stop expanding if we have "enough" results
-        if (result.total >= ListAdsUc.MIN_RESULTS_BEFORE_EXPAND) {
+        // ✅ FIX: Stop expanding if we have enough results for the requested page
+        // Must check: total >= page * limit to ensure enough data for pagination
+        const requestedPage = filters.page || 1;
+        const requestedLimit = filters.limit || 20;
+        const requiredTotal = requestedPage * requestedLimit;
+
+        if (result.total >= requiredTotal) {
           return result;
         }
       } catch (error) {
@@ -250,14 +265,15 @@ export class ListAdsUc {
       sortOrder = 'DESC',
     } = filters;
 
-    // Build simplified aggregation pipeline
-    const pipeline: any[] = [];
+    // ✅ CRITICAL FIX: Build basePipeline first (NO pagination, NO sort)
+    // This ensures countPipeline gets accurate total count
+    const basePipeline: any[] = [];
 
     // Use $geoNear when coordinates are provided (MUST be first stage)
     if (latitude !== undefined && longitude !== undefined) {
       const maxDistanceKm = customDistanceKm ?? 50; // Default 50km radius
 
-      pipeline.push({
+      basePipeline.push({
         $geoNear: {
           near: {
             type: 'Point',
@@ -270,17 +286,18 @@ export class ListAdsUc {
           maxDistance: maxDistanceKm * 1000, // Convert km to meters for MongoDB
           query: {
             // Base filters applied within $geoNear
+            // Note: geoLocation validation is handled by MongoDB's 2dsphere index
+            // Removing explicit geoLocation check allows fallback to work correctly
             isDeleted: { $ne: true },
             isActive: true,
             isApproved: true,
             soldOut: { $ne: true },
-            geoLocation: { $exists: true, $ne: null }, // Only ads with valid geoLocation
           },
         },
       });
     } else {
       // No coordinates - use regular match for base filters
-      pipeline.push({
+      basePipeline.push({
         $match: {
           isDeleted: { $ne: true },
           isActive: true,
@@ -292,14 +309,14 @@ export class ListAdsUc {
 
     // Category filter
     if (category) {
-      pipeline.push({
+      basePipeline.push({
         $match: { category },
       });
     }
 
     // Location filter
     if (location) {
-      pipeline.push({
+      basePipeline.push({
         $match: {
           location: { $regex: location, $options: 'i' },
         },
@@ -311,14 +328,14 @@ export class ListAdsUc {
       const priceMatch: any = {};
       if (minPrice) priceMatch.$gte = minPrice;
       if (maxPrice) priceMatch.$lte = maxPrice;
-      pipeline.push({
+      basePipeline.push({
         $match: { price: priceMatch },
       });
     }
 
     // Basic search filter (before lookups)
     if (search) {
-      pipeline.push({
+      basePipeline.push({
         $match: {
           $or: [
             // Basic ad fields
@@ -330,7 +347,7 @@ export class ListAdsUc {
     }
 
     // User lookup
-    pipeline.push({
+    basePipeline.push({
       $lookup: {
         from: 'users',
         localField: 'postedBy',
@@ -353,12 +370,12 @@ export class ListAdsUc {
         ],
       },
     });
-    pipeline.push({
+    basePipeline.push({
       $unwind: { path: '$user', preserveNullAndEmptyArrays: true },
     });
 
     // Property details lookup
-    pipeline.push({
+    basePipeline.push({
       $lookup: {
         from: 'propertyads',
         localField: '_id',
@@ -368,6 +385,7 @@ export class ListAdsUc {
     });
 
     // Property-specific filters
+    // ✅ FIX: Use $elemMatch since propertyDetails is still an array at filter time
     if (
       propertyTypes ||
       listingType ||
@@ -379,45 +397,49 @@ export class ListAdsUc {
       hasParking !== undefined
     ) {
       // Ensure we are filtering only property ads when property filters are present
-      pipeline.push({ $match: { category: 'property' } });
+      basePipeline.push({ $match: { category: 'property' } });
 
-      const propMatch: any = {};
+      const elemMatchConditions: any = {};
 
       if (propertyTypes && propertyTypes.length > 0) {
-        propMatch['propertyDetails.propertyType'] = { $in: propertyTypes };
+        elemMatchConditions.propertyType = { $in: propertyTypes };
       }
       if (listingType) {
-        propMatch['propertyDetails.listingType'] = listingType;
+        elemMatchConditions.listingType = listingType;
       }
       if (minBedrooms !== undefined || maxBedrooms !== undefined) {
-        propMatch['propertyDetails.bedrooms'] = {};
+        elemMatchConditions.bedrooms = {};
         if (minBedrooms !== undefined)
-          propMatch['propertyDetails.bedrooms'].$gte = minBedrooms;
+          elemMatchConditions.bedrooms.$gte = minBedrooms;
         if (maxBedrooms !== undefined)
-          propMatch['propertyDetails.bedrooms'].$lte = maxBedrooms;
+          elemMatchConditions.bedrooms.$lte = maxBedrooms;
       }
       if (minArea !== undefined || maxArea !== undefined) {
-        propMatch['propertyDetails.areaSqft'] = {};
-        if (minArea !== undefined)
-          propMatch['propertyDetails.areaSqft'].$gte = minArea;
-        if (maxArea !== undefined)
-          propMatch['propertyDetails.areaSqft'].$lte = maxArea;
+        elemMatchConditions.areaSqft = {};
+        if (minArea !== undefined) elemMatchConditions.areaSqft.$gte = minArea;
+        if (maxArea !== undefined) elemMatchConditions.areaSqft.$lte = maxArea;
       }
       if (isFurnished !== undefined) {
-        propMatch['propertyDetails.isFurnished'] = isFurnished;
+        elemMatchConditions.isFurnished = isFurnished;
       }
       if (hasParking !== undefined) {
-        propMatch['propertyDetails.hasParking'] = hasParking;
+        elemMatchConditions.hasParking = hasParking;
       }
 
-      if (Object.keys(propMatch).length > 0) {
-        // propertyDetails may be an array; match on any element
-        pipeline.push({ $match: propMatch });
+      if (Object.keys(elemMatchConditions).length > 0) {
+        // ✅ FIX: Use $elemMatch to correctly filter array field
+        basePipeline.push({
+          $match: {
+            propertyDetails: {
+              $elemMatch: elemMatchConditions,
+            },
+          },
+        });
       }
     }
 
     // Vehicle details lookup
-    pipeline.push({
+    basePipeline.push({
       $lookup: {
         from: 'vehicleads',
         localField: '_id',
@@ -427,7 +449,7 @@ export class ListAdsUc {
     });
 
     // Commercial vehicle details lookup
-    pipeline.push({
+    basePipeline.push({
       $lookup: {
         from: 'commercialvehicleads',
         localField: '_id',
@@ -436,19 +458,17 @@ export class ListAdsUc {
       },
     });
 
-    // Vehicle specific filters (apply to all vehicle categories: private_vehicle, commercial_vehicle, two_wheeler)
+    // Vehicle specific filters
+    // ✅ FIX: Apply vehicle filters when vehicle filters are present, regardless of category
+    // This matches OLX behavior where filters work even without explicit category selection
     if (
-      (category === 'private_vehicle' ||
-        category === 'commercial_vehicle' ||
-        category === 'two_wheeler') &&
-      (fuelTypeIds?.length ||
-        transmissionTypeIds?.length ||
-        manufacturerIds?.length ||
-        modelIds?.length ||
-        minYear !== undefined ||
-        maxYear !== undefined)
+      fuelTypeIds?.length ||
+      transmissionTypeIds?.length ||
+      manufacturerIds?.length ||
+      modelIds?.length ||
+      minYear !== undefined ||
+      maxYear !== undefined
     ) {
-      const vehicleMatch: any = {};
       const elemMatchConditions: any = {};
 
       if (fuelTypeIds?.length) {
@@ -482,31 +502,38 @@ export class ListAdsUc {
       }
 
       if (Object.keys(elemMatchConditions).length > 0) {
-        // Apply filters to the appropriate vehicle details collection based on category
-        if (category === 'two_wheeler') {
-          vehicleMatch.vehicleDetails = {
-            $elemMatch: elemMatchConditions,
-          };
-        } else if (category === 'private_vehicle') {
-          vehicleMatch.vehicleDetails = {
-            $elemMatch: elemMatchConditions,
-          };
-        } else if (category === 'commercial_vehicle') {
-          vehicleMatch.commercialVehicleDetails = {
-            $elemMatch: elemMatchConditions,
-          };
+        // ✅ FIX: Apply filters to both vehicle collections when category is not specified
+        // If category is specified, still check both to handle edge cases
+        if (category === 'commercial_vehicle') {
+          // Only commercial vehicles
+          basePipeline.push({
+            $match: {
+              commercialVehicleDetails: {
+                $elemMatch: elemMatchConditions,
+              },
+            },
+          });
+        } else {
+          // Apply to both vehicleDetails and commercialVehicleDetails
+          // This handles: no category, private_vehicle, two_wheeler, or mixed scenarios
+          basePipeline.push({
+            $match: {
+              $or: [
+                { vehicleDetails: { $elemMatch: elemMatchConditions } },
+                {
+                  commercialVehicleDetails: { $elemMatch: elemMatchConditions },
+                },
+              ],
+            },
+          });
         }
       }
-
-      pipeline.push({
-        $match: vehicleMatch,
-      });
     }
 
     // No favorites lookup in base data - will be added per user
 
     // Add fields for better response structure
-    pipeline.push({
+    basePipeline.push({
       $addFields: {
         id: '$_id',
         postedAt: '$createdAt',
@@ -528,7 +555,7 @@ export class ListAdsUc {
     });
 
     // Project final fields
-    pipeline.push({
+    basePipeline.push({
       $project: {
         _id: 1,
         title: 1,
@@ -559,11 +586,26 @@ export class ListAdsUc {
       },
     });
 
-    // Sort: nearest first, then newest within same distance
-    if (latitude !== undefined && longitude !== undefined) {
-      // Geospatial sorting: distance first (nearest), then createdAt (newest)
+    // ✅ Clone basePipeline for data and count pipelines
+    const dataPipeline = [...basePipeline];
+    const countPipeline = [...basePipeline];
+
+    // ✅ Apply sorting ONLY to dataPipeline
+    // Priority: Search relevance > Distance > Recency
+    if (search && latitude !== undefined && longitude !== undefined) {
+      // When search + location: prioritize relevance (newest first), then distance
+      // Users expect relevant results first, not just nearest
+      dataPipeline.push({
+        $sort: {
+          createdAt: -1, // Newest/relevant first
+          distance: 1, // Then nearest
+          _id: -1, // Final tie-breaker for deterministic ordering
+        },
+      });
+    } else if (latitude !== undefined && longitude !== undefined) {
+      // Geospatial sorting (no search): distance first (nearest), then createdAt (newest)
       // Note: $geoNear ensures all results have a distance field
-      pipeline.push({
+      dataPipeline.push({
         $sort: {
           distance: 1, // Nearest first (ascending distance)
           createdAt: -1, // Newest first within same distance
@@ -573,7 +615,7 @@ export class ListAdsUc {
     } else {
       // Regular sorting when no location filtering
       const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-      pipeline.push({
+      dataPipeline.push({
         $sort: {
           [sortBy]: sortDirection,
           _id: -1, // Tie-breaker for deterministic ordering
@@ -581,22 +623,17 @@ export class ListAdsUc {
       });
     }
 
-    // Add pagination
+    // ✅ Apply pagination ONLY to dataPipeline
     const skip = (page - 1) * limit;
-    pipeline.push({ $skip: skip });
-    pipeline.push({ $limit: limit });
+    dataPipeline.push({ $skip: skip });
+    dataPipeline.push({ $limit: limit });
 
-    // Count total documents (BEFORE pagination stages)
-    // Filter out pagination and sort stages to get accurate total count
-    const countPipeline = pipeline.filter(
-      (stage) =>
-        !('$skip' in stage) && !('$limit' in stage) && !('$sort' in stage),
-    );
+    // ✅ Count pipeline: just add $count (no sort, no pagination)
     countPipeline.push({ $count: 'total' });
 
     // Execute queries
     const [data, countResult] = await Promise.all([
-      this.adRepo.aggregate(pipeline),
+      this.adRepo.aggregate(dataPipeline),
       this.adRepo.aggregate(countPipeline),
     ]);
 
