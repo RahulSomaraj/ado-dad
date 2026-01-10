@@ -94,18 +94,6 @@ export class ManufacturersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a manufacturer' })
-  @ApiParam({
-    name: 'id',
-    description: 'Manufacturer ID',
-    example: '507f1f77bcf86cd799439011',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Manufacturer updated successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Manufacturer not found' })
-  @ApiResponse({ status: 400, description: 'Invalid request' })
   async updateManufacturer(
     @Param('id') id: string,
     @Body() updateManufacturerDto: UpdateManufacturerDto,

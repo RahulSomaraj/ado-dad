@@ -19,8 +19,6 @@ export class Manufacturer {
 
   @Prop({
     required: true,
-    validate: (v: string) =>
-      /^https?:\/\/.*\.(jpg|jpeg|png|webp|avif|gif|svg)$/.test(v),
   })
   logo: string;
 

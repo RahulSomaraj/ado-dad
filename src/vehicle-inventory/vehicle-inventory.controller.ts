@@ -142,14 +142,6 @@ export class VehicleInventoryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a vehicle model' })
-  @ApiParam({ name: 'id', description: 'Vehicle model ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Vehicle model updated successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Invalid request' })
-  @ApiResponse({ status: 404, description: 'Vehicle model not found' })
   async updateVehicleModel(
     @Param('id') id: string,
     @Body() updateVehicleModelDto: UpdateVehicleModelDto,
