@@ -251,8 +251,12 @@ export class VehicleInventoryService {
       sort[sortBy] = sortOrder === 'DESC' ? -1 : 1;
     }
 
-    // Pagination - return everything if limit/page not provided
-    const shouldPaginate = limit !== undefined && page !== undefined;
+    // Pagination - return everything if limit/page not provided OR if page=1&limit=100
+    const isGetAllRequest = 
+      (limit === undefined && page === undefined) ||
+      (page === 1 && limit === 100);
+    
+    const shouldPaginate = !isGetAllRequest && limit !== undefined && page !== undefined;
     const actualPage = shouldPaginate ? page : 1;
     const actualLimit = shouldPaginate ? limit : undefined;
 
@@ -275,6 +279,7 @@ export class VehicleInventoryService {
     ]);
 
     const responseLimit = actualLimit || total;
+    const responsePage = isGetAllRequest ? (page || 1) : actualPage;
     const totalPages = shouldPaginate ? Math.ceil(total / responseLimit) : 1;
     const hasNext = shouldPaginate ? actualPage < totalPages : false;
     const hasPrev = shouldPaginate ? actualPage > 1 : false;
@@ -282,7 +287,7 @@ export class VehicleInventoryService {
     const response: PaginatedVehicleModelResponseDto = {
       data: models as any,
       total,
-      page: actualPage,
+      page: responsePage,
       limit: responseLimit,
       totalPages,
       hasNext,

@@ -326,8 +326,12 @@ export class ManufacturersService {
     );
     const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
 
-    // Pagination - return everything if limit/page not provided
-    const shouldPaginate = filters.limit !== undefined && filters.page !== undefined;
+    // Pagination - return everything if limit/page not provided OR if page=1&limit=100
+    const isGetAllRequest = 
+      (filters.limit === undefined && filters.page === undefined) ||
+      (filters.page === 1 && filters.limit === 100);
+    
+    const shouldPaginate = !isGetAllRequest && filters.limit !== undefined && filters.page !== undefined;
     const limit = shouldPaginate ? this.clamp(filters.limit!, 1, 50) : undefined;
     const page = shouldPaginate ? this.clamp(filters.page!, 1, 1000) : 1;
     const skip = shouldPaginate ? (page - 1) * limit! : undefined;
@@ -358,6 +362,7 @@ export class ManufacturersService {
     ]);
 
     const actualLimit = limit || total;
+    const responsePage = isGetAllRequest ? (filters.page || 1) : page;
     const totalPages = shouldPaginate ? Math.ceil(total / actualLimit) : 1;
     const hasNext = shouldPaginate ? page < totalPages : false;
     const hasPrev = shouldPaginate ? page > 1 : false;
@@ -365,7 +370,7 @@ export class ManufacturersService {
     const response: PaginatedManufacturerResponseDto = {
       data: data as any,
       total,
-      page,
+      page: responsePage,
       limit: actualLimit,
       totalPages,
       hasNext,
