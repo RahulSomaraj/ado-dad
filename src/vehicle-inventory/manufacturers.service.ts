@@ -326,10 +326,11 @@ export class ManufacturersService {
     );
     const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
 
-    // Pagination
-    const limit = this.clamp(filters.limit || 10, 1, 50);
-    const page = this.clamp(filters.page || 1, 1, 1000);
-    const skip = (page - 1) * limit;
+    // Pagination - return everything if limit/page not provided
+    const shouldPaginate = filters.limit !== undefined && filters.page !== undefined;
+    const limit = shouldPaginate ? this.clamp(filters.limit!, 1, 50) : undefined;
+    const page = shouldPaginate ? this.clamp(filters.page!, 1, 1000) : 1;
+    const skip = shouldPaginate ? (page - 1) * limit! : undefined;
 
     // Execute query
     const [total, data] = await Promise.all([
@@ -349,19 +350,23 @@ export class ManufacturersService {
         if (stringSortFields.includes(sortBy)) {
           q.collation({ locale: 'en', strength: 2 });
         }
-        return q.sort(sort).skip(skip).limit(limit).lean().exec();
+        q.sort(sort);
+        if (skip !== undefined) q.skip(skip);
+        if (limit !== undefined) q.limit(limit);
+        return q.lean().exec();
       })(),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
+    const actualLimit = limit || total;
+    const totalPages = shouldPaginate ? Math.ceil(total / actualLimit) : 1;
+    const hasNext = shouldPaginate ? page < totalPages : false;
+    const hasPrev = shouldPaginate ? page > 1 : false;
 
     const response: PaginatedManufacturerResponseDto = {
       data: data as any,
       total,
       page,
-      limit,
+      limit: actualLimit,
       totalPages,
       hasNext,
       hasPrev,

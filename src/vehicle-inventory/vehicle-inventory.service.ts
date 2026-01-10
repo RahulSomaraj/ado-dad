@@ -221,8 +221,8 @@ export class VehicleInventoryService {
     filters: FilterVehicleModelDto,
   ): Promise<PaginatedVehicleModelResponseDto> {
     const {
-      page = 1,
-      limit = 10,
+      page,
+      limit,
       sortBy = 'name',
       sortOrder = 'ASC',
     } = filters;
@@ -251,29 +251,42 @@ export class VehicleInventoryService {
       sort[sortBy] = sortOrder === 'DESC' ? -1 : 1;
     }
 
+    // Pagination - return everything if limit/page not provided
+    const shouldPaginate = limit !== undefined && page !== undefined;
+    const actualPage = shouldPaginate ? page : 1;
+    const actualLimit = shouldPaginate ? limit : undefined;
+
     const [models, total] = await Promise.all([
-      this.vehicleModelModel
-        .find(query)
-        .populate('manufacturer', 'name displayName logo')
-        .collation({ locale: 'en', strength: 2 })
-        .sort(sort)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean()
-        .exec(),
+      (() => {
+        const q = this.vehicleModelModel
+          .find(query)
+          .populate('manufacturer', 'name displayName logo')
+          .collation({ locale: 'en', strength: 2 })
+          .sort(sort);
+        
+        if (shouldPaginate) {
+          q.skip((actualPage - 1) * actualLimit!);
+          q.limit(actualLimit!);
+        }
+        
+        return q.lean().exec();
+      })(),
       this.vehicleModelModel.countDocuments(query).exec(),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
+    const responseLimit = actualLimit || total;
+    const totalPages = shouldPaginate ? Math.ceil(total / responseLimit) : 1;
+    const hasNext = shouldPaginate ? actualPage < totalPages : false;
+    const hasPrev = shouldPaginate ? actualPage > 1 : false;
 
     const response: PaginatedVehicleModelResponseDto = {
       data: models as any,
       total,
-      page,
-      limit,
+      page: actualPage,
+      limit: responseLimit,
       totalPages,
-      hasNext: page < totalPages,
-      hasPrev: page > 1,
+      hasNext,
+      hasPrev,
     };
 
     return response;
