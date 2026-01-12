@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Param, Get, BadRequestException, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody, ApiExcludeController } from '@nestjs/swagger';
 import { NotificationProducer } from '../notifications/notification.producer';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -9,6 +9,7 @@ import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { AdminSendNotificationDto } from '../notifications/dto/admin-send-notification.dto';
 
 @ApiTags('Admin Notifications')
+@ApiExcludeController()
 @Controller('admin/notifications')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
@@ -59,7 +60,6 @@ export class AdminNotificationController {
             }
         }
     })
-    @ApiResponse({ status: 201, description: 'Notification queued successfully', type: NotificationLog })
     async send(@Body() body: AdminSendNotificationDto) {
         const { targetType, userIds, title, message, data } = body;
 

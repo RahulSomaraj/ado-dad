@@ -5,8 +5,10 @@ import { JwtAuthGuard } from '../../auth/guard/jwt-auth-guard';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
 import { FcmResponseDto } from './dto/fcm-response.dto';
+import { ApiExcludeController } from '@nestjs/swagger';
 
 @ApiTags('FCM')
+@ApiExcludeController()
 @Controller('fcm')
 export class FcmController {
     private readonly logger = new Logger(FcmController.name);

@@ -6,6 +6,7 @@ import { RedisQueueService } from './queue/redis-queue.service';
 import { NotificationProducer } from './notification.producer';
 import { NotificationWorker } from './notification.worker';
 import { RedisModule } from '../shared/redis.module';
+import { NotificationsController } from './notifications.controller';
 
 @Module({
     imports: [
@@ -20,6 +21,7 @@ import { RedisModule } from '../shared/redis.module';
         NotificationProducer,
         NotificationWorker,
     ],
+    controllers: [NotificationsController],
     exports: [NotificationProducer, FcmModule, RedisQueueService, MongooseModule],
 })
 export class NotificationsModule { }
