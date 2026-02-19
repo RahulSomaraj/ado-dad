@@ -261,7 +261,7 @@ export class ChatService {
         // Get user details
         const otherUser = await this.userModel
           .findById(otherUserId)
-          .select('name profilePic email')
+          .select('name profilePic email countryCode phoneNumber')
           .lean()
           .exec();
 
@@ -298,6 +298,8 @@ export class ChatService {
                 name: otherUser.name,
                 profilePic: otherUser.profilePic,
                 email: otherUser.email,
+                countryCode: otherUser.countryCode,
+                phoneNumber: otherUser.phoneNumber,
               }
             : null,
           latestMessage: latestMessage
