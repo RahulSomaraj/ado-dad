@@ -368,9 +368,7 @@ export class ChatService {
   /** Get ad by ID */
   async getAdById(adId: string | Types.ObjectId): Promise<any> {
     this.validateObjectId(adId, 'Ad ID');
-
     const ad = await this.adModel.findById(adId).lean().exec();
-
     return ad;
   }
 

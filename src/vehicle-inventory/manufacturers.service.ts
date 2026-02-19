@@ -124,7 +124,6 @@ export class ManufacturersService {
     try {
       // Prepare manufacturer data - handle empty vehicleCategory string
       const manufacturerData: any = { ...createManufacturerDto };
-
       // If vehicleCategory is empty string or not provided, apply default
       if (
         !manufacturerData.vehicleCategory ||
@@ -132,13 +131,10 @@ export class ManufacturersService {
       ) {
         manufacturerData.vehicleCategory = 'passenger_car';
       }
-
       const manufacturer = new this.manufacturerModel(manufacturerData);
       const savedManufacturer = await manufacturer.save();
-
       // Invalidate caches after creation
       await this.invalidateManufacturerCaches();
-
       return savedManufacturer;
     } catch (error) {
       if (error.code === 11000) {
@@ -327,12 +323,17 @@ export class ManufacturersService {
     const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
 
     // Pagination - return everything if limit/page not provided OR if page=1&limit=100
-    const isGetAllRequest = 
+    const isGetAllRequest =
       (filters.limit === undefined && filters.page === undefined) ||
       (filters.page === 1 && filters.limit === 100);
-    
-    const shouldPaginate = !isGetAllRequest && filters.limit !== undefined && filters.page !== undefined;
-    const limit = shouldPaginate ? this.clamp(filters.limit!, 1, 50) : undefined;
+
+    const shouldPaginate =
+      !isGetAllRequest &&
+      filters.limit !== undefined &&
+      filters.page !== undefined;
+    const limit = shouldPaginate
+      ? this.clamp(filters.limit!, 1, 50)
+      : undefined;
     const page = shouldPaginate ? this.clamp(filters.page!, 1, 1000) : 1;
     const skip = shouldPaginate ? (page - 1) * limit! : undefined;
 
@@ -362,7 +363,7 @@ export class ManufacturersService {
     ]);
 
     const actualLimit = limit || total;
-    const responsePage = isGetAllRequest ? (filters.page || 1) : page;
+    const responsePage = isGetAllRequest ? filters.page || 1 : page;
     const totalPages = shouldPaginate ? Math.ceil(total / actualLimit) : 1;
     const hasNext = shouldPaginate ? page < totalPages : false;
     const hasPrev = shouldPaginate ? page > 1 : false;
