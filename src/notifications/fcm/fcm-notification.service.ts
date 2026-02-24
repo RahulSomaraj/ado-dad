@@ -34,14 +34,15 @@ export class FcmNotificationService {
                 throw new Error('Unsupported target type for send()');
             }
             this.logger.log(`Notification sent successfully: ${response}`);
+
+            await this.notificationRepository.createLog(dto.title, dto.body, dto, response);
+            return response;
         } catch (error) {
             this.logger.error(`Notification failed: ${error.message}`);
+            // Log the error to the database as well
             await this.notificationRepository.createLog(dto.title, dto.body, dto, { error: error.message });
             throw error;
         }
-
-        await this.notificationRepository.createLog(dto.title, dto.body, dto, response);
-        return response;
     }
 
     private transformToFcmV1(dto: BroadcastNotificationDto): admin.messaging.Message {
