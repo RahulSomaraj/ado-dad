@@ -20,11 +20,24 @@ export class FirebaseService implements OnModuleInit {
             }
 
             // Try to initialize using environment variables
-            const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
-            const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
-            const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n');
+            const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID') || process.env.FIREBASE_PROJECT_ID;
+            const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL') || process.env.FIREBASE_CLIENT_EMAIL;
+            const rawPrivateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY') || process.env.FIREBASE_PRIVATE_KEY;
 
-            if (projectId && clientEmail && privateKey) {
+            if (projectId && clientEmail && rawPrivateKey) {
+                // Robust private key parsing
+                // 1. Trim whitespace
+                // 2. Remove literal quotes if present
+                // 3. Replace escaped newlines with actual newlines
+                const privateKey = rawPrivateKey
+                    .trim()
+                    .replace(/^"|"$/g, '')
+                    .replace(/\\n/g, '\n');
+
+                this.logger.log(`Attempting to initialize Firebase for project: ${projectId}`);
+                this.logger.log(`Client Email: ${clientEmail}`);
+                this.logger.log(`Private Key length: ${privateKey.length} chars (starts with: ${privateKey.substring(0, 30)}...)`);
+
                 this.firebaseApp = admin.initializeApp({
                     credential: admin.credential.cert({
                         projectId,
@@ -42,7 +55,7 @@ export class FirebaseService implements OnModuleInit {
                 'Missing one or more: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.'
             );
         } catch (error) {
-            this.logger.error('Firebase initialization error', error.stack);
+            this.logger.error(`Firebase initialization error: ${error.message}`, error.stack);
         }
     }
 
