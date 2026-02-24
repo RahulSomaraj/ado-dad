@@ -21,19 +21,18 @@ export class FcmNotificationService {
         const priority = dto.priority ?? NotificationPriority.NORMAL;
 
         const message = this.transformToFcmV1({ ...dto, targetType, priority });
-        let response: string;
+        let response: any;
 
         try {
-            if ('topic' in message) {
-                response = await this.firebaseService.getMessaging().send(message as admin.messaging.TopicMessage);
-            } else if ('token' in message) {
-                response = await this.firebaseService.getMessaging().send(message as admin.messaging.TokenMessage);
-            } else if ('condition' in message) {
-                response = await this.firebaseService.getMessaging().send(message as admin.messaging.ConditionMessage);
+            if ('tokens' in message) {
+                // Handle multicast
+                response = await this.firebaseService.getMessaging().sendEachForMulticast(message as admin.messaging.MulticastMessage);
             } else {
-                throw new Error('Unsupported target type for send()');
+                // Handle single message (token, topic, or condition)
+                response = await this.firebaseService.getMessaging().send(message as admin.messaging.Message);
             }
-            this.logger.log(`Notification sent successfully: ${response}`);
+
+            this.logger.log(`Notification sent successfully: ${JSON.stringify(response)}`);
 
             await this.notificationRepository.createLog(dto.title, dto.body, dto, response);
             return response;
@@ -45,53 +44,70 @@ export class FcmNotificationService {
         }
     }
 
-    private transformToFcmV1(dto: BroadcastNotificationDto): admin.messaging.Message {
+    private transformToFcmV1(dto: BroadcastNotificationDto): admin.messaging.Message | admin.messaging.MulticastMessage {
         const { title, body, targetType, topic, tokens, media, data, priority } = dto;
 
-        const message: any = {
+        const baseMessage = {
             notification: {
                 title,
                 body,
+                ...(media?.type === 'IMAGE' && media.url ? { image: media.url } : {}),
             },
             data: {
-                ...(data?.type && { type: data.type }),
-                ...(data?.screen && { screen: data.screen }),
-                ...(data?.entityId && { entityId: data.entityId }),
+                ...this.formatData(data || {}), // Generic formatting for all data fields
+                ...(data?.extra && { extra: JSON.stringify(data.extra) }), // Ensure extra is stringified
                 ...(media?.type && { mediaType: media.type }),
                 ...(media?.url && { mediaUrl: media.url }),
-                ...(data?.extra && { extra: JSON.stringify(data.extra) }),
-                ...this.formatData(data || {}), // Include any additional data fields
             },
             android: {
-                priority: priority === NotificationPriority.HIGH ? 'high' : 'normal',
+                priority: (priority === NotificationPriority.HIGH ? 'high' : 'normal') as 'high' | 'normal',
+                notification: {
+                    sound: 'default',
+                    priority: (priority === NotificationPriority.HIGH ? 'high' : 'default') as 'high' | 'default',
+                }
             },
             apns: {
                 headers: {
                     'apns-priority': priority === NotificationPriority.HIGH ? '10' : '5',
                 },
+                payload: {
+                    aps: {
+                        sound: 'default',
+                    },
+                },
             },
         };
 
-        // Add image to notification if media is IMAGE
-        if (media?.type === 'IMAGE' && media.url) {
-            message.notification.image = media.url;
-        }
-
         // Set target
         if (targetType === TargetType.ALL) {
-            message.topic = 'all_users';
+            return {
+                ...baseMessage,
+                topic: 'all_users',
+            } as admin.messaging.TopicMessage;
         } else if (targetType === TargetType.TOPIC && topic) {
-            message.topic = topic;
+            return {
+                ...baseMessage,
+                topic: topic,
+            } as admin.messaging.TopicMessage;
         } else if (targetType === TargetType.TOKENS && tokens?.length) {
             if (tokens.length === 1) {
-                message.token = tokens[0];
+                return {
+                    ...baseMessage,
+                    token: tokens[0],
+                } as admin.messaging.TokenMessage;
             } else {
-                // Return original message for internal use or handle multicast separately
-                message.tokens = tokens;
+                return {
+                    ...baseMessage,
+                    tokens: tokens,
+                } as admin.messaging.MulticastMessage;
             }
         }
 
-        return message;
+        // Default fallback (though API should prevent this)
+        return {
+            ...baseMessage,
+            topic: 'all_users',
+        } as admin.messaging.TopicMessage;
     }
 
     async sendToUser(userId: string, title: string, body: string, data: any = {}) {
@@ -147,11 +163,8 @@ export class FcmNotificationService {
         if (!data) return {};
         const formatted: Record<string, string> = {};
 
-        // Skip keys that are already handled explicitly or aren't strings
-        const handledKeys = ['type', 'screen', 'entityId', 'extra'];
-
         for (const [key, value] of Object.entries(data)) {
-            if (value === null || value === undefined || handledKeys.includes(key)) continue;
+            if (value === null || value === undefined) continue;
             formatted[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
         }
         return formatted;
