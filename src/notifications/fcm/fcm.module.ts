@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { FirebaseProvider } from '../../shared/firebase/firebase.provider';
-import { FcmService } from './fcm.service';
+import { FirebaseService } from '../../firebase/firebase.service';
 import { FcmToken, FcmTokenSchema } from './schemas/fcm-token.schema';
 import { PushNotification, PushNotificationSchema } from './schemas/push-notification.schema';
-import { FcmTokenRepository } from './repositories/fcm-token.repo';
 import { FcmController } from './fcm.controller';
+import { FcmTokenRepository } from './repositories/fcm-token.repository';
+import { PushNotificationRepository } from './repositories/push-notification.repository';
+import { FcmTokenService } from './fcm-token.service';
+import { FcmNotificationService } from './fcm-notification.service';
 
 @Module({
     imports: [
@@ -14,9 +16,15 @@ import { FcmController } from './fcm.controller';
             { name: PushNotification.name, schema: PushNotificationSchema },
         ]),
     ],
-    providers: [FirebaseProvider, FcmService, FcmTokenRepository],
+    providers: [
+        FirebaseService,
+        FcmTokenRepository,
+        PushNotificationRepository,
+        FcmTokenService,
+        FcmNotificationService,
+    ],
     controllers: [FcmController],
-    exports: [FcmService],
+    exports: [FcmTokenService, FcmNotificationService],
 })
 export class FcmModule { }
 

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsString, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class RegisterFcmTokenDto {
     @ApiProperty({
@@ -12,18 +12,26 @@ export class RegisterFcmTokenDto {
     token: string;
 
     @ApiProperty({
-        description: 'The platform of the device',
-        enum: ['web', 'android', 'ios'],
-        example: 'web',
-        required: true,
+        description: 'The ID of the user',
+        example: 'user_123',
+        required: false,
     })
-    @IsEnum(['web', 'android', 'ios'])
-    @IsNotEmpty()
-    platform: string;
+    @IsString()
+    @IsOptional()
+    userId?: string;
 
     @ApiProperty({
-        description: 'Unique ID of the device (for de-duplication)',
-        example: 'android-123456789',
+        description: 'The device platform (e.g., ios, android, web)',
+        example: 'android',
+        required: false,
+    })
+    @IsString()
+    @IsOptional()
+    platform?: string;
+
+    @ApiProperty({
+        description: 'Unique identifier for the device',
+        example: 'device_123',
         required: false,
     })
     @IsString()

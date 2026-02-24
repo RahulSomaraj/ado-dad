@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { RedisQueueService } from './queue/redis-queue.service';
 import { NotificationLog } from './notification-logs/schemas/notification-log.schema';
-import { FcmService } from './fcm/fcm.service';
+import { FcmNotificationService } from './fcm/fcm-notification.service';
 
 @Injectable()
 export class NotificationWorker implements OnModuleInit {
@@ -11,7 +11,7 @@ export class NotificationWorker implements OnModuleInit {
 
     constructor(
         private readonly queue: RedisQueueService,
-        private readonly fcmService: FcmService,
+        private readonly fcmNotificationService: FcmNotificationService,
         @InjectModel(NotificationLog.name)
         private readonly logModel: Model<NotificationLog>,
     ) { }
@@ -37,25 +37,28 @@ export class NotificationWorker implements OnModuleInit {
 
                 try {
                     if (log.targetType === 'USER' && log.userIds?.length) {
-                        await this.fcmService.sendToUser(
+                        await this.fcmNotificationService.sendToUser(
                             log.userIds[0],
                             log.title,
                             log.body,
                             log.data,
                         );
                     } else if (log.targetType === 'USERS' && log.userIds?.length) {
-                        await this.fcmService.sendToUsers(
-                            log.userIds,
-                            log.title,
-                            log.body,
-                            log.data,
-                        );
+                        for (const userId of log.userIds) {
+                            await this.fcmNotificationService.sendToUser(
+                                userId,
+                                log.title,
+                                log.body,
+                                log.data,
+                            );
+                        }
                     } else if (log.targetType === 'ALL') {
-                        await this.fcmService.sendToAll(
-                            log.title,
-                            log.body,
-                            log.data,
-                        );
+                        await this.fcmNotificationService.sendBroadcast({
+                            title: log.title,
+                            body: log.body,
+                            targetType: 'ALL' as any,
+                            data: log.data,
+                        });
                     }
 
                     log.status = 'SENT';

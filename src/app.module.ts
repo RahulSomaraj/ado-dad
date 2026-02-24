@@ -38,7 +38,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { EmailService } from './utils/email.service';
 import { RefreshTokenService } from './auth/auth.refresh.service';
 import { RedisService } from './shared/redis.service';
-import { AdminNotificationController } from './admin/admin-notification.controller';
 
 // Schemas
 import {
@@ -128,7 +127,7 @@ import { configService } from './config/mongo.config';
     NotificationsModule,
   ],
   providers: [AppService, RefreshTokenService, EmailService, RedisService],
-  controllers: [AppController, AdminNotificationController],
+  controllers: [AppController],
   exports: [JwtModule],
 })
 export class AppModule implements NestModule {
