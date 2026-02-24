@@ -69,9 +69,10 @@ export class BroadcastNotificationDto {
     @IsString()
     body: string;
 
-    @ApiProperty({ enum: TargetType, example: TargetType.ALL })
+    @ApiPropertyOptional({ enum: TargetType, example: TargetType.ALL, default: TargetType.ALL })
     @IsEnum(TargetType)
-    targetType: TargetType;
+    @IsOptional()
+    targetType?: TargetType = TargetType.ALL;
 
     @ApiPropertyOptional({ description: 'Topic name if targetType is TOPIC', example: 'news' })
     @IsString()

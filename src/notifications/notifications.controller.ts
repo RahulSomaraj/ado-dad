@@ -68,6 +68,13 @@ export class NotificationsController {
                         screen: 'home'
                     }
                 }
+            },
+            minimalNotification: {
+                summary: 'Minimal Notification (Only Required Fields)',
+                value: {
+                    title: 'Hello World',
+                    body: 'This is a broadcast message'
+                }
             }
         }
     })

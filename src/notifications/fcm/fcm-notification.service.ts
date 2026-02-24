@@ -16,7 +16,11 @@ export class FcmNotificationService {
     ) { }
 
     async sendBroadcast(dto: BroadcastNotificationDto) {
-        const message = this.transformToFcmV1(dto);
+        // Apply defaults
+        const targetType = dto.targetType ?? TargetType.ALL;
+        const priority = dto.priority ?? NotificationPriority.NORMAL;
+
+        const message = this.transformToFcmV1({ ...dto, targetType, priority });
         let response: string;
 
         try {
@@ -27,13 +31,11 @@ export class FcmNotificationService {
             } else if ('condition' in message) {
                 response = await this.firebaseService.getMessaging().send(message as admin.messaging.ConditionMessage);
             } else {
-                // Fallback for unexpected types (multicast is handled differently but we use send() for topics/tokens)
                 throw new Error('Unsupported target type for send()');
             }
             this.logger.log(`Notification sent successfully: ${response}`);
         } catch (error) {
             this.logger.error(`Notification failed: ${error.message}`);
-            // If it fails, we still log it but throw the error to be handled by the controller/global filter
             await this.notificationRepository.createLog(dto.title, dto.body, dto, { error: error.message });
             throw error;
         }
