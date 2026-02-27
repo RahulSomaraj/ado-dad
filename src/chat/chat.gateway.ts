@@ -244,12 +244,15 @@ export class ChatGateway
         userId,
         payload.content,
         payload.type,
+        payload.attachments || [],
       );
 
       const out = {
         roomId: payload.roomId,
         content: message.content,
         senderId: userId,
+        type: message.type,
+        attachments: message.attachments,
         createdAt: (message as any).createdAt,
         _id: (message as any)._id,
         id: (message as any)._id,
@@ -267,6 +270,7 @@ export class ChatGateway
           senderId: userId,
           content: payload.content,
           type: message.type,
+          attachments: message.attachments,
           createdAt: (message as any).createdAt,
         },
       };

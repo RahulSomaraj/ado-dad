@@ -6,6 +6,7 @@ export type ChatMessageDocument = ChatMessage & Document;
 export enum MessageType {
   TEXT = 'text',
   IMAGE = 'image',
+  AUDIO = 'audio',
   FILE = 'file',
   SYSTEM = 'system',
 }
@@ -31,11 +32,30 @@ export class ChatMessage {
   @Prop({ required: true, enum: MessageType, default: MessageType.TEXT })
   type: MessageType;
 
-  @Prop({ required: true })
-  content: string;
+  @Prop({ required: false })
+  content?: string;
 
-  @Prop({ type: [String], default: [] })
-  attachments?: string[]; // URLs to files/images
+  @Prop({
+    type: [
+      {
+        type: { type: String, enum: ['image', 'audio', 'file'], required: true },
+        url: { type: String, required: true },
+        mimeType: { type: String },
+        size: { type: Number },
+        duration: { type: Number },
+        thumbnailUrl: { type: String },
+      },
+    ],
+    default: [],
+  })
+  attachments?: {
+    type: string;
+    url: string;
+    mimeType?: string;
+    size?: number;
+    duration?: number;
+    thumbnailUrl?: string;
+  }[];
 
   @Prop({ type: Boolean, default: false })
   isRead: boolean;

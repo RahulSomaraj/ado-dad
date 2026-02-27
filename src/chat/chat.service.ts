@@ -421,8 +421,9 @@ export class ChatService {
   async sendMessage(
     roomId: string,
     senderId: string,
-    content: string,
+    content?: string,
     type: MessageType = MessageType.TEXT,
+    attachments: any[] = [],
   ): Promise<ChatMessage> {
     this.validateObjectId(senderId, 'Sender ID');
 
@@ -432,13 +433,40 @@ export class ChatService {
     }
     this.assertParticipant(room, senderId);
 
-    // Content moderation
-    const moderation = await this.contentModerationService.moderateContent(
-      content,
-      senderId,
-    );
-    if (!moderation.isApproved) {
-      throw new BadRequestException(`Content rejected: ${moderation.reason}`);
+    // Validation for different message types
+    if (type === MessageType.TEXT && !content) {
+      throw new BadRequestException('Text message requires content');
+    }
+    if (
+      (type === MessageType.IMAGE ||
+        type === MessageType.AUDIO ||
+        type === MessageType.FILE) &&
+      (!attachments || attachments.length === 0)
+    ) {
+      throw new BadRequestException(`${type} message requires attachments`);
+    }
+
+    // Content moderation (primarily for text)
+    let moderation: {
+      isApproved: boolean;
+      reason: string;
+      flags: string[];
+      score: number;
+    } = { isApproved: true, reason: '', flags: [], score: 0 };
+    if (content) {
+      const result = await this.contentModerationService.moderateContent(
+        content,
+        senderId,
+      );
+      moderation = {
+        isApproved: result.isApproved,
+        reason: result.reason || '',
+        flags: result.flags || [],
+        score: result.score || 0,
+      };
+      if (!moderation.isApproved) {
+        throw new BadRequestException(`Content rejected: ${moderation.reason}`);
+      }
     }
 
     const msg = await this.chatMessageModel.create({
@@ -447,6 +475,7 @@ export class ChatService {
       senderId: new Types.ObjectId(senderId),
       type,
       content,
+      attachments,
       isRead: false,
       moderationFlags: moderation.flags?.length ? moderation.flags : undefined,
       moderationScore: moderation.score,
