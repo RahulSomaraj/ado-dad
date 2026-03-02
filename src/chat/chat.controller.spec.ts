@@ -12,7 +12,7 @@ describe('ChatController', () => {
             createChatRoom: jest.fn(),
             getUserChatRooms: jest.fn(),
             getRoomMessages: jest.fn(),
-            checkExistingChatRoom: jest.fn(),
+            findExistingChatRoom: jest.fn(),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -79,6 +79,45 @@ describe('ChatController', () => {
             expect(result.success).toBe(true);
             expect(result.data).toEqual(mockResult);
             expect(chatService.getRoomMessages).toHaveBeenCalledWith(roomId, 'cursor123', 50);
+        });
+
+        it('should throw BadRequestException if service fails', async () => {
+            chatService.getRoomMessages.mockRejectedValue(new Error('Service Failed'));
+            await expect(controller.getRoomMessages('room1', '50'))
+                .rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('checkExistingChatRoom', () => {
+        const adId = 'ad123';
+        const otherUserId = 'user456';
+        const mockReq = { user: { id: 'user123' } };
+
+        it('should return exists: true if room is found', async () => {
+            const mockRoom = { roomId: 'room1' };
+            chatService.findExistingChatRoom.mockResolvedValue(mockRoom);
+
+            const result = await controller.checkExistingChatRoom(adId, otherUserId, mockReq);
+
+            expect(result.success).toBe(true);
+            expect(result.data.exists).toBe(true);
+            expect(result.data.roomId).toBe('room1');
+        });
+
+        it('should return exists: false if no room is found', async () => {
+            chatService.findExistingChatRoom.mockResolvedValue(null);
+
+            const result = await controller.checkExistingChatRoom(adId, otherUserId, mockReq);
+
+            expect(result.success).toBe(true);
+            expect(result.data.exists).toBe(false);
+            expect(result.data.roomId).toBeNull();
+        });
+
+        it('should throw BadRequestException if user id is missing', async () => {
+            const invalidReq = { user: {} };
+            await expect(controller.checkExistingChatRoom(adId, otherUserId, invalidReq))
+                .rejects.toThrow(BadRequestException);
         });
     });
 });

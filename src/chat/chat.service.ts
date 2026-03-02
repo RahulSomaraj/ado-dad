@@ -34,7 +34,7 @@ export class ChatService {
     @InjectModel(Ad.name) private readonly adModel: Model<AdDocument>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly contentModerationService: ContentModerationService,
-  ) {}
+  ) { }
 
   /* =========================
    * Helpers
@@ -157,7 +157,7 @@ export class ChatService {
       const existing = await this.chatRoomModel.findOne({
         initiatorId: new Types.ObjectId(initiatorId),
         adId: new Types.ObjectId(adId),
-      });
+      }).exec();
 
       if (existing) {
         if (existing.status !== ChatRoomStatus.ACTIVE) {
@@ -215,7 +215,7 @@ export class ChatService {
 
   /** Get a chat room by its string roomId (human id) */
   async getChatRoom(roomId: string): Promise<ChatRoom> {
-    const room = await this.chatRoomModel.findOne({ roomId });
+    const room = await this.chatRoomModel.findOne({ roomId }).exec();
     if (!room) throw new NotFoundException('Chat room not found');
     return room;
   }
@@ -230,7 +230,7 @@ export class ChatService {
     return this.chatRoomModel.findOne({
       initiatorId: new Types.ObjectId(initiatorId),
       adId: new Types.ObjectId(adId),
-    });
+    }).exec();
   }
 
   /** Get all ACTIVE rooms for a user (as initiator or ad poster) sorted by recency with enhanced data */
@@ -294,30 +294,30 @@ export class ChatService {
           // Enhanced data
           otherUser: otherUser
             ? {
-                id: otherUser._id,
-                name: otherUser.name,
-                profilePic: otherUser.profilePic,
-                email: otherUser.email,
-                countryCode: otherUser.countryCode,
-                phoneNumber: otherUser.phoneNumber,
-              }
+              id: otherUser._id,
+              name: otherUser.name,
+              profilePic: otherUser.profilePic,
+              email: otherUser.email,
+              countryCode: otherUser.countryCode,
+              phoneNumber: otherUser.phoneNumber,
+            }
             : null,
           latestMessage: latestMessage
             ? {
-                content: latestMessage.content,
-                type: latestMessage.type,
-                createdAt: (latestMessage as any).createdAt,
-              }
+              content: latestMessage.content,
+              type: latestMessage.type,
+              createdAt: (latestMessage as any).createdAt,
+            }
             : null,
           adDetails: adDetails
             ? {
-                id: adDetails._id,
-                title: adDetails.title,
-                description: adDetails.description,
-                price: adDetails.price,
-                images: adDetails.images,
-                category: adDetails.category,
-              }
+              id: adDetails._id,
+              title: adDetails.title,
+              description: adDetails.description,
+              price: adDetails.price,
+              images: adDetails.images,
+              category: adDetails.category,
+            }
             : null,
         };
       }),

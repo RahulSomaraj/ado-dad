@@ -1,5 +1,4 @@
 import {
-  IsIn,
   IsNotEmpty,
   IsString,
   Length,
@@ -8,6 +7,7 @@ import {
   IsArray,
   ValidateNested,
   IsNumber,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MessageType } from '../schemas/chat-message.schema';
@@ -21,15 +21,16 @@ export class AttachmentDto {
   url: string;
 
   @IsString()
-  @IsOptional()
-  mimeType?: string;
+  @IsNotEmpty()
+  mimeType: string;
 
   @IsNumber()
-  @IsOptional()
-  size?: number;
+  @IsNotEmpty()
+  size: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
+  @Max(180) // Max 180 seconds (3 minutes)
   duration?: number;
 
   @IsString()

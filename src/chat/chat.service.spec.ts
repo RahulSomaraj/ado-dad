@@ -57,6 +57,7 @@ describe('ChatService', () => {
     const mockChatMessageModel = {
         create: jest.fn(),
         find: jest.fn(),
+        findOne: jest.fn(),
         aggregate: jest.fn(),
         countDocuments: jest.fn(),
     };
@@ -125,7 +126,7 @@ describe('ChatService', () => {
 
         it('should return existing room if it already exists', async () => {
             mockAdModel.findById.mockReturnValue(createMockQuery(mockAd));
-            mockChatRoomModel.findOne.mockResolvedValue(mockChatRoom);
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
 
             const result = await service.createChatRoom(new Types.ObjectId().toString(), mockAd._id.toString());
             expect(result).toEqual(mockChatRoom);
@@ -133,7 +134,7 @@ describe('ChatService', () => {
 
         it('should create a new room if it does not exist', async () => {
             mockAdModel.findById.mockReturnValue(createMockQuery(mockAd));
-            mockChatRoomModel.findOne.mockResolvedValue(null);
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(null));
             mockChatRoomModel.create.mockResolvedValue(mockChatRoom);
 
             const result = await service.createChatRoom(new Types.ObjectId().toString(), mockAd._id.toString());
@@ -204,6 +205,82 @@ describe('ChatService', () => {
             const result = await service.sendMessage(roomId, senderId, undefined, MessageType.IMAGE, attachments);
             expect(result.type).toBe(MessageType.IMAGE);
             expect(result.attachments).toEqual(attachments);
+        });
+
+        it('should throw BadRequestException if content is rejected by moderation', async () => {
+            const room = {
+                ...mockChatRoom,
+                initiatorId: new Types.ObjectId(senderId),
+                adPosterId: new Types.ObjectId(),
+            };
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
+            mockContentModerationService.moderateContent.mockResolvedValue({ isApproved: false, reason: 'Profanity' });
+
+            await expect(service.sendMessage(roomId, senderId, 'bad word'))
+                .rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('getUserChatRooms', () => {
+        const userId = new Types.ObjectId();
+
+        it('should return enhanced chat rooms for a user', async () => {
+            const mockRooms = [{
+                ...mockChatRoom,
+                initiatorId: userId,
+                adPosterId: new Types.ObjectId(),
+                adId: new Types.ObjectId(),
+                createdAt: new Date(),
+            }];
+            mockChatRoomModel.find.mockReturnValue(createMockQuery(mockRooms));
+            mockUserModel.findById.mockReturnValue(createMockQuery({ name: 'Other User' }));
+            mockChatMessageModel.findOne.mockReturnValue(createMockQuery({ content: 'Last msg' }));
+            mockAdModel.findById.mockReturnValue(createMockQuery({ title: 'Ad Title' }));
+
+            const result = await service.getUserChatRooms(userId.toString());
+            expect(result).toHaveLength(1);
+            expect(result[0].otherUser.name).toBe('Other User');
+            expect(result[0].latestMessage.content).toBe('Last msg');
+            expect(result[0].adDetails.title).toBe('Ad Title');
+        });
+    });
+
+    describe('findExistingChatRoom', () => {
+        const initiatorId = new Types.ObjectId();
+        const adId = new Types.ObjectId();
+        const otherUserId = new Types.ObjectId();
+
+        it('should find room where user is initiator', async () => {
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
+            const result = await service.findExistingChatRoom(initiatorId, adId, otherUserId);
+            expect(result).toEqual(mockChatRoom);
+        });
+
+        it('should return null if no room exists', async () => {
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(null));
+            const result = await service.findExistingChatRoom(initiatorId, adId, otherUserId);
+            expect(result).toBeNull();
+        });
+    });
+
+    describe('getRoomMessages', () => {
+        const roomId = 'rooms123';
+
+        it('should return paginated messages with sender info', async () => {
+            const mockMessages = [
+                { _id: new Types.ObjectId(), content: 'Msg 1', sender: { name: 'User 1' } },
+                { _id: new Types.ObjectId(), content: 'Msg 2', sender: { name: 'User 2' } },
+            ];
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
+            mockChatMessageModel.countDocuments.mockResolvedValue(10);
+            mockChatMessageModel.aggregate.mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockMessages)
+            });
+
+            const result = await service.getRoomMessages(roomId, undefined, 2);
+            expect(result.messages).toHaveLength(2);
+            expect(result.total).toBe(10);
+            expect(result.messages[0].sender.name).toBe('User 1');
         });
     });
 });

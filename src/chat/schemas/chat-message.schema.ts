@@ -42,7 +42,7 @@ export class ChatMessage {
         url: { type: String, required: true },
         mimeType: { type: String },
         size: { type: Number },
-        duration: { type: Number },
+        duration: { type: Number, max: 180 },
         thumbnailUrl: { type: String },
       },
     ],

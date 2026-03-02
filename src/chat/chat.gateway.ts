@@ -9,12 +9,13 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { BadRequestException, Logger, UseGuards } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { WsJwtGuard } from '../auth/guard/ws-guard';
 import { CreateChatRoomDto } from './dto/create-chat-room.dto';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { MessageType } from './schemas/chat-message.schema';
 import { RateLimit } from './guards/rate-limit.guard';
 
 @WebSocketGateway({
@@ -29,14 +30,13 @@ import { RateLimit } from './guards/rate-limit.guard';
 })
 // @UseGuards(WsJwtGuard) // Temporarily disabled for debugging
 export class ChatGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
   private connectedUsers = new Map<string, Socket>();
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService) { }
 
   // -------- Manual auth fallback (unchanged except minor logs) --------
   private async authenticateClient(client: Socket): Promise<boolean> {
@@ -238,6 +238,48 @@ export class ChatGateway
       this.logger.log(
         `🟢 [sendMessage] User ${userId} sending to ${payload.roomId}: ${payload.content}`,
       );
+
+      // 🔥 Business Logic Validation for Voice Messages
+      if (payload.type === MessageType.AUDIO) {
+        if (!payload.attachments || payload.attachments.length !== 1) {
+          throw new BadRequestException(
+            'Audio message must contain exactly one attachment',
+          );
+        }
+
+        const attachment = payload.attachments[0];
+
+        // Enforce attachment type
+        if (attachment.type !== 'audio') {
+          throw new BadRequestException('Invalid attachment type for audio message');
+        }
+
+        // Duration validation (Max 180s)
+        if (attachment.duration && attachment.duration > 180) {
+          throw new BadRequestException('Voice message cannot exceed 3 minutes (180s)');
+        }
+
+        // File size limit (3MB)
+        if (attachment.size > 3 * 1024 * 1024) {
+          throw new BadRequestException('Voice file exceeds allowed size (3MB)');
+        }
+
+        // Mime type validation
+        const allowedMimeTypes = [
+          'audio/mpeg',
+          'audio/mp4',
+          'audio/aac',
+          'audio/x-m4a',
+          'audio/m4a',
+          'audio/webm',
+          'audio/ogg',
+          'audio/wav',
+        ];
+
+        if (!allowedMimeTypes.includes(attachment.mimeType)) {
+          throw new BadRequestException(`Invalid audio format: ${attachment.mimeType}`);
+        }
+      }
 
       const message = await this.chatService.sendMessage(
         payload.roomId,

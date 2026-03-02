@@ -13,22 +13,22 @@ export class ContentModerationService {
 
   // Simple profanity filter (in production, use a proper library)
   private readonly profanityPatterns = [
-    /\b(fuck|shit|bitch|asshole|dick|pussy)\b/gi,
-    /\b(kill|die|hate)\b/gi,
+    /\b(fuck|shit|bitch|asshole|dick|pussy|fucking|shitty)\b/i,
+    /\b(kill|die|hate)\b/i,
   ];
 
   // Spam patterns
   private readonly spamPatterns = [
-    /\b(buy\s+now|click\s+here|limited\s+time|act\s+now)\b/gi,
-    /(https?:\/\/[^\s]+)/g, // URLs
-    /(\w{20,})/g, // Very long words
+    /\b(buy\s+now|click\s+here|limited\s+time|act\s+now)\b/i,
+    /(https?:\/\/[^\s]+)/, // URLs
+    /(\w{20,})/, // Very long words
   ];
 
   // PII patterns
   private readonly piiPatterns = [
-    /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
-    /\b\d{3}-\d{3}-\d{4}\b/g, // Phone
-    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, // Email
+    /\b\d{3}-\d{2}-\d{4}\b/, // SSN
+    /\b\d{3}-\d{3}-\d{4}\b/, // Phone
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, // Email
   ];
 
   async moderateContent(
@@ -56,7 +56,7 @@ export class ContentModerationService {
       );
       if (profanityFound) {
         flags.push('profanity_detected');
-        score += 40;
+        score += 70; // Reject immediately
       }
 
       // Check for spam indicators
