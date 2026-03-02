@@ -216,8 +216,8 @@ export class GetAdByIdUc {
             : Promise.resolve(undefined),
           vehicleDetails.transmissionTypeId
             ? this.inventory.getTransmissionType(
-                vehicleDetails.transmissionTypeId,
-              )
+              vehicleDetails.transmissionTypeId,
+            )
             : Promise.resolve(undefined),
         ]);
 
@@ -241,8 +241,8 @@ export class GetAdByIdUc {
         await Promise.all([
           commercialVehicleDetails.manufacturerId
             ? this.inventory.getManufacturer(
-                commercialVehicleDetails.manufacturerId,
-              )
+              commercialVehicleDetails.manufacturerId,
+            )
             : Promise.resolve(undefined),
           commercialVehicleDetails.modelId
             ? this.inventory.getModel(commercialVehicleDetails.modelId)
@@ -255,8 +255,8 @@ export class GetAdByIdUc {
             : Promise.resolve(undefined),
           commercialVehicleDetails.transmissionTypeId
             ? this.inventory.getTransmissionType(
-                commercialVehicleDetails.transmissionTypeId,
-              )
+              commercialVehicleDetails.transmissionTypeId,
+            )
             : Promise.resolve(undefined),
         ]);
 
@@ -290,12 +290,12 @@ export class GetAdByIdUc {
       postedBy: ad.postedBy.toString(),
       user: ad.user
         ? {
-            id: ad.user._id.toString(),
-            name: ad.user.name,
-            email: ad.user.email,
-            countryCode: ad.user.countryCode,
-            phoneNumber: ad.user.phoneNumber,
-          }
+          id: ad.user._id.toString(),
+          name: ad.user.name,
+          email: ad.user.email,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
+        }
         : undefined,
       propertyDetails: ad.propertyDetails?.[0] || undefined,
       vehicleDetails: processedVehicleDetails,
@@ -330,24 +330,28 @@ export class GetAdByIdUc {
             id: room._id.toString(),
             participants: [
               {
-                id: room.initiatorId._id.toString(),
-                name: room.initiatorId.name || 'Unknown',
-                email: room.initiatorId.email || '',
+                id: (room.initiatorId as any)?._id?.toString() || '',
+                name: (room.initiatorId as any)?.name || 'Unknown',
+                email: (room.initiatorId as any)?.email || '',
               },
               {
-                id: room.adPosterId._id.toString(),
-                name: room.adPosterId.name || 'Unknown',
-                email: room.adPosterId.email || '',
+                id: (room.adPosterId as any)?._id?.toString() || '',
+                name: (room.adPosterId as any)?.name || 'Unknown',
+                email: (room.adPosterId as any)?.email || '',
               },
             ],
             lastMessage: lastMessage
               ? {
-                  content: lastMessage.content,
-                  createdAt: (lastMessage as any).createdAt || new Date(),
-                  sender: (lastMessage as any).senderId?.name || 'Unknown',
-                }
+                content: lastMessage.content || '',
+                createdAt: (lastMessage as any).createdAt instanceof Date
+                  ? (lastMessage as any).createdAt
+                  : new Date((lastMessage as any).createdAt || Date.now()),
+                sender: (lastMessage as any).senderId?.name || 'Unknown',
+              }
               : undefined,
-            createdAt: room.createdAt || new Date(),
+            createdAt: (room as any).createdAt instanceof Date
+              ? (room as any).createdAt
+              : new Date((room as any).createdAt || Date.now()),
           };
         }),
       );

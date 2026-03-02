@@ -183,6 +183,40 @@ describe('ChatGateway', () => {
             await gateway.handleSendMessage(mockSocket as Socket, dto);
             expect(chatService.sendMessage).toHaveBeenCalled();
         });
+
+        it('should accept audio/mp4 (M4A) format', async () => {
+            const dto: SendMessageDto = {
+                roomId: 'room123',
+                type: MessageType.AUDIO,
+                attachments: [{
+                    type: 'audio' as any,
+                    url: 'url',
+                    mimeType: 'audio/mp4',
+                    size: 1000,
+                    duration: 10
+                }]
+            };
+            chatService.sendMessage.mockResolvedValue({ _id: 'msg1' });
+            await gateway.handleSendMessage(mockSocket as Socket, dto);
+            expect(chatService.sendMessage).toHaveBeenCalled();
+        });
+
+        it('should accept audio/amr format', async () => {
+            const dto: SendMessageDto = {
+                roomId: 'room123',
+                type: MessageType.AUDIO,
+                attachments: [{
+                    type: 'audio' as any,
+                    url: 'url',
+                    mimeType: 'audio/amr',
+                    size: 1000,
+                    duration: 10
+                }]
+            };
+            chatService.sendMessage.mockResolvedValue({ _id: 'msg1' });
+            await gateway.handleSendMessage(mockSocket as Socket, dto);
+            expect(chatService.sendMessage).toHaveBeenCalled();
+        });
     });
 
     describe('handleJoinChatRoom', () => {

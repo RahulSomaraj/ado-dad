@@ -25,7 +25,7 @@ import { v4 as uuidv4 } from 'uuid';
 @ApiTags('Upload')
 @Controller('upload')
 export class UploadController {
-  constructor(private readonly s3Service: S3Service) {}
+  constructor(private readonly s3Service: S3Service) { }
 
   @Post('file')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -115,8 +115,14 @@ export class UploadController {
     @Query('fileType') fileType: string,
   ) {
     try {
+      // Normalize M4A mime types to audio/mp4 as recommended for better compatibility
+      let normalizedType = fileType;
+      if (['audio/x-m4a', 'audio/m4a'].includes(fileType)) {
+        normalizedType = 'audio/mp4';
+      }
+
       // Try S3 first, fallback to local endpoint
-      const url = await this.s3Service.getPresignedUrl(fileName, fileType);
+      const url = await this.s3Service.getPresignedUrl(fileName, normalizedType);
       return { url };
     } catch (error) {
       console.error(

@@ -274,6 +274,12 @@ export class ChatGateway
           'audio/webm',
           'audio/ogg',
           'audio/wav',
+          'audio/3gpp',
+          'audio/3gpp2',
+          'audio/amr',
+          'audio/x-aac',
+          'audio/vnd.dlna.adts',
+          'application/octet-stream', // Fallback for some mobile uploads
         ];
 
         if (!allowedMimeTypes.includes(attachment.mimeType)) {

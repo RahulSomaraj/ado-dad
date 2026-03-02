@@ -469,13 +469,21 @@ export class ChatService {
       }
     }
 
+    // Normalize audio mime types in attachments
+    const normalizedAttachments = attachments.map(attr => {
+      if (attr.type === 'audio' && ['audio/x-m4a', 'audio/m4a'].includes(attr.mimeType)) {
+        return { ...attr, mimeType: 'audio/mp4' };
+      }
+      return attr;
+    });
+
     const msg = await this.chatMessageModel.create({
       roomRef: (room as any)._id, // ObjectId reference to ChatRoom
       roomId: room.roomId, // denormalized string id for convenience
       senderId: new Types.ObjectId(senderId),
       type,
       content,
-      attachments,
+      attachments: normalizedAttachments,
       isRead: false,
       moderationFlags: moderation.flags?.length ? moderation.flags : undefined,
       moderationScore: moderation.score,
