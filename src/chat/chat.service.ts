@@ -21,6 +21,8 @@ import {
 import { Ad, AdDocument } from '../ads/schemas/ad.schema';
 import { User } from '../users/schemas/user.schema';
 import { ContentModerationService } from './services/content-moderation.service';
+import axios from 'axios';
+
 
 @Injectable()
 export class ChatService {
@@ -91,6 +93,30 @@ export class ChatService {
   private ensureUpdated(res: any, notFoundMsg = 'Resource not found') {
     const matched = res?.matchedCount ?? res?.n ?? 0;
     if (!matched) throw new NotFoundException(notFoundMsg);
+  }
+
+  private async getAudioDuration(url: string): Promise<number | null> {
+    try {
+      // music-metadata is ESM only, use dynamic import
+      const mm = await (eval('import("music-metadata")') as Promise<typeof import('music-metadata')>);
+
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 5000, // 5s timeout
+      });
+
+      const buffer = Buffer.from(response.data);
+      const metadata = await mm.parseBuffer(buffer);
+
+      return metadata.format.duration
+        ? Math.ceil(metadata.format.duration)
+        : null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to extract audio duration from ${url}: ${error.message}`,
+      );
+      return null;
+    }
   }
 
   /* =========================
@@ -469,13 +495,38 @@ export class ChatService {
       }
     }
 
-    // Normalize audio mime types in attachments
-    const normalizedAttachments = attachments.map(attr => {
-      if (attr.type === 'audio' && ['audio/x-m4a', 'audio/m4a'].includes(attr.mimeType)) {
-        return { ...attr, mimeType: 'audio/mp4' };
-      }
-      return attr;
-    });
+    // Normalize audio mime types in attachments and extract duration if missing
+    const normalizedAttachments = await Promise.all(
+      attachments.map(async (attr) => {
+        if (attr.type === 'audio') {
+          let updatedAttr = { ...attr };
+
+          // 1. Normalize MIME type
+          if (['audio/x-m4a', 'audio/m4a', 'application/octet-stream'].includes(attr.mimeType)) {
+            updatedAttr.mimeType = 'audio/mp4';
+          }
+
+          // 2. Extract duration if missing
+          if (!updatedAttr.duration) {
+            this.logger.log(`Extracting duration for audio: ${updatedAttr.url}`);
+            const duration = await this.getAudioDuration(updatedAttr.url);
+            if (duration) {
+              updatedAttr.duration = duration;
+            }
+          }
+
+          // 3. Mandatory check
+          if (!updatedAttr.duration) {
+            throw new BadRequestException(
+              'Audio duration is missing and could not be extracted',
+            );
+          }
+
+          return updatedAttr;
+        }
+        return attr;
+      }),
+    );
 
     const msg = await this.chatMessageModel.create({
       roomRef: (room as any)._id, // ObjectId reference to ChatRoom

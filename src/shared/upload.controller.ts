@@ -37,6 +37,11 @@ export class UploadController {
   })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
     try {
+      // Normalize MIME type for m4a files
+      if (file && (file.mimetype === 'audio/x-m4a' || file.mimetype === 'audio/m4a')) {
+        file.mimetype = 'audio/mp4';
+      }
+
       // Try S3 first, fallback to local storage
       const fileUrl = await this.s3Service.uploadFile(file);
       return { fileUrl };
@@ -117,8 +122,13 @@ export class UploadController {
     try {
       // Normalize M4A mime types to audio/mp4 as recommended for better compatibility
       let normalizedType = fileType;
-      if (['audio/x-m4a', 'audio/m4a'].includes(fileType)) {
-        normalizedType = 'audio/mp4';
+      if (['audio/x-m4a', 'audio/m4a', 'application/octet-stream'].includes(fileType)) {
+        // If it's a known M4A type or a generic stream (which mobile often uses), 
+        // and its extension (if we had it) would be .m4a or .mp4, we'd normalize here.
+        // For presigned URL, we rely mostly on the requested type.
+        if (fileType !== 'application/octet-stream') {
+          normalizedType = 'audio/mp4';
+        }
       }
 
       // Try S3 first, fallback to local endpoint
