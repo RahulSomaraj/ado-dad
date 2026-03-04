@@ -5,7 +5,7 @@ import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<UserType[]>(
@@ -18,13 +18,14 @@ export class RolesGuard implements CanActivate {
     }
 
     const { user } = context.switchToHttp().getRequest();
+    const userRole = user?.type || user?.userType;
 
-    // Check if user exists and has type property
-    if (!user || !user.type) {
+    // Check if user exists and has a role property
+    if (!userRole) {
       return false;
     }
 
-    // If user.type is a single value, check if it exists in requiredRoles
-    return requiredRoles.includes(user.type);
+    // If userRole exists, check if it exists in requiredRoles
+    return requiredRoles.includes(userRole);
   }
 }

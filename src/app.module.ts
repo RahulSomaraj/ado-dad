@@ -33,6 +33,7 @@ import { VehicleModule } from './vehicles/vehicle.module';
 import { ChatModule } from './chat/chat.module';
 import { UserReportModule } from './users/user-report.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AppVersionModule } from './app-version/app-version.module';
 
 // Services
 import { EmailService } from './utils/email.service';
@@ -125,6 +126,7 @@ import { configService } from './config/mongo.config';
     VehicleInventoryModule,
     VehicleModule,
     NotificationsModule,
+    AppVersionModule,
   ],
   providers: [AppService, RefreshTokenService, EmailService, RedisService],
   controllers: [AppController],
