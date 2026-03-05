@@ -1690,28 +1690,27 @@ export class AdsService {
     if (!this.isValidId(id)) {
       throw new BadRequestException(`Invalid ad ID: ${id}`);
     }
-    // First, find the ad to check if it exists
-    const ad = await this.adModel.findById(id);
+    // Find the ad - exclude already deleted ads
+    const ad = await this.adModel.findOne({ _id: id, isDeleted: { $ne: true } });
     if (!ad) {
       throw new NotFoundException(`Advertisement with ID ${id} not found`);
     }
 
-    // Check if user is admin or super admin (they can delete any ad)
-    if (userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN) {
-      await this.adModel.findByIdAndDelete(id);
-      await this.invalidateAdCache(id, userId);
-      return;
-    }
-
-    // For regular users, check if they are the owner of the ad
-    if (ad.postedBy.toString() !== userId) {
+    // Admins can delete any ad; regular users can only delete their own
+    const isAdmin = userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN;
+    if (!isAdmin && ad.postedBy.toString() !== userId) {
       throw new NotFoundException(
         `You don't have permission to delete this advertisement. Only the owner, admin, or super admin can delete it.`,
       );
     }
 
-    // User is the owner, proceed with deletion
-    await this.adModel.findByIdAndDelete(id);
+    // Soft delete: mark as deleted instead of hard delete
+    await this.adModel.findByIdAndUpdate(id, {
+      isDeleted: true,
+      isActive: false,
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    });
     await this.invalidateAdCache(id, userId);
   }
 
