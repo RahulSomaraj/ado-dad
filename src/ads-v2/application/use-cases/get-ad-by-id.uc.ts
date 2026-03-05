@@ -7,7 +7,7 @@ import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
 import { DetailedAdResponseDto } from '../../../ads/dto/common/ad-response.dto';
-import { AdCategory } from '../../../ads/schemas/ad.schema';
+import { AdCategory, AdStatus } from '../../../ads/schemas/ad.schema';
 import {
   Favorite,
   FavoriteDocument,
@@ -34,7 +34,7 @@ export class GetAdByIdUc {
     private readonly chatRoomModel: Model<ChatRoomDocument>,
     @InjectModel(ChatMessage.name)
     private readonly messageModel: Model<ChatMessageDocument>,
-  ) {}
+  ) { }
 
   async exec(input: {
     adId: string;
@@ -260,13 +260,13 @@ export class GetAdByIdUc {
 
     const userResponse = ad.user
       ? {
-          id: ad.user._id.toString(),
-          name: ad.user.name,
-          email: ad.user.email,
-          countryCode: ad.user.countryCode,
-          phoneNumber: ad.user.phoneNumber,
-          profilePic: ad.user.profilePic,
-        }
+        id: ad.user._id.toString(),
+        name: ad.user.name,
+        email: ad.user.email,
+        countryCode: ad.user.countryCode,
+        phoneNumber: ad.user.phoneNumber,
+        profilePic: ad.user.profilePic,
+      }
       : undefined;
 
     return {
@@ -283,6 +283,7 @@ export class GetAdByIdUc {
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
       isApproved: ad.isApproved || false,
+      status: ad.status || (ad.isApproved ? AdStatus.APPROVED : AdStatus.PENDING),
       approvedBy: ad.approvedBy ? ad.approvedBy.toString() : undefined,
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,

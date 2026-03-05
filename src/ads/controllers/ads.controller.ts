@@ -65,7 +65,7 @@ export class AdsController {
     private readonly dataValidationService: DataValidationService,
     private readonly s3Service: S3Service,
     private readonly vehicleInventoryService: VehicleInventoryService,
-  ) {}
+  ) { }
 
   @Post('list')
   async getAllAds(
@@ -622,6 +622,11 @@ export class AdsController {
           type: 'boolean',
           description: 'Filter by sold out status',
         },
+        showUnapproved: {
+          type: 'boolean',
+          description: 'Show pending/unapproved ads (default: true for my-ads)',
+          default: true,
+        },
       },
     },
     description: 'Filter and pagination parameters for user advertisements',
@@ -647,13 +652,17 @@ export class AdsController {
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
       soldOut?: boolean;
+      showUnapproved?: boolean;
     } = {},
   ) {
     const userId = req.user.id;
     if (!userId) {
       throw new BadRequestException('User ID not found in request');
     }
-    return this.adsService.getUserAds(userId, filterDto);
+    return this.adsService.getUserAds(userId, {
+      ...filterDto,
+      showUnapproved: filterDto.showUnapproved !== false,
+    });
   }
 
   // Get ads by user ID
@@ -746,9 +755,29 @@ export class AdsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update advertisement approval status (Admin only)' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+    description: 'Advertisement ID'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['isApproved'],
+      properties: {
+        isApproved: {
+          type: 'boolean',
+          description: 'true to approve, false to reject',
+          example: true,
+        },
+      },
+    },
+  })
   async updateAdApproval(
     @Param('id') id: string,
-    @Body() body: { isApproved: boolean },
+    @Body('isApproved') isApproved: boolean,
     @Request() req: any,
   ): Promise<DetailedAdResponseDto> {
     try {
@@ -760,7 +789,7 @@ export class AdsController {
 
       return await this.adsService.updateAdApproval(
         id,
-        body.isApproved,
+        isApproved,
         req.user.id,
       );
     } catch (error) {

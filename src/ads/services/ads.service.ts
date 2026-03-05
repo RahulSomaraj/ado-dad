@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
-import { Ad, AdDocument, AdCategory } from '../schemas/ad.schema';
+import { Ad, AdDocument, AdCategory, AdStatus } from '../schemas/ad.schema';
 import {
   PropertyAd,
   PropertyAdDocument,
@@ -439,6 +439,7 @@ export class AdsService {
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
       soldOut?: boolean;
+      showUnapproved?: boolean;
     } = {},
   ): Promise<PaginatedDetailedAdResponseDto> {
     if (!this.isValidId(userId)) {
@@ -470,12 +471,16 @@ export class AdsService {
     // ------- Pipeline -------
     const pipeline: any[] = [];
 
-    // Match user's ads only (including approved status)
+    // Match user's ads only
     const matchStage: any = {
       postedBy: new Types.ObjectId(userId),
       isDeleted: { $ne: true },
-      isApproved: true,
     };
+
+    // Filter by approval status if showUnapproved is false (default)
+    if (!filters.showUnapproved) {
+      matchStage.isApproved = true;
+    }
 
     // // Add soldOut filter - default to false (exclude sold-out ads) unless explicitly requested
     // if (soldOut !== undefined) {
@@ -1366,6 +1371,7 @@ export class AdsService {
       category: AdCategory.PROPERTY,
       soldOut: false, // Always set soldOut to false by default
       isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
     });
     const savedAd = await ad.save();
 
@@ -1429,6 +1435,7 @@ export class AdsService {
       category: AdCategory.PRIVATE_VEHICLE,
       soldOut: false, // Always set soldOut to false by default
       isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
     });
     const savedAd = await ad.save();
 
@@ -1502,6 +1509,7 @@ export class AdsService {
         category: AdCategory.COMMERCIAL_VEHICLE,
         soldOut: false, // Always set soldOut to false by default
         isApproved: false, // Always set isApproved to false by default
+        status: AdStatus.PENDING,
       });
       const savedAd = await ad.save({ session });
 
@@ -1585,6 +1593,7 @@ export class AdsService {
       category: AdCategory.TWO_WHEELER,
       soldOut: false, // Always set soldOut to false by default
       isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
     });
     const savedAd = await ad.save();
 
@@ -1729,8 +1738,10 @@ export class AdsService {
 
     if (isApproved) {
       updateData.approvedBy = new Types.ObjectId(approvedBy);
+      updateData.status = AdStatus.APPROVED;
     } else {
       updateData.approvedBy = null;
+      updateData.status = AdStatus.REJECTED;
     }
 
     await this.adModel.findByIdAndUpdate(id, updateData, {
@@ -2461,7 +2472,7 @@ export class AdsService {
             name: (m as any).name,
             country: (m as any).originCountry,
           };
-        } catch {}
+        } catch { }
       }
 
       if (vehicleDetails.modelId) {
@@ -2474,7 +2485,7 @@ export class AdsService {
             name: (model as any).name,
             manufacturerId: (model as any).manufacturer?.toString?.(),
           };
-        } catch {}
+        } catch { }
       }
 
       if (vehicleDetails.variantId) {
@@ -2505,7 +2516,7 @@ export class AdsService {
           if (cleanedVariant) {
             inv.variant = cleanedVariant;
           }
-        } catch {}
+        } catch { }
       }
 
       if (vehicleDetails.transmissionTypeId) {
@@ -2518,7 +2529,7 @@ export class AdsService {
             name: (t as any).name,
             description: (t as any).description,
           };
-        } catch {}
+        } catch { }
       }
 
       if (vehicleDetails.fuelTypeId) {
@@ -2531,7 +2542,7 @@ export class AdsService {
             name: (f as any).name,
             description: (f as any).description,
           };
-        } catch {}
+        } catch { }
       }
 
       if (Object.keys(inv).length > 0) {
@@ -2561,6 +2572,7 @@ export class AdsService {
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
       isApproved: ad.isApproved || false,
+      status: ad.status || AdStatus.PENDING,
       approvedBy: ad.approvedBy ? (ad.approvedBy as any).toString() : undefined,
       postedAt: ad.createdAt, // expose createdAt as postedAt
       updatedAt: ad.updatedAt,

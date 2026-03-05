@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AdCategory } from '../../schemas/ad.schema';
+import { AdCategory, AdStatus } from '../../schemas/ad.schema';
 import {
   PropertyTypeEnum,
   AdListingType,
@@ -81,6 +81,9 @@ export class AdResponseDto {
 
   @ApiProperty({ description: 'Is advertisement approved' })
   isApproved: boolean;
+
+  @ApiProperty({ description: 'Advertisement status', enum: AdStatus })
+  status: AdStatus;
 
   @ApiPropertyOptional({ description: 'Approved by user ID' })
   approvedBy?: string;

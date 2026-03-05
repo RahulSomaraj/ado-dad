@@ -10,6 +10,12 @@ export enum AdCategory {
   TWO_WHEELER = 'two_wheeler',
 }
 
+export enum AdStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
 @Schema({ timestamps: true })
 export class Ad {
   _id: Types.ObjectId;
@@ -74,6 +80,9 @@ export class Ad {
   @Prop({ default: false })
   isApproved: boolean;
 
+  @Prop({ required: true, enum: AdStatus, default: AdStatus.PENDING })
+  status: AdStatus;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false })
   approvedBy?: mongoose.Types.ObjectId;
 
@@ -107,6 +116,7 @@ AdSchema.index({ approvedBy: 1 });
 AdSchema.index({ isActive: 1 });
 AdSchema.index({ soldOut: 1 });
 AdSchema.index({ isApproved: 1 });
+AdSchema.index({ status: 1 });
 AdSchema.index({ price: 1 });
 // Compound indexes moved from service
 AdSchema.index(

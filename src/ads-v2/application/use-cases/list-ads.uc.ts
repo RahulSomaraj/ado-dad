@@ -13,6 +13,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
+import { AdStatus } from '../../../ads/schemas/ad.schema';
 
 export interface PaginatedAdsResponse {
   data: DetailedAdResponseDto[];
@@ -47,7 +48,7 @@ export class ListAdsUc {
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
     private readonly locationHierarchyService: LocationHierarchyService,
-  ) {}
+  ) { }
 
   async exec(
     filters: ListAdsV2Dto,
@@ -1173,6 +1174,7 @@ export class ListAdsUc {
       isActive: ad.isActive,
       soldOut: ad.soldOut || false,
       isApproved: ad.isApproved || false,
+      status: ad.status || (ad.isApproved ? AdStatus.APPROVED : AdStatus.PENDING),
       approvedBy: ad.approvedBy ? ad.approvedBy.toString() : null,
       postedAt: ad.createdAt,
       updatedAt: ad.updatedAt,

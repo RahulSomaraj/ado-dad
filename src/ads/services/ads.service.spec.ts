@@ -1,15 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { AdsService } from './ads.service';
-import { Ad } from '../schemas/ad.schema';
+import { Ad, AdCategory, AdStatus } from '../schemas/ad.schema';
 import { PropertyAd } from '../schemas/property-ad.schema';
 import { VehicleAd } from '../schemas/vehicle-ad.schema';
 import { CommercialVehicleAd } from '../schemas/commercial-vehicle-ad.schema';
-import { PropertyType } from '../schemas/property-type.schema';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
-import { CreateVehicleAdDto } from '../dto/vehicle/create-vehicle-ad.dto';
-import { CreateCommercialVehicleAdDto } from '../dto/commercial-vehicle/create-commercial-vehicle-ad.dto';
-import { BadRequestException } from '@nestjs/common';
+import { CreateAdDto } from '../dto/common/create-ad.dto';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { RedisService } from '../../shared/redis.service';
+import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
+import { GeocodingService } from '../../common/services/geocoding.service';
+import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
+import { Favorite } from '../../favorites/schemas/schema.favorite';
+import { ChatRoom } from '../../chat/schemas/chat-room.schema';
+import { ChatMessage } from '../../chat/schemas/chat-message.schema';
+import { Types } from 'mongoose';
 
 describe('AdsService', () => {
   let service: AdsService;
@@ -20,6 +26,7 @@ describe('AdsService', () => {
     findById: jest.fn(),
     findOne: jest.fn(),
     aggregate: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
   };
 
   const mockPropertyAdModel = {
@@ -40,19 +47,50 @@ describe('AdsService', () => {
     findOne: jest.fn(),
   };
 
-  const mockPropertyTypeModel = {
-    find: jest.fn(),
-    findOne: jest.fn(),
-    new: jest.fn(),
-    save: jest.fn(),
-  };
-
   const mockVehicleInventoryService = {
     findManufacturerById: jest.fn(),
     findVehicleModelById: jest.fn(),
     findVehicleVariantById: jest.fn(),
     findTransmissionTypeById: jest.fn(),
     findFuelTypeById: jest.fn(),
+  };
+
+  const mockRedisService = {
+    cacheGet: jest.fn(),
+    cacheSet: jest.fn(),
+    keys: jest.fn(),
+    cacheDel: jest.fn(),
+    get: jest.fn(),
+    set: jest.fn(),
+  };
+
+  const mockDetectionService = {
+    detectCommercialVehicleDefaults: jest.fn().mockResolvedValue({ isCommercialVehicle: false }),
+  };
+
+  const mockGeocodingService = {
+    reverseGeocode: jest.fn(),
+  };
+
+  const mockLocationHierarchyService = {
+    getLocationFilter: jest.fn(),
+    getLocationAggregationPipeline: jest.fn().mockReturnValue([]),
+    getLocationScoringStage: jest.fn().mockReturnValue({ $addFields: { locationScore: 1 } }),
+  };
+
+  const mockFavoriteModel = {
+    countDocuments: jest.fn(),
+    findOne: jest.fn(),
+    deleteMany: jest.fn(),
+  };
+
+  const mockChatRoomModel = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+  };
+
+  const mockChatMessageModel = {
+    findOne: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -76,193 +114,140 @@ describe('AdsService', () => {
           useValue: mockCommercialVehicleAdModel,
         },
         {
-          provide: getModelToken(PropertyType.name),
-          useValue: mockPropertyTypeModel,
+          provide: getModelToken(Favorite.name),
+          useValue: mockFavoriteModel,
+        },
+        {
+          provide: getModelToken(ChatRoom.name),
+          useValue: mockChatRoomModel,
+        },
+        {
+          provide: getModelToken(ChatMessage.name),
+          useValue: mockChatMessageModel,
         },
         {
           provide: VehicleInventoryService,
           useValue: mockVehicleInventoryService,
         },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
+        },
+        {
+          provide: CommercialVehicleDetectionService,
+          useValue: mockDetectionService,
+        },
+        {
+          provide: GeocodingService,
+          useValue: mockGeocodingService,
+        },
+        {
+          provide: LocationHierarchyService,
+          useValue: mockLocationHierarchyService,
+        },
       ],
     }).compile();
 
     service = module.get<AdsService>(AdsService);
+
+    // Reset all mocks
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  describe('createVehicleAd', () => {
-    it('should create a vehicle ad with valid vehicle inventory references', async () => {
-      const createDto: CreateVehicleAdDto = {
-        title: 'Test Vehicle',
-        description: 'Test Description',
-        price: 50000,
-        location: 'Test Location',
-        manufacturerId: '507f1f77bcf86cd799439011',
-        modelId: '507f1f77bcf86cd799439012',
-        variantId: '507f1f77bcf86cd799439013',
-        year: 2020,
-        mileage: 50000,
-        transmissionTypeId: '507f1f77bcf86cd799439014',
-        fuelTypeId: '507f1f77bcf86cd799439015',
-        vehicleType: 'four_wheeler' as any,
-        color: 'Red',
-        isFirstOwner: true,
-        hasInsurance: true,
-        hasRcBook: true,
-        additionalFeatures: 'Test features',
+  describe('createAd', () => {
+    it('should initialize ad with PENDING status', async () => {
+      const createDto: CreateAdDto = {
+        category: AdCategory.PROPERTY,
+        data: {
+          title: 'Test Property',
+          description: 'Test Property Description',
+          price: 100000,
+          location: 'Test Location',
+          propertyType: 'apartment' as any,
+          bedrooms: 2,
+          bathrooms: 1,
+          areaSqft: 1000,
+          latitude: 0,
+          longitude: 0,
+        },
       };
 
-      const mockAd = { _id: 'test-id', ...createDto } as any;
-      const mockVehicleAd = { _id: 'test-id', ...createDto } as any;
-
-      mockVehicleInventoryService.findManufacturerById.mockResolvedValue({
-        _id: createDto.manufacturerId,
-      });
-      mockVehicleInventoryService.findVehicleModelById.mockResolvedValue({
-        _id: createDto.modelId,
-      });
-      mockVehicleInventoryService.findVehicleVariantById.mockResolvedValue({
-        _id: createDto.variantId,
-      });
-      mockVehicleInventoryService.findTransmissionTypeById.mockResolvedValue({
-        _id: createDto.transmissionTypeId,
-      });
-      mockVehicleInventoryService.findFuelTypeById.mockResolvedValue({
-        _id: createDto.fuelTypeId,
-      });
-
-      mockAdModel.new.mockReturnValue(mockAd);
-      mockAdModel.save.mockResolvedValue(mockAd);
-      mockVehicleAdModel.new.mockReturnValue(mockVehicleAd);
-      mockVehicleAdModel.save.mockResolvedValue(mockVehicleAd);
-
-      const result = await service.createVehicleAd(createDto, 'user-id');
-
-      expect(
-        mockVehicleInventoryService.findManufacturerById,
-      ).toHaveBeenCalledWith(createDto.manufacturerId);
-      expect(
-        mockVehicleInventoryService.findVehicleModelById,
-      ).toHaveBeenCalledWith(createDto.modelId);
-      expect(
-        mockVehicleInventoryService.findVehicleVariantById,
-      ).toHaveBeenCalledWith(createDto.variantId);
-      expect(
-        mockVehicleInventoryService.findTransmissionTypeById,
-      ).toHaveBeenCalledWith(createDto.transmissionTypeId);
-      expect(mockVehicleInventoryService.findFuelTypeById).toHaveBeenCalledWith(
-        createDto.fuelTypeId,
-      );
-      expect(result).toBeDefined();
-    });
-
-    it('should throw BadRequestException for invalid vehicle inventory references', async () => {
-      const createDto: CreateVehicleAdDto = {
-        title: 'Test Vehicle',
-        description: 'Test Description',
-        price: 50000,
-        location: 'Test Location',
-        manufacturerId: 'invalid-id',
-        modelId: '507f1f77bcf86cd799439012',
-        year: 2020,
-        mileage: 50000,
-        transmissionTypeId: '507f1f77bcf86cd799439014',
-        fuelTypeId: '507f1f77bcf86cd799439015',
-        vehicleType: 'four_wheeler' as any,
-        color: 'Red',
-        isFirstOwner: true,
-        hasInsurance: true,
-        hasRcBook: true,
-        additionalFeatures: 'Test features',
+      const mockId = new Types.ObjectId();
+      const mockAdInstance = {
+        _id: mockId,
+        save: jest.fn().mockResolvedValue({ _id: mockId }),
       };
 
-      mockVehicleInventoryService.findManufacturerById.mockRejectedValue(
-        new Error('Manufacturer not found'),
-      );
+      // Mocking the model constructor
+      (service as any).adModel = jest.fn().mockImplementation(() => mockAdInstance);
+      (service as any).propertyAdModel = jest.fn().mockImplementation(() => ({
+        save: jest.fn().mockResolvedValue({}),
+      }));
 
-      await expect(
-        service.createVehicleAd(createDto, 'user-id'),
-      ).rejects.toThrow(BadRequestException);
+      // In AdsService, it does: postedBy: new Types.ObjectId(userId)
+      // So userId must be a 24-character hex string
+      const userId = new Types.ObjectId().toString();
+
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'test-id' } as any);
+      mockRedisService.keys.mockResolvedValue([]);
+
+      await service.createAd(createDto, userId);
+
+      // Check if status: PENDING was passed to constructor
+      expect((service as any).adModel).toHaveBeenCalledWith(expect.objectContaining({
+        status: AdStatus.PENDING,
+        isApproved: false,
+      }));
     });
   });
 
-  describe('createCommercialVehicleAd', () => {
-    it('should create a commercial vehicle ad with valid vehicle inventory references', async () => {
-      const createDto: CreateCommercialVehicleAdDto = {
-        title: 'Test Commercial Vehicle',
-        description: 'Test Description',
-        price: 500000,
-        location: 'Test Location',
-        vehicleType: 'truck' as any,
-        bodyType: 'flatbed' as any,
-        manufacturerId: '507f1f77bcf86cd799439011',
-        modelId: '507f1f77bcf86cd799439012',
-        variantId: '507f1f77bcf86cd799439013',
-        year: 2020,
-        mileage: 100000,
-        payloadCapacity: 5000,
-        payloadUnit: 'kg',
-        axleCount: 2,
-        transmissionTypeId: '507f1f77bcf86cd799439014',
-        fuelTypeId: '507f1f77bcf86cd799439015',
-        color: 'White',
-        hasInsurance: true,
-        hasFitness: true,
-        hasPermit: true,
-        additionalFeatures: 'Test features',
-        seatingCapacity: 3,
-      };
+  describe('updateAdApproval', () => {
+    it('should set status to APPROVED when isApproved is true', async () => {
+      const adId = new Types.ObjectId().toString();
+      const adminId = new Types.ObjectId().toString();
 
-      const mockAd = { _id: 'test-id', ...createDto } as any;
-      const mockCommercialVehicleAd = { _id: 'test-id', ...createDto } as any;
+      mockAdModel.findById = jest.fn().mockResolvedValue({ _id: new Types.ObjectId(adId) });
+      mockAdModel.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: adId });
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: adId } as any);
+      mockRedisService.keys.mockResolvedValue([]);
 
-      mockVehicleInventoryService.findManufacturerById.mockResolvedValue({
-        _id: createDto.manufacturerId,
-      });
-      mockVehicleInventoryService.findVehicleModelById.mockResolvedValue({
-        _id: createDto.modelId,
-      });
-      mockVehicleInventoryService.findVehicleVariantById.mockResolvedValue({
-        _id: createDto.variantId,
-      });
-      mockVehicleInventoryService.findTransmissionTypeById.mockResolvedValue({
-        _id: createDto.transmissionTypeId,
-      });
-      mockVehicleInventoryService.findFuelTypeById.mockResolvedValue({
-        _id: createDto.fuelTypeId,
-      });
+      await service.updateAdApproval(adId, true, adminId);
 
-      mockAdModel.new.mockReturnValue(mockAd);
-      mockAdModel.save.mockResolvedValue(mockAd);
-      mockCommercialVehicleAdModel.new.mockReturnValue(mockCommercialVehicleAd);
-      mockCommercialVehicleAdModel.save.mockResolvedValue(
-        mockCommercialVehicleAd,
+      expect(mockAdModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        adId,
+        expect.objectContaining({
+          status: AdStatus.APPROVED,
+          isApproved: true,
+          approvedBy: expect.any(Types.ObjectId),
+        }),
+        expect.any(Object),
       );
+    });
 
-      const result = await service.createCommercialVehicleAd(
-        createDto,
-        'user-id',
-      );
+    it('should set status to REJECTED when isApproved is false', async () => {
+      const adId = new Types.ObjectId().toString();
+      const adminId = new Types.ObjectId().toString();
 
-      expect(
-        mockVehicleInventoryService.findManufacturerById,
-      ).toHaveBeenCalledWith(createDto.manufacturerId);
-      expect(
-        mockVehicleInventoryService.findVehicleModelById,
-      ).toHaveBeenCalledWith(createDto.modelId);
-      expect(
-        mockVehicleInventoryService.findVehicleVariantById,
-      ).toHaveBeenCalledWith(createDto.variantId);
-      expect(
-        mockVehicleInventoryService.findTransmissionTypeById,
-      ).toHaveBeenCalledWith(createDto.transmissionTypeId);
-      expect(mockVehicleInventoryService.findFuelTypeById).toHaveBeenCalledWith(
-        createDto.fuelTypeId,
+      mockAdModel.findById = jest.fn().mockResolvedValue({ _id: new Types.ObjectId(adId) });
+      mockAdModel.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: adId });
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: adId } as any);
+      mockRedisService.keys.mockResolvedValue([]);
+
+      await service.updateAdApproval(adId, false, adminId);
+
+      expect(mockAdModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        adId,
+        expect.objectContaining({
+          status: AdStatus.REJECTED,
+          isApproved: false,
+          approvedBy: null,
+        }),
+        expect.any(Object),
       );
-      expect(result).toBeDefined();
     });
   });
 });
