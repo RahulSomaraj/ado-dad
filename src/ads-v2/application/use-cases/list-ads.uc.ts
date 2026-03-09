@@ -258,14 +258,40 @@ export class ListAdsUc {
       },
     });
 
-    // Hierarchical location-based filtering
+    // Extract distance filtering into geoNear if coordinates are provided
     if (latitude !== undefined && longitude !== undefined) {
-      // Get location hierarchy pipeline stages with custom distance if provided
+      const radiusKm = customDistanceKm || 50;
+      
+      // Use $geoNear as the very first stage for efficient geospatial querying
+      // This will use the 2dsphere index on geoLocation
+      const geoNearStage = {
+        $geoNear: {
+          near: { type: 'Point', coordinates: [longitude, latitude] },
+          distanceField: 'distance',
+          maxDistance: radiusKm * 1000, // convert km to meters
+          spherical: true,
+          // Push initial match conditions into geoNear for better index usage
+          query: {
+            isDeleted: { $ne: true },
+            isActive: true,
+            isApproved: true,
+            soldOut: { $ne: true }
+          },
+          // We divide by 1000 to output distance in km to match the existing logic
+          distanceMultiplier: 0.001
+        }
+      };
+      
+      // Replace the initial match stage with geoNear since it includes the match query
+      pipeline[0] = geoNearStage;
+
+      // Get location hierarchy pipeline stages without distance calculations
       const locationPipeline =
         this.locationHierarchyService.getLocationAggregationPipeline(
           latitude,
           longitude,
           customDistanceKm, // Pass custom distance for fallback mechanism
+          true // skipDistanceCalc flag
         );
 
       // Add location filtering stages to pipeline
@@ -319,46 +345,7 @@ export class ListAdsUc {
       });
     }
 
-    // User lookup
-    pipeline.push({
-      $lookup: {
-        from: 'users',
-        localField: 'postedBy',
-        foreignField: '_id',
-        as: 'user',
-        pipeline: [
-          {
-            $project: {
-              _id: 1,
-              name: 1,
-              email: 1,
-              countryCode: 1,
-              phoneNumber: 1,
-              profilePic: 1,
-              type: 1,
-              createdAt: 1,
-              isDeleted: 1,
-            },
-          },
-        ],
-      },
-    });
-    pipeline.push({
-      $unwind: { path: '$user', preserveNullAndEmptyArrays: true },
-    });
-
-    // Property details lookup
-    pipeline.push({
-      $lookup: {
-        from: 'propertyads',
-        localField: '_id',
-        foreignField: 'ad',
-        as: 'propertyDetails',
-      },
-    });
-
-    // Property-specific filters
-    if (
+    const hasPropertyFilters = Boolean(
       propertyTypes ||
       listingType ||
       minBedrooms !== undefined ||
@@ -367,7 +354,30 @@ export class ListAdsUc {
       maxArea !== undefined ||
       isFurnished !== undefined ||
       hasParking !== undefined
-    ) {
+    );
+
+    const hasVehicleFilters = Boolean(
+      (category === 'private_vehicle' ||
+        category === 'commercial_vehicle' ||
+        category === 'two_wheeler') &&
+      (fuelTypeIds?.length ||
+        transmissionTypeIds?.length ||
+        manufacturerIds?.length ||
+        modelIds?.length ||
+        minYear !== undefined ||
+        maxYear !== undefined)
+    );
+
+    if (hasPropertyFilters) {
+      pipeline.push({
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      });
+
       // Ensure we are filtering only property ads when property filters are present
       pipeline.push({ $match: { category: 'property' } });
 
@@ -406,38 +416,27 @@ export class ListAdsUc {
       }
     }
 
-    // Vehicle details lookup
-    pipeline.push({
-      $lookup: {
-        from: 'vehicleads',
-        localField: '_id',
-        foreignField: 'ad',
-        as: 'vehicleDetails',
-      },
-    });
+    if (hasVehicleFilters) {
+      if (category === 'two_wheeler' || category === 'private_vehicle') {
+        pipeline.push({
+          $lookup: {
+            from: 'vehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'vehicleDetails',
+          },
+        });
+      } else if (category === 'commercial_vehicle') {
+        pipeline.push({
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
+        });
+      }
 
-    // Commercial vehicle details lookup
-    pipeline.push({
-      $lookup: {
-        from: 'commercialvehicleads',
-        localField: '_id',
-        foreignField: 'ad',
-        as: 'commercialVehicleDetails',
-      },
-    });
-
-    // Vehicle specific filters (apply to all vehicle categories: private_vehicle, commercial_vehicle, two_wheeler)
-    if (
-      (category === 'private_vehicle' ||
-        category === 'commercial_vehicle' ||
-        category === 'two_wheeler') &&
-      (fuelTypeIds?.length ||
-        transmissionTypeIds?.length ||
-        manufacturerIds?.length ||
-        modelIds?.length ||
-        minYear !== undefined ||
-        maxYear !== undefined)
-    ) {
       const vehicleMatch: any = {};
       const elemMatchConditions: any = {};
 
@@ -490,6 +489,103 @@ export class ListAdsUc {
 
       pipeline.push({
         $match: vehicleMatch,
+      });
+    }
+
+    // Sort with location priority
+    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
+
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortBy]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({
+        $sort: { [sortBy]: sortDirection },
+      });
+    }
+
+    // Count total documents BEFORE lookups and pagination
+    // For large datasets, use a more efficient count approach or limit max results
+    const countPipeline = [...pipeline];
+    // Optional: Add a limit to the count pipeline to prevent scanning millions of records
+    // if you only want to show "10,000+ results" rather than exact counts
+    // countPipeline.push({ $limit: 10000 });
+    countPipeline.push({ $count: 'total' });
+
+    // Add pagination
+    const skip = (page - 1) * limit;
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limit });
+
+    // --- DELAYED LOOKUPS POST-PAGINATION ---
+
+    // User lookup
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'postedBy',
+        foreignField: '_id',
+        as: 'user',
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              email: 1,
+              countryCode: 1,
+              phoneNumber: 1,
+              profilePic: 1,
+              type: 1,
+              createdAt: 1,
+              isDeleted: 1,
+            },
+          },
+        ],
+      },
+    });
+    pipeline.push({
+      $unwind: { path: '$user', preserveNullAndEmptyArrays: true },
+    });
+
+    // If property lookups weren't done before pagination, do them now
+    if (!hasPropertyFilters) {
+      pipeline.push({
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      });
+    }
+
+    // Always fetch all vehicle details since response format expects them
+    // unless they were already fetched for filtering
+    if (!hasVehicleFilters || (category !== 'private_vehicle' && category !== 'two_wheeler')) {
+      pipeline.push({
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      });
+    }
+
+    if (!hasVehicleFilters || category !== 'commercial_vehicle') {
+      pipeline.push({
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
       });
     }
 
@@ -549,39 +645,32 @@ export class ListAdsUc {
       },
     });
 
-    // Sort with location priority
-    const sortDirection = sortOrder === 'ASC' ? 1 : -1;
-
-    if (latitude !== undefined && longitude !== undefined) {
-      // Prioritize by location score first, then by requested sort field
-      pipeline.push({
-        $sort: {
-          locationScore: -1, // Higher location score first (district > state > country)
-          [sortBy]: sortDirection,
-        },
-      });
-    } else {
-      // Regular sorting when no location filtering
-      pipeline.push({
-        $sort: { [sortBy]: sortDirection },
-      });
+    // Execute queries
+    // Limit the maximum number of pages that can be accessed to prevent deep pagination performance issues
+    const MAX_DOCUMENTS_TO_COUNT = 10000;
+    const isDeepPagination = skip > MAX_DOCUMENTS_TO_COUNT;
+    
+    // If user is trying to paginate extremely deep, return empty or limit them
+    if (isDeepPagination) {
+      return {
+        data: [],
+        total: MAX_DOCUMENTS_TO_COUNT,
+        page,
+        limit,
+        totalPages: Math.ceil(MAX_DOCUMENTS_TO_COUNT / limit),
+        hasNext: false,
+        hasPrev: true,
+        cachedAt: Date.now(),
+      };
     }
 
-    // Count total documents
-    const countPipeline = [...pipeline];
-    countPipeline.push({ $count: 'total' });
-
-    // Add pagination
-    const skip = (page - 1) * limit;
-    pipeline.push({ $skip: skip });
-    pipeline.push({ $limit: limit });
-
-    // Execute queries
     const [data, countResult] = await Promise.all([
       this.adRepo.aggregate(pipeline),
-      this.adRepo.aggregate(countPipeline),
+      // Limit the count to prevent massive full collection scans on unindexed filters
+      this.adRepo.aggregate([...countPipeline.slice(0, countPipeline.length - 1), { $limit: MAX_DOCUMENTS_TO_COUNT }, { $count: 'total' }]),
     ]);
 
+    // If count hits the limit, we know there are *at least* that many
     const total = countResult[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
 

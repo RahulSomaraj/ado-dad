@@ -222,6 +222,7 @@ export class LocationHierarchyService {
     latitude: number,
     longitude: number,
     radiusKm: number = 50,
+    skipDistanceCalc: boolean = false,
   ): any[] {
     const pipeline: any[] = [];
 
@@ -229,25 +230,27 @@ export class LocationHierarchyService {
     const locationBoundaries = this.getLocationBoundaries(latitude, longitude);
     const stateBoundary = locationBoundaries.find((b) => b.type === 'state');
 
-    // Add distance calculation for all ads
-    pipeline.push({
-      $addFields: {
-        distance: {
-          $let: {
-            vars: {
-              latDiff: { $abs: { $subtract: ['$latitude', latitude] } },
-              lonDiff: { $abs: { $subtract: ['$longitude', longitude] } },
-            },
-            in: {
-              $multiply: [
-                111.32, // Approximate km per degree at equator
-                { $add: ['$$latDiff', '$$lonDiff'] }, // Manhattan distance
-              ],
+    // Add distance calculation for all ads if not already done by $geoNear
+    if (!skipDistanceCalc) {
+      pipeline.push({
+        $addFields: {
+          distance: {
+            $let: {
+              vars: {
+                latDiff: { $abs: { $subtract: ['$latitude', latitude] } },
+                lonDiff: { $abs: { $subtract: ['$longitude', longitude] } },
+              },
+              in: {
+                $multiply: [
+                  111.32, // Approximate km per degree at equator
+                  { $add: ['$$latDiff', '$$lonDiff'] }, // Manhattan distance
+                ],
+              },
             },
           },
         },
-      },
-    });
+      });
+    }
 
     // Apply intelligent filtering based on state boundaries
     if (stateBoundary) {
@@ -255,17 +258,22 @@ export class LocationHierarchyService {
       // But if custom distance is provided (for fallback), use distance-based filtering instead
       if (radiusKm !== 50) {
         // Custom distance provided - use distance-based filtering even within state
-        pipeline.push({
-          $match: {
-            $and: [
-              { latitude: { $exists: true, $ne: null } },
-              { longitude: { $exists: true, $ne: null } },
-              { distance: { $lte: radiusKm } },
-            ],
-          },
-        });
+        // If skipDistanceCalc is true, the filtering is already handled by $geoNear maxDistance
+        if (!skipDistanceCalc) {
+          pipeline.push({
+            $match: {
+              $and: [
+                { latitude: { $exists: true, $ne: null } },
+                { longitude: { $exists: true, $ne: null } },
+                { distance: { $lte: radiusKm } },
+              ],
+            },
+          });
+        }
       } else {
         // Default behavior - return all ads in the state
+        // When using $geoNear, it already filters by radiusKm (50km default), 
+        // but we can still boost state matches or fallback to regex matching
         pipeline.push({
           $match: {
             $or: [
@@ -296,15 +304,18 @@ export class LocationHierarchyService {
       }
     } else {
       // If coordinates don't fall within a known state, use radius-based filtering
-      pipeline.push({
-        $match: {
-          $and: [
-            { latitude: { $exists: true, $ne: null } },
-            { longitude: { $exists: true, $ne: null } },
-            { distance: { $lte: radiusKm } },
-          ],
-        },
-      });
+      // If skipDistanceCalc is true, the filtering is already handled by $geoNear maxDistance
+      if (!skipDistanceCalc) {
+        pipeline.push({
+          $match: {
+            $and: [
+              { latitude: { $exists: true, $ne: null } },
+              { longitude: { $exists: true, $ne: null } },
+              { distance: { $lte: radiusKm } },
+            ],
+          },
+        });
+      }
     }
 
     return pipeline;
