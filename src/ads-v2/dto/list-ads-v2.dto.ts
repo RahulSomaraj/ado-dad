@@ -88,7 +88,7 @@ export class ListAdsV2Dto {
   maxPrice?: number;
 
   @ApiPropertyOptional({
-    description: 'Page number for pagination',
+    description: 'Page number for pagination (ignored when cursor is provided)',
     minimum: 1,
     default: 1,
     example: 1,
@@ -98,6 +98,16 @@ export class ListAdsV2Dto {
   @IsNumber()
   @Min(1)
   page?: number = 1;
+
+  @ApiPropertyOptional({
+    description:
+      'Cursor for cursor-based pagination (recommended for large datasets). When provided, returns nextCursor for the next page instead of using page/skip.',
+    example: '65b123fa1a2b3c4d5e6f7890',
+  })
+  @IsOptional()
+  @IsString()
+  @IsMongoId()
+  cursor?: string;
 
   @ApiPropertyOptional({
     description: 'Number of items per page',

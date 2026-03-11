@@ -17,22 +17,28 @@ import { AdStatus } from '../../../ads/schemas/ad.schema';
 
 export interface PaginatedAdsResponse {
   data: DetailedAdResponseDto[];
-  total: number;
+  total?: number;
   page: number;
   limit: number;
-  totalPages: number;
+  totalPages?: number;
   hasNext: boolean;
   hasPrev: boolean;
+  /** Set when using cursor pagination; use this for the next request. */
+  nextCursor?: string | null;
+  /** Set when using cursor pagination; use this for the previous page. */
+  prevCursor?: string | null;
 }
 
 export interface CachedListData {
   data: DetailedAdResponseDto[];
-  total: number;
+  total?: number;
   page: number;
   limit: number;
-  totalPages: number;
+  totalPages?: number;
   hasNext: boolean;
   hasPrev: boolean;
+  nextCursor?: string | null;
+  prevCursor?: string | null;
   cachedAt: number;
 }
 
@@ -90,6 +96,8 @@ export class ListAdsUc {
       totalPages: baseData.totalPages,
       hasNext: baseData.hasNext,
       hasPrev: baseData.hasPrev,
+      nextCursor: baseData.nextCursor,
+      prevCursor: baseData.prevCursor,
     };
   }
 
@@ -112,7 +120,13 @@ export class ListAdsUc {
       sortBy,
       sortOrder,
       listingType,
+      cursor,
     } = filters;
+
+    // Cursor-based requests: cache per cursor
+    const paginationPart = cursor
+      ? `cursor=${cursor}&limit=${limit || 20}`
+      : `page=${page || 1}&limit=${limit || 20}`;
 
     // Scenario 1: All ads (no filters except pagination and sort)
     if (
@@ -125,7 +139,7 @@ export class ListAdsUc {
       !transmissionTypeIds?.length &&
       !listingType
     ) {
-      return `ads:v2:list:all&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
+      return `ads:v2:list:all&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
 
     // Scenario 2: Category + Location only (no other filters)
@@ -139,7 +153,7 @@ export class ListAdsUc {
       !transmissionTypeIds?.length &&
       !listingType
     ) {
-      return `ads:v2:list:category=${category}&location=${location}&page=${page || 1}&limit=${limit || 20}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
+      return `ads:v2:list:category=${category}&location=${location}&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
 
     // All other combinations: NO CACHING
@@ -175,7 +189,7 @@ export class ListAdsUc {
         const result = await this.fetchWithSpecificDistance(filters, distance);
 
         // If we found results, return them
-        if (result.total > 0) {
+        if ((result.total ?? 0) > 0 || result.data.length > 0) {
           return result;
         }
 
@@ -243,20 +257,37 @@ export class ListAdsUc {
       limit = 20,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
+      cursor,
     } = filters;
+
+    const useCursorPagination = Boolean(cursor && Types.ObjectId.isValid(cursor));
 
     // Build simplified aggregation pipeline
     const pipeline: any[] = [];
+    const baseMatch = {
+      isDeleted: { $ne: true },
+      isActive: true,
+      isApproved: true,
+      soldOut: { $ne: true },
+    };
 
-    // Base match - exclude deleted ads and only show approved ads
-    pipeline.push({
-      $match: {
-        isDeleted: { $ne: true },
-        isActive: true,
-        isApproved: true, // Only show approved ads in listings
-        soldOut: { $ne: true }, // Exclude sold-out ads from listings (include null/undefined)
-      },
-    });
+    // First stage: base match or $geoNear (when coords). When no geo + search, use $text in first $match (required by MongoDB).
+    const searchTrimmed = search?.trim();
+    const hasSearch = Boolean(searchTrimmed);
+    const hasGeo = latitude !== undefined && longitude !== undefined;
+
+    if (hasGeo) {
+      // geoNear must be first; search will use regex later
+    } else if (hasSearch) {
+      pipeline.push({
+        $match: {
+          $text: { $search: searchTrimmed },
+          ...baseMatch,
+        },
+      });
+    } else {
+      pipeline.push({ $match: baseMatch });
+    }
 
     // Extract distance filtering into geoNear if coordinates are provided
     if (latitude !== undefined && longitude !== undefined) {
@@ -332,18 +363,57 @@ export class ListAdsUc {
       });
     }
 
-    // Basic search filter (before lookups)
-    if (search) {
+    // Search with geo: use regex (cannot use $text when $geoNear is first)
+    if (hasSearch && hasGeo) {
       pipeline.push({
         $match: {
           $or: [
-            // Basic ad fields
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
+            { title: { $regex: searchTrimmed, $options: 'i' } },
+            { description: { $regex: searchTrimmed, $options: 'i' } },
           ],
         },
       });
     }
+
+    // Simplified count pipeline: filter stages only (no lookups, no sort). Use when no property/vehicle filters.
+    const buildSimplifiedCountPipeline = (): any[] => {
+      const stages: any[] = [];
+      stages.push(pipeline[0]); // first stage: base match, $text+base, or geoNear
+      if (hasGeo) {
+        stages.push(
+          ...this.locationHierarchyService.getLocationAggregationPipeline(
+            latitude as number,
+            longitude as number,
+            customDistanceKm,
+            true,
+          ),
+        );
+      }
+      if (category) stages.push({ $match: { category } });
+      if (location) {
+        stages.push({
+          $match: { location: { $regex: location, $options: 'i' } },
+        });
+      }
+      if (minPrice || maxPrice) {
+        const priceMatch: any = {};
+        if (minPrice) priceMatch.$gte = minPrice;
+        if (maxPrice) priceMatch.$lte = maxPrice;
+        stages.push({ $match: { price: priceMatch } });
+      }
+      if (hasSearch && hasGeo) {
+        stages.push({
+          $match: {
+            $or: [
+              { title: { $regex: searchTrimmed, $options: 'i' } },
+              { description: { $regex: searchTrimmed, $options: 'i' } },
+            ],
+          },
+        });
+      }
+      stages.push({ $count: 'total' });
+      return stages;
+    };
 
     const hasPropertyFilters = Boolean(
       propertyTypes ||
@@ -492,36 +562,36 @@ export class ListAdsUc {
       });
     }
 
-    // Sort with location priority
+    // Sort with location priority (index-friendly: isDeleted, isActive, isApproved, soldOut, createdAt)
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
 
     if (latitude !== undefined && longitude !== undefined) {
-      // Prioritize by location score first, then by requested sort field
       pipeline.push({
         $sort: {
-          locationScore: -1, // Higher location score first (district > state > country)
+          locationScore: -1,
           [sortBy]: sortDirection,
         },
       });
     } else {
-      // Regular sorting when no location filtering
       pipeline.push({
         $sort: { [sortBy]: sortDirection },
       });
     }
 
-    // Count total documents BEFORE lookups and pagination
-    // For large datasets, use a more efficient count approach or limit max results
-    const countPipeline = [...pipeline];
-    // Optional: Add a limit to the count pipeline to prevent scanning millions of records
-    // if you only want to show "10,000+ results" rather than exact counts
-    // countPipeline.push({ $limit: 10000 });
-    countPipeline.push({ $count: 'total' });
-
-    // Add pagination
-    const skip = (page - 1) * limit;
-    pipeline.push({ $skip: skip });
-    pipeline.push({ $limit: limit });
+    // --- PAGINATION: cursor (no skip) or offset ---
+    if (useCursorPagination) {
+      const cursorId = new Types.ObjectId(cursor as string);
+      pipeline.push({
+        $match: {
+          _id: sortOrder === 'DESC' ? { $lt: cursorId } : { $gt: cursorId },
+        },
+      });
+      pipeline.push({ $limit: limit + 1 }); // fetch one extra to know hasNext
+    } else {
+      const skip = (page - 1) * limit;
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+    }
 
     // --- DELAYED LOOKUPS POST-PAGINATION ---
 
@@ -645,39 +715,68 @@ export class ListAdsUc {
       },
     });
 
-    // Execute queries
-    // Limit the maximum number of pages that can be accessed to prevent deep pagination performance issues
-    const MAX_DOCUMENTS_TO_COUNT = 10000;
-    const isDeepPagination = skip > MAX_DOCUMENTS_TO_COUNT;
-    
-    // If user is trying to paginate extremely deep, return empty or limit them
-    if (isDeepPagination) {
+    // Execute: run data aggregation; optionally run simplified count (no count when property/vehicle filters or cursor)
+    const runCount =
+      !hasPropertyFilters &&
+      !hasVehicleFilters &&
+      !useCursorPagination;
+
+    const skip = useCursorPagination ? 0 : (page - 1) * limit;
+    const isDeepOffsetPagination = !useCursorPagination && skip > 10000;
+    if (isDeepOffsetPagination) {
       return {
         data: [],
-        total: MAX_DOCUMENTS_TO_COUNT,
+        total: undefined,
         page,
         limit,
-        totalPages: Math.ceil(MAX_DOCUMENTS_TO_COUNT / limit),
+        totalPages: undefined,
         hasNext: false,
         hasPrev: true,
+        nextCursor: null,
+        prevCursor: cursor ?? null,
         cachedAt: Date.now(),
       };
     }
 
-    const [data, countResult] = await Promise.all([
+    const [rawData, countResult] = await Promise.all([
       this.adRepo.aggregate(pipeline),
-      // Limit the count to prevent massive full collection scans on unindexed filters
-      this.adRepo.aggregate([...countPipeline.slice(0, countPipeline.length - 1), { $limit: MAX_DOCUMENTS_TO_COUNT }, { $count: 'total' }]),
+      runCount
+        ? this.adRepo.aggregate(buildSimplifiedCountPipeline())
+        : Promise.resolve([{ total: 0 }]),
     ]);
 
-    // If count hits the limit, we know there are *at least* that many
-    const total = countResult[0]?.total || 0;
-    const totalPages = Math.ceil(total / limit);
+    // Cursor path: we requested limit+1; take first `limit` and set nextCursor if we got more
+    let data = rawData;
+    let hasNext: boolean;
+    let nextCursor: string | null = null;
+    let prevCursorOut: string | null = null;
+
+    if (useCursorPagination) {
+      hasNext = rawData.length > limit;
+      data = rawData.slice(0, limit);
+      if (hasNext && data.length > 0) {
+        nextCursor = data[data.length - 1]._id?.toString() ?? null;
+      }
+      prevCursorOut = cursor ?? null;
+    } else {
+      const total = countResult[0]?.total ?? 0;
+      const totalPages = Math.ceil(total / limit);
+      hasNext = (hasPropertyFilters || hasVehicleFilters)
+        ? rawData.length === limit
+        : page < totalPages;
+      if (!(hasPropertyFilters || hasVehicleFilters)) {
+        nextCursor = null;
+        prevCursorOut = null;
+      }
+    }
+
+    const total = runCount ? (countResult[0]?.total ?? 0) : undefined;
+    const totalPages =
+      total !== undefined && limit > 0 ? Math.ceil(total / limit) : undefined;
 
     // Batch fetch all inventory items to avoid N+1 queries
     const inventoryMaps = await this.batchFetchInventoryItems(data);
 
-    // Map the data to include vehicle inventory details using pre-fetched data
     const mappedData = data.map((ad) =>
       this.mapToDetailedResponseDtoWithInventory(
         ad,
@@ -695,8 +794,10 @@ export class ListAdsUc {
       page,
       limit,
       totalPages,
-      hasNext: page < totalPages,
-      hasPrev: page > 1,
+      hasNext,
+      hasPrev: useCursorPagination ? Boolean(prevCursorOut) : page > 1,
+      nextCursor: nextCursor ?? undefined,
+      prevCursor: prevCursorOut ?? undefined,
       cachedAt: Date.now(),
     };
   }

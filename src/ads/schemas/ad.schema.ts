@@ -134,8 +134,8 @@ AdSchema.index({ approvedBy: 1, isApproved: 1 }, { background: true });
 AdSchema.index({ link: 1 }, { background: true });
 AdSchema.index({ isDeleted: 1 }, { background: true });
 AdSchema.index({ postedBy: 1, isDeleted: 1 }, { background: true });
-// Text index for search functionality - only description field exists
-AdSchema.index({ description: 'text' }, { background: true });
+// Text index for search (title + description) - one text index per collection
+AdSchema.index({ title: 'text', description: 'text' }, { background: true });
 // 2dsphere index for geographic queries (legacy latitude/longitude)
 AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });
 // 2dsphere index for GeoJSON location queries (MUST be first for $geoNear)
@@ -154,6 +154,19 @@ AdSchema.index(
 );
 // Compound index for admin queries (isDeleted + createdAt sort)
 AdSchema.index({ isDeleted: 1, createdAt: -1 }, { background: true });
+// Compound index for listing: visibility + sort (avoids in-memory sort)
+AdSchema.index(
+  { isDeleted: 1, isActive: 1, isApproved: 1, soldOut: 1, createdAt: -1 },
+  { background: true },
+);
+AdSchema.index(
+  { isDeleted: 1, isActive: 1, isApproved: 1, soldOut: 1, price: 1 },
+  { background: true },
+);
+AdSchema.index(
+  { isDeleted: 1, isActive: 1, isApproved: 1, soldOut: 1, category: 1, createdAt: -1 },
+  { background: true },
+);
 // Note: Cannot create compound index with 2dsphere - MongoDB only allows ONE 2dsphere index per collection
 // The simple { geoLocation: '2dsphere' } index above is sufficient for $geoNear
 // Visibility filters (isDeleted, isApproved) are applied in $geoNear query itself
