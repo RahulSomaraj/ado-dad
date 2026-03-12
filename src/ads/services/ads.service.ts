@@ -291,20 +291,7 @@ export class AdsService {
       pipeline.push(buildLocationScoreStage(locationHierarchy));
     }
 
-    // Add all lookup stages using helpers
-    pipeline.push(...buildUserLookupStage());
-    pipeline.push(...buildManufacturerLookupStages());
-    pipeline.push(...buildPropertyAdLookupStages());
-    pipeline.push(...buildVehicleAdLookupStages());
-    pipeline.push(...buildCommercialVehicleAdLookupStages());
-
-    // Apply vehicle filters using helper
-    const vehicleFilter = buildVehicleFilterMatcher(filters);
-    if (vehicleFilter) {
-      pipeline.push({ $match: vehicleFilter });
-    }
-
-    // Price filtering
+    // Price and search BEFORE lookups to reduce documents early
     if (filters.minPrice != null || filters.maxPrice != null) {
       const priceMatch: any = {};
       if (filters.minPrice != null) priceMatch.$gte = Number(filters.minPrice);
@@ -312,34 +299,6 @@ export class AdsService {
       pipeline.push({ $match: { price: priceMatch } });
     }
 
-    // Premium manufacturer filtering
-    if (filters.isPremiumManufacturer !== undefined) {
-      pipeline.push({
-        $match: {
-          $or: [
-            {
-              $and: [
-                { vehicleDetails: { $exists: true, $ne: [] } },
-                {
-                  'manufacturerInfo.isPremium': filters.isPremiumManufacturer,
-                },
-              ],
-            },
-            {
-              $and: [
-                { commercialVehicleDetails: { $exists: true, $ne: [] } },
-                {
-                  'commercialManufacturerInfo.isPremium':
-                    filters.isPremiumManufacturer,
-                },
-              ],
-            },
-          ],
-        },
-      });
-    }
-
-    // Text search (after lookups to search in manufacturer/model names)
     if (search && search.trim()) {
       const searchTerm = search.trim();
       pipeline.push({
@@ -353,52 +312,133 @@ export class AdsService {
       });
     }
 
-    // Sorting: location score first if available, then requested field
-    const sortStage: any = {};
-    if (latitude !== undefined && longitude !== undefined) {
-      sortStage.locationScore = -1; // Higher score first
-    }
-    sortStage[sortField] = sortDirection;
-    pipeline.push({ $sort: sortStage });
+    const vehicleFilter = buildVehicleFilterMatcher(filters);
+    const needLookupsBeforePagination =
+      vehicleFilter != null || filters.isPremiumManufacturer !== undefined;
 
-    // Clean up internal fields
-    pipeline.push({
-      $project: {
-        manufacturerInfo: 0,
-        commercialManufacturerInfo: 0,
-      },
-    });
+    let data: any[];
+    let total: number;
 
-    // Convert distance from meters to km if using $geoNear
-    if (latitude !== undefined && longitude !== undefined) {
+    if (!needLookupsBeforePagination) {
+      // Fast path: paginate first, then run lookups only on the page (e.g. 20 docs)
+      const countPipeline = [...pipeline];
+      countPipeline.push({ $count: 'count' });
+
+      const sortStage: any = {};
+      if (latitude !== undefined && longitude !== undefined) {
+        sortStage.locationScore = -1;
+      }
+      sortStage[sortField] = sortDirection;
+      pipeline.push({ $sort: sortStage });
+      pipeline.push({ $skip: (page - 1) * limit });
+      pipeline.push({ $limit: limit });
+
+      pipeline.push(...buildUserLookupStage());
+      pipeline.push(...buildManufacturerLookupStages());
+      pipeline.push(...buildPropertyAdLookupStages());
+      pipeline.push(...buildVehicleAdLookupStages());
+      pipeline.push(...buildCommercialVehicleAdLookupStages());
+
       pipeline.push({
-        $addFields: {
-          distance: {
-            $cond: {
-              if: { $ne: ['$distance', null] },
-              then: { $divide: ['$distance', 1000] }, // Convert meters to km
-              else: null,
-            },
-          },
+        $project: {
+          manufacturerInfo: 0,
+          commercialManufacturerInfo: 0,
         },
       });
+      if (latitude !== undefined && longitude !== undefined) {
+        pipeline.push({
+          $addFields: {
+            distance: {
+              $cond: {
+                if: { $ne: ['$distance', null] },
+                then: { $divide: ['$distance', 1000] },
+                else: null,
+              },
+            },
+          },
+        });
+      }
+
+      const [dataResult, countResult] = await Promise.all([
+        this.adModel.aggregate(pipeline).collation({ locale: 'en', strength: 2 }),
+        this.adModel.aggregate(countPipeline).collation({ locale: 'en', strength: 2 }),
+      ]);
+      data = dataResult ?? [];
+      total = countResult?.[0]?.count ?? 0;
+    } else {
+      // Vehicle/premium filters need lookups first
+      pipeline.push(...buildUserLookupStage());
+      pipeline.push(...buildManufacturerLookupStages());
+      pipeline.push(...buildPropertyAdLookupStages());
+      pipeline.push(...buildVehicleAdLookupStages());
+      pipeline.push(...buildCommercialVehicleAdLookupStages());
+      if (vehicleFilter) {
+        pipeline.push({ $match: vehicleFilter });
+      }
+      if (filters.isPremiumManufacturer !== undefined) {
+        pipeline.push({
+          $match: {
+            $or: [
+              {
+                $and: [
+                  { vehicleDetails: { $exists: true, $ne: [] } },
+                  {
+                    'manufacturerInfo.isPremium': filters.isPremiumManufacturer,
+                  },
+                ],
+              },
+              {
+                $and: [
+                  { commercialVehicleDetails: { $exists: true, $ne: [] } },
+                  {
+                    'commercialManufacturerInfo.isPremium':
+                      filters.isPremiumManufacturer,
+                  },
+                ],
+              },
+            ],
+          },
+        });
+      }
+
+      const sortStage: any = {};
+      if (latitude !== undefined && longitude !== undefined) {
+        sortStage.locationScore = -1;
+      }
+      sortStage[sortField] = sortDirection;
+      pipeline.push({ $sort: sortStage });
+      pipeline.push({
+        $project: {
+          manufacturerInfo: 0,
+          commercialManufacturerInfo: 0,
+        },
+      });
+      if (latitude !== undefined && longitude !== undefined) {
+        pipeline.push({
+          $addFields: {
+            distance: {
+              $cond: {
+                if: { $ne: ['$distance', null] },
+                then: { $divide: ['$distance', 1000] },
+                else: null,
+              },
+            },
+          },
+        });
+      }
+      pipeline.push({
+        $facet: {
+          data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+        },
+      });
+
+      const result = await this.adModel
+        .aggregate(pipeline)
+        .collation({ locale: 'en', strength: 2 });
+      data = result?.[0]?.data ?? [];
+      total = result?.[0]?.total?.[0]?.count ?? 0;
     }
-
-    // Pagination
-    pipeline.push({
-      $facet: {
-        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-        total: [{ $count: 'count' }],
-      },
-    });
-
-    // Execute aggregation
-    const result = await this.adModel
-      .aggregate(pipeline)
-      .collation({ locale: 'en', strength: 2 });
-
-    const data = result?.[0]?.data ?? [];
-    const total = result?.[0]?.total?.[0]?.count ?? 0;
 
     // Map to DTOs
     const dtoData = data.map((ad: any) => {
