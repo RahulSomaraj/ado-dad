@@ -6,6 +6,7 @@ import { ManufacturersController } from './manufacturers.controller';
 
 import { SafeFuelTypeSeedService } from './seed/safe-seed-fuel-types';
 import { SafeTransmissionTypeSeedService } from './seed/safe-seed-transmission-types';
+import { SafeCommercialVehicleTypeSeedService } from './seed/safe-seed-commercial-vehicle-types';
 import { SafeVehicleModelSeedService } from './seed/safe-seed-vehicle-models';
 import { SafeVehicleVariantSeedService } from './seed/safe-seed-vehicle-variants';
 import {
@@ -22,6 +23,10 @@ import {
   TransmissionTypeSchema,
 } from './schemas/transmission-type.schema';
 import {
+  CommercialVehicleType,
+  CommercialVehicleTypeSchema,
+} from './schemas/commercial-vehicle-type.schema';
+import {
   Manufacturer,
   ManufacturerSchema,
 } from './schemas/manufacturer.schema';
@@ -36,6 +41,7 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
       { name: VehicleVariant.name, schema: VehicleVariantSchema },
       { name: FuelType.name, schema: FuelTypeSchema },
       { name: TransmissionType.name, schema: TransmissionTypeSchema },
+      { name: CommercialVehicleType.name, schema: CommercialVehicleTypeSchema },
       { name: Manufacturer.name, schema: ManufacturerSchema },
     ]),
     ManufacturersModule,
@@ -46,6 +52,7 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
     VehicleInventoryService,
     RedisService,
     SafeFuelTypeSeedService,
+    SafeCommercialVehicleTypeSeedService,
     SafeTransmissionTypeSeedService,
     SafeVehicleModelSeedService,
     SafeVehicleVariantSeedService,
@@ -53,9 +60,10 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
   exports: [
     VehicleInventoryService,
     SafeFuelTypeSeedService,
+    SafeCommercialVehicleTypeSeedService,
     SafeTransmissionTypeSeedService,
     SafeVehicleModelSeedService,
     SafeVehicleVariantSeedService,
   ],
 })
-export class VehicleInventoryModule {}
+export class VehicleInventoryModule { }
