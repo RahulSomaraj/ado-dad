@@ -113,6 +113,7 @@ export class ListAdsUc {
       search,
       minPrice,
       maxPrice,
+      commercialVehicleTypes,
       fuelTypeIds,
       transmissionTypeIds,
       page,
@@ -135,6 +136,7 @@ export class ListAdsUc {
       !search &&
       !minPrice &&
       !maxPrice &&
+      !commercialVehicleTypes?.length &&
       !fuelTypeIds?.length &&
       !transmissionTypeIds?.length &&
       !listingType
@@ -149,6 +151,7 @@ export class ListAdsUc {
       !search &&
       !minPrice &&
       !maxPrice &&
+      !commercialVehicleTypes?.length &&
       !fuelTypeIds?.length &&
       !transmissionTypeIds?.length &&
       !listingType
@@ -239,6 +242,7 @@ export class ListAdsUc {
       longitude,
       minPrice,
       maxPrice,
+      commercialVehicleTypes,
       fuelTypeIds,
       transmissionTypeIds,
       manufacturerIds,
@@ -264,6 +268,7 @@ export class ListAdsUc {
 
     // Build simplified aggregation pipeline
     const pipeline: any[] = [];
+    let didCommercialVehicleLookup = false;
     const baseMatch = {
       isDeleted: { $ne: true },
       isActive: true,
@@ -427,15 +432,16 @@ export class ListAdsUc {
     );
 
     const hasVehicleFilters = Boolean(
-      (category === 'private_vehicle' ||
-        category === 'commercial_vehicle' ||
-        category === 'two_wheeler') &&
-      (fuelTypeIds?.length ||
-        transmissionTypeIds?.length ||
-        manufacturerIds?.length ||
-        modelIds?.length ||
-        minYear !== undefined ||
-        maxYear !== undefined)
+      (commercialVehicleTypes?.length && commercialVehicleTypes.length > 0) ||
+        ((category === 'private_vehicle' ||
+          category === 'commercial_vehicle' ||
+          category === 'two_wheeler') &&
+          (fuelTypeIds?.length ||
+            transmissionTypeIds?.length ||
+            manufacturerIds?.length ||
+            modelIds?.length ||
+            minYear !== undefined ||
+            maxYear !== undefined))
     );
 
     if (hasPropertyFilters) {
@@ -505,6 +511,7 @@ export class ListAdsUc {
             as: 'commercialVehicleDetails',
           },
         });
+        didCommercialVehicleLookup = true;
       }
 
       const vehicleMatch: any = {};
@@ -559,6 +566,33 @@ export class ListAdsUc {
 
       pipeline.push({
         $match: vehicleMatch,
+      });
+    }
+
+    // Commercial vehicle types filter: works even if category is not provided.
+    // It returns ads that have commercial vehicle details with type in the provided list.
+    if (commercialVehicleTypes?.length) {
+      // Ensure commercial vehicle details are available for matching
+      if (!didCommercialVehicleLookup) {
+        pipeline.push({
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
+        });
+        didCommercialVehicleLookup = true;
+      }
+
+      pipeline.push({
+        $match: {
+          commercialVehicleDetails: {
+            $elemMatch: {
+              commercialVehicleType: { $in: commercialVehicleTypes },
+            },
+          },
+        },
       });
     }
 
@@ -649,14 +683,17 @@ export class ListAdsUc {
     }
 
     if (!hasVehicleFilters || category !== 'commercial_vehicle') {
-      pipeline.push({
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'commercialVehicleDetails',
-        },
-      });
+      if (!didCommercialVehicleLookup) {
+        pipeline.push({
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
+        });
+        didCommercialVehicleLookup = true;
+      }
     }
 
     // No favorites lookup in base data - will be added per user
