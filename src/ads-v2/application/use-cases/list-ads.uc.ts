@@ -129,10 +129,12 @@ export class ListAdsUc {
       ? `cursor=${cursor}&limit=${limit || 20}`
       : `page=${page || 1}&limit=${limit || 20}`;
 
-    // Scenario 1: All ads (no filters except pagination and sort)
+    // Scenario 1: All ads (no filters except pagination and sort, no geo coords)
     if (
       !category &&
       !location &&
+      !filters.latitude &&
+      !filters.longitude &&
       !search &&
       !minPrice &&
       !maxPrice &&
@@ -144,10 +146,12 @@ export class ListAdsUc {
       return `ads:v2:list:all&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
 
-    // Scenario 2: Category + Location only (no other filters)
+    // Scenario 2: Category + Location only (no other filters, no geo coords)
     if (
       category &&
       location &&
+      !filters.latitude &&
+      !filters.longitude &&
       !search &&
       !minPrice &&
       !maxPrice &&
