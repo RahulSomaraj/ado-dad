@@ -195,8 +195,9 @@ export class ListAdsUc {
       try {
         const result = await this.fetchWithSpecificDistance(filters, distance);
 
-        // If we found results, return them
-        if ((result.total ?? 0) > 0 || result.data.length > 0) {
+        // Only return if actual data was returned — total > 0 alone means the page
+        // is beyond the last page for this radius, so we must try the next radius.
+        if (result.data.length > 0) {
           return result;
         }
 
@@ -208,15 +209,10 @@ export class ListAdsUc {
       }
     }
 
-    // If no results found with any distance, return the last attempt
-    // or fetch without location filtering as final fallback
-    if (lastResult) {
-      return lastResult;
-    }
-
-    // Final fallback: fetch without location filtering
+    // All geo radii exhausted with no data for this page.
+    // Fall back to non-geo search and reset to page 1 so something is always returned.
     const { latitude, longitude, ...filtersWithoutLocation } = filters;
-    return await this.fetchWithOriginalLogic(filtersWithoutLocation);
+    return await this.fetchWithOriginalLogic({ ...filtersWithoutLocation, page: 1 });
   }
 
   /**
