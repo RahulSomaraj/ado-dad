@@ -43,6 +43,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const redisConfig = this.configService.get('REDIS_CONFIG');
       const isTestEnvironment =
         process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID;
+      const isProductionEnvironment = process.env.NODE_ENV === 'production';
+
+      if (isProductionEnvironment && !redisConfig?.password) {
+        this.logRedisUnavailable(
+          '⚠️  REDIS_PASSWORD is missing in production. Redis caching is disabled.',
+        );
+        this.isConnected = false;
+        return;
+      }
 
       this.redisClient = createClient({
         socket: {
@@ -156,6 +165,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return `${this.keyPrefix}${key}`;
   }
 
+  private isClientReady(): boolean {
+    return !!this.redisClient && this.isConnected && this.redisClient.isReady;
+  }
+
   // Basic Redis Operations
   async set(key: string, value: string, ttl?: number): Promise<void> {
     if (!this.isConnected || !this.redisClient) {
@@ -192,6 +205,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async del(key: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(`Redis not connected, skipping delete for key: ${key}`);
+      return 0;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.del(fullKey);
@@ -359,42 +376,66 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   // Set Operations
   async sAdd(key: string, member: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, skipping set add for key: ${key}`,
+      );
+      return 0;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.sAdd(fullKey, member);
     } catch (error) {
       this.logger.error(`Error adding member to set ${key}:`, error);
-      throw error;
+      return 0;
     }
   }
 
   async sRem(key: string, member: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, skipping set remove for key: ${key}`,
+      );
+      return 0;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.sRem(fullKey, member);
     } catch (error) {
       this.logger.error(`Error removing member from set ${key}:`, error);
-      throw error;
+      return 0;
     }
   }
 
   async sMembers(key: string): Promise<string[]> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, returning empty members for key: ${key}`,
+      );
+      return [];
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.sMembers(fullKey);
     } catch (error) {
       this.logger.error(`Error getting members from set ${key}:`, error);
-      throw error;
+      return [];
     }
   }
 
   async sIsMember(key: string, member: string): Promise<boolean> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, returning false membership for key: ${key}`,
+      );
+      return false;
+    }
     try {
       const fullKey = this.getKey(key);
       return await this.redisClient.sIsMember(fullKey, member);
     } catch (error) {
       this.logger.error(`Error checking membership in set ${key}:`, error);
-      throw error;
+      return false;
     }
   }
 
