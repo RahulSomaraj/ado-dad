@@ -6,7 +6,7 @@ import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { S3Service } from '../shared/s3.service';
-import { RedisService } from '../shared/redis.service';
+import { RedisModule } from '../shared/redis.module';
 import {
   AuthTokens,
   AuthTokensSchema,
@@ -21,8 +21,9 @@ import { AdSchema } from 'src/ads/schemas/ad.schema';
       { name: AuthTokens.name, schema: AuthTokensSchema },
     ]),
     JwtModule.register({}),
+    RedisModule,
   ],
-  providers: [UsersService, EmailService, S3Service, RedisService],
+  providers: [UsersService, EmailService, S3Service],
   controllers: [UsersController],
 })
 export class UsersModule {}

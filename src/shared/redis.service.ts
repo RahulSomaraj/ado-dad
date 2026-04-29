@@ -15,6 +15,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private isConnected: boolean = false;
   private connectionAttempts: number = 0;
   private maxRetries: number = 3;
+  private hasLoggedConnectionFailure: boolean = false;
 
   constructor(private readonly configService: ConfigService) {
     this.keyPrefix =
@@ -50,11 +51,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           connectTimeout: redisConfig.connectTimeout,
           reconnectStrategy: (retries) => {
             if (retries >= this.maxRetries) {
-              this.logger.warn(
+              this.logRedisUnavailable(
                 '⚠️  Redis connection failed after maximum retries. Application will run without caching.',
-              );
-              this.logger.warn(
-                '   To enable Redis caching, ensure Redis is running on localhost:6379',
               );
               return false; // Stop retrying
             }
@@ -68,11 +66,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.redisClient.on('error', (err) => {
         // Only log the first error to avoid spam
         if (!this.isConnected && this.connectionAttempts === 0) {
-          this.logger.warn(
+          this.logRedisUnavailable(
             '⚠️  Redis connection failed. Application will run without caching.',
-          );
-          this.logger.warn(
-            '   To enable Redis caching, ensure Redis is running on localhost:6379',
           );
         }
         this.isConnected = false;
@@ -84,6 +79,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           this.logger.log('Redis Client Connected');
         }
         this.isConnected = true;
+        this.hasLoggedConnectionFailure = false;
         this.connectionAttempts = 0; // Reset attempts on successful connection
       });
 
@@ -108,15 +104,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         );
       }
     } catch (error) {
-      this.logger.warn(
+      this.logRedisUnavailable(
         '⚠️  Redis connection failed. Application will run without caching.',
-      );
-      this.logger.warn(
-        '   To enable Redis caching, ensure Redis is running on localhost:6379',
       );
       this.isConnected = false;
       // Do not crash app if Redis is down; continue in degraded mode.
     }
+  }
+
+  private logRedisUnavailable(message: string): void {
+    if (this.hasLoggedConnectionFailure) {
+      return;
+    }
+    this.logger.warn(message);
+    this.logger.warn(
+      '   To enable Redis caching, ensure Redis is running on localhost:6379',
+    );
+    this.hasLoggedConnectionFailure = true;
   }
 
   private async disconnect() {
@@ -330,7 +334,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async rPop(key: string): Promise<string | null> {
     if (!this.isConnected || !this.redisClient) {
-      this.logger.warn(`Redis not connected, returning null for rPop: ${key}`);
       return null;
     }
     try {

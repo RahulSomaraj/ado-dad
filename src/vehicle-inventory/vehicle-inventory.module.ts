@@ -30,7 +30,6 @@ import {
   Manufacturer,
   ManufacturerSchema,
 } from './schemas/manufacturer.schema';
-import { RedisService } from '../shared/redis.service';
 import { ManufacturersModule } from './manufacturers.module';
 import { TestDataSafetyModule } from '../common/test-data-safety.module';
 
@@ -50,7 +49,6 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
   controllers: [VehicleInventoryController, ManufacturersController],
   providers: [
     VehicleInventoryService,
-    RedisService,
     SafeFuelTypeSeedService,
     SafeCommercialVehicleTypeSeedService,
     SafeTransmissionTypeSeedService,
