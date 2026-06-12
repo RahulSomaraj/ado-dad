@@ -143,6 +143,17 @@ export class ListAdsV2Dto {
   @IsString()
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
 
+  @ApiPropertyOptional({
+    description:
+      'Commercial vehicle types filter (multi-select). Works for any category: returns only ads that have commercial vehicle details with type in this list (e.g. truck, van, bus).',
+    type: [String],
+    example: ['truck', 'van', 'bus'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  commercialVehicleTypes?: string[];
+
   // Two-wheeler specific filters
   @ApiPropertyOptional({
     description:

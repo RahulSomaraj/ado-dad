@@ -48,6 +48,8 @@ cp env.example .env
 # Build and run production with external services
 docker-compose up --build
 
+
+docker run -d --name adodad-redis -p 6379:6379 redis:7-alpine
 # Access the application
 curl http://localhost:3000/ads
 ```

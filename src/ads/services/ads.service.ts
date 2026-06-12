@@ -2178,7 +2178,6 @@ export class AdsService {
     // Convert to maps for O(1) lookup
     const manufacturers: Record<string, any> = {};
     manufacturerResults.forEach((item: any) => {
-      console.log('manufacturerResults', item);
       const id = item._id?.toString() || item.id?.toString();
       if (id) manufacturers[id] = item;
     });

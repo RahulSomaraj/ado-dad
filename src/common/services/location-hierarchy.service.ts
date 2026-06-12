@@ -271,36 +271,30 @@ export class LocationHierarchyService {
           });
         }
       } else {
-        // Default behavior - return all ads in the state
-        // When using $geoNear, it already filters by radiusKm (50km default), 
-        // but we can still boost state matches or fallback to regex matching
-        pipeline.push({
-          $match: {
-            $or: [
-              // Ads with coordinates within state bounds
-              {
-                $and: [
-                  { latitude: { $exists: true, $ne: null } },
-                  { longitude: { $exists: true, $ne: null } },
-                  {
-                    latitude: {
-                      $gte: stateBoundary.bounds.south,
-                      $lte: stateBoundary.bounds.north,
-                    },
-                    longitude: {
-                      $gte: stateBoundary.bounds.west,
-                      $lte: stateBoundary.bounds.east,
-                    },
+        // radiusKm === 50 (default threshold). When $geoNear is already filtering
+        // by maxDistance, skip the hardcoded state-bounds match — the state config
+        // is region-specific (Kerala) and would wrongly exclude ads from other regions.
+        if (!skipDistanceCalc) {
+          pipeline.push({
+            $match: {
+              $and: [
+                { latitude: { $exists: true, $ne: null } },
+                { longitude: { $exists: true, $ne: null } },
+                {
+                  latitude: {
+                    $gte: stateBoundary.bounds.south,
+                    $lte: stateBoundary.bounds.north,
                   },
-                ],
-              },
-              // Ads with state name in location text
-              {
-                location: { $regex: stateBoundary.name, $options: 'i' },
-              },
-            ],
-          },
-        });
+                  longitude: {
+                    $gte: stateBoundary.bounds.west,
+                    $lte: stateBoundary.bounds.east,
+                  },
+                },
+              ],
+            },
+          });
+        }
+        // When skipDistanceCalc=true, $geoNear already handles distance — add nothing.
       }
     } else {
       // If coordinates don't fall within a known state, use radius-based filtering

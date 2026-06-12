@@ -41,7 +41,6 @@ import { SuspensionGuard } from '../moderation/guards/suspension.guard';
 // External modules and services
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { S3Service } from '../shared/s3.service';
-import { RedisService } from '../shared/redis.service';
 import { GeocodingService } from '../common/services/geocoding.service';
 import { LocationHierarchyService } from '../common/services/location-hierarchy.service';
 
@@ -71,7 +70,6 @@ import { LocationHierarchyService } from '../common/services/location-hierarchy.
     EnhancedAdsSeedService,
     CommercialVehicleDetectionService,
     S3Service,
-    RedisService,
     GeocodingService,
     LocationHierarchyService,
     SuspensionGuard,

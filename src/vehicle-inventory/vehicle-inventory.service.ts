@@ -16,6 +16,10 @@ import {
 } from './schemas/vehicle-variant.schema';
 import { FuelType, FuelTypeDocument } from './schemas/fuel-type.schema';
 import {
+  CommercialVehicleType,
+  CommercialVehicleTypeDocument,
+} from './schemas/commercial-vehicle-type.schema';
+import {
   TransmissionType,
   TransmissionTypeDocument,
 } from './schemas/transmission-type.schema';
@@ -55,11 +59,13 @@ export class VehicleInventoryService {
     private readonly vehicleVariantModel: Model<VehicleVariantDocument>,
     @InjectModel(FuelType.name)
     private readonly fuelTypeModel: Model<FuelTypeDocument>,
+    @InjectModel(CommercialVehicleType.name)
+    private readonly commercialVehicleTypeModel: Model<CommercialVehicleTypeDocument>,
     @InjectModel(TransmissionType.name)
     private readonly transmissionTypeModel: Model<TransmissionTypeDocument>,
     private readonly redisService: RedisService,
     private readonly manufacturersService: ManufacturersService,
-  ) {}
+  ) { }
 
   // ---- helpers ------------------------------------------------------------
   private key(parts: Record<string, unknown>): string {
@@ -252,10 +258,10 @@ export class VehicleInventoryService {
     }
 
     // Pagination - return everything if limit/page not provided OR if page=1&limit=100
-    const isGetAllRequest = 
+    const isGetAllRequest =
       (limit === undefined && page === undefined) ||
       (page === 1 && limit === 100);
-    
+
     const shouldPaginate = !isGetAllRequest && limit !== undefined && page !== undefined;
     const actualPage = shouldPaginate ? page : 1;
     const actualLimit = shouldPaginate ? limit : undefined;
@@ -267,12 +273,12 @@ export class VehicleInventoryService {
           .populate('manufacturer', 'name displayName logo')
           .collation({ locale: 'en', strength: 2 })
           .sort(sort);
-        
+
         if (shouldPaginate) {
           q.skip((actualPage - 1) * actualLimit!);
           q.limit(actualLimit!);
         }
-        
+
         return q.lean().exec();
       })(),
       this.vehicleModelModel.countDocuments(query).exec(),
@@ -959,9 +965,16 @@ export class VehicleInventoryService {
     return transmissionType;
   }
 
-  // Lookup methods for fuel types and transmission types
+  // Lookup methods for fuel types, transmission types and commercial vehicle types
   async getFuelTypes(): Promise<FuelType[]> {
     return this.fuelTypeModel
+      .find({ isDeleted: false })
+      .sort({ sortOrder: 1, name: 1 })
+      .exec();
+  }
+
+  async getCommercialVehicleTypes(): Promise<CommercialVehicleType[]> {
+    return this.commercialVehicleTypeModel
       .find({ isDeleted: false })
       .sort({ sortOrder: 1, name: 1 })
       .exec();
@@ -1481,9 +1494,9 @@ export class VehicleInventoryService {
     const parseArray = (v: any) =>
       v
         ? String(v)
-            .split(',')
-            .map((i) => i.trim())
-            .filter(Boolean)
+          .split(',')
+          .map((i) => i.trim())
+          .filter(Boolean)
         : [];
 
     for (const [idx, row] of uniqueRows.entries()) {
@@ -1565,12 +1578,12 @@ export class VehicleInventoryService {
 
         features: row.featuresJson
           ? (() => {
-              try {
-                return JSON.parse(row.featuresJson);
-              } catch {
-                return undefined;
-              }
-            })()
+            try {
+              return JSON.parse(row.featuresJson);
+            } catch {
+              return undefined;
+            }
+          })()
           : undefined,
 
         isActive: parseBool(row.isActive, true),
@@ -1631,9 +1644,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: validVariants[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: validVariants[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);
@@ -1679,8 +1692,8 @@ export class VehicleInventoryService {
     }
     const normalizedId =
       typeof id === 'string' &&
-      id.trim().toLowerCase() !== 'undefined' &&
-      id.trim().toLowerCase() !== 'null'
+        id.trim().toLowerCase() !== 'undefined' &&
+        id.trim().toLowerCase() !== 'null'
         ? id.trim()
         : '';
 
@@ -1824,9 +1837,9 @@ export class VehicleInventoryService {
     const skippedFromErrors =
       writeErrors.length > 0
         ? writeErrors.map((we: any) => ({
-            row: validModels[we.index] ?? we.op,
-            reason: we.errmsg || we.message || 'Insert failed',
-          }))
+          row: validModels[we.index] ?? we.op,
+          reason: we.errmsg || we.message || 'Insert failed',
+        }))
         : [];
 
     skipped.push(...skippedFromErrors);

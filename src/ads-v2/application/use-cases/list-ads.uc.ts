@@ -113,6 +113,7 @@ export class ListAdsUc {
       search,
       minPrice,
       maxPrice,
+      commercialVehicleTypes,
       fuelTypeIds,
       transmissionTypeIds,
       page,
@@ -128,13 +129,16 @@ export class ListAdsUc {
       ? `cursor=${cursor}&limit=${limit || 20}`
       : `page=${page || 1}&limit=${limit || 20}`;
 
-    // Scenario 1: All ads (no filters except pagination and sort)
+    // Scenario 1: All ads (no filters except pagination and sort, no geo coords)
     if (
       !category &&
       !location &&
+      !filters.latitude &&
+      !filters.longitude &&
       !search &&
       !minPrice &&
       !maxPrice &&
+      !commercialVehicleTypes?.length &&
       !fuelTypeIds?.length &&
       !transmissionTypeIds?.length &&
       !listingType
@@ -142,13 +146,16 @@ export class ListAdsUc {
       return `ads:v2:list:all&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
     }
 
-    // Scenario 2: Category + Location only (no other filters)
+    // Scenario 2: Category + Location only (no other filters, no geo coords)
     if (
       category &&
       location &&
+      !filters.latitude &&
+      !filters.longitude &&
       !search &&
       !minPrice &&
       !maxPrice &&
+      !commercialVehicleTypes?.length &&
       !fuelTypeIds?.length &&
       !transmissionTypeIds?.length &&
       !listingType
@@ -188,8 +195,9 @@ export class ListAdsUc {
       try {
         const result = await this.fetchWithSpecificDistance(filters, distance);
 
-        // If we found results, return them
-        if ((result.total ?? 0) > 0 || result.data.length > 0) {
+        // Only return if actual data was returned — total > 0 alone means the page
+        // is beyond the last page for this radius, so we must try the next radius.
+        if (result.data.length > 0) {
           return result;
         }
 
@@ -201,15 +209,10 @@ export class ListAdsUc {
       }
     }
 
-    // If no results found with any distance, return the last attempt
-    // or fetch without location filtering as final fallback
-    if (lastResult) {
-      return lastResult;
-    }
-
-    // Final fallback: fetch without location filtering
+    // All geo radii exhausted with no data for this page.
+    // Fall back to non-geo search and reset to page 1 so something is always returned.
     const { latitude, longitude, ...filtersWithoutLocation } = filters;
-    return await this.fetchWithOriginalLogic(filtersWithoutLocation);
+    return await this.fetchWithOriginalLogic({ ...filtersWithoutLocation, page: 1 });
   }
 
   /**
@@ -239,6 +242,7 @@ export class ListAdsUc {
       longitude,
       minPrice,
       maxPrice,
+      commercialVehicleTypes,
       fuelTypeIds,
       transmissionTypeIds,
       manufacturerIds,
@@ -264,6 +268,7 @@ export class ListAdsUc {
 
     // Build simplified aggregation pipeline
     const pipeline: any[] = [];
+    let didCommercialVehicleLookup = false;
     const baseMatch = {
       isDeleted: { $ne: true },
       isActive: true,
@@ -427,15 +432,16 @@ export class ListAdsUc {
     );
 
     const hasVehicleFilters = Boolean(
-      (category === 'private_vehicle' ||
-        category === 'commercial_vehicle' ||
-        category === 'two_wheeler') &&
-      (fuelTypeIds?.length ||
-        transmissionTypeIds?.length ||
-        manufacturerIds?.length ||
-        modelIds?.length ||
-        minYear !== undefined ||
-        maxYear !== undefined)
+      (commercialVehicleTypes?.length && commercialVehicleTypes.length > 0) ||
+        ((category === 'private_vehicle' ||
+          category === 'commercial_vehicle' ||
+          category === 'two_wheeler') &&
+          (fuelTypeIds?.length ||
+            transmissionTypeIds?.length ||
+            manufacturerIds?.length ||
+            modelIds?.length ||
+            minYear !== undefined ||
+            maxYear !== undefined))
     );
 
     if (hasPropertyFilters) {
@@ -505,6 +511,7 @@ export class ListAdsUc {
             as: 'commercialVehicleDetails',
           },
         });
+        didCommercialVehicleLookup = true;
       }
 
       const vehicleMatch: any = {};
@@ -559,6 +566,33 @@ export class ListAdsUc {
 
       pipeline.push({
         $match: vehicleMatch,
+      });
+    }
+
+    // Commercial vehicle types filter: works even if category is not provided.
+    // It returns ads that have commercial vehicle details with type in the provided list.
+    if (commercialVehicleTypes?.length) {
+      // Ensure commercial vehicle details are available for matching
+      if (!didCommercialVehicleLookup) {
+        pipeline.push({
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
+        });
+        didCommercialVehicleLookup = true;
+      }
+
+      pipeline.push({
+        $match: {
+          commercialVehicleDetails: {
+            $elemMatch: {
+              commercialVehicleType: { $in: commercialVehicleTypes },
+            },
+          },
+        },
       });
     }
 
@@ -649,14 +683,17 @@ export class ListAdsUc {
     }
 
     if (!hasVehicleFilters || category !== 'commercial_vehicle') {
-      pipeline.push({
-        $lookup: {
-          from: 'commercialvehicleads',
-          localField: '_id',
-          foreignField: 'ad',
-          as: 'commercialVehicleDetails',
-        },
-      });
+      if (!didCommercialVehicleLookup) {
+        pipeline.push({
+          $lookup: {
+            from: 'commercialvehicleads',
+            localField: '_id',
+            foreignField: 'ad',
+            as: 'commercialVehicleDetails',
+          },
+        });
+        didCommercialVehicleLookup = true;
+      }
     }
 
     // No favorites lookup in base data - will be added per user

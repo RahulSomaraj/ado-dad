@@ -21,8 +21,6 @@ import { VehicleInventoryGateway } from './infrastructure/services/vehicle-inven
 import { CommercialIntentService } from './infrastructure/services/commercial-intent.service';
 import { OutboxService } from './infrastructure/services/outbox.service';
 
-// External services
-import { RedisService } from '../shared/redis.service';
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { CommercialVehicleDetectionService } from '../ads/services/commercial-vehicle-detection.service';
 import { GeocodingService } from '../common/services/geocoding.service';
@@ -107,7 +105,6 @@ const OutboxSchema = {
     OutboxService,
 
     // External services
-    RedisService,
     CommercialVehicleDetectionService,
     GeocodingService,
     LocationHierarchyService,

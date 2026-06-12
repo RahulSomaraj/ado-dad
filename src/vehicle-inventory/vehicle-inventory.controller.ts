@@ -189,6 +189,19 @@ export class VehicleInventoryController {
     return this.vehicleInventoryService.getFuelTypes();
   }
 
+  @Get('commercial-vehicle-types')
+  @ApiOperation({
+    summary: 'Get all commercial vehicle types',
+    description: 'Retrieve all available commercial vehicle types',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Commercial vehicle types retrieved successfully',
+  })
+  async getCommercialVehicleTypes() {
+    return this.vehicleInventoryService.getCommercialVehicleTypes();
+  }
+
   @Get('transmission-types')
   @ApiOperation({
     summary: 'Get all transmission types',

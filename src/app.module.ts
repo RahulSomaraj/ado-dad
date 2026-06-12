@@ -38,7 +38,7 @@ import { AppVersionModule } from './app-version/app-version.module';
 // Services
 import { EmailService } from './utils/email.service';
 import { RefreshTokenService } from './auth/auth.refresh.service';
-import { RedisService } from './shared/redis.service';
+import { RedisModule } from './shared/redis.module';
 
 // Schemas
 import {
@@ -129,8 +129,9 @@ import { ModerationModule } from './moderation/moderation.module';
     NotificationsModule,
     AppVersionModule,
     ModerationModule,
+    RedisModule,
   ],
-  providers: [AppService, RefreshTokenService, EmailService, RedisService],
+  providers: [AppService, RefreshTokenService, EmailService],
   controllers: [AppController],
   exports: [JwtModule],
 })
