@@ -34,6 +34,10 @@ import {
   ChatMessageSchema,
 } from '../chat/schemas/chat-message.schema';
 
+// Moderation enforcement
+import { User, UserSchema } from '../users/schemas/user.schema';
+import { SuspensionGuard } from '../moderation/guards/suspension.guard';
+
 // External modules and services
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { S3Service } from '../shared/s3.service';
@@ -53,6 +57,7 @@ import { LocationHierarchyService } from '../common/services/location-hierarchy.
       { name: Favorite.name, schema: FavoriteSchema },
       { name: ChatRoom.name, schema: ChatRoomSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     // External modules
     VehicleInventoryModule,
@@ -69,6 +74,7 @@ import { LocationHierarchyService } from '../common/services/location-hierarchy.
     RedisService,
     GeocodingService,
     LocationHierarchyService,
+    SuspensionGuard,
   ],
   exports: [AdsService, LookupService, MongooseModule],
 })

@@ -85,6 +85,13 @@ export class ShowroomController {
     });
   }
 
+  @Get('count')
+  @ApiOperation({ summary: 'Get total showroom count' })
+  @ApiResponse({ status: 200, description: 'Total showroom count' })
+  async getShowroomCount(): Promise<{ total: number }> {
+    return this.showroomService.getShowroomCount();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a showroom by ID' })
   @ApiResponse({ status: 200, description: 'Showroom details' })

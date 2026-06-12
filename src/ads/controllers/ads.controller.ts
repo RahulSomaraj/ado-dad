@@ -49,6 +49,7 @@ import {
   PaginatedDetailedAdResponseDto,
 } from '../dto/common/ad-response.dto';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth-guard';
+import { SuspensionGuard } from '../../moderation/guards/suspension.guard';
 import { S3Service } from '../../shared/s3.service';
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { RolesGuard } from '../../roles/roles.guard';
@@ -72,6 +73,33 @@ export class AdsController {
     @Body() filterDto: FilterAdDto,
   ): Promise<PaginatedDetailedAdResponseDto> {
     return this.adsService.findAll(filterDto);
+  }
+
+  @Get('stats')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiOperation({
+    summary: 'Get ad statistics (total, approved, pending, sold, total value)',
+  })
+  async getAdsStats() {
+    return this.adsService.getAdsStats();
+  }
+
+  @Get('stats/daily')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiOperation({
+    summary: 'Get per-day counts of ads created over the last N days',
+  })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Number of days to include (default 7, max 90)',
+  })
+  async getDailyAdsCounts(@Query('days') days?: string) {
+    return this.adsService.getDailyAdsCounts(days ? parseInt(days, 10) : 7);
   }
 
   @Get(':id')
@@ -102,7 +130,7 @@ export class AdsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, SuspensionGuard)
   @ApiBearerAuth()
   async createAd(
     @Body() createAdDto: CreateAdDto,
@@ -118,7 +146,7 @@ export class AdsController {
   }
 
   @Put('v2/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, SuspensionGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing advertisement (v2)' })
   @ApiBody({
@@ -213,7 +241,7 @@ export class AdsController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, SuspensionGuard)
   @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN, UserType.SHOWROOM)
   @ApiBearerAuth()
   @ApiOperation({
@@ -747,6 +775,7 @@ export class AdsController {
       page: filterDto.page,
       limit: filterDto.limit,
       search: filterDto.search,
+      postedBy: filterDto.postedBy,
     };
     return this.adsService.getAllAdsForAdmin(serviceFilter);
   }

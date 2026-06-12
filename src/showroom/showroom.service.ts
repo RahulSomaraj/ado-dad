@@ -14,6 +14,12 @@ export class ShowroomService {
     private readonly redisService: RedisService,
   ) {}
 
+  // Get total showroom count (for the admin dashboard)
+  async getShowroomCount(): Promise<{ total: number }> {
+    const total = await this.showroomModel.countDocuments().exec();
+    return { total };
+  }
+
   // Get all showrooms
   async getShowrooms(p0: {
     location: string | undefined;

@@ -108,6 +108,10 @@ export class UserReportService {
       reason,
       status,
       search,
+      dateFrom,
+      dateTo,
+      strikeLevel,
+      suspensionStatus,
       page = 1,
       limit = 20,
       sortBy = 'createdAt',
@@ -119,8 +123,8 @@ export class UserReportService {
       isDeleted: false,
     };
 
-    // Regular users can only see their own reports
-    if (requesterType !== 'AD' && requesterType !== 'SA') {
+    // Regular users can only see their own reports; staff see all.
+    if (!['AD', 'SA', 'MO'].includes(requesterType)) {
       matchConditions.reportedBy = new Types.ObjectId(requesterId);
     }
 
@@ -140,6 +144,21 @@ export class UserReportService {
     if (search) {
       matchConditions.description = { $regex: search, $options: 'i' };
     }
+    if (dateFrom || dateTo) {
+      matchConditions.createdAt = {};
+      if (dateFrom) matchConditions.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) matchConditions.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Post-lookup match on the reported user's denormalized moderation fields.
+    const reportedUserMatch: any = {};
+    if (strikeLevel !== undefined && strikeLevel !== null) {
+      reportedUserMatch['reportedUserDetails.strikeCount'] = Number(strikeLevel);
+    }
+    if (suspensionStatus) {
+      reportedUserMatch['reportedUserDetails.moderationStatus'] =
+        suspensionStatus;
+    }
 
     // Build aggregation pipeline
     const pipeline: any[] = [
@@ -158,6 +177,9 @@ export class UserReportService {
                 email: 1,
                 countryCode: 1,
                 phoneNumber: 1,
+                strikeCount: 1,
+                moderationStatus: 1,
+                suspendedUntil: 1,
               },
             },
           ],
@@ -210,6 +232,11 @@ export class UserReportService {
         },
       },
     ];
+
+    // Filter by the reported user's moderation fields (inserted before $sort).
+    if (Object.keys(reportedUserMatch).length > 0) {
+      pipeline.splice(pipeline.length - 1, 0, { $match: reportedUserMatch });
+    }
 
     // Count total documents
     const countPipeline = [...pipeline, { $count: 'total' }];
@@ -272,6 +299,9 @@ export class UserReportService {
                 email: 1,
                 countryCode: 1,
                 phoneNumber: 1,
+                strikeCount: 1,
+                moderationStatus: 1,
+                suspendedUntil: 1,
               },
             },
           ],
@@ -328,7 +358,7 @@ export class UserReportService {
     }
 
     // Check permissions
-    if (requesterType !== 'AD' && requesterType !== 'SA') {
+    if (!['AD', 'SA', 'MO'].includes(requesterType)) {
       if (report.reportedBy.toString() !== requesterId) {
         throw new ForbiddenException('You can only view your own reports');
       }

@@ -573,6 +573,14 @@ export class AdminAllAdsFilterDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter ads by owner (user id) — used for user-filtered views',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsOptional()
+  @IsString()
+  postedBy?: string;
 }
 
 export class FilterVehicleModelsDto {

@@ -90,6 +90,94 @@ export class AdsService {
     private readonly locationHierarchyService: LocationHierarchyService,
   ) { }
 
+  /**
+   * Aggregate ad statistics for the admin dashboard:
+   * total listings, approved/pending counts, sold count, and the total
+   * monetary value of all (non-deleted) listings.
+   */
+  async getAdsStats(): Promise<{
+    total: number;
+    approved: number;
+    pending: number;
+    sold: number;
+    totalValue: number;
+  }> {
+    const notDeleted = { isDeleted: { $ne: true } };
+    const [total, approved, pending, sold, valueAgg] = await Promise.all([
+      this.adModel.countDocuments({ ...notDeleted }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, isApproved: true }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, isApproved: false }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, soldOut: true }).exec(),
+      this.adModel
+        .aggregate([
+          { $match: { ...notDeleted } },
+          { $group: { _id: null, total: { $sum: '$price' } } },
+        ])
+        .exec(),
+    ]);
+
+    const totalValue =
+      Array.isArray(valueAgg) && valueAgg.length > 0
+        ? (valueAgg[0].total as number)
+        : 0;
+
+    return { total, approved, pending, sold, totalValue };
+  }
+
+  /**
+   * Per-day count of ads created over the last `days` days (inclusive of
+   * today). Days with no ads are returned with a count of 0 so the series is
+   * always continuous. Dates are bucketed in UTC.
+   */
+  async getDailyAdsCounts(
+    days = 7,
+  ): Promise<Array<{ date: string; count: number }>> {
+    const safeDays = Math.min(Math.max(Number(days) || 7, 1), 90);
+
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - (safeDays - 1));
+
+    const agg = await this.adModel
+      .aggregate([
+        {
+          $match: {
+            isDeleted: { $ne: true },
+            createdAt: { $gte: since },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: 'UTC',
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .exec();
+
+    const counts = new Map<string, number>(
+      (agg as Array<{ _id: string; count: number }>).map((a) => [
+        a._id,
+        a.count,
+      ]),
+    );
+
+    const series: Array<{ date: string; count: number }> = [];
+    for (let i = 0; i < safeDays; i++) {
+      const d = new Date(since);
+      d.setUTCDate(since.getUTCDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      series.push({ date: key, count: counts.get(key) ?? 0 });
+    }
+    return series;
+  }
+
   /** ---------- HELPERS ---------- */
   private isValidId(id?: string) {
     return !!id && Types.ObjectId.isValid(id);
@@ -1853,6 +1941,13 @@ export class AdsService {
 
     // Base visibility: show all ads (including unapproved) except soft-deleted
     pipeline.push({ $match: { isDeleted: { $ne: true } } });
+
+    // Optional filter by owner (used to pre-filter the admin ads view by user)
+    if (filters.postedBy && this.isValidId(filters.postedBy)) {
+      pipeline.push({
+        $match: { postedBy: new Types.ObjectId(filters.postedBy) },
+      });
+    }
 
     // Optional category filter
     if (filters.category) {

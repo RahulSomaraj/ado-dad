@@ -3,4 +3,5 @@ export enum UserType {
   ADMIN = 'AD',
   USER = 'NU', // Normal User
   SHOWROOM = 'SR', // SHOW Room
+  MODERATOR = 'MO', // Moderation team member (reports / strikes / suspensions)
 }

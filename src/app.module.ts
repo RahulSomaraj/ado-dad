@@ -49,6 +49,7 @@ import { User, UserSchema } from './users/schemas/user.schema';
 
 // Configuration service
 import { configService } from './config/mongo.config';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { configService } from './config/mongo.config';
     VehicleModule,
     NotificationsModule,
     AppVersionModule,
+    ModerationModule,
   ],
   providers: [AppService, RefreshTokenService, EmailService, RedisService],
   controllers: [AppController],

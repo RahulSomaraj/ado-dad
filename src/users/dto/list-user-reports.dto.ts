@@ -55,6 +55,41 @@ export class ListUserReportsDto {
   search?: string;
 
   @ApiPropertyOptional({
+    description: 'Filter reports created on/after this date (ISO 8601)',
+    example: '2026-06-01',
+  })
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter reports created on/before this date (ISO 8601)',
+    example: '2026-06-30',
+  })
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by the reported user’s active strike count',
+    example: 3,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  strikeLevel?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by the reported user’s moderation status',
+    enum: ['active', 'suspended', 'banned'],
+    example: 'suspended',
+  })
+  @IsOptional()
+  @IsString()
+  suspensionStatus?: string;
+
+  @ApiPropertyOptional({
     description: 'Page number for pagination',
     minimum: 1,
     default: 1,

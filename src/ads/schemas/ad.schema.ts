@@ -104,9 +104,24 @@ export class Ad {
 
   @Prop({ type: Date, required: false })
   deletedAt?: Date;
+
+  // ---- Admin removal (moderation; separate from user soft-delete, reversible) ----
+  @Prop({ default: false })
+  isRemovedByAdmin?: boolean;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false })
+  removedBy?: mongoose.Types.ObjectId;
+
+  @Prop({ type: Date, required: false })
+  removedAt?: Date;
+
+  @Prop({ type: String, required: false, trim: true })
+  removalReason?: string;
 }
 
 export const AdSchema = SchemaFactory.createForClass(Ad);
+
+AdSchema.index({ isRemovedByAdmin: 1 });
 
 // Indexes for fast lookups
 AdSchema.index({ category: 1, createdAt: -1 });

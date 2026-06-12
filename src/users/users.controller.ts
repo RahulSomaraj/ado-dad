@@ -240,6 +240,16 @@ export class UsersController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @Get('count')
+  @ApiOperation({ summary: 'Get user counts (total normal users + breakdown by type)' })
+  @ApiResponse({ status: 200, description: 'User counts' })
+  async getUserCount() {
+    return this.usersService.getUserCount();
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Get(':id')
   @ApiResponse({ status: 404, description: 'User not found' })

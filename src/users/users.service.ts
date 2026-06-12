@@ -67,9 +67,51 @@ export class UsersService {
     private readonly jwtService: JwtService,
   ) {}
 
+  /**
+   * Returns user counts for the admin dashboard.
+   * `total` is the number of normal users (type NU); a per-type breakdown is
+   * also included. Soft-deleted users are excluded.
+   */
+  async getUserCount(): Promise<{
+    total: number;
+    normalUsers: number;
+    showrooms: number;
+    admins: number;
+    byType: Record<string, number>;
+  }> {
+    const notDeleted = { isDeleted: { $ne: true } };
+    const [normalUsers, showrooms, admins, superAdmins] = await Promise.all([
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.USER })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.SHOWROOM })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.ADMIN })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.SUPER_ADMIN })
+        .exec(),
+    ]);
+
+    return {
+      total: normalUsers,
+      normalUsers,
+      showrooms,
+      admins: admins + superAdmins,
+      byType: {
+        [UserType.USER]: normalUsers,
+        [UserType.SHOWROOM]: showrooms,
+        [UserType.ADMIN]: admins,
+        [UserType.SUPER_ADMIN]: superAdmins,
+      },
+    };
+  }
+
   // Reusable field sets
   private static readonly BASE_PROJECTION =
-    '_id name email type countryCode phoneNumber profilePic createdAt updatedAt';
+    '_id name email type countryCode phoneNumber profilePic createdAt updatedAt strikeCount moderationStatus suspendedUntil';
 
   // Limited projection for unauthenticated users
   private static readonly PUBLIC_PROJECTION = '_id name email type createdAt';

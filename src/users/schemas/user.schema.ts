@@ -3,6 +3,13 @@ import { Document } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { UserType } from '../enums/user.types';
 
+/** Moderation lifecycle status for a user (denormalized for fast filtering). */
+export enum ModerationStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  BANNED = 'banned',
+}
+
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true })
@@ -35,6 +42,16 @@ export class User extends Document {
   @Prop({ default: false })
   isDeleted?: boolean;
 
+  // ---- Moderation (denormalized; source of truth is UserStrike/Suspension) ----
+  @Prop({ default: 0 })
+  strikeCount?: number;
+
+  @Prop({ enum: ModerationStatus, default: ModerationStatus.ACTIVE })
+  moderationStatus?: ModerationStatus;
+
+  @Prop({ type: Date, required: false })
+  suspendedUntil?: Date;
+
   // Method to compare password
   async comparePassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);
@@ -57,6 +74,8 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ countryCode: 1, phoneNumber: 1 }, { unique: true });
 UserSchema.index({ name: 'text', email: 'text', phoneNumber: 'text' });
+UserSchema.index({ moderationStatus: 1 });
+UserSchema.index({ suspendedUntil: 1 });
 
 // Pre-save hook to normalize countryCode and hash password before saving
 UserSchema.pre('save', async function (next) {

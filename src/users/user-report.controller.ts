@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Put,
+  Patch,
   Delete,
   Query,
   UseGuards,
@@ -27,6 +28,7 @@ import { CreateUserReportDto } from './dto/create-user-report.dto';
 import { UpdateUserReportDto } from './dto/update-user-report.dto';
 import { ListUserReportsDto } from './dto/list-user-reports.dto';
 import { UserReportResponseDto } from './dto/user-report-response.dto';
+import { ReportStatus } from './schemas/user-report.schema';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
@@ -225,7 +227,7 @@ export class UserReportController {
   }
 
   @Get('stats')
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get report statistics (Admin only)',
     description: `
@@ -284,7 +286,7 @@ export class UserReportController {
   }
 
   @Get(':id')
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get a specific user report',
     description: `
@@ -321,7 +323,7 @@ export class UserReportController {
   }
 
   @Put(':id')
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Update a user report (Admin only)',
     description: `
@@ -398,8 +400,42 @@ export class UserReportController {
     );
   }
 
+  @Patch(':id/resolve')
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Resolve a report (quick action)' })
+  @ApiParam({ name: 'id', description: 'Report ID' })
+  async resolveReport(
+    @Param('id') id: string,
+    @Body() body: UpdateUserReportDto,
+    @Request() req: any,
+  ): Promise<UserReportResponseDto> {
+    return this.userReportService.updateReport(
+      id,
+      { status: ReportStatus.RESOLVED, adminNotes: body?.adminNotes },
+      req.user.id,
+      req.user.type,
+    );
+  }
+
+  @Patch(':id/dismiss')
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Dismiss a report (quick action)' })
+  @ApiParam({ name: 'id', description: 'Report ID' })
+  async dismissReport(
+    @Param('id') id: string,
+    @Body() body: UpdateUserReportDto,
+    @Request() req: any,
+  ): Promise<UserReportResponseDto> {
+    return this.userReportService.updateReport(
+      id,
+      { status: ReportStatus.DISMISSED, adminNotes: body?.adminNotes },
+      req.user.id,
+      req.user.type,
+    );
+  }
+
   @Delete(':id')
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @Roles(UserType.MODERATOR, UserType.ADMIN, UserType.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a user report (Admin only)',
