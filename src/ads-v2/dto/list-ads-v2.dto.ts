@@ -66,6 +66,20 @@ export class ListAdsV2Dto {
   longitude?: number;
 
   @ApiPropertyOptional({
+    description:
+      'Explicit search radius in km for geo queries. When provided, overrides the automatic distance fallback and returns ads within this radius (nearest first). The client widens this across pages to load progressively farther ads.',
+    minimum: 1,
+    maximum: 5000,
+    example: 50,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(5000)
+  maxDistance?: number;
+
+  @ApiPropertyOptional({
     description: 'Minimum price filter',
     minimum: 0,
     example: 100000,

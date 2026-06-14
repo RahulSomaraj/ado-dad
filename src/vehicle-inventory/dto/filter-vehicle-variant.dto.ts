@@ -1,16 +1,36 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, Min, IsEnum } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  Min,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../shared/dto/pagination.dto';
 
 export class FilterVehicleVariantDto extends PaginationDto {
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     type: String,
-    description: 'Filter by vehicle model ID' 
+    description: 'Filter by vehicle model ID'
   })
   @IsOptional()
   @IsString()
   modelId?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Filter by active status (true = active, false = inactive)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  isActive?: boolean;
 
   @ApiPropertyOptional({ 
     type: String,

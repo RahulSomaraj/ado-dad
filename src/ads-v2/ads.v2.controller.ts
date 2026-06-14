@@ -30,6 +30,8 @@ import { ListAdsV2Dto } from './dto/list-ads-v2.dto';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
 import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
+import { ProfileStatsUc } from './application/use-cases/profile-stats.uc';
+import { SellerStatsUc } from './application/use-cases/seller-stats.uc';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../auth/guard/roles.decorator';
@@ -46,6 +48,8 @@ export class AdsV2Controller {
     private readonly createAdUc: CreateAdUc,
     private readonly listAdsUc: ListAdsUc,
     private readonly getAdByIdUc: GetAdByIdUc,
+    private readonly profileStatsUc: ProfileStatsUc,
+    private readonly sellerStatsUc: SellerStatsUc,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -389,6 +393,64 @@ export class AdsV2Controller {
       console.error('Error listing v2 advertisements:', error);
       throw error;
     }
+  }
+
+  @Get('me/stats')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async myStats(@Req() req: any) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return { ads: 0, wishlist: 0, chats: 0 };
+    }
+    return this.profileStatsUc.exec(userId);
+  }
+
+  @Get('sellers/:id/stats')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Trust signals for a seller (ad count, member-since, reply time)',
+    description:
+      'Returns public trust signals for a seller. No authentication required. Response is cached for 5 minutes per seller.',
+  })
+  @ApiParam({ name: 'id', description: 'Seller (user) ObjectId' })
+  @ApiResponse({
+    status: 200,
+    description: 'Seller stats returned successfully',
+    schema: {
+      example: {
+        adCount: 12,
+        memberSince: '2023-01-15T00:00:00.000Z',
+        isVerified: true,
+        avgReplyMinutes: 5,
+        rating: null,
+        ratingCount: 0,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Seller not found',
+    schema: {
+      example: { statusCode: 404, message: 'Seller not found', error: 'Not Found' },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  async sellerStats(@Param('id') id: string) {
+    if (!id || typeof id !== 'string' || id.trim().length === 0) {
+      throw new BadRequestException('Seller id is required');
+    }
+    return this.sellerStatsUc.exec(id.trim());
   }
 
   @Get(':id')

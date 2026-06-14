@@ -175,6 +175,12 @@ export class ListAdsUc {
   ): Promise<CachedListData> {
     // If location coordinates are provided, try with automatic distance fallback
     if (filters.latitude !== undefined && filters.longitude !== undefined) {
+      // When the client specifies an explicit radius, honour it (single radius,
+      // nearest first) so it can widen the radius itself across pages. Otherwise
+      // fall back to the automatic distance expansion.
+      if (filters.maxDistance) {
+        return await this.fetchWithOriginalLogic(filters, filters.maxDistance);
+      }
       return await this.fetchWithDistanceFallback(filters);
     }
 
@@ -646,6 +652,7 @@ export class ListAdsUc {
               phoneNumber: 1,
               profilePic: 1,
               type: 1,
+              isVerified: 1,
               createdAt: 1,
               isDeleted: 1,
             },

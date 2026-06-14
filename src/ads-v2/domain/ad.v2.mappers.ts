@@ -22,6 +22,7 @@ export function mapToDetailedResponseDto(ad: any) {
           email: ad.user.email,
           countryCode: ad.user.countryCode,
           phoneNumber: ad.user.phoneNumber,
+          isVerified: ad.user.isVerified ?? false,
         }
       : undefined,
     propertyDetails: ad.propertyDetails?.[0]
@@ -162,6 +163,7 @@ export function mapToBasicResponseDto(ad: any) {
           email: ad.user.email,
           countryCode: ad.user.countryCode,
           phoneNumber: ad.user.phoneNumber,
+          isVerified: ad.user.isVerified ?? false,
         }
       : undefined,
   };

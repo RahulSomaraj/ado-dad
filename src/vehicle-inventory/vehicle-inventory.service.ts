@@ -251,6 +251,10 @@ export class VehicleInventoryService {
       query.manufacturer = filters.manufacturerId;
     }
 
+    if (filters.vehicleType) {
+      query.vehicleType = filters.vehicleType;
+    }
+
     // Determine sort
     const sort: any = {};
     if (sortBy) {
@@ -1057,6 +1061,15 @@ export class VehicleInventoryService {
         matchStage.$and.push({ transmissionType: transmissionTypeObj });
       } else {
         matchStage.transmissionType = transmissionTypeObj;
+      }
+    }
+
+    // Optional active/inactive status filter (omitted = all statuses)
+    if (filters.isActive !== undefined && filters.isActive !== null) {
+      if (matchStage.$and) {
+        matchStage.$and.push({ isActive: filters.isActive });
+      } else {
+        matchStage.isActive = filters.isActive;
       }
     }
 

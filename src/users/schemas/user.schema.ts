@@ -33,6 +33,10 @@ export class User extends Document {
   @Prop({ default: 'default-profile-pic-url' })
   profilePic?: string;
 
+  // Verified seller badge (KYC / manual verification)
+  @Prop({ default: false })
+  isVerified?: boolean;
+
   @Prop()
   otp?: string;
 

@@ -7,6 +7,8 @@ import { LocationConfigController } from './controllers/location-config.controll
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
 import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
+import { ProfileStatsUc } from './application/use-cases/profile-stats.uc';
+import { SellerStatsUc } from './application/use-cases/seller-stats.uc';
 
 // Repositories
 import { AdRepository } from './infrastructure/repos/ad.repo';
@@ -43,6 +45,7 @@ import {
   ChatMessage,
   ChatMessageSchema,
 } from '../chat/schemas/chat-message.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 // Outbox schema
 const OutboxSchema = {
@@ -69,6 +72,7 @@ const OutboxSchema = {
       { name: Favorite.name, schema: FavoriteSchema },
       { name: ChatRoom.name, schema: ChatRoomSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
+      { name: User.name, schema: UserSchema },
       { name: 'Outbox', schema: OutboxSchema },
     ]),
     VehicleInventoryModule,
@@ -90,6 +94,8 @@ const OutboxSchema = {
     CreateAdUc,
     ListAdsUc,
     GetAdByIdUc,
+    ProfileStatsUc,
+    SellerStatsUc,
 
     // Repositories
     AdRepository,
