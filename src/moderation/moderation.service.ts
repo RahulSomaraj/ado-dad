@@ -1,3 +1,4 @@
+import { escapeRegExp } from '../common/security/regex.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -466,8 +467,8 @@ export class ModerationService {
       const users = await this.userModel
         .find({
           $or: [
-            { name: { $regex: query.search, $options: 'i' } },
-            { email: { $regex: query.search, $options: 'i' } },
+            { name: { $regex: escapeRegExp(query.search), $options: 'i' } },
+            { email: { $regex: escapeRegExp(query.search), $options: 'i' } },
           ],
         })
         .select('_id')

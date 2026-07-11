@@ -1,3 +1,4 @@
+import { GetMyAdsDto } from '../dto/common/get-my-ads.dto';
 import {
   Controller,
   Get,
@@ -672,16 +673,7 @@ export class AdsController {
   @ApiBearerAuth()
   async getMyAds(
     @Request() req,
-    @Body()
-    filterDto: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      sortBy?: string;
-      sortOrder?: 'ASC' | 'DESC';
-      soldOut?: boolean;
-      showUnapproved?: boolean;
-    } = {},
+    @Body() filterDto: GetMyAdsDto = {},
   ) {
     const userId = req.user.id;
     if (!userId) {
@@ -765,7 +757,7 @@ export class AdsController {
 
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   async getAllAdsForAdmin(
     @Query() filterDto: AdminAllAdsFilterDto,

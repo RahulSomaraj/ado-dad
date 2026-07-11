@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppVersionController } from './app-version.controller';
 import { AppVersionService } from './app-version.service';
 import { UpdateAppVersionDto } from './dto/update-app-version.dto';
-import { AuthGuard } from '../roles/auth.guard';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
 import { RolesGuard } from '../roles/roles.guard';
 import { JwtService } from '@nestjs/jwt';
 
@@ -31,7 +31,7 @@ describe('AppVersionController', () => {
                 },
             ],
         })
-            .overrideGuard(AuthGuard)
+            .overrideGuard(JwtAuthGuard)
             .useValue({ canActivate: () => true })
             .overrideGuard(RolesGuard)
             .useValue({ canActivate: () => true })

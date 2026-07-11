@@ -1,3 +1,4 @@
+import { getJwtSecret } from '../common/jwt-secret.util';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
@@ -79,9 +80,7 @@ const OutboxSchema = {
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret:
-          configService.get('TOKEN_KEY') ||
-          'default-secret-key-change-in-production',
+        secret: getJwtSecret(),
         signOptions: { expiresIn: '24h' },
       }),
       inject: [ConfigService],

@@ -16,7 +16,7 @@ import { CreateChatRoomDto } from './dto/create-chat-room.dto';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { MessageType } from './schemas/chat-message.schema';
-import { RateLimit } from './guards/rate-limit.guard';
+import { RateLimit, RateLimitGuard } from './guards/rate-limit.guard';
 
 @WebSocketGateway({
   namespace: '/chat',
@@ -28,7 +28,7 @@ import { RateLimit } from './guards/rate-limit.guard';
   },
   transports: ['websocket', 'polling'],
 })
-// @UseGuards(WsJwtGuard) // Temporarily disabled for debugging
+@UseGuards(WsJwtGuard, RateLimitGuard)
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
@@ -53,8 +53,17 @@ export class ChatGateway
       if (!cleanToken) return false;
 
       const { verify } = await import('jsonwebtoken');
-      const secret =
-        process.env.TOKEN_KEY || 'default-secret-key-change-in-production';
+      const secret = process.env.TOKEN_KEY
+        ? process.env.TOKEN_KEY
+        : process.env.NODE_ENV === 'production'
+          ? null
+          : 'default-secret-key-change-in-production';
+      if (!secret) {
+        this.logger.error(
+          'TOKEN_KEY is not set — refusing WebSocket auth in production',
+        );
+        return false;
+      }
       const payload = verify(cleanToken, secret, {
         algorithms: ['HS256'],
       }) as any;
@@ -127,10 +136,7 @@ export class ChatGateway
       this.logger.warn('⚠️ Server not initialized yet');
     }
 
-    this.logger.log(
-      '⚠️ Running in single-instance mode (Redis adapter not configured)',
-    );
-    this.logger.log('🔓 WsJwtGuard temporarily disabled for debugging');
+    this.logger.log('🔐 WsJwtGuard + RateLimitGuard enabled for socket events');
   }
 
   async handleConnection(client: Socket) {
@@ -138,10 +144,9 @@ export class ChatGateway
       this.logger.log(
         `🔌 [handleConnection] Client ${client.id} attempting connection`,
       );
-      this.logger.log(`🔌 [handleConnection] Client handshake:`, {
-        auth: client.handshake.auth,
-        headers: client.handshake.headers,
-      });
+      this.logger.log(
+        `🔌 [handleConnection] token present: auth=${!!client.handshake.auth?.token}, header=${!!client.handshake.headers['authorization']}`,
+      );
 
       // Try to authenticate the client properly
       const isAuthenticated = await this.authenticateClient(client);
@@ -210,11 +215,11 @@ export class ChatGateway
 
   // ---------- SEND MESSAGE ----------
   @SubscribeMessage('sendMessage')
-  // @RateLimit({
-  //   maxRequests: 10,
-  //   windowMs: 10000,
-  //   message: 'Too many messages, please slow down',
-  // })
+  @RateLimit({
+    maxRequests: 10,
+    windowMs: 10000,
+    message: 'Too many messages, please slow down',
+  })
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: SendMessageDto,
@@ -589,6 +594,7 @@ export class ChatGateway
         roomId,
         undefined,
         50,
+        userId, // ensures requester is a room participant
       );
 
       this.logger.log(

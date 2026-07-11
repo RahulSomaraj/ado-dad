@@ -1,3 +1,4 @@
+import { safeFilename } from '../common/security/path-safety.util';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import {
   S3Client,
@@ -47,7 +48,7 @@ export class S3Service {
         throw new Error('File is missing.');
       }
 
-      const fileKey = `${uuidv4()}-${file.originalname}`;
+      const fileKey = `${uuidv4()}-${safeFilename(file.originalname)}`;
 
       const params: PutObjectCommandInput = {
         Bucket: this.bucketName,
@@ -77,7 +78,7 @@ export class S3Service {
   async getPresignedUrl(fileName: string, fileType: string): Promise<string> {
     try {
       // Create a unique file key with a UUID prefix
-      const fileKey = `uploads/${uuidv4()}-${fileName}`;
+      const fileKey = `uploads/${uuidv4()}-${safeFilename(fileName)}`;
 
       const params = {
         Bucket: this.bucketName,

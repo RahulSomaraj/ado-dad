@@ -1,3 +1,4 @@
+import { getJwtSecret } from '../common/jwt-secret.util';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
@@ -14,9 +15,7 @@ import { AppVersion, AppVersionSchema } from './schemas/app-version.schema';
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
-                secret:
-                    configService.get('TOKEN_KEY') ||
-                    'default-secret-key-change-in-production',
+                secret: getJwtSecret(),
                 signOptions: {
                     expiresIn: configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
                     issuer: 'ado-dad-api',

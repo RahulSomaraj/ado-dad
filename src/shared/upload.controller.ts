@@ -1,3 +1,4 @@
+import { safeFilename } from '../common/security/path-safety.util';
 import {
   Controller,
   Get,
@@ -36,6 +37,7 @@ export class UploadController {
     summary: 'Upload a file to S3 or local storage (Authenticated)',
   })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    this.validateUploadedFile(file);
     try {
       // Normalize MIME type for m4a files
       if (file && (file.mimetype === 'audio/x-m4a' || file.mimetype === 'audio/m4a')) {
@@ -93,9 +95,13 @@ export class UploadController {
 
   // Public test endpoints for Swagger testing (no authentication required)
   @Post('test/file')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Test file upload (No authentication required)' })
   async testUploadFile(@UploadedFile() file: Express.Multer.File) {
+    this.validateUploadedFile(file);
     try {
       // Try S3 first, fallback to local storage
       const fileUrl = await this.s3Service.uploadFile(file);
@@ -112,6 +118,9 @@ export class UploadController {
   }
 
   @Get('presigned-url')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Test presigned URL generation (No authentication required)',
   })
@@ -153,6 +162,9 @@ export class UploadController {
   }
 
   @Post('local/:fileKey')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SHOWROOM, UserType.USER, UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload file to local storage' })
   async uploadToLocal(
@@ -171,7 +183,10 @@ export class UploadController {
       }
 
       // Generate unique filename
-      const uniqueFileName = fileKey || `${uuidv4()}-${file.originalname}`;
+      this.validateUploadedFile(file);
+      const uniqueFileName = fileKey
+        ? safeFilename(fileKey)
+        : `${uuidv4()}-${safeFilename(file.originalname)}`;
       const filePath = join(uploadsDir, uniqueFileName);
 
       // Write file to local storage
@@ -186,6 +201,27 @@ export class UploadController {
     }
   }
 
+  private validateUploadedFile(file?: Express.Multer.File): void {
+    if (!file) throw new BadRequestException('No file provided');
+    if (file.size > 15 * 1024 * 1024) {
+      throw new BadRequestException('File exceeds the 15MB limit');
+    }
+    const mt = (file.mimetype || '').toLowerCase();
+    const allowed =
+      /^(image\/(jpeg|png|webp|gif)|audio\/|video\/|application\/pdf)$/i.test(mt) ||
+      mt === 'application/octet-stream';
+    if (!allowed) {
+      throw new BadRequestException(`Unsupported file type: ${file.mimetype}`);
+    }
+    if (
+      /\.(exe|bat|cmd|com|sh|js|mjs|php|phtml|jsp|asp|aspx|html?|svg|dll|jar|msi|scr|vbs|ps1)$/i.test(
+        file.originalname || '',
+      )
+    ) {
+      throw new BadRequestException('Disallowed file extension');
+    }
+  }
+
   @Get('images/:filename')
   async serveImage(@Param('filename') filename: string, @Res() res: Response) {
     // Add CORS headers
@@ -197,6 +233,7 @@ export class UploadController {
     );
     res.header('Access-Control-Max-Age', '86400');
 
+    filename = safeFilename(filename);
     const imagePath = join(
       __dirname,
       '..',
@@ -228,6 +265,7 @@ export class UploadController {
     );
     res.header('Access-Control-Max-Age', '86400');
 
+    filename = safeFilename(filename);
     const filePath = join(__dirname, '..', '..', 'public', 'uploads', filename);
 
     if (existsSync(filePath)) {

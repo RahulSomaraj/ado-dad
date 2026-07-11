@@ -48,7 +48,7 @@ COPY --chown=nestjs:nodejs ecosystem.config.js ./
 RUN mkdir -p ./public ./logs || true
 
 # Make sure logs directory exists and is writable
-RUN mkdir -p /app/logs && chmod -R 777 /app/logs
+RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs && chmod -R 750 /app/logs
 
 # Create health check file with configurable port
 RUN echo 'const http = require("http"); const port = process.env.APP_CONFIG__BACKEND_PORT || 3000; const options = { hostname: "localhost", port: port, path: "/ads", method: "GET", timeout: 2000 }; const req = http.request(options, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on("error", () => process.exit(1)); req.on("timeout", () => process.exit(1)); req.end();' > healthcheck.js

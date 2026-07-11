@@ -1,3 +1,4 @@
+import { escapeRegExp } from '../common/security/regex.util';
 import {
   Injectable,
   NotFoundException,
@@ -155,7 +156,7 @@ export class UsersService {
       // Add search functionality - search across all fields
       if (search?.trim()) {
         const searchTerm = search.trim();
-        const searchRegex = new RegExp(searchTerm, 'i'); // case-insensitive
+        const searchRegex = new RegExp(escapeRegExp(searchTerm), 'i'); // case-insensitive
         query.$or = [
           { name: searchRegex },
           { email: searchRegex },
@@ -263,7 +264,7 @@ export class UsersService {
       // Add search functionality - search across all fields
       if (search?.trim()) {
         const searchTerm = search.trim();
-        const searchRegex = new RegExp(searchTerm, 'i'); // case-insensitive
+        const searchRegex = new RegExp(escapeRegExp(searchTerm), 'i'); // case-insensitive
         query.$or = [
           { name: searchRegex },
           { email: searchRegex },

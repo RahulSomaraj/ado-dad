@@ -1,3 +1,5 @@
+import { Throttle } from './common/guards/auth-throttle.guard';
+import { safeFilename } from './common/security/path-safety.util';
 import {
   Body,
   Controller,
@@ -133,6 +135,7 @@ export class AppController {
   @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
   async serveImage(@Param('filename') filename: string, @Res() res: Response) {
     try {
+      filename = safeFilename(filename);
       const imagePath = join(
         __dirname,
         '..',
@@ -188,6 +191,7 @@ export class AppController {
   @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
   async serveAsset(@Param('filename') filename: string, @Res() res: Response) {
     try {
+      filename = safeFilename(filename);
       const assetPath = join(
         __dirname,
         '..',
@@ -243,6 +247,7 @@ export class AppController {
   @Header('Cross-Origin-Embedder-Policy', 'unsafe-none')
   async serveData(@Param('filename') filename: string, @Res() res: Response) {
     try {
+      filename = safeFilename(filename);
       const dataPath = join(__dirname, '..', '..', 'public', filename);
 
       if (!existsSync(dataPath)) {
@@ -297,6 +302,7 @@ export class AppController {
     }
   }
 
+  @Throttle({ limit: 5, ttl: 300, keyFields: ['username'], name: 'login' })
   @UseGuards(LocalAuthGuard)
   @Post('auth/login')
   login(

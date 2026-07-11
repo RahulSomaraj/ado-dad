@@ -12,8 +12,9 @@ export class CreateRatingDto {
     description: 'User ID',
     example: '63a79bfb1234567890abcdef',
   })
+  @IsOptional()
   @IsMongoId()
-  user: string;
+  user?: string;
 
   @ApiProperty({
     description: 'Product ID',

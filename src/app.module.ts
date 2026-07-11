@@ -1,3 +1,6 @@
+import { APP_GUARD } from '@nestjs/core';
+import { AuthThrottleGuard } from './common/guards/auth-throttle.guard';
+import { getJwtSecret } from './common/jwt-secret.util';
 import { Module, NestModule, MiddlewareConsumer, Logger } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -92,9 +95,7 @@ import { ModerationModule } from './moderation/moderation.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret:
-          configService.get('TOKEN_KEY') ||
-          'default-secret-key-change-in-production',
+        secret: getJwtSecret(),
         signOptions: {
           expiresIn: configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
           issuer: 'ado-dad-api',
@@ -131,7 +132,12 @@ import { ModerationModule } from './moderation/moderation.module';
     ModerationModule,
     RedisModule,
   ],
-  providers: [AppService, RefreshTokenService, EmailService],
+  providers: [
+    AppService,
+    RefreshTokenService,
+    EmailService,
+    { provide: APP_GUARD, useClass: AuthThrottleGuard },
+  ],
   controllers: [AppController],
   exports: [JwtModule],
 })

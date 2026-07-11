@@ -73,6 +73,7 @@ export class VehicleController {
   }
 
   @Post()
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a vehicle' })
   @ApiResponse({ status: 201, description: 'Vehicle created', type: Vehicle })
   @ApiResponse({ status: 400, description: 'Bad Request' })
@@ -85,6 +86,7 @@ export class VehicleController {
   }
 
   @Put(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiResponse({ status: 200, description: 'Vehicle updated successfully' })
   @ApiResponse({ status: 404, description: 'Vehicle not found' })
   async updateVehicle(
@@ -97,6 +99,7 @@ export class VehicleController {
   }
 
   @Delete(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiResponse({ status: 200, description: 'Vehicle deleted successfully' })
   async deleteVehicle(@Param('id') id: string, @Request() req) {
     const { user } = req;

@@ -1,3 +1,4 @@
+import { escapeRegExp } from '../common/security/regex.util';
 import {
   Injectable,
   Logger,
@@ -142,7 +143,7 @@ export class UserReportService {
       matchConditions.status = status;
     }
     if (search) {
-      matchConditions.description = { $regex: search, $options: 'i' };
+      matchConditions.description = { $regex: escapeRegExp(search), $options: 'i' };
     }
     if (dateFrom || dateTo) {
       matchConditions.createdAt = {};

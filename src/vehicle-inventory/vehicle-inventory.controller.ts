@@ -352,6 +352,8 @@ export class VehicleInventoryController {
   }
 
   @Post(':id/upload-csv')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @UseInterceptors(AnyFilesInterceptor())
   @ApiOperation({
     summary: 'Upload vehicle models CSV for a manufacturer',
@@ -398,6 +400,8 @@ export class VehicleInventoryController {
   }
 
   @Post('models/:id/upload-csv')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @UseInterceptors(AnyFilesInterceptor())
   @ApiOperation({
     summary: 'Upload vehicle models CSV for a manufacturer (alias)',
@@ -444,6 +448,8 @@ export class VehicleInventoryController {
   }
 
   @Post('upload-vehicle-models-csv')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @UseInterceptors(AnyFilesInterceptor())
   @ApiOperation({
     summary: 'Upload vehicle models CSV (manufacturer in form data)',
@@ -476,6 +482,8 @@ export class VehicleInventoryController {
   }
 
   @Post('upload-vehicle-variants-csv')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Bulk upload vehicle variants from CSV file' })
   @UseInterceptors(AnyFilesInterceptor())
   @ApiConsumes('multipart/form-data')

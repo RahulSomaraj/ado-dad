@@ -1,3 +1,4 @@
+import { getJwtSecret } from '../common/jwt-secret.util';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -30,7 +31,7 @@ import { AuthTokens, AuthTokensSchema } from './schemas/schema.refresh-token';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         // secret: configService.get<string>('jwt.secret'),
-        secret: process.env.TOKEN_KEY || 'default-secret',
+        secret: getJwtSecret(),
       }),
       inject: [ConfigService],
     }),

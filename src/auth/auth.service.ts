@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -44,8 +45,6 @@ export class AuthService {
 
       // Trim username but don't convert to lowercase (phone numbers need to preserve + prefix)
       const trimmedUsername = username.trim();
-
-      console.log('trimmedUsername', trimmedUsername);
 
       // Find user with optimized query
       const user = await this.findUserByCredentials(trimmedUsername);
@@ -109,8 +108,6 @@ export class AuthService {
     const { parsePhoneNumber } =
       await import('../common/utils/phone-validator.util');
     const parsed = parsePhoneNumber(identifier);
-    console.log('parsed', parsed);
-
     if (parsed) {
       // If phone number is successfully parsed, search by countryCode + phoneNumber
       const query = {
@@ -186,7 +183,6 @@ export class AuthService {
    */
   private sanitizeUserData(user: User): UserValidationResult {
     const { password, otp, otpExpires, ...sanitizedUser } = user;
-    console.log('sanitizedUser', sanitizedUser);
     return {
       ...sanitizedUser,
       _id: user._id.toString(),
@@ -269,7 +265,7 @@ export class AuthService {
    * Generate random 6-digit OTP
    */
   private generateRandomOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 1000000).toString();
   }
 
   /**

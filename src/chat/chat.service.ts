@@ -1,3 +1,4 @@
+import { assertSafePublicUrl } from '../common/security/url-safety.util';
 import {
   Injectable,
   Logger,
@@ -98,11 +99,18 @@ export class ChatService {
   private async getAudioDuration(url: string): Promise<number | null> {
     try {
       // music-metadata is ESM only, use dynamic import
-      const mm = await (eval('import("music-metadata")') as Promise<typeof import('music-metadata')>);
+      const mm = (await (new Function(
+        'return import("music-metadata")',
+      )() as Promise<typeof import('music-metadata')>));
+
+      // SECURITY: block SSRF — validate the URL before the server fetches it.
+      await assertSafePublicUrl(url);
 
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
         timeout: 5000, // 5s timeout
+        maxContentLength: 15 * 1024 * 1024, // cap 15MB
+        maxRedirects: 0, // no redirects (prevents redirect-based SSRF)
       });
 
       const buffer = Buffer.from(response.data);
@@ -562,6 +570,7 @@ export class ChatService {
     roomId: string,
     cursor?: string,
     limit = 50,
+    requesterId?: string,
   ): Promise<{
     messages: any[];
     nextCursor: string | null;
@@ -569,6 +578,11 @@ export class ChatService {
     total: number;
   }> {
     const room = await this.getChatRoom(roomId);
+
+    // Access control: only room participants may read messages
+    if (requesterId) {
+      this.assertParticipant(room, requesterId);
+    }
 
     const query: any = { roomRef: (room as any)._id };
     if (cursor) {

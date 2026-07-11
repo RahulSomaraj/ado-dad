@@ -23,7 +23,11 @@ export class RatingService {
   }
 
   async create(createRatingDto: CreateRatingDto, user: any) {
-    const newRating = new this.ratingModel(createRatingDto);
+    // SECURITY: attribute the rating to the authenticated user, never the client-supplied id.
+    const newRating = new this.ratingModel({
+      ...createRatingDto,
+      user: user?.id || user?._id,
+    });
     const savedRating = await newRating.save();
 
     // Invalidate caches for this product's ratings and aggregates

@@ -5,9 +5,14 @@
 db = db.getSiblingDB('adodad_db');
 
 // Create application user with read/write permissions
+const APP_DB_USER = (typeof process !== 'undefined' && process.env.APP_DB_USER) || 'adodad_user';
+const APP_DB_PASSWORD = (typeof process !== 'undefined' && process.env.APP_DB_PASSWORD) || '';
+if (!APP_DB_PASSWORD) {
+  throw new Error('APP_DB_PASSWORD env var is required to initialize MongoDB (no default password).');
+}
 db.createUser({
-  user: 'adodad_user',
-  pwd: 'adodad_password',
+  user: APP_DB_USER,
+  pwd: APP_DB_PASSWORD,
   roles: [
     {
       role: 'readWrite',

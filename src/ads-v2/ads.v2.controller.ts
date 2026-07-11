@@ -1,3 +1,4 @@
+import { getJwtSecret } from '../common/jwt-secret.util';
 import {
   Body,
   Controller,
@@ -64,9 +65,7 @@ export class AdsV2Controller {
       }
 
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-      const secret =
-        this.configService.get('TOKEN_KEY') ||
-        'default-secret-key-change-in-production';
+      const secret = getJwtSecret();
 
       const payload = this.jwtService.verify(token, { secret });
       return payload.id || null;

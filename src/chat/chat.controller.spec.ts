@@ -69,21 +69,35 @@ describe('ChatController', () => {
     });
 
     describe('getRoomMessages', () => {
+        const mockReq = { user: { id: 'user123' } };
+
         it('should retrieve room messages with pagination', async () => {
             const roomId = 'room123';
             const mockResult = { messages: [], total: 0 };
             chatService.getRoomMessages.mockResolvedValue(mockResult);
 
-            const result = await controller.getRoomMessages(roomId, '50', 'cursor123');
+            const result = await controller.getRoomMessages(roomId, '50', 'cursor123', mockReq);
 
             expect(result.success).toBe(true);
             expect(result.data).toEqual(mockResult);
-            expect(chatService.getRoomMessages).toHaveBeenCalledWith(roomId, 'cursor123', 50);
+            expect(chatService.getRoomMessages).toHaveBeenCalledWith(roomId, 'cursor123', 50, 'user123');
+        });
+
+        it('should throw BadRequestException if user id is missing', async () => {
+            await expect(controller.getRoomMessages('room1', '50', undefined, { user: {} }))
+                .rejects.toThrow(BadRequestException);
+        });
+
+        it('should preserve ForbiddenException from the service', async () => {
+            const { ForbiddenException } = require('@nestjs/common');
+            chatService.getRoomMessages.mockRejectedValue(new ForbiddenException('Not a participant of this room'));
+            await expect(controller.getRoomMessages('room1', '50', undefined, mockReq))
+                .rejects.toThrow(ForbiddenException);
         });
 
         it('should throw BadRequestException if service fails', async () => {
             chatService.getRoomMessages.mockRejectedValue(new Error('Service Failed'));
-            await expect(controller.getRoomMessages('room1', '50'))
+            await expect(controller.getRoomMessages('room1', '50', undefined, mockReq))
                 .rejects.toThrow(BadRequestException);
         });
     });

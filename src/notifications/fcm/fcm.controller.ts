@@ -42,7 +42,7 @@ export class FcmController {
         @Body() registerFcmTokenDto: RegisterFcmTokenDto,
     ): Promise<FcmResponseDto> {
         try {
-            const userId = registerFcmTokenDto.userId || req.user?.id;
+            const userId = req.user?.id; // SECURITY: bind token to the authenticated user only
             if (!userId) {
                 throw new BadRequestException('User ID not found');
             }

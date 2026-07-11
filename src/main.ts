@@ -11,7 +11,7 @@ import * as compression from 'compression';
 import { json, urlencoded, text } from 'express';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { IoAdapter } from '@nestjs/platform-socket.io';
+import { RedisIoAdapter } from './shared/redis-io.adapter';
 import { Connection } from 'mongoose';
 
 async function bootstrap() {
@@ -20,12 +20,19 @@ async function bootstrap() {
   const PORT = Number(configService.get('APP_CONFIG.BACKEND_PORT')) || 5000;
   const NODE_ENV = configService.get('NODE_ENV') || 'development';
 
-  // Configure WebSocket adapter
-  app.useWebSocketAdapter(new IoAdapter(app));
+  // Configure WebSocket adapter (Redis-backed when Redis is configured,
+  // falls back to in-memory single-instance adapter otherwise)
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // (a) Enable CORS globally via Nest
+  const corsOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: '*',
+    origin: corsOrigins.length ? corsOrigins : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
       'Content-Type',
@@ -40,7 +47,9 @@ async function bootstrap() {
       'X-Platform',
       'User-Agent',
     ],
-    credentials: true,
+    // Only send credentials when an explicit origin allow-list is configured
+    // (wildcard origin + credentials is unsafe and blocked by browsers).
+    credentials: corsOrigins.length > 0,
   });
 
   // (b) Global security headers via Helmet
@@ -67,7 +76,8 @@ async function bootstrap() {
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, swaggerDocument, {
+  if (NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true')
+    SwaggerModule.setup('docs', app, swaggerDocument, {
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'list',
@@ -176,6 +186,7 @@ async function bootstrap() {
       // whitelist: true,
       // forbidNonWhitelisted: true,
       // transformOptions: { enableImplicitConversion: true },
+      whitelist: true, // strip unknown props → blocks mass-assignment & Mongo operator injection
       skipMissingProperties: true,
     }),
   );

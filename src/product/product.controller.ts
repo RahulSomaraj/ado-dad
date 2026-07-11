@@ -39,6 +39,7 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Post()
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a new product' })
   @ApiBody({
     type: CreateProductDto,
@@ -144,6 +145,7 @@ export class ProductController {
   }
 
   @Put(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Update a product by ID' })
   @ApiBody({
     type: UpdateProductDto,
@@ -168,6 +170,7 @@ export class ProductController {
   }
 
   @Delete(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Delete a product by ID' })
   @ApiResponse({ status: 200, description: 'Product deleted successfully' })
   async delete(@Param('id') id: string, @Request() req): Promise<void> {

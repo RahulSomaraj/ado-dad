@@ -344,7 +344,7 @@ export class AppService {
   private async generateAccessToken(payload: TokenPayload): Promise<string> {
     return this.jwtService.sign(payload, {
       secret: this.configService.get('TOKEN_KEY'),
-      expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
+      expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRY') || '15m',
       issuer: 'ado-dad-api',
       audience: 'ado-dad-users',
     });
@@ -356,7 +356,7 @@ export class AppService {
   private async generateRefreshToken(payload: TokenPayload): Promise<string> {
     return this.jwtService.sign(payload, {
       secret: this.configService.get('TOKEN_KEY'),
-      expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRY') || '60d',
+      expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRY') || '30d',
       issuer: 'ado-dad-api',
       audience: 'ado-dad-users',
     });

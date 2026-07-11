@@ -1,3 +1,5 @@
+import { Throttle } from '../common/guards/auth-throttle.guard';
+import { safeFilename } from '../common/security/path-safety.util';
 import {
   Controller,
   Get,
@@ -58,6 +60,15 @@ export class UsersController {
   })
   @ApiResponse({ status: 201, description: 'User created' })
   async createUser(@Body() userData: CreateUserDto) {
+    // SECURITY: never allow privileged account types via public self-signup.
+    const allowedSelfSignup = [UserType.USER, UserType.SHOWROOM];
+    if (!userData.type) {
+      (userData as any).type = UserType.USER;
+    } else if (!allowedSelfSignup.includes(userData.type as UserType)) {
+      throw new ForbiddenException(
+        'You are not allowed to self-register with this account type',
+      );
+    }
     return this.usersService.createUser(userData);
   }
 
@@ -127,11 +138,21 @@ export class UsersController {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
 
-        const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
+        const uniqueFileName = `${uuidv4()}-${safeFilename(profilePic.originalname)}`;
         const filePath = require('path').join(uploadsDir, uniqueFileName);
         fs.writeFileSync(filePath, profilePic.buffer);
         profilePicUrl = `/uploads/${uniqueFileName}`;
       }
+    }
+
+    // SECURITY: never allow privileged account types via public self-signup.
+    const allowedSelfSignup = [UserType.USER, UserType.SHOWROOM];
+    if (!userData.type) {
+      (userData as any).type = UserType.USER;
+    } else if (!allowedSelfSignup.includes(userData.type as UserType)) {
+      throw new ForbiddenException(
+        'You are not allowed to self-register with this account type',
+      );
     }
 
     // Create user with profile picture URL
@@ -282,6 +303,10 @@ export class UsersController {
     if (!isAdmin && actor.id !== id && actor._id !== id) {
       throw new ForbiddenException('You can only update your own profile');
     }
+    // SECURITY: only admins may change a user's role/type.
+    if (!isAdmin) {
+      delete (updateData as any).type;
+    }
     return this.usersService.updateUser(id, updateData);
   }
 
@@ -386,6 +411,7 @@ export class UsersController {
     return this.usersService.deleteMyData(userId);
   }
 
+  @Throttle({ limit: 3, ttl: 300, keyFields: ['identifier', 'email'], name: 'send-otp' })
   @Post('send-otp')
   @ApiBody({
     description: 'Email or phone number to receive OTP',
@@ -407,6 +433,7 @@ export class UsersController {
     return this.usersService.sendOTP(identifier);
   }
 
+  @Throttle({ limit: 5, ttl: 300, keyFields: ['identifier'], name: 'verify-otp' })
   @Post('verify-otp')
   @ApiBody({
     description: 'Verify OTP for email or phone number',
@@ -435,6 +462,7 @@ export class UsersController {
     return this.usersService.verifyOTP(body.identifier, body.otp);
   }
 
+  @Throttle({ limit: 3, ttl: 900, keyFields: ['email'], name: 'forgot-password' })
   @Post('forgot-password')
   @ApiOperation({
     summary: 'Request password reset',
@@ -477,6 +505,7 @@ export class UsersController {
     return this.usersService.forgotPassword(body.email);
   }
 
+  @Throttle({ limit: 10, ttl: 900, name: 'reset-password' })
   @Post('reset-password')
   @ApiOperation({
     summary: 'Reset password using token',

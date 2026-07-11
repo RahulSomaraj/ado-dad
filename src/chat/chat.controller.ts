@@ -6,6 +6,7 @@ import {
   Query,
   Body,
   BadRequestException,
+  HttpException,
   UseGuards,
   Request,
   UseFilters,
@@ -462,12 +463,20 @@ export class ChatController {
     @Param('roomId') roomId: string,
     @Query('limit') limit = '50',
     @Query('cursor') cursor?: string,
+    @Request() req?: any,
   ) {
+    const userId = req?.user?.id || req?.user?._id;
+
+    if (!userId) {
+      throw new BadRequestException('User ID not found in request');
+    }
+
     try {
       const result = await this.chatService.getRoomMessages(
         roomId,
         cursor, // cursor for pagination
         parseInt(limit, 10),
+        userId, // ensures requester is a room participant
       );
 
       return {
@@ -476,6 +485,9 @@ export class ChatController {
         roomId,
       };
     } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error; // preserve 403/404 status codes
+      }
       throw new BadRequestException(error.message);
     }
   }

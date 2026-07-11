@@ -1,3 +1,4 @@
+import { escapeRegExp } from '../../common/security/regex.util';
 import {
   Injectable,
   NotFoundException,
@@ -55,7 +56,7 @@ export class LookupService {
   ): Promise<PropertyType> {
     // Prevent duplicate property type names (case-insensitive)
     const existing = await this.propertyTypeModel.findOne({
-      name: new RegExp(`^${createDto.name}$`, 'i'),
+      name: new RegExp(`^${escapeRegExp(createDto.name)}$`, 'i'),
       isDeleted: false,
     });
     if (existing) {

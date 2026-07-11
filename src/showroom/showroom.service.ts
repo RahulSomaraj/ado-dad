@@ -1,3 +1,5 @@
+import { ForbiddenException } from '@nestjs/common';
+import { UserType } from '../users/enums/user.types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -54,7 +56,10 @@ export class ShowroomService {
     createShowroomDto: CreateShowroomDto,
     user: any,
   ): Promise<ShowroomDocument> {
-    const newShowroom = new this.showroomModel(createShowroomDto);
+    const newShowroom = new this.showroomModel({
+      ...createShowroomDto,
+      createdBy: user?.id || user?._id,
+    });
     const saved = await newShowroom.save();
     await this.invalidateShowroomCache((saved._id as any).toString());
     return saved;
@@ -66,6 +71,7 @@ export class ShowroomService {
     updateShowroomDto: UpdateShowroomDto,
     user: any,
   ): Promise<ShowroomDocument> {
+    await this.assertShowroomOwner(id, user);
     const updatedShowroom = await this.showroomModel
       .findByIdAndUpdate(id, updateShowroomDto, {
         new: true,
@@ -81,11 +87,25 @@ export class ShowroomService {
 
   // Delete a showroom
   async deleteShowroom(id: string, user: any): Promise<void> {
+    await this.assertShowroomOwner(id, user);
     const result = await this.showroomModel.findByIdAndDelete(id).exec();
     if (!result) {
       throw new NotFoundException(`Showroom with ID "${id}" not found.`);
     }
     await this.invalidateShowroomCache(id);
+  }
+
+  private async assertShowroomOwner(id: string, user: any): Promise<void> {
+    const isAdmin =
+      user?.type === UserType.SUPER_ADMIN || user?.type === UserType.ADMIN;
+    if (isAdmin) return;
+    const doc = await this.showroomModel.findById(id).select('createdBy').exec();
+    if (!doc) throw new NotFoundException(`Showroom with ID "${id}" not found.`);
+    const ownerId = (doc as any).createdBy ? String((doc as any).createdBy) : '';
+    const actorId = String(user?.id || user?._id || '');
+    if (!ownerId || ownerId !== actorId) {
+      throw new ForbiddenException('You can only modify showrooms you created');
+    }
   }
 
   private async invalidateShowroomCache(id?: string): Promise<void> {

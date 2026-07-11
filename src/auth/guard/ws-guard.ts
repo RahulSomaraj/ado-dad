@@ -11,29 +11,18 @@ import * as jwt from 'jsonwebtoken';
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
 
+  /** HS256 key: TOKEN_KEY, or a dev-only fallback (never in production). */
+  private getHsKey(): string | null {
+    if (process.env.TOKEN_KEY) return process.env.TOKEN_KEY;
+    if (process.env.NODE_ENV === 'production') return null;
+    return 'default-secret-key-change-in-production';
+  }
+
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const client = ctx.switchToWs().getClient();
     const handlerName = ctx.getHandler()?.name || 'unknown';
 
     this.logger.log(`[WsJwtGuard] event=${handlerName} socket=${client.id}`);
-
-    // Print detailed handshake information for debugging
-    this.logger.log(
-      `=== WebSocket Handshake Debug for Client ${client.id} ===`,
-    );
-    this.logger.log(
-      `Headers: ${JSON.stringify(client.handshake.headers, null, 2)}`,
-    );
-    this.logger.log(`Auth: ${JSON.stringify(client.handshake.auth, null, 2)}`);
-    this.logger.log(
-      `Query: ${JSON.stringify(client.handshake.query, null, 2)}`,
-    );
-    this.logger.log(`URL: ${client.handshake.url}`);
-    this.logger.log(`Method: ${client.handshake.method}`);
-    this.logger.log(`Address: ${client.handshake.address}`);
-    this.logger.log(`Time: ${client.handshake.time}`);
-    this.logger.log(`Issued: ${client.handshake.issued}`);
-    this.logger.log(`================================================`);
 
     // Get token from multiple sources for better compatibility
     let rawAuth = '';
@@ -87,9 +76,14 @@ export class WsJwtGuard implements CanActivate {
       this.logger.log(`WsJwtGuard: JWT alg detected: ${alg || 'unknown'}`);
 
       if (alg?.startsWith('HS')) {
-        // Use HS256 with TOKEN_KEY
-        const hsKey =
-          process.env.TOKEN_KEY || 'default-secret-key-change-in-production';
+        // Use HS256 with TOKEN_KEY (no insecure fallback in production)
+        const hsKey = this.getHsKey();
+        if (!hsKey) {
+          this.logger.error(
+            'WsJwtGuard: TOKEN_KEY is not set — refusing HS256 token in production',
+          );
+          return false;
+        }
         payload = jwt.verify(bearer, hsKey, { algorithms: ['HS256'] });
         this.logger.log(`WsJwtGuard: HS256 verification successful`);
       } else if (alg?.startsWith('RS')) {
@@ -106,7 +100,7 @@ export class WsJwtGuard implements CanActivate {
         this.logger.log(
           `WsJwtGuard: Unknown alg ${alg}, attempting fallback verification`,
         );
-        const hsKey = process.env.TOKEN_KEY;
+        const hsKey = this.getHsKey();
         const rsKey = process.env.JWT_PUBLIC_KEY;
 
         if (hsKey) {

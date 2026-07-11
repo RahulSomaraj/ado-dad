@@ -282,5 +282,25 @@ describe('ChatService', () => {
             expect(result.total).toBe(10);
             expect(result.messages[0].sender.name).toBe('User 1');
         });
+
+        it('should allow a room participant to read messages', async () => {
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
+            mockChatMessageModel.countDocuments.mockResolvedValue(0);
+            mockChatMessageModel.aggregate.mockReturnValue({
+                exec: jest.fn().mockResolvedValue([]),
+            });
+
+            const participantId = mockChatRoom.initiatorId.toString();
+            const result = await service.getRoomMessages(roomId, undefined, 50, participantId);
+            expect(result.messages).toHaveLength(0);
+        });
+
+        it('should throw ForbiddenException when a non-participant reads messages', async () => {
+            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
+
+            const strangerId = new Types.ObjectId().toString();
+            await expect(service.getRoomMessages(roomId, undefined, 50, strangerId))
+                .rejects.toThrow(ForbiddenException);
+        });
     });
 });

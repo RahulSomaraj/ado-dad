@@ -1,3 +1,6 @@
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
 import { Controller, Post, Body, Get, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { FcmNotificationService } from './fcm/fcm-notification.service';
@@ -13,6 +16,8 @@ export class NotificationsController {
     constructor(private readonly fcmNotificationService: FcmNotificationService) { }
 
     @Post('send')
+    @UseGuards(RolesGuard)
+    @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
     @ApiOperation({
         summary: 'Send push notification',
         description: 'Sends a push notification based on target configuration. Supports ALL, TOPIC, and TOKENS targets with media and action support.'

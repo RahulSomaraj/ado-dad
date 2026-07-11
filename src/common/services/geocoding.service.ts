@@ -39,8 +39,15 @@ export class GeocodingService {
 
       const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${this.googleMapsApiKey}`;
 
-      const response = await fetch(url);
-      const data = await response.json();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      let data: any;
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        data = await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (data.status === 'OK' && data.results && data.results.length > 0) {
         const result = data.results[0];

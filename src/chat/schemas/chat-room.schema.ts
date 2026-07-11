@@ -67,7 +67,7 @@ export class ChatRoom {
 export const ChatRoomSchema = SchemaFactory.createForClass(ChatRoom);
 
 // Indexes for fast lookups
-ChatRoomSchema.index({ roomId: 1 }, { unique: true });
+// NOTE: roomId already has a unique index from @Prop({ unique: true }) — do not redeclare it here
 ChatRoomSchema.index({ initiatorId: 1, adId: 1 }, { unique: true });
 ChatRoomSchema.index({ adId: 1 });
 ChatRoomSchema.index({ adPosterId: 1 });

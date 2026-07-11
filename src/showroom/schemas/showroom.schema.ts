@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Showroom {
@@ -11,6 +11,9 @@ export class Showroom {
 
   @Prop({ required: true })
   owner: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false })
+  createdBy?: Types.ObjectId;
 
   @Prop({ required: true })
   address: string;

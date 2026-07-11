@@ -38,6 +38,7 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
   async create(
@@ -71,6 +72,7 @@ export class CategoryController {
   }
 
   @Put(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({ status: 200, description: 'Category updated successfully' })
@@ -84,6 +86,7 @@ export class CategoryController {
   }
 
   @Delete(':id')
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a category' })
