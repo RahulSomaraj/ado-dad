@@ -42,6 +42,7 @@ import { CreateAdDto } from '../dto/common/create-ad.dto';
 
 import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
 import { RedisService } from '../../shared/redis.service';
+import { AdsCache } from '../../ads-v2/infrastructure/services/ads-cache';
 import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
 import { GeocodingService } from '../../common/services/geocoding.service';
 import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
@@ -88,6 +89,7 @@ export class AdsService {
     private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
     private readonly geocodingService: GeocodingService,
     private readonly locationHierarchyService: LocationHierarchyService,
+    private readonly adsV2Cache: AdsCache,
   ) { }
 
   /**
@@ -2244,6 +2246,16 @@ export class AdsService {
     userId?: string,
   ): Promise<void> {
     try {
+      // The v2 read stack (ads-v2) keeps its own Redis namespace with tag-based
+      // invalidation. Writes still go through v1, so v1 has to clear v2's
+      // entries too — otherwise an edited, sold or deleted ad keeps showing in
+      // the v2 feed until the 5 minute TTL expires. This matters much more
+      // since P1-2 made the geo (default) list shape cacheable.
+      await this.adsV2Cache.invalidateLists();
+      if (adId) {
+        await this.adsV2Cache.invalidateById(adId);
+      }
+
       // Invalidate general ad listings
       const findAllKeys = await this.redisService.keys(
         `${AdsService.CACHE_PREFIX}findAll*`,
@@ -3114,6 +3126,10 @@ export class AdsService {
       { $set: { soldOut, updatedAt: new Date() } },
       { new: true },
     );
+
+    // Sold-out flips visibility in every list query, so the caches must go —
+    // this path previously invalidated nothing at all.
+    await this.invalidateAdCache(id, requesterId);
 
     // Reuse aggregation-based fetch to return enriched data consistently
     return await this.findOne(id);

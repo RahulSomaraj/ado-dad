@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
+import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
 import { DetailedAdResponseDto } from '../../../ads/dto/common/ad-response.dto';
 import { AdCategory, AdStatus } from '../../../ads/schemas/ad.schema';
@@ -25,9 +26,22 @@ import { Model } from 'mongoose';
 
 @Injectable()
 export class GetAdByIdUc {
+  /**
+   * P1-5: ad detail is the second most requested endpoint and used to hit Mongo
+   * on every open — AdsCache.setById existed but was called from nowhere.
+   *
+   * Only the ad-derived part of the response is cached, under the 'anonymous'
+   * slot, so one entry serves every viewer. Everything user- or
+   * moment-specific (isFavorite, favouritesCount, chats, ratings, viewCount) is
+   * layered on after the cache read. Invalidation rides on the existing
+   * `invalidateById` tag, which v1 writes now trigger (see AdsService).
+   */
+  private static readonly CACHE_TTL = 300; // 5 minutes
+
   constructor(
     private readonly adRepo: AdRepository,
     private readonly inventory: VehicleInventoryGateway,
+    private readonly cache: AdsCache,
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
     @InjectModel(ChatRoom.name)
@@ -47,7 +61,8 @@ export class GetAdByIdUc {
       throw new BadRequestException(`Invalid ad ID: ${adId}`);
     }
 
-    // No caching - fetch directly from database
+    const cacheKey = this.cache.byIdKey(adId, 'anonymous');
+    const cachedBase = await this.cache.get<DetailedAdResponseDto>(cacheKey);
 
     // Build simplified aggregation pipeline
     const pipeline = [
@@ -131,9 +146,10 @@ export class GetAdByIdUc {
       userFavorite,
       chatData,
       ratings,
+      incrementedViewCount,
     ] = await Promise.all([
-      // 1. Main Ad Fetch
-      this.adRepo.aggregate(pipeline),
+      // 1. Main Ad Fetch — skipped entirely on a cache hit
+      cachedBase ? Promise.resolve(null) : this.adRepo.aggregate(pipeline),
 
       // 2. Favorites Count
       this.favoriteModel.countDocuments({
@@ -153,27 +169,42 @@ export class GetAdByIdUc {
 
       // 5. Ratings
       this.getAdRatings(adId),
+
+      // 6. View count — the same write as before, but we read the new value
+      //    back so a cached payload never shows a stale count.
+      this.adRepo.incrementViewCount(new Types.ObjectId(adId)).catch((err) => {
+        console.error('Error incrementing view count:', err);
+        return null;
+      }),
     ]);
 
-    // Check if ad exists
-    if (adResults.length === 0) {
-      throw new NotFoundException(`Advertisement with ID ${adId} not found`);
+    let base: DetailedAdResponseDto;
+
+    if (cachedBase) {
+      base = cachedBase;
+    } else {
+      // Check if ad exists
+      if (!adResults || adResults.length === 0) {
+        throw new NotFoundException(`Advertisement with ID ${adId} not found`);
+      }
+
+      const ad = adResults[0];
+
+      // Map to detailed response DTO
+      // This involves inventory lookups which are internally parallelized
+      base = await this.mapToDetailedResponseDto(ad);
+      base.viewCount = ad.viewCount || 0;
+
+      await this.cache.setById(
+        adId,
+        'anonymous',
+        base,
+        GetAdByIdUc.CACHE_TTL,
+      );
     }
 
-    const ad = adResults[0];
-
-    // Fire-and-forget view count increment (don't await)
-    // We catch errors to prevent unhandled promise rejections
-    this.adRepo
-      .updateOne(
-        { _id: new Types.ObjectId(adId) },
-        { $inc: { viewCount: 1 } },
-      )
-      .catch((err) => console.error('Error incrementing view count:', err));
-
-    // Map to detailed response DTO
-    // This involves inventory lookups which are internally parallelized
-    const detailed = await this.mapToDetailedResponseDto(ad);
+    // Never mutate the object handed back by the cache layer.
+    const detailed: DetailedAdResponseDto = { ...base };
 
     // Populate the auxiliary data we fetched in parallel
     detailed.favoritesCount = favoritesCount;
@@ -193,8 +224,9 @@ export class GetAdByIdUc {
       detailed.reviews = ratings.reviews;
     }
 
-    // Add locally incremented view count for immediate feedback
-    detailed.viewCount = (ad.viewCount || 0) + 1;
+    // Exact when the increment succeeded; otherwise fall back to the snapshot.
+    detailed.viewCount =
+      incrementedViewCount ?? (base.viewCount || 0) + 1;
 
     return detailed;
   }

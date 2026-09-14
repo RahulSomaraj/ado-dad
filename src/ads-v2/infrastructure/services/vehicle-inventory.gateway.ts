@@ -1,9 +1,103 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { VehicleInventoryService } from '../../../vehicle-inventory/vehicle-inventory.service';
+import { RedisService } from '../../../shared/redis.service';
+
+type InventoryKind =
+  | 'manufacturer'
+  | 'model'
+  | 'variant'
+  | 'fuelType'
+  | 'transmissionType';
 
 @Injectable()
 export class VehicleInventoryGateway {
-  constructor(private readonly inventory: VehicleInventoryService) {}
+  /**
+   * P1-6: manufacturers, models, variants, fuel types and transmission types
+   * are effectively immutable reference data, yet every list response issued
+   * five Mongo queries for them (batchFetchInventoryItems) and every detail
+   * response issued five more. They are now cached per id for an hour.
+   *
+   * Cached per id rather than per collection so the list batch path and the
+   * single-item detail path share entries.
+   */
+  private static readonly CACHE_TTL = 3600; // 1 hour
+
+  constructor(
+    private readonly inventory: VehicleInventoryService,
+    private readonly redis: RedisService,
+  ) {}
+
+  private cacheKey(kind: InventoryKind, id: string): string {
+    return `ads:v2:inventory:${kind}:${id}`;
+  }
+
+  /**
+   * Read a set of reference items through Redis, loading only the misses.
+   *
+   * Fails open: any Redis error degrades to a plain database read, matching the
+   * behaviour of the rest of the caching in this service.
+   */
+  private async getByIdsCached(
+    kind: InventoryKind,
+    ids: string[],
+    load: (missingIds: string[]) => Promise<any[]>,
+  ): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const unique = Array.from(
+      new Set(ids.filter(Boolean).map((id) => String(id))),
+    );
+    if (unique.length === 0) return [];
+
+    const cached = await Promise.all(
+      unique.map((id) =>
+        this.redis
+          .cacheGet<any>(this.cacheKey(kind, id))
+          .catch(() => null),
+      ),
+    );
+
+    const resolved = new Map<string, any>();
+    const missing: string[] = [];
+    unique.forEach((id, i) => {
+      if (cached[i]) resolved.set(id, cached[i]);
+      else missing.push(id);
+    });
+
+    if (missing.length > 0) {
+      const docs = (await load(missing)) || [];
+      await Promise.all(
+        docs.map(async (doc: any) => {
+          const id = String(doc?._id ?? '');
+          if (!id) return;
+          resolved.set(id, doc);
+          try {
+            await this.redis.cacheSet(
+              this.cacheKey(kind, id),
+              doc,
+              VehicleInventoryGateway.CACHE_TTL,
+            );
+          } catch {
+            // Best-effort; a write failure just means the next read misses.
+          }
+        }),
+      );
+      // Misses that the database did not return simply do not exist — do not
+      // cache the negative, the caller's "Not Found" placeholder covers it.
+    }
+
+    return unique.map((id) => resolved.get(id)).filter(Boolean);
+  }
+
+  private async getOneCached(
+    kind: InventoryKind,
+    id: string,
+    load: (missingIds: string[]) => Promise<any[]>,
+  ): Promise<any | null> {
+    if (!id) return null;
+    const [item] = await this.getByIdsCached(kind, [id], load);
+    return item ?? null;
+  }
 
   async assertRefs(
     manufacturerId: string,
@@ -109,8 +203,11 @@ export class VehicleInventoryGateway {
   // Methods to get full objects for detailed responses
   async getManufacturer(manufacturerId: string): Promise<any> {
     try {
-      const manufacturer =
-        await this.inventory.findManufacturerById(manufacturerId);
+      const manufacturer = await this.getOneCached(
+        'manufacturer',
+        manufacturerId,
+        (missing) => this.inventory.findManufacturersByIds(missing),
+      );
       return (
         manufacturer || {
           _id: manufacturerId,
@@ -129,7 +226,9 @@ export class VehicleInventoryGateway {
 
   async getModel(modelId: string): Promise<any> {
     try {
-      const model = await this.inventory.findVehicleModelById(modelId);
+      const model = await this.getOneCached('model', modelId, (missing) =>
+        this.inventory.findVehicleModelsByIds(missing),
+      );
       return (
         model || { _id: modelId, name: 'Not Found', displayName: 'Not Found' }
       );
@@ -140,7 +239,9 @@ export class VehicleInventoryGateway {
 
   async getVariant(variantId: string): Promise<any> {
     try {
-      const variant = await this.inventory.findVehicleVariantById(variantId);
+      const variant = await this.getOneCached('variant', variantId, (missing) =>
+        this.inventory.findVehicleVariantsByIds(missing),
+      );
       return (
         variant || {
           _id: variantId,
@@ -155,8 +256,11 @@ export class VehicleInventoryGateway {
 
   async getTransmissionType(transmissionId: string): Promise<any> {
     try {
-      const transmission =
-        await this.inventory.findTransmissionTypeById(transmissionId);
+      const transmission = await this.getOneCached(
+        'transmissionType',
+        transmissionId,
+        (missing) => this.inventory.findTransmissionTypesByIds(missing),
+      );
       return (
         transmission || {
           _id: transmissionId,
@@ -175,7 +279,11 @@ export class VehicleInventoryGateway {
 
   async getFuelType(fuelTypeId: string): Promise<any> {
     try {
-      const fuelType = await this.inventory.findFuelTypeById(fuelTypeId);
+      const fuelType = await this.getOneCached(
+        'fuelType',
+        fuelTypeId,
+        (missing) => this.inventory.findFuelTypesByIds(missing),
+      );
       return (
         fuelType || {
           _id: fuelTypeId,
@@ -190,27 +298,32 @@ export class VehicleInventoryGateway {
 
   // Batch fetch methods for optimization
   async getManufacturersByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    return this.inventory.findManufacturersByIds(ids);
+    return this.getByIdsCached('manufacturer', ids, (missing) =>
+      this.inventory.findManufacturersByIds(missing),
+    );
   }
 
   async getModelsByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    return this.inventory.findVehicleModelsByIds(ids);
+    return this.getByIdsCached('model', ids, (missing) =>
+      this.inventory.findVehicleModelsByIds(missing),
+    );
   }
 
   async getVariantsByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    return this.inventory.findVehicleVariantsByIds(ids);
+    return this.getByIdsCached('variant', ids, (missing) =>
+      this.inventory.findVehicleVariantsByIds(missing),
+    );
   }
 
   async getFuelTypesByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    return this.inventory.findFuelTypesByIds(ids);
+    return this.getByIdsCached('fuelType', ids, (missing) =>
+      this.inventory.findFuelTypesByIds(missing),
+    );
   }
 
   async getTransmissionTypesByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    return this.inventory.findTransmissionTypesByIds(ids);
+    return this.getByIdsCached('transmissionType', ids, (missing) =>
+      this.inventory.findTransmissionTypesByIds(missing),
+    );
   }
 }

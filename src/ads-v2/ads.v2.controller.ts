@@ -1,4 +1,3 @@
-import { getJwtSecret } from '../common/jwt-secret.util';
 import {
   Body,
   Controller,
@@ -38,9 +37,9 @@ import { RolesGuard } from '../auth/guard/roles.guards';
 import { Roles } from '../auth/guard/roles.decorator';
 import { UserType } from '../users/enums/user.types';
 import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { GetAdByIdSwagger } from './dto/get-ad-by-id.dto';
+import { Throttle } from '../common/guards/auth-throttle.guard';
+import { OptionalJwtAuthGuard } from '../auth/guard/optional-jwt-auth-guard';
 
 @ApiTags('Ads v2')
 @Controller('v2/ads')
@@ -51,28 +50,7 @@ export class AdsV2Controller {
     private readonly getAdByIdUc: GetAdByIdUc,
     private readonly profileStatsUc: ProfileStatsUc,
     private readonly sellerStatsUc: SellerStatsUc,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
-
-  /**
-   * Extract user ID from JWT token if present
-   */
-  private extractUserIdFromToken(authHeader: string): string | null {
-    try {
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return null;
-      }
-
-      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-      const secret = getJwtSecret();
-
-      const payload = this.jwtService.verify(token, { secret });
-      return payload.id || null;
-    } catch (error) {
-      return null;
-    }
-  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -379,12 +357,17 @@ export class AdsV2Controller {
 
   @Post('list')
   @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read. Each call costs a geo aggregation,
+  // so it is throttled per client IP. Fails open if Redis is unavailable.
+  @Throttle({ name: 'adsList', limit: 60, ttl: 60 })
+  // P0-6: optional auth through the shared passport pipeline — verifies the
+  // signature, expiry and that the user still exists, and downgrades
+  // suspended/banned accounts to anonymous. Anonymous callers still get 200.
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
   async list(@Body() dto: ListAdsV2Dto, @Req() req: any) {
     try {
-      // Get user ID from auth token if available
-      const authHeader = req.headers.authorization;
-      const userId = this.extractUserIdFromToken(authHeader);
+      const userId: string | undefined = req.user?.id;
 
       const result = await this.listAdsUc.exec(dto, userId || undefined);
       return result;
@@ -408,6 +391,8 @@ export class AdsV2Controller {
 
   @Get('sellers/:id/stats')
   @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read.
+  @Throttle({ name: 'sellerStats', limit: 60, ttl: 60 })
   @ApiOperation({
     summary: 'Trust signals for a seller (ad count, member-since, reply time)',
     description:
@@ -454,6 +439,10 @@ export class AdsV2Controller {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read.
+  @Throttle({ name: 'adsDetail', limit: 120, ttl: 60 })
+  // P0-6: see POST /v2/ads/list above.
+  @UseGuards(OptionalJwtAuthGuard)
   @GetAdByIdSwagger()
   async getById(
     @Param('id') id: string,
@@ -467,9 +456,9 @@ export class AdsV2Controller {
     // Trim whitespace from ID
     const adId = id.trim();
 
-    // Extract user ID from authorization header if present (optional authentication)
-    const authHeader = req.headers?.authorization;
-    const userId = this.extractUserIdFromToken(authHeader);
+    // Optional authentication: populated by OptionalJwtAuthGuard, null when the
+    // caller is anonymous (or suspended/banned).
+    const userId: string | undefined = req.user?.id;
 
     // Call the use case to get advertisement by ID
     // userId will be undefined if no valid token is provided

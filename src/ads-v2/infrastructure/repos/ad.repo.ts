@@ -5,6 +5,19 @@ import { Ad, AdDocument } from '../../../ads/schemas/ad.schema';
 
 @Injectable()
 export class AdRepository {
+  /**
+   * P3-3: cap on server-side execution time for ads aggregations.
+   *
+   * The pool is small (maxPoolSize: 10) and a geo list request used to issue
+   * two aggregations, so a handful of slow $geoNear scans could saturate it and
+   * stall the whole API. maxTimeMS makes a pathological query fail fast instead
+   * of holding a connection open for socketTimeoutMS (45 s).
+   *
+   * Raise only after measuring; log/alert on MaxTimeMSExpired so a timeout
+   * never silently hides a regression.
+   */
+  private static readonly AGGREGATE_MAX_TIME_MS = 5000;
+
   constructor(
     @InjectModel(Ad.name) private readonly model: Model<AdDocument>,
   ) {}
@@ -368,7 +381,10 @@ export class AdRepository {
       },
     ];
 
-    const [result] = await this.model.aggregate(pipeline).exec();
+    const [result] = await this.model
+      .aggregate(pipeline)
+      .option({ maxTimeMS: AdRepository.AGGREGATE_MAX_TIME_MS })
+      .exec();
     return result;
   }
 
@@ -391,7 +407,43 @@ export class AdRepository {
     return this.model.deleteOne(filter, options).exec();
   }
 
-  async aggregate(pipeline: any[]): Promise<any[]> {
-    return this.model.aggregate(pipeline).exec();
+  /**
+   * P1-5: atomically bump viewCount and return the new value.
+   *
+   * The detail response is now served from cache, so the cached payload's
+   * viewCount is a snapshot. Reading the post-increment value back from the
+   * write we already perform keeps the displayed count exact without adding a
+   * second query.
+   */
+  async incrementViewCount(
+    id: string | Types.ObjectId,
+  ): Promise<number | null> {
+    const doc = await this.model
+      .findOneAndUpdate(
+        { _id: id },
+        { $inc: { viewCount: 1 } },
+        { new: true, projection: { viewCount: 1 } },
+      )
+      .lean()
+      .exec();
+    return (doc as any)?.viewCount ?? null;
+  }
+
+  async aggregate(
+    pipeline: any[],
+    options?: { maxTimeMS?: number; allowDiskUse?: boolean },
+  ): Promise<any[]> {
+    return this.model
+      .aggregate(pipeline)
+      .option({
+        maxTimeMS: options?.maxTimeMS ?? AdRepository.AGGREGATE_MAX_TIME_MS,
+        // Left off deliberately: the list pipeline must stay within the 100 MB
+        // in-memory limit. If a stage ever needs disk, that is a pipeline bug
+        // to fix, not a flag to flip.
+        ...(options?.allowDiskUse !== undefined
+          ? { allowDiskUse: options.allowDiskUse }
+          : {}),
+      })
+      .exec();
   }
 }

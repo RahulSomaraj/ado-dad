@@ -3,6 +3,8 @@ import {
   IsNumber,
   IsString,
   IsEnum,
+  IsIn,
+  IsBoolean,
   Min,
   Max,
   IsArray,
@@ -145,6 +147,7 @@ export class ListAdsV2Dto {
   })
   @IsOptional()
   @IsString()
+  @IsIn(['createdAt', 'updatedAt', 'price', 'title'])
   sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({
@@ -155,7 +158,18 @@ export class ListAdsV2Dto {
   })
   @IsOptional()
   @IsString()
+  @IsIn(['ASC', 'DESC'])
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
+
+  @ApiPropertyOptional({
+    description:
+      'Whether to run the extra count aggregation that populates `total` and `totalPages`. Set false for infinite-scroll clients, which only need `hasNext` — this removes a second full aggregation (including a repeat of $geoNear when coordinates are supplied) from every request.',
+    default: true,
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeTotal?: boolean = true;
 
   @ApiPropertyOptional({
     description:

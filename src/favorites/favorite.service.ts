@@ -9,6 +9,7 @@ import { Favorite, FavoriteDocument } from './schemas/schema.favorite';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { AdsService } from '../ads/services/ads.service';
+import { RedisService } from '../shared/redis.service';
 
 const toObjectId = (id: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -24,7 +25,25 @@ export class FavoriteService {
   constructor(
     @InjectModel(Favorite.name) private favoriteModel: Model<FavoriteDocument>,
     private readonly adsService: AdsService,
+    private readonly redis: RedisService,
   ) {}
+
+  /**
+   * P2-4: ListAdsUc caches a user's favourite ad ids under
+   * `ads:v2:userFavorites:{userId}` with a 5 minute TTL and nothing used to
+   * clear it, so hearts stayed stale for up to 5 minutes after a toggle (the
+   * mobile client papered over this with an optimistic update that then
+   * reverted on the next refetch). Every mutation below drops the entry.
+   *
+   * Best-effort: a Redis failure must never fail the favourite itself.
+   */
+  private async invalidateUserFavoritesCache(userId: string): Promise<void> {
+    try {
+      await this.redis.cacheDel(`ads:v2:userFavorites:${userId}`);
+    } catch {
+      // Cache invalidation is best-effort; the TTL is the backstop.
+    }
+  }
 
   // -------- CREATE / TOGGLE --------
 
@@ -51,6 +70,7 @@ export class FavoriteService {
 
     if (existing) {
       await this.favoriteModel.deleteOne({ _id: existing._id });
+      await this.invalidateUserFavoritesCache(userId);
       return { isFavorited: false, message: 'Ad removed from favorites' };
     }
 
@@ -58,6 +78,8 @@ export class FavoriteService {
       userId: userOid,
       itemId: adOid,
     }).save();
+
+    await this.invalidateUserFavoritesCache(userId);
 
     return {
       isFavorited: true,
@@ -444,6 +466,8 @@ export class FavoriteService {
     );
     if (!favorite) throw new NotFoundException('Favorite not found');
 
+    await this.invalidateUserFavoritesCache(userId);
+
     return favorite;
   }
 
@@ -459,6 +483,8 @@ export class FavoriteService {
       userId: userOid,
     });
     if (!favorite) throw new NotFoundException('Favorite not found');
+
+    await this.invalidateUserFavoritesCache(userId);
 
     return { message: 'Item removed from favorites' };
   }

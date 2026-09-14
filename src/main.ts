@@ -31,6 +31,17 @@ async function bootstrap() {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+
+  // P0-5: a wildcard origin must never be the production default. Fail closed
+  // at bootstrap instead of silently serving `Access-Control-Allow-Origin: *`.
+  if (NODE_ENV === 'production' && corsOrigins.length === 0) {
+    throw new Error(
+      'CORS_ORIGINS is required when NODE_ENV=production. ' +
+        'Set it to a comma-separated allow-list of origins ' +
+        '(e.g. CORS_ORIGINS=https://app.ado-dad.com,https://admin.ado-dad.com).',
+    );
+  }
+
   app.enableCors({
     origin: corsOrigins.length ? corsOrigins : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],

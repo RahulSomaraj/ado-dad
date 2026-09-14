@@ -23,13 +23,21 @@ export class AdsCache {
     await this.redis.sAdd(AdsCache.TAG_LIST, key);
   }
 
+  /**
+   * P1-5: the key format used by setById, exposed so callers can read the same
+   * entry back through get() instead of re-deriving the string.
+   */
+  byIdKey(id: string, userId: string | 'anonymous'): string {
+    return `${AdsCache.PREFIX}getById:${id}:${userId}`;
+  }
+
   async setById(
     id: string,
     userId: string | 'anonymous',
     value: any,
     ttlSec: number,
   ): Promise<void> {
-    const key = `${AdsCache.PREFIX}getById:${id}:${userId}`;
+    const key = this.byIdKey(id, userId);
     await this.redis.cacheSet(key, value, ttlSec);
     await this.redis.sAdd(AdsCache.TAG_BY_ID(id), key);
   }

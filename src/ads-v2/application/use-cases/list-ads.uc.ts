@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
@@ -46,6 +46,18 @@ export interface CachedListData {
 export class ListAdsUc {
   private static readonly CACHE_TTL = 300; // 5 minutes
 
+  private readonly logger = new Logger(ListAdsUc.name);
+
+  /**
+   * P1-2 instrumentation: in-process counters so the geo-bucket change can be
+   * measured from the app logs without adding a metrics dependency. Emitted
+   * every REPORT_EVERY list requests.
+   */
+  private static readonly REPORT_EVERY = 500;
+  private cacheHits = 0;
+  private cacheMisses = 0;
+  private cacheSkipped = 0;
+
   constructor(
     private readonly adRepo: AdRepository,
     private readonly inventory: VehicleInventoryGateway,
@@ -66,15 +78,21 @@ export class ListAdsUc {
     let baseData: CachedListData | null = null;
 
     if (cacheKey) {
-      // 2. Try to get from cache (only for specific scenarios)
+      // 2. Try to get from cache (only for cacheable request shapes)
       baseData = await this.cache.get<CachedListData>(cacheKey);
     }
+
+    this.recordCacheOutcome(
+      cacheKey === null ? 'skip' : baseData ? 'hit' : 'miss',
+    );
 
     if (!baseData) {
       // 3. Fetch from database
       baseData = await this.fetchListDataFromDatabase(filters);
 
-      // 4. Cache only if it's one of our target scenarios
+      // 4. Cache only if the request shape is cacheable. Note this happens
+      //    BEFORE isFavorite is applied, keeping the cached payload
+      //    user-agnostic.
       if (cacheKey) {
         await this.cache.setList(cacheKey, baseData, ListAdsUc.CACHE_TTL);
       }
@@ -102,69 +120,130 @@ export class ListAdsUc {
   }
 
   /**
-   * Generate cache key only for specific scenarios:
-   * 1. All ads (no filters except pagination and sort)
-   * 2. Category + Location only (no other filters)
+   * Quantise a coordinate pair into a cache bucket.
+   *
+   * P1-2: two decimal places is roughly a 1.1 km cell, so neighbours in the
+   * same town collapse onto one cache entry instead of each triggering its own
+   * cold $geoNear scan. Coarser buckets raise the hit rate but make the "near
+   * me" ordering less precise — 2 dp is the balance point for a city feed.
+   */
+  private static readonly GEO_BUCKET_DP = 2;
+
+  private geoBucket(latitude: number, longitude: number): string {
+    const dp = ListAdsUc.GEO_BUCKET_DP;
+    return `${latitude.toFixed(dp)}:${longitude.toFixed(dp)}`;
+  }
+
+  /**
+   * Build the Redis key for a list request, or null when the request shape is
+   * not worth caching.
+   *
+   * P1-2: the geo path used to return null unconditionally, which meant the
+   * hottest queries in the product (home feed, every category page, the
+   * similar-ads strip — all of which send coordinates) had a 0 % hit rate.
+   * Coordinates are now quantised into a bucket and folded into the key.
+   *
+   * The shape is an allow-list, not a scenario list: any filter that is not
+   * explicitly part of the key makes the request uncacheable. That is
+   * deliberate — the previous scenario checks ignored `manufacturerIds`,
+   * `modelIds`, `propertyTypes`, the year/bedroom/area ranges and the boolean
+   * property filters, so e.g. `{ propertyTypes: ['villa'] }` matched
+   * "Scenario 1: all ads" and could be served a cache entry built for a
+   * completely different filter set.
+   *
+   * Invariant: the key must stay user-agnostic. `isFavorite` is applied after
+   * the cache read in exec(), so `userId` must never appear here.
    */
   private generateListCacheKey(filters: ListAdsV2Dto): string | null {
     const {
       category,
       location,
+      latitude,
+      longitude,
+      maxDistance,
+      listingType,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      cursor,
+      includeTotal,
+      // High-cardinality / single-use filters — any of these disables caching.
       search,
       minPrice,
       maxPrice,
       commercialVehicleTypes,
       fuelTypeIds,
       transmissionTypeIds,
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-      listingType,
-      cursor,
+      manufacturerIds,
+      modelIds,
+      propertyTypes,
+      minYear,
+      maxYear,
+      minBedrooms,
+      maxBedrooms,
+      minArea,
+      maxArea,
+      isFurnished,
+      hasParking,
     } = filters;
 
-    // Cursor-based requests: cache per cursor
+    const isSet = (v: unknown) => v !== undefined && v !== null && v !== '';
+
+    const hasUncacheableFilter =
+      isSet(search) ||
+      isSet(minPrice) ||
+      isSet(maxPrice) ||
+      isSet(minYear) ||
+      isSet(maxYear) ||
+      isSet(minBedrooms) ||
+      isSet(maxBedrooms) ||
+      isSet(minArea) ||
+      isSet(maxArea) ||
+      isSet(isFurnished) ||
+      isSet(hasParking) ||
+      !!commercialVehicleTypes?.length ||
+      !!fuelTypeIds?.length ||
+      !!transmissionTypeIds?.length ||
+      !!manufacturerIds?.length ||
+      !!modelIds?.length ||
+      !!propertyTypes?.length;
+
+    if (hasUncacheableFilter) {
+      return null;
+    }
+
+    // Geo component. `maxDistance` is part of the key because it changes the
+    // result set; when the client omits it, fetchWithDistanceFallback walks a
+    // fixed radius ladder, which is deterministic for a given filter set, so
+    // 'auto' identifies that shape unambiguously.
+    const hasGeo = typeof latitude === 'number' && typeof longitude === 'number';
+    if ((latitude !== undefined) !== (longitude !== undefined)) {
+      // Half a coordinate pair is a malformed request shape — don't cache it.
+      return null;
+    }
+    const geoPart = hasGeo
+      ? `${this.geoBucket(latitude as number, longitude as number)}@${maxDistance ?? 'auto'}`
+      : 'none';
+
     const paginationPart = cursor
       ? `cursor=${cursor}&limit=${limit || 20}`
       : `page=${page || 1}&limit=${limit || 20}`;
 
-    // Scenario 1: All ads (no filters except pagination and sort, no geo coords)
-    if (
-      !category &&
-      !location &&
-      !filters.latitude &&
-      !filters.longitude &&
-      !search &&
-      !minPrice &&
-      !maxPrice &&
-      !commercialVehicleTypes?.length &&
-      !fuelTypeIds?.length &&
-      !transmissionTypeIds?.length &&
-      !listingType
-    ) {
-      return `ads:v2:list:all&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
-    }
+    const parts = [
+      `category=${category ?? 'any'}`,
+      `location=${location ? location.trim().toLowerCase() : 'any'}`,
+      `geo=${geoPart}`,
+      `listingType=${listingType ?? 'any'}`,
+      paginationPart,
+      `sortBy=${sortBy || 'createdAt'}`,
+      `sortOrder=${sortOrder || 'DESC'}`,
+      // The cached payload carries total/totalPages, so requests that ask for
+      // them cannot share an entry with requests that don't.
+      `includeTotal=${includeTotal === false ? 0 : 1}`,
+    ];
 
-    // Scenario 2: Category + Location only (no other filters, no geo coords)
-    if (
-      category &&
-      location &&
-      !filters.latitude &&
-      !filters.longitude &&
-      !search &&
-      !minPrice &&
-      !maxPrice &&
-      !commercialVehicleTypes?.length &&
-      !fuelTypeIds?.length &&
-      !transmissionTypeIds?.length &&
-      !listingType
-    ) {
-      return `ads:v2:list:category=${category}&location=${location}&${paginationPart}&sortBy=${sortBy || 'createdAt'}&sortOrder=${sortOrder || 'DESC'}`;
-    }
-
-    // All other combinations: NO CACHING
-    return null;
+    return `ads:v2:list:${parts.join('&')}`;
   }
 
   /**
@@ -194,7 +273,12 @@ export class ListAdsUc {
   private async fetchWithDistanceFallback(
     filters: ListAdsV2Dto,
   ): Promise<CachedListData> {
-    const distanceThresholds = [50, 100, 200, 500, 1000]; // km
+    // P3-5: was [50, 100, 200, 500, 1000]. Each rung re-ran the COMPLETE
+    // aggregation, so one request in a sparse region could cost six of them.
+    // Two rungs are enough: $geoNear already returns nearest-first, so a 200 km
+    // radius yields the same first page as a 50 km one whenever there is
+    // anything within 50 km — the narrower rungs bought nothing but scans.
+    const distanceThresholds = [200, 1000]; // km
     let lastResult: CachedListData | null = null;
 
     for (const distance of distanceThresholds) {
@@ -268,7 +352,13 @@ export class ListAdsUc {
       sortBy = 'createdAt',
       sortOrder = 'DESC',
       cursor,
+      includeTotal = true,
     } = filters;
+
+    // Was a sort explicitly requested, or are we falling back to the default?
+    // On the geo path the default is "nearest first" (the natural $geoNear
+    // order), so we must not push a $sort that would destroy it.
+    const sortExplicitlyRequested = filters.sortBy !== undefined;
 
     const useCursorPagination = Boolean(cursor && Types.ObjectId.isValid(cursor));
 
@@ -339,13 +429,12 @@ export class ListAdsUc {
       // Add location filtering stages to pipeline
       pipeline.push(...locationPipeline);
 
-      // Add location scoring for prioritization
-      pipeline.push(
-        this.locationHierarchyService.getLocationScoringStage(
-          latitude,
-          longitude,
-        ),
-      );
+      // P3-2: the `locationScore` $addFields stage used to be pushed here. It
+      // built a large nested $cond/$round/$multiply expression and ran BEFORE
+      // $skip/$limit, i.e. over every document inside the radius — and nothing
+      // consumed it: the $sort that used to read it was deliberately removed
+      // (see the comment on the sort stage below), and $geoNear already emits
+      // documents nearest-first. Pure dead CPU on the hottest path.
     }
 
     // Category filter
@@ -606,12 +695,22 @@ export class ListAdsUc {
     const sortDirection = sortOrder === 'ASC' ? 1 : -1;
 
     if (latitude !== undefined && longitude !== undefined) {
-      pipeline.push({
-        $sort: {
-          locationScore: -1,
-          [sortBy]: sortDirection,
-        },
-      });
+      // $geoNear (pipeline stage 0) already emits documents nearest-first, and
+      // $match preserves that order. Sorting on `locationScore` here re-sorted
+      // the entire candidate set in memory on a computed $addFields value — a
+      // blocking sort that can never use an index, runs before $project (so it
+      // sorts whole documents, description and images included), and has no
+      // allowDiskUse, so it throws past 100MB. It also made the secondary
+      // [sortBy] key a no-op, because locationScore is per-km and effectively
+      // unique — which is why "Price: low to high" never worked under geo.
+      //
+      // Default (no explicit sort) => keep $geoNear's distance order, no $sort.
+      // Explicit sort => honour it on its own, so price/year sorting works.
+      if (sortExplicitlyRequested) {
+        pipeline.push({
+          $sort: { [sortBy]: sortDirection },
+        });
+      }
     } else {
       pipeline.push({
         $sort: { [sortBy]: sortDirection },
@@ -755,12 +854,16 @@ export class ListAdsUc {
         propertyDetails: 1,
         vehicleDetails: 1,
         commercialVehicleDetails: 1,
-        locationScore: 1, // Include location score for sorting
+        // P3-2: locationScore removed — it was computed but never sorted on.
       },
     });
 
     // Execute: run data aggregation; optionally run simplified count (no count when property/vehicle filters or cursor)
+    // `includeTotal: false` lets infinite-scroll clients skip the second
+    // aggregation entirely. It is NOT free on the geo path: the count pipeline
+    // re-uses pipeline[0], so it repeats the whole $geoNear scan.
     const runCount =
+      includeTotal &&
       !hasPropertyFilters &&
       !hasVehicleFilters &&
       !useCursorPagination;
@@ -805,9 +908,13 @@ export class ListAdsUc {
     } else {
       const total = countResult[0]?.total ?? 0;
       const totalPages = Math.ceil(total / limit);
-      hasNext = (hasPropertyFilters || hasVehicleFilters)
+      // Without a count there is no totalPages to compare against, so fall back
+      // to the same heuristic the filtered path uses: a full page implies more.
+      hasNext = !runCount
         ? rawData.length === limit
-        : page < totalPages;
+        : (hasPropertyFilters || hasVehicleFilters)
+          ? rawData.length === limit
+          : page < totalPages;
       if (!(hasPropertyFilters || hasVehicleFilters)) {
         nextCursor = null;
         prevCursorOut = null;
@@ -1431,6 +1538,30 @@ export class ListAdsUc {
   }
 
   /**
+   * P1-2: track list cache hit / miss / skip and log the rate periodically.
+   * 'skip' means the request shape is not cacheable at all (a key was never
+   * generated), which is worth separating from a genuine miss.
+   */
+  private recordCacheOutcome(outcome: 'hit' | 'miss' | 'skip'): void {
+    if (outcome === 'hit') this.cacheHits++;
+    else if (outcome === 'miss') this.cacheMisses++;
+    else this.cacheSkipped++;
+
+    const total = this.cacheHits + this.cacheMisses + this.cacheSkipped;
+    if (total % ListAdsUc.REPORT_EVERY !== 0) return;
+
+    const cacheable = this.cacheHits + this.cacheMisses;
+    const hitRate = cacheable
+      ? ((this.cacheHits / cacheable) * 100).toFixed(1)
+      : '0.0';
+    this.logger.log(
+      `ads:v2:list cache — requests=${total} hits=${this.cacheHits} ` +
+        `misses=${this.cacheMisses} uncacheable=${this.cacheSkipped} ` +
+        `hitRate=${hitRate}% (of cacheable shapes)`,
+    );
+  }
+
+  /**
    * Get user's favorite ad IDs (with caching)
    */
   private async getUserFavorites(userId: string): Promise<string[]> {
@@ -1466,9 +1597,15 @@ export class ListAdsUc {
     ads: DetailedAdResponseDto[],
     userFavorites: string[],
   ): DetailedAdResponseDto[] {
+    // P2-4: Array.includes made this O(n·m) — one linear scan of the
+    // favourites list per row. A Set makes the lookup O(1).
+    if (!userFavorites.length) {
+      return ads.map((ad) => ({ ...ad, isFavorite: false }));
+    }
+    const favoriteIds = new Set(userFavorites);
     return ads.map((ad) => ({
       ...ad,
-      isFavorite: userFavorites.includes(ad.id),
+      isFavorite: favoriteIds.has(ad.id),
     }));
   }
 }

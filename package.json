@@ -46,6 +46,7 @@
     "seed:vehicle-models:safe": "ts-node src/vehicle-inventory/seed/run-safe-vehicle-models-seed.ts",
     "seed:vehicle-variants:safe": "ts-node src/vehicle-inventory/seed/run-safe-vehicle-variants-seed.ts",
     "add:superadmin": "ts-node src/users/seed/add-super-admin.ts",
+    "create:superadmin": "ts-node src/users/seed/create-super-admin.ts",
     "fix:commercial-vehicle-data": "ts-node src/ads/scripts/fix-commercial-vehicle-data.ts",
     "validate:data": "ts-node -e \"import('./src/ads/scripts/fix-commercial-vehicle-data.ts').then(m => m.fixCommercialVehicleData())\"",
     "data:consistency-check": "curl -X GET \"http://localhost:5001/ads/validation/consistency\" -H \"Authorization: Bearer YOUR_TOKEN\"",

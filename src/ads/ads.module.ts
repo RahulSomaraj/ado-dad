@@ -43,6 +43,7 @@ import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.m
 import { S3Service } from '../shared/s3.service';
 import { GeocodingService } from '../common/services/geocoding.service';
 import { LocationHierarchyService } from '../common/services/location-hierarchy.service';
+import { AdsCache } from '../ads-v2/infrastructure/services/ads-cache';
 
 @Module({
   imports: [
@@ -73,6 +74,10 @@ import { LocationHierarchyService } from '../common/services/location-hierarchy.
     GeocodingService,
     LocationHierarchyService,
     SuspensionGuard,
+    // P1-2b: lets AdsService clear the ads-v2 Redis namespace on writes.
+    // AdsCache only depends on the global RedisService, so providing a second
+    // instance here introduces no module cycle and no shared state.
+    AdsCache,
   ],
   exports: [AdsService, LookupService, MongooseModule],
 })
