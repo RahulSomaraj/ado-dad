@@ -1,246 +1,114 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ChatGateway } from './chat.gateway';
-import { ChatService } from './chat.service';
-import { Socket, Server } from 'socket.io';
-import { CreateChatRoomDto } from './dto/create-chat-room.dto';
-import { SendMessageDto } from './dto/send-message.dto';
-import { MessageType } from './schemas/chat-message.schema';
+import { ChatError, ChatErrorCode } from './chat-errors';
 
 describe('ChatGateway', () => {
-    let gateway: ChatGateway;
-    let chatService: any;
-    let mockServer: any;
-    let mockSocket: any;
+  let gateway: ChatGateway;
+  let chatService: any;
+  let messaging: any;
+  let events: any;
+  let auth: any;
+  let limiter: any;
+  let client: any;
 
-    beforeEach(async () => {
-        chatService = {
-            createChatRoom: jest.fn(),
-            sendMessage: jest.fn(),
-            getUserChatRooms: jest.fn(),
-            getRoomMessages: jest.fn(),
-            getChatRoom: jest.fn(),
-            getUserRole: jest.fn(),
-        };
+  beforeEach(() => {
+    chatService = {
+      getRoomForParticipant: jest.fn().mockResolvedValue({ roomId: 'r1', initiatorId: 'u1', adPosterId: 'u2' }),
+      isParticipant: jest.fn().mockReturnValue(true),
+      createChatRoom: jest.fn().mockResolvedValue({ roomId: 'r1' }),
+      getRoomView: jest.fn().mockResolvedValue({ roomId: 'r1' }),
+      getUserChatRooms: jest.fn().mockResolvedValue([]),
+      getRoomMessages: jest.fn().mockResolvedValue({ messages: [{ id: 'm' }], nextCursor: null, hasMore: false }),
+    };
+    messaging = { send: jest.fn().mockResolvedValue({ id: 'm1' }), markRead: jest.fn().mockResolvedValue({ unreadCount: 0 }) };
+    events = { attach: jest.fn() };
+    auth = {
+      authenticate: jest.fn().mockResolvedValue({ ok: true, user: { id: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 } }),
+      isExpired: jest.fn((u: any) => !!u?.exp && u.exp * 1000 <= Date.now()),
+    };
+    limiter = { consume: jest.fn().mockResolvedValue(undefined) };
+    gateway = new ChatGateway(chatService, messaging, events, auth, limiter);
+    client = {
+      id: 's1',
+      data: { user: { id: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 } },
+      emit: jest.fn(),
+      join: jest.fn(),
+      leave: jest.fn(),
+      disconnect: jest.fn(),
+      to: jest.fn().mockReturnValue({ emit: jest.fn() }),
+    };
+  });
 
-        mockServer = {
-            emit: jest.fn(),
-            to: jest.fn().mockReturnThis(),
-            on: jest.fn(),
-        };
-
-        mockSocket = {
-            id: 'test-socket-id',
-            handshake: {
-                auth: { token: 'valid-token' },
-                headers: {},
-            },
-            emit: jest.fn(),
-            join: jest.fn(),
-            leave: jest.fn(),
-            user: { id: 'test-user-id', type: 'user' },
-            on: jest.fn(),
-            onAny: jest.fn(),
-            to: jest.fn().mockReturnThis(),
-        };
-
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                ChatGateway,
-                {
-                    provide: ChatService,
-                    useValue: chatService,
-                },
-            ],
-        }).compile();
-
-        gateway = module.get<ChatGateway>(ChatGateway);
-        gateway.server = mockServer as Server;
+  describe('handleConnection', () => {
+    it('joins the user channel on success', async () => {
+      client.data = {};
+      await gateway.handleConnection(client);
+      expect(client.join).toHaveBeenCalledWith('user:u1');
+      expect(client.emit).toHaveBeenCalledWith('connected', expect.objectContaining({ userId: 'u1' }));
     });
 
-    it('should be defined', () => {
-        expect(gateway).toBeDefined();
+    it('emits auth_error with the reason and disconnects', async () => {
+      auth.authenticate.mockResolvedValue({ ok: false, code: ChatErrorCode.TOKEN_EXPIRED });
+      await gateway.handleConnection(client);
+      expect(client.emit).toHaveBeenCalledWith('auth_error', { code: 'TOKEN_EXPIRED' });
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('sendMessage', () => {
+    it('acks with the stored message', async () => {
+      const ack = await gateway.handleSendMessage(client, { roomId: 'r1', content: 'hi', type: 'text' as any, clientMessageId: 'abcdefgh' });
+      expect(ack).toEqual({ success: true, message: { id: 'm1' } });
+      expect(messaging.send).toHaveBeenCalledWith('r1', 'u1', { content: 'hi', type: 'text', clientMessageId: 'abcdefgh' });
+      expect(client.emit).toHaveBeenCalledWith('sendMessageResponse', ack);
     });
 
-    describe('handleCreateChatRoom', () => {
-        it('should create a room and emit chatRoomCreated', async () => {
-            const dto: CreateChatRoomDto = { adId: 'ad123' };
-            const mockRoom = { roomId: 'room123' };
-            chatService.createChatRoom.mockResolvedValue(mockRoom);
-
-            await gateway.handleCreateChatRoom(mockSocket as Socket, dto);
-
-            expect(chatService.createChatRoom).toHaveBeenCalledWith('test-user-id', 'ad123');
-            expect(mockServer.emit).toHaveBeenCalledWith('chatRoomCreated', expect.objectContaining({
-                success: true,
-                data: expect.objectContaining({ roomId: 'room123' })
-            }));
-        });
+    it('acks errors with a code instead of staying silent (F-01)', async () => {
+      messaging.send.mockRejectedValue(new ChatError(ChatErrorCode.CONTENT_BLOCKED, 'Message not allowed'));
+      const ack = await gateway.handleSendMessage(client, { roomId: 'r1', content: 'x', type: 'text' as any });
+      expect(ack).toEqual({ success: false, code: 'CONTENT_BLOCKED', error: 'Message not allowed' });
     });
 
-    describe('handleSendMessage', () => {
-        it('should send a message and broadcast it', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                content: 'Hello',
-                type: MessageType.TEXT,
-            };
-            const mockMessage = {
-                _id: 'msg123',
-                content: 'Hello',
-                type: MessageType.TEXT,
-                attachments: [],
-                createdAt: new Date(),
-            };
-            chatService.sendMessage.mockResolvedValue(mockMessage);
-
-            const callback = jest.fn();
-            await gateway.handleSendMessage(mockSocket as Socket, dto, callback);
-
-            expect(chatService.sendMessage).toHaveBeenCalledWith(
-                'room123',
-                'test-user-id',
-                'Hello',
-                MessageType.TEXT,
-                [],
-            );
-            expect(mockServer.to).toHaveBeenCalledWith('room123');
-            expect(mockServer.emit).toHaveBeenCalledWith('message', expect.objectContaining({ content: 'Hello', roomId: 'room123' }));
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-        });
+    it('rejects an expired session with auth_error (F-02)', async () => {
+      client.data.user.exp = Math.floor(Date.now() / 1000) - 5;
+      const ack = await gateway.handleSendMessage(client, { roomId: 'r1', content: 'x', type: 'text' as any });
+      expect(ack).toMatchObject({ success: false, code: 'TOKEN_EXPIRED' });
+      expect(client.emit).toHaveBeenCalledWith('auth_error', { code: 'TOKEN_EXPIRED' });
+      expect(messaging.send).not.toHaveBeenCalled();
     });
 
-    describe('handleGetUserChatRooms', () => {
-        it('should fetch user chat rooms and emit response', async () => {
-            const mockRooms = [{ roomId: 'room1' }];
-            chatService.getUserChatRooms.mockResolvedValue(mockRooms);
-
-            await gateway.handleGetUserChatRooms(mockSocket as Socket, {});
-
-            expect(chatService.getUserChatRooms).toHaveBeenCalledWith('test-user-id');
-            expect(mockSocket.emit).toHaveBeenCalledWith('getUserChatRoomsResponse', expect.objectContaining({ success: true, chatRooms: mockRooms }));
-        });
+    it('returns RATE_LIMITED acks', async () => {
+      limiter.consume.mockRejectedValue(new ChatError(ChatErrorCode.RATE_LIMITED, 'slow down'));
+      const ack = await gateway.handleSendMessage(client, { roomId: 'r1', content: 'x', type: 'text' as any });
+      expect(ack).toMatchObject({ success: false, code: 'RATE_LIMITED' });
     });
+  });
 
-    describe('Voice Message Validation', () => {
-        it('should return error for invalid attachment count', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [] // Missing attachment
-            };
-            const callback = jest.fn();
-            await gateway.handleSendMessage(mockSocket as Socket, dto, callback);
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: 'Audio message must contain exactly one attachment' }));
-        });
+  it('joinChatRoom acks and still emits the legacy response', async () => {
+    const ack = await gateway.handleJoinChatRoom(client, { roomId: 'r1' });
+    expect(ack).toMatchObject({ success: true, roomId: 'r1', userRole: 'initiator' });
+    expect(client.join).toHaveBeenCalledWith('r1');
+    expect(client.emit).toHaveBeenCalledWith('joinChatRoomResponse', ack);
+  });
 
-        it('should return error for invalid mime type', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [{
-                    type: 'audio' as any,
-                    url: 'url',
-                    mimeType: 'audio/invalid',
-                    size: 1000,
-                    duration: 10
-                }]
-            };
-            const callback = jest.fn();
-            await gateway.handleSendMessage(mockSocket as Socket, dto, callback);
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: 'Invalid audio format: audio/invalid' }));
-        });
+  it('joinChatRoom refuses non-participants', async () => {
+    chatService.getRoomForParticipant.mockRejectedValue(new ChatError(ChatErrorCode.NOT_PARTICIPANT, 'no'));
+    const ack = await gateway.handleJoinChatRoom(client, { roomId: 'r1' });
+    expect(ack).toMatchObject({ success: false, code: 'NOT_PARTICIPANT' });
+    expect(client.join).not.toHaveBeenCalled();
+  });
 
-        it('should return error for duration > 180s', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [{
-                    type: 'audio' as any,
-                    url: 'url',
-                    mimeType: 'audio/webm',
-                    size: 1000,
-                    duration: 200
-                }]
-            };
-            const callback = jest.fn();
-            await gateway.handleSendMessage(mockSocket as Socket, dto, callback);
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: 'Voice message cannot exceed 3 minutes (180s)' }));
-        });
+  it('markChatRoomRead is handled (was missing)', async () => {
+    const ack = await gateway.handleMarkRead(client, { roomId: 'r1' });
+    expect(ack).toMatchObject({ success: true, unreadCount: 0 });
+  });
 
-        it('should validate duration successfully', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [{
-                    type: 'audio' as any,
-                    url: 'url',
-                    mimeType: 'audio/webm',
-                    size: 1000,
-                    duration: 10
-                }]
-            };
-            chatService.sendMessage.mockResolvedValue({ _id: 'msg1' });
-            await gateway.handleSendMessage(mockSocket as Socket, dto);
-            expect(chatService.sendMessage).toHaveBeenCalled();
-        });
+  it('legacy getRoomMessages returns both `messages` and `data`', async () => {
+    const ack: any = await gateway.handleGetRoomMessages(client, { roomId: 'r1' });
+    expect(ack.messages).toEqual(ack.data);
+  });
 
-        it('should accept audio/mp4 (M4A) format', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [{
-                    type: 'audio' as any,
-                    url: 'url',
-                    mimeType: 'audio/mp4',
-                    size: 1000,
-                    duration: 10
-                }]
-            };
-            chatService.sendMessage.mockResolvedValue({ _id: 'msg1' });
-            await gateway.handleSendMessage(mockSocket as Socket, dto);
-            expect(chatService.sendMessage).toHaveBeenCalled();
-        });
-
-        it('should accept audio/amr format', async () => {
-            const dto: SendMessageDto = {
-                roomId: 'room123',
-                type: MessageType.AUDIO,
-                attachments: [{
-                    type: 'audio' as any,
-                    url: 'url',
-                    mimeType: 'audio/amr',
-                    size: 1000,
-                    duration: 10
-                }]
-            };
-            chatService.sendMessage.mockResolvedValue({ _id: 'msg1' });
-            await gateway.handleSendMessage(mockSocket as Socket, dto);
-            expect(chatService.sendMessage).toHaveBeenCalled();
-        });
-    });
-
-    describe('handleJoinChatRoom', () => {
-        it('should allow participant to join', async () => {
-            const room = { roomId: 'room1', participants: ['test-user-id'] };
-            chatService.getChatRoom.mockResolvedValue(room);
-            chatService.getUserRole.mockResolvedValue('initiator');
-
-            const callback = jest.fn();
-            await gateway.handleJoinChatRoom(mockSocket as Socket, { roomId: 'room1' }, callback);
-
-            expect(mockSocket.join).toHaveBeenCalledWith('room1');
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-        });
-
-        it('should reject non-participant', async () => {
-            const room = { roomId: 'room1', participants: ['other-user'] };
-            chatService.getChatRoom.mockResolvedValue(room);
-
-            const callback = jest.fn();
-            await gateway.handleJoinChatRoom(mockSocket as Socket, { roomId: 'room1' }, callback);
-
-            expect(mockSocket.join).not.toHaveBeenCalled();
-            expect(callback).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
-        });
-    });
+  it('createChatRoom acks the room view', async () => {
+    const ack: any = await gateway.handleCreateChatRoom(client, { adId: '507f1f77bcf86cd799439011' });
+    expect(ack).toMatchObject({ success: true, data: { roomId: 'r1' } });
+  });
 });

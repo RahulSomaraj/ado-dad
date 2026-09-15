@@ -129,16 +129,11 @@ export class UploadController {
     @Query('fileType') fileType: string,
   ) {
     try {
-      // Normalize M4A mime types to audio/mp4 as recommended for better compatibility
-      let normalizedType = fileType;
-      if (['audio/x-m4a', 'audio/m4a', 'application/octet-stream'].includes(fileType)) {
-        // If it's a known M4A type or a generic stream (which mobile often uses), 
-        // and its extension (if we had it) would be .m4a or .mp4, we'd normalize here.
-        // For presigned URL, we rely mostly on the requested type.
-        if (fileType !== 'application/octet-stream') {
-          normalizedType = 'audio/mp4';
-        }
-      }
+      // Sign with EXACTLY the type the client will send as Content-Type.
+      // Normalising here (e.g. audio/m4a → audio/mp4) made S3 reject the PUT with
+      // SignatureDoesNotMatch because the client still sends its original type.
+      // New chat uploads use POST /chats/rooms/:roomId/uploads instead.
+      const normalizedType = fileType;
 
       // Try S3 first, fallback to local endpoint
       const url = await this.s3Service.getPresignedUrl(fileName, normalizedType);
@@ -208,7 +203,7 @@ export class UploadController {
     }
     const mt = (file.mimetype || '').toLowerCase();
     const allowed =
-      /^(image\/(jpeg|png|webp|gif)|audio\/|video\/|application\/pdf)$/i.test(mt) ||
+      /^(image\/(jpeg|png|webp|gif)|audio\/[\w.+-]+|video\/[\w.+-]+|application\/pdf)$/i.test(mt) ||
       mt === 'application/octet-stream';
     if (!allowed) {
       throw new BadRequestException(`Unsupported file type: ${file.mimetype}`);

@@ -1,306 +1,260 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
-import { ChatService } from './chat.service';
-import { ChatRoom, ChatRoomStatus, UserRole } from './schemas/chat-room.schema';
-import { ChatMessage, MessageType } from './schemas/chat-message.schema';
-import { Ad } from '../ads/schemas/ad.schema';
-import { User } from '../users/schemas/user.schema';
-import { ContentModerationService } from './services/content-moderation.service';
 import { Types } from 'mongoose';
-import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ChatService } from './chat.service';
+import { ChatRoomStatus } from './schemas/chat-room.schema';
+import { MessageType } from './schemas/chat-message.schema';
+import { ChatError, ChatErrorCode } from './chat-errors';
+import { ModerationStatus } from '../users/schemas/user.schema';
+
+const q = (data: any) => {
+  const chain: any = {};
+  for (const m of ['select', 'lean', 'sort', 'limit']) chain[m] = jest.fn(() => chain);
+  chain.exec = jest.fn().mockResolvedValue(data);
+  return chain;
+};
 
 describe('ChatService', () => {
-    let service: ChatService;
+  const buyer = new Types.ObjectId().toString();
+  const seller = new Types.ObjectId().toString();
+  const stranger = new Types.ObjectId().toString();
+  const adId = new Types.ObjectId().toString();
 
-    const mockChatRoom = {
-        _id: new Types.ObjectId(),
-        roomId: 'chat_ad123_user456_poster789',
-        initiatorId: new Types.ObjectId(),
-        adId: new Types.ObjectId(),
-        adPosterId: new Types.ObjectId(),
-        participants: [],
-        userRoles: new Map(),
-        status: ChatRoomStatus.ACTIVE,
-        save: jest.fn().mockResolvedValue(true),
+  let roomModel: any;
+  let msgModel: any;
+  let adModel: any;
+  let userModel: any;
+  let moderation: any;
+  let s3: any;
+  let service: ChatService;
+  let room: any;
+
+  beforeEach(() => {
+    room = {
+      _id: new Types.ObjectId(),
+      roomId: `chat_${adId}_${buyer}_${seller}`,
+      initiatorId: new Types.ObjectId(buyer),
+      adPosterId: new Types.ObjectId(seller),
+      adId: new Types.ObjectId(adId),
+      participants: [buyer, seller],
+      status: ChatRoomStatus.ACTIVE,
+      messageCount: 3,
+      unreadCounts: new Map([[seller, 2]]),
     };
-
-    const mockAd = {
-        _id: new Types.ObjectId(),
-        postedBy: new Types.ObjectId(),
-        isActive: true,
-        category: 'Test Category',
-        description: 'Test Description',
-        price: 100,
-        location: { type: 'Point', coordinates: [0, 0] },
-        priceUnit: 'AED',
+    roomModel = {
+      findOne: jest.fn(() => q(room)),
+      create: jest.fn(),
+      updateOne: jest.fn().mockResolvedValue({ matchedCount: 1 }),
+      updateMany: jest.fn().mockResolvedValue({}),
+      aggregate: jest.fn(() => q([])),
+      bulkWrite: jest.fn().mockResolvedValue({}),
     };
-
-    const createMockQuery = (data: any) => ({
-        lean: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue(data),
-        select: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        populate: jest.fn().mockReturnThis(),
-    });
-
-    const mockChatRoomModel = {
-        findOne: jest.fn(),
-        create: jest.fn(),
-        updateOne: jest.fn(),
-        find: jest.fn(),
-        findById: jest.fn(),
-        aggregate: jest.fn(),
+    msgModel = {
+      findOne: jest.fn(() => q(null)),
+      create: jest.fn(async (d: any) => ({ ...d, _id: new Types.ObjectId(), createdAt: new Date() })),
+      aggregate: jest.fn(() => q([])),
+      updateMany: jest.fn().mockResolvedValue({ modifiedCount: 2 }),
+      countDocuments: jest.fn().mockResolvedValue(9),
     };
+    adModel = { findById: jest.fn(() => q({ _id: adId, postedBy: seller, isActive: true })) };
+    userModel = { findById: jest.fn(() => q({ moderationStatus: ModerationStatus.ACTIVE })) };
+    moderation = { moderateContent: jest.fn().mockResolvedValue({ isApproved: true, flags: [], score: 0 }) };
+    s3 = { getMediaHosts: () => ['bucket.s3.ap-south-1.amazonaws.com'], bucket: 'bucket' };
+    service = new ChatService(roomModel, msgModel, adModel, userModel, moderation, s3);
+  });
 
-    const mockChatMessageModel = {
-        create: jest.fn(),
-        find: jest.fn(),
-        findOne: jest.fn(),
-        aggregate: jest.fn(),
-        countDocuments: jest.fn(),
-    };
+  const expectCode = async (p: Promise<any>, code: ChatErrorCode) => {
+    await expect(p).rejects.toBeInstanceOf(ChatError);
+    await p.catch((e) => expect(e.code).toBe(code));
+  };
 
-    const mockAdModel = {
-        findById: jest.fn(),
-    };
-
-    const mockUserModel = {
-        findById: jest.fn(),
-    };
-
-    const mockContentModerationService = {
-        moderateContent: jest.fn().mockResolvedValue({ isApproved: true }),
-    };
-
-    beforeEach(async () => {
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                ChatService,
-                {
-                    provide: getModelToken(ChatRoom.name),
-                    useValue: mockChatRoomModel,
-                },
-                {
-                    provide: getModelToken(ChatMessage.name),
-                    useValue: mockChatMessageModel,
-                },
-                {
-                    provide: getModelToken(Ad.name),
-                    useValue: mockAdModel,
-                },
-                {
-                    provide: getModelToken(User.name),
-                    useValue: mockUserModel,
-                },
-                {
-                    provide: ContentModerationService,
-                    useValue: mockContentModerationService,
-                },
-            ],
-        }).compile();
-
-        service = module.get<ChatService>(ChatService);
-        jest.clearAllMocks();
+  describe('createChatRoom', () => {
+    it('returns the existing room (idempotent)', async () => {
+      await expect(service.createChatRoom(buyer, adId)).resolves.toBe(room);
+      expect(roomModel.create).not.toHaveBeenCalled();
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
+    it('creates with lastMessageAt set and zeroed unread counters', async () => {
+      roomModel.findOne = jest.fn(() => q(null));
+      roomModel.create = jest.fn(async (d: any) => d);
+      const created: any = await service.createChatRoom(buyer, adId);
+      expect(created.lastMessageAt).toBeInstanceOf(Date);
+      expect(created.unreadCounts.get(buyer)).toBe(0);
+      expect(created.participants).toEqual([buyer, seller]);
     });
 
-    describe('createChatRoom', () => {
-        it('should throw NotFoundException if advertisement is not found', async () => {
-            mockAdModel.findById.mockReturnValue(createMockQuery(null));
-
-            await expect(service.createChatRoom(new Types.ObjectId().toString(), new Types.ObjectId().toString()))
-                .rejects.toThrow(NotFoundException);
-        });
-
-        it('should throw BadRequestException if advertisement is inactive', async () => {
-            mockAdModel.findById.mockReturnValue(createMockQuery({ ...mockAd, isActive: false }));
-
-            await expect(service.createChatRoom(new Types.ObjectId().toString(), mockAd._id.toString()))
-                .rejects.toThrow(BadRequestException);
-        });
-
-        it('should return existing room if it already exists', async () => {
-            mockAdModel.findById.mockReturnValue(createMockQuery(mockAd));
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
-
-            const result = await service.createChatRoom(new Types.ObjectId().toString(), mockAd._id.toString());
-            expect(result).toEqual(mockChatRoom);
-        });
-
-        it('should create a new room if it does not exist', async () => {
-            mockAdModel.findById.mockReturnValue(createMockQuery(mockAd));
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(null));
-            mockChatRoomModel.create.mockResolvedValue(mockChatRoom);
-
-            const result = await service.createChatRoom(new Types.ObjectId().toString(), mockAd._id.toString());
-            expect(result).toEqual(mockChatRoom);
-            expect(mockChatRoomModel.create).toHaveBeenCalled();
-        });
+    it('refuses a sold ad for a new room', async () => {
+      roomModel.findOne = jest.fn(() => q(null));
+      adModel.findById = jest.fn(() => q({ _id: adId, postedBy: seller, isActive: true, soldOut: true }));
+      await expectCode(service.createChatRoom(buyer, adId), ChatErrorCode.AD_UNAVAILABLE);
     });
 
-    describe('sendMessage', () => {
-        const roomId = 'chat_123';
-        const senderId = new Types.ObjectId().toString();
+    it('404s a missing ad', async () => {
+      adModel.findById = jest.fn(() => q(null));
+      await expectCode(service.createChatRoom(buyer, adId), ChatErrorCode.AD_NOT_FOUND);
+    });
+  });
 
-        it('should throw NotFoundException if room does not exist', async () => {
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(null));
-
-            await expect(service.sendMessage(roomId, senderId, 'Hello'))
-                .rejects.toThrow(NotFoundException);
-        });
-
-        it('should throw ForbiddenException if sender is not a participant', async () => {
-            const room = {
-                ...mockChatRoom,
-                initiatorId: new Types.ObjectId(),
-                adPosterId: new Types.ObjectId(),
-            };
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
-
-            await expect(service.sendMessage(roomId, senderId, 'Hello'))
-                .rejects.toThrow(ForbiddenException);
-        });
-
-        it('should send a text message successfully', async () => {
-            const room = {
-                ...mockChatRoom,
-                initiatorId: new Types.ObjectId(senderId),
-                adPosterId: new Types.ObjectId(),
-            };
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
-            mockChatMessageModel.create.mockResolvedValue({ _id: new Types.ObjectId(), content: 'Hello' });
-
-            const result = await service.sendMessage(roomId, senderId, 'Hello');
-            expect(result.content).toBe('Hello');
-            expect(mockChatMessageModel.create).toHaveBeenCalled();
-        });
-
-        it('should throw BadRequestException if text message has no content', async () => {
-            const room = {
-                ...mockChatRoom,
-                initiatorId: new Types.ObjectId(senderId),
-                adPosterId: new Types.ObjectId(),
-            };
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
-
-            await expect(service.sendMessage(roomId, senderId, '', MessageType.TEXT))
-                .rejects.toThrow(BadRequestException);
-        });
-
-        it('should send an image message successfully', async () => {
-            const room = {
-                ...mockChatRoom,
-                initiatorId: new Types.ObjectId(senderId),
-                adPosterId: new Types.ObjectId(),
-            };
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
-            const attachments = [{ type: 'image', url: 'http://image.com' }];
-            mockChatMessageModel.create.mockResolvedValue({ _id: new Types.ObjectId(), type: MessageType.IMAGE, attachments });
-
-            const result = await service.sendMessage(roomId, senderId, undefined, MessageType.IMAGE, attachments);
-            expect(result.type).toBe(MessageType.IMAGE);
-            expect(result.attachments).toEqual(attachments);
-        });
-
-        it('should throw BadRequestException if content is rejected by moderation', async () => {
-            const room = {
-                ...mockChatRoom,
-                initiatorId: new Types.ObjectId(senderId),
-                adPosterId: new Types.ObjectId(),
-            };
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(room));
-            mockContentModerationService.moderateContent.mockResolvedValue({ isApproved: false, reason: 'Profanity' });
-
-            await expect(service.sendMessage(roomId, senderId, 'bad word'))
-                .rejects.toThrow(BadRequestException);
-        });
+  describe('sendMessage', () => {
+    it('stores, updates preview and increments only the recipient unread', async () => {
+      const res = await service.sendMessage(room.roomId, buyer, {
+        type: MessageType.TEXT,
+        content: 'Is it still available?',
+        clientMessageId: 'abcDEF123456',
+      });
+      expect(res.created).toBe(true);
+      expect(res.recipientId).toBe(seller);
+      expect(res.message.clientMessageId).toBe('abcDEF123456');
+      const update = roomModel.updateOne.mock.calls[0][1];
+      expect(update.$inc).toEqual({ messageCount: 1, [`unreadCounts.${seller}`]: 1 });
+      expect(update.$set.lastMessage.preview).toBe('Is it still available?');
     });
 
-    describe('getUserChatRooms', () => {
-        const userId = new Types.ObjectId();
-
-        it('should return enhanced chat rooms for a user', async () => {
-            const mockRooms = [{
-                ...mockChatRoom,
-                initiatorId: userId,
-                adPosterId: new Types.ObjectId(),
-                adId: new Types.ObjectId(),
-                createdAt: new Date(),
-            }];
-            mockChatRoomModel.find.mockReturnValue(createMockQuery(mockRooms));
-            mockUserModel.findById.mockReturnValue(createMockQuery({ name: 'Other User' }));
-            mockChatMessageModel.findOne.mockReturnValue(createMockQuery({ content: 'Last msg' }));
-            mockAdModel.findById.mockReturnValue(createMockQuery({ title: 'Ad Title' }));
-
-            const result = await service.getUserChatRooms(userId.toString());
-            expect(result).toHaveLength(1);
-            expect(result[0].otherUser.name).toBe('Other User');
-            expect(result[0].latestMessage.content).toBe('Last msg');
-            expect(result[0].adDetails.title).toBe('Ad Title');
-        });
+    it('replays an existing clientMessageId without writing', async () => {
+      msgModel.findOne = jest.fn(() => q({ _id: new Types.ObjectId(), roomId: room.roomId, senderId: buyer, type: 'text', content: 'hi', clientMessageId: 'abcDEF123456' }));
+      const res = await service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'hi', clientMessageId: 'abcDEF123456' });
+      expect(res.created).toBe(false);
+      expect(msgModel.create).not.toHaveBeenCalled();
+      expect(roomModel.updateOne).not.toHaveBeenCalled();
     });
 
-    describe('findExistingChatRoom', () => {
-        const initiatorId = new Types.ObjectId();
-        const adId = new Types.ObjectId();
-        const otherUserId = new Types.ObjectId();
-
-        it('should find room where user is initiator', async () => {
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
-            const result = await service.findExistingChatRoom(initiatorId, adId, otherUserId);
-            expect(result).toEqual(mockChatRoom);
-        });
-
-        it('should return null if no room exists', async () => {
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(null));
-            const result = await service.findExistingChatRoom(initiatorId, adId, otherUserId);
-            expect(result).toBeNull();
-        });
+    it('rejects non-participants', async () => {
+      await expectCode(
+        service.sendMessage(room.roomId, stranger, { type: MessageType.TEXT, content: 'hey' }),
+        ChatErrorCode.NOT_PARTICIPANT,
+      );
     });
 
-    describe('getRoomMessages', () => {
-        const roomId = 'rooms123';
-
-        it('should return paginated messages with sender info', async () => {
-            const mockMessages = [
-                { _id: new Types.ObjectId(), content: 'Msg 1', sender: { name: 'User 1' } },
-                { _id: new Types.ObjectId(), content: 'Msg 2', sender: { name: 'User 2' } },
-            ];
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
-            mockChatMessageModel.countDocuments.mockResolvedValue(10);
-            mockChatMessageModel.aggregate.mockReturnValue({
-                exec: jest.fn().mockResolvedValue(mockMessages)
-            });
-
-            const result = await service.getRoomMessages(roomId, undefined, 2);
-            expect(result.messages).toHaveLength(2);
-            expect(result.total).toBe(10);
-            expect(result.messages[0].sender.name).toBe('User 1');
-        });
-
-        it('should allow a room participant to read messages', async () => {
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
-            mockChatMessageModel.countDocuments.mockResolvedValue(0);
-            mockChatMessageModel.aggregate.mockReturnValue({
-                exec: jest.fn().mockResolvedValue([]),
-            });
-
-            const participantId = mockChatRoom.initiatorId.toString();
-            const result = await service.getRoomMessages(roomId, undefined, 50, participantId);
-            expect(result.messages).toHaveLength(0);
-        });
-
-        it('should throw ForbiddenException when a non-participant reads messages', async () => {
-            mockChatRoomModel.findOne.mockReturnValue(createMockQuery(mockChatRoom));
-
-            const strangerId = new Types.ObjectId().toString();
-            await expect(service.getRoomMessages(roomId, undefined, 50, strangerId))
-                .rejects.toThrow(ForbiddenException);
-        });
+    it('rejects closed rooms', async () => {
+      room.status = ChatRoomStatus.INACTIVE;
+      await expectCode(service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'x' }), ChatErrorCode.ROOM_CLOSED);
     });
+
+    it('rejects suspended senders', async () => {
+      userModel.findById = jest.fn(() => q({ moderationStatus: ModerationStatus.SUSPENDED, suspendedUntil: new Date(Date.now() + 1e6) }));
+      await expectCode(service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'x' }), ChatErrorCode.SUSPENDED);
+    });
+
+    it('maps moderation blocks to CONTENT_BLOCKED', async () => {
+      moderation.moderateContent.mockResolvedValue({ isApproved: false, flags: ['profanity_detected'], score: 100, reason: 'nope' });
+      await expectCode(service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'bad' }), ChatErrorCode.CONTENT_BLOCKED);
+    });
+
+    it('rejects attachments hosted elsewhere', async () => {
+      await expectCode(
+        service.sendMessage(room.roomId, buyer, {
+          type: MessageType.IMAGE,
+          attachments: [{ type: 'image', url: 'https://evil.example/pixel.png', mimeType: 'image/png', size: 10 }],
+        }),
+        ChatErrorCode.ATTACHMENT_INVALID,
+      );
+    });
+
+    it('accepts own-bucket audio with client duration and normalises m4a', async () => {
+      const res = await service.sendMessage(room.roomId, buyer, {
+        type: MessageType.AUDIO,
+        attachments: [{ type: 'audio', url: 'https://bucket.s3.ap-south-1.amazonaws.com/chat/x/a.m4a', mimeType: 'audio/m4a', size: 1000, duration: 12 }],
+      });
+      expect(res.message.attachments[0].mimeType).toBe('audio/mp4');
+      expect(res.message.attachments[0].duration).toBe(12);
+      expect(roomModel.updateOne.mock.calls[0][1].$set.lastMessage.preview).toBe('Voice message');
+    });
+
+    it('does not create unread for self-chat', async () => {
+      room.adPosterId = new Types.ObjectId(buyer);
+      await service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'note to self' });
+      expect(roomModel.updateOne.mock.calls[0][1].$inc).toEqual({ messageCount: 1 });
+    });
+  });
+
+  describe('markRoomRead', () => {
+    it('marks only the other party messages and resets my counter', async () => {
+      const res = await service.markRoomRead(room.roomId, seller);
+      expect(res.otherUserId).toBe(buyer);
+      expect(String(msgModel.updateMany.mock.calls[0][0].senderId)).toBe(buyer);
+      expect(roomModel.updateOne.mock.calls[0][1].$set[`unreadCounts.${seller}`]).toBe(0);
+    });
+
+    it('rejects non-participants', async () => {
+      await expectCode(service.markRoomRead(room.roomId, stranger), ChatErrorCode.NOT_PARTICIPANT);
+    });
+  });
+
+  describe('getRoomMessages', () => {
+    it('requires participation', async () => {
+      await expectCode(service.getRoomMessages(room.roomId, stranger), ChatErrorCode.NOT_PARTICIPANT);
+    });
+
+    it('sorts and limits before the sender lookup, and skips count by default', async () => {
+      await service.getRoomMessages(room.roomId, buyer, { limit: 20 });
+      const pipeline = msgModel.aggregate.mock.calls[0][0];
+      expect(Object.keys(pipeline[1])[0]).toBe('$sort');
+      expect(pipeline[2]).toEqual({ $limit: 21 });
+      expect(Object.keys(pipeline[3])[0]).toBe('$lookup');
+      expect(msgModel.countDocuments).not.toHaveBeenCalled();
+    });
+
+    it('uses ascending order for `after` catch-up', async () => {
+      const after = new Types.ObjectId().toString();
+      const res = await service.getRoomMessages(room.roomId, buyer, { after });
+      expect(msgModel.aggregate.mock.calls[0][0][1]).toEqual({ $sort: { _id: 1 } });
+      expect(res.order).toBe('asc');
+    });
+
+    it('strips moderation fields and never selects email', async () => {
+      await service.getRoomMessages(room.roomId, buyer);
+      const pipeline = JSON.stringify(msgModel.aggregate.mock.calls[0][0]);
+      expect(pipeline).not.toContain('email');
+      expect(pipeline).toContain('"moderationFlags":0');
+    });
+  });
+
+  describe('listRooms', () => {
+    it('builds a view with per-user unread, role, availability and no email', async () => {
+      roomModel.aggregate = jest.fn(() =>
+        q([
+          {
+            ...room,
+            lastMessage: { id: new Types.ObjectId(), type: 'text', preview: 'Can you do 5 lakh?', senderId: new Types.ObjectId(buyer), createdAt: new Date() },
+            unreadCounts: { [seller]: 2 },
+            other: [{ _id: new Types.ObjectId(buyer), name: 'Anand K', profilePic: 'p', phoneNumber: '9847012345', countryCode: '+91' }],
+            adDoc: [{ _id: new Types.ObjectId(adId), title: 'Maruti Swift VXI', price: 540000, isActive: true, soldOut: true, image: 'img' }],
+          },
+        ]),
+      );
+      const { rooms, nextCursor } = await service.listRooms(seller, { limit: 20 });
+      expect(nextCursor).toBeNull();
+      expect(rooms[0]).toMatchObject({
+        unreadCount: 2,
+        myRole: 'selling',
+        ad: { title: 'Maruti Swift VXI', price: 540000, status: 'sold', image: 'img' },
+        otherUser: { name: 'Anand K', phoneNumber: '9847012345' },
+        latestMessage: { content: 'Can you do 5 lakh?' },
+      });
+      expect(JSON.stringify(rooms[0])).not.toContain('email');
+    });
+
+    it('filters unread on the per-user counter and paginates with a cursor', async () => {
+      const docs = Array.from({ length: 3 }, (_, i) => ({ ...room, _id: new Types.ObjectId(), lastMessageAt: new Date(Date.now() - i * 1000), other: [], adDoc: [] }));
+      roomModel.aggregate = jest.fn(() => q(docs));
+      const res = await service.listRooms(seller, { limit: 2, filter: 'unread' });
+      const match = roomModel.aggregate.mock.calls[0][0][0].$match;
+      expect(match[`unreadCounts.${seller}`]).toEqual({ $gt: 0 });
+      expect(res.rooms).toHaveLength(2);
+      expect(res.nextCursor).toEqual(expect.any(String));
+
+      await service.listRooms(seller, { limit: 2, cursor: res.nextCursor! });
+      expect(roomModel.aggregate.mock.calls[1][0][0].$match.$and).toBeDefined();
+    });
+
+    it('rejects a garbage cursor', async () => {
+      await expectCode(service.listRooms(seller, { limit: 2, cursor: 'nope' }), ChatErrorCode.VALIDATION);
+    });
+  });
+
+  describe('previewFor', () => {
+    it('summarises each type', () => {
+      expect(ChatService.previewFor('image')).toBe('Photo');
+      expect(ChatService.previewFor('audio')).toBe('Voice message');
+      expect(ChatService.previewFor('text', '  multi\n line  ')).toBe('multi line');
+    });
+  });
 });

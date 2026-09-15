@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Document, Types } from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 export type ChatMessageDocument = ChatMessage & Document;
 
@@ -13,21 +13,18 @@ export enum MessageType {
 
 @Schema({ timestamps: true })
 export class ChatMessage {
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ChatRoom',
-    required: true,
-  })
-  roomRef: mongoose.Types.ObjectId; // ObjectId reference to ChatRoom
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom', required: true })
+  roomRef: mongoose.Types.ObjectId;
 
-  @Prop({
-    type: String,
-    required: true,
-  })
-  roomId: string; // denormalized string id for convenience
+  @Prop({ type: String, required: true })
+  roomId: string; // denormalised string id
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   senderId: mongoose.Types.ObjectId;
+
+  /** Client-generated id — makes sends idempotent and lets clients match optimistic bubbles. */
+  @Prop({ type: String, required: false })
+  clientMessageId?: string;
 
   @Prop({ required: true, enum: MessageType, default: MessageType.TEXT })
   type: MessageType;
@@ -44,6 +41,8 @@ export class ChatMessage {
         size: { type: Number },
         duration: { type: Number, max: 180 },
         thumbnailUrl: { type: String },
+        width: { type: Number },
+        height: { type: Number },
       },
     ],
     default: [],
@@ -55,8 +54,11 @@ export class ChatMessage {
     size?: number;
     duration?: number;
     thumbnailUrl?: string;
+    width?: number;
+    height?: number;
   }[];
 
+  /** Legacy room-wide flag: true once the recipient has read the message. */
   @Prop({ type: Boolean, default: false })
   isRead: boolean;
 
@@ -71,24 +73,29 @@ export class ChatMessage {
 
   @Prop({ type: Number, default: 0 })
   moderationScore?: number;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 
-// Indexes for fast lookups
+// History (keyset on _id) — the query the app actually runs
+ChatMessageSchema.index({ roomId: 1, _id: -1 }, { name: 'roomId_id' });
+// Legacy/admin paths
+ChatMessageSchema.index({ roomRef: 1, createdAt: -1 }, { name: 'roomRef_createdAt' });
+ChatMessageSchema.index({ roomId: 1, createdAt: -1 }, { name: 'roomId_createdAt' });
+// Mark-read: unread messages from the other participant
+ChatMessageSchema.index({ roomRef: 1, senderId: 1, isRead: 1 }, { name: 'roomRef_sender_isRead' });
+// Idempotency
 ChatMessageSchema.index(
-  { roomRef: 1, createdAt: -1 },
-  { name: 'roomRef_createdAt' },
+  { roomRef: 1, senderId: 1, clientMessageId: 1 },
+  {
+    name: 'uniq_client_message',
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: 'string' } },
+  },
 );
-ChatMessageSchema.index(
-  { roomId: 1, createdAt: -1 },
-  { name: 'roomId_createdAt' },
-);
-ChatMessageSchema.index({ senderId: 1 });
-ChatMessageSchema.index({ isRead: 1 });
-ChatMessageSchema.index({ createdAt: -1 });
-
-// Compound indexes
-ChatMessageSchema.index({ roomRef: 1, isRead: 1 });
-ChatMessageSchema.index({ roomId: 1, isRead: 1 });
-ChatMessageSchema.index({ senderId: 1, createdAt: -1 });
+// Existing indexes kept for now (drop after explain() confirms unused — see B15):
+// { senderId: 1 }, { isRead: 1 }, { createdAt: -1 }, { roomRef: 1, isRead: 1 },
+// { roomId: 1, isRead: 1 }, { senderId: 1, createdAt: -1 }

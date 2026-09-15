@@ -67,6 +67,46 @@ export class S3Service {
     }
   }
 
+  /** Public object URL for a key in this bucket. */
+  getPublicUrl(key: string): string {
+    return `https://${this.bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  }
+
+  get bucket(): string {
+    return this.bucketName;
+  }
+
+  /** Hostnames that serve this bucket's objects (plus optional CDN hosts from CHAT_MEDIA_HOSTS). */
+  getMediaHosts(): string[] {
+    const region = process.env.AWS_REGION;
+    const extra = (process.env.CHAT_MEDIA_HOSTS || '')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+    return [
+      `${this.bucketName}.s3.${region}.amazonaws.com`,
+      `${this.bucketName}.s3.amazonaws.com`,
+      ...extra,
+    ].map((h) => h.toLowerCase());
+  }
+
+  /**
+   * Presigned PUT for an exact key chosen by the server. The client must send
+   * exactly `contentType` as its Content-Type header (it is part of the signature).
+   */
+  async getPresignedPutUrlForKey(key: string, contentType: string, expiresIn = 300): Promise<string> {
+    try {
+      return await getSignedUrl(
+        this.s3,
+        new PutObjectCommand({ Bucket: this.bucketName, Key: key, ContentType: contentType }),
+        { expiresIn },
+      );
+    } catch (error) {
+      console.error('S3 Pre-signed URL Error:', (error as Error).message);
+      throw new InternalServerErrorException('Error generating pre-signed URL.');
+    }
+  }
+
   /**
    * Generates a pre-signed URL for uploading files to S3.
    * The URL will be valid for 60 seconds.

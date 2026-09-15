@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Document, Types } from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 export type ChatRoomDocument = ChatRoom & Document;
 
@@ -14,43 +14,47 @@ export enum UserRole {
   RECEIVER = 'receiver',
 }
 
+/** Denormalised preview of the newest message — lets the room list render without a per-room query. */
+export class ChatRoomLastMessage {
+  id: mongoose.Types.ObjectId;
+  type: string;
+  preview: string;
+  senderId: mongoose.Types.ObjectId;
+  createdAt: Date;
+}
+
+const LastMessageSchema = new mongoose.Schema(
+  {
+    id: { type: mongoose.Schema.Types.ObjectId },
+    type: { type: String },
+    preview: { type: String },
+    senderId: { type: mongoose.Schema.Types.ObjectId },
+    createdAt: { type: Date },
+  },
+  { _id: false },
+);
+
 @Schema({ timestamps: true })
 export class ChatRoom {
   @Prop({ required: true, unique: true })
   roomId: string; // human-readable id used by clients
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  })
-  initiatorId: mongoose.Types.ObjectId; // user who created the chat
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  initiatorId: mongoose.Types.ObjectId; // buyer — user who opened the chat
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Ad',
-    required: true,
-  })
-  adId: mongoose.Types.ObjectId; // advertisement being discussed
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Ad', required: true })
+  adId: mongoose.Types.ObjectId;
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  })
-  adPosterId: mongoose.Types.ObjectId; // other participant
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  adPosterId: mongoose.Types.ObjectId; // seller
 
   @Prop({ type: [String], required: true })
-  participants: string[]; // Array of user IDs: [initiatorId, adPosterId]
+  participants: string[];
 
   @Prop({ type: Map, of: String, default: new Map() })
-  userRoles: Map<string, UserRole>; // userId -> role mapping
+  userRoles: Map<string, UserRole>;
 
-  @Prop({
-    required: true,
-    enum: ChatRoomStatus,
-    default: ChatRoomStatus.ACTIVE,
-  })
+  @Prop({ required: true, enum: ChatRoomStatus, default: ChatRoomStatus.ACTIVE })
   status: ChatRoomStatus;
 
   @Prop({ type: Date })
@@ -59,30 +63,26 @@ export class ChatRoom {
   @Prop({ type: Number, default: 0 })
   messageCount: number;
 
-  // Timestamps added by Mongoose
+  @Prop({ type: LastMessageSchema, required: false })
+  lastMessage?: ChatRoomLastMessage;
+
+  /** Unread message count per participant: `{ [userId]: n }`. */
+  @Prop({ type: Map, of: Number, default: new Map() })
+  unreadCounts: Map<string, number>;
+
+  /** When each participant last read the room: `{ [userId]: Date }`. */
+  @Prop({ type: Map, of: Date, default: new Map() })
+  lastReadAt: Map<string, Date>;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export const ChatRoomSchema = SchemaFactory.createForClass(ChatRoom);
 
-// Indexes for fast lookups
-// NOTE: roomId already has a unique index from @Prop({ unique: true }) — do not redeclare it here
+// NOTE: roomId already has a unique index from @Prop({ unique: true })
 ChatRoomSchema.index({ initiatorId: 1, adId: 1 }, { unique: true });
-ChatRoomSchema.index({ adId: 1 });
-ChatRoomSchema.index({ adPosterId: 1 });
-ChatRoomSchema.index({ participants: 1 });
-ChatRoomSchema.index({ status: 1 });
-ChatRoomSchema.index({ lastMessageAt: -1 });
-ChatRoomSchema.index({ createdAt: -1 });
-
-// Compound indexes
-ChatRoomSchema.index({ initiatorId: 1, status: 1 });
-ChatRoomSchema.index({ adPosterId: 1, status: 1 });
 ChatRoomSchema.index({ adId: 1, status: 1 });
-
-// Additional performance indexes
-ChatRoomSchema.index(
-  { initiatorId: 1, adPosterId: 1 },
-  { name: 'by_participants' },
-);
+// Room list: participant + recency (one index per side of the $or)
+ChatRoomSchema.index({ initiatorId: 1, lastMessageAt: -1, _id: -1 });
+ChatRoomSchema.index({ adPosterId: 1, lastMessageAt: -1, _id: -1 });

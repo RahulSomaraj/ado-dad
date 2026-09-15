@@ -1,137 +1,65 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ChatController } from './chat.controller';
-import { ChatService } from './chat.service';
-import { BadRequestException } from '@nestjs/common';
+import { ChatError, ChatErrorCode } from './chat-errors';
 
 describe('ChatController', () => {
-    let controller: ChatController;
-    let chatService: any;
+  let controller: ChatController;
+  let chatService: any;
+  let messaging: any;
+  let uploads: any;
+  let limiter: any;
+  const req = { user: { id: 'u1' } };
 
-    beforeEach(async () => {
-        chatService = {
-            createChatRoom: jest.fn(),
-            getUserChatRooms: jest.fn(),
-            getRoomMessages: jest.fn(),
-            findExistingChatRoom: jest.fn(),
-        };
+  beforeEach(() => {
+    chatService = {
+      createChatRoom: jest.fn().mockResolvedValue({ roomId: 'r1' }),
+      getRoomView: jest.fn().mockResolvedValue({ roomId: 'r1', unreadCount: 0 }),
+      listRooms: jest.fn().mockResolvedValue({ rooms: [{ roomId: 'r1' }], nextCursor: 'c' }),
+      getRoomMessages: jest.fn().mockResolvedValue({ messages: [], nextCursor: null, hasMore: false }),
+      getRoomForParticipant: jest.fn().mockResolvedValue({ roomId: 'r1' }),
+      getUnreadSummary: jest.fn().mockResolvedValue({ total: 3, rooms: 2 }),
+      findExistingChatRoom: jest.fn().mockResolvedValue(null),
+    };
+    messaging = { send: jest.fn().mockResolvedValue({ id: 'm1' }), markRead: jest.fn().mockResolvedValue({ unreadCount: 0 }) };
+    uploads = { createTicket: jest.fn().mockResolvedValue({ uploadUrl: 'u' }) };
+    limiter = { consume: jest.fn().mockResolvedValue(undefined) };
+    controller = new ChatController(chatService, messaging, uploads, limiter);
+  });
 
-        const module: TestingModule = await Test.createTestingModule({
-            controllers: [ChatController],
-            providers: [
-                {
-                    provide: ChatService,
-                    useValue: chatService,
-                },
-            ],
-        }).compile();
+  it('create returns the full room view', async () => {
+    const res = await controller.createChatRoom(req, { adId: 'a1' });
+    expect(res.data).toEqual({ roomId: 'r1', unreadCount: 0 });
+    expect(chatService.createChatRoom).toHaveBeenCalledWith('u1', 'a1');
+  });
 
-        controller = module.get<ChatController>(ChatController);
-    });
+  it('list keeps `data` as an array and adds nextCursor', async () => {
+    const res = await controller.getUserChatRooms(req, { limit: 20 });
+    expect(Array.isArray(res.data)).toBe(true);
+    expect(res.nextCursor).toBe('c');
+  });
 
-    it('should be defined', () => {
-        expect(controller).toBeDefined();
-    });
+  it('send goes through the messaging service after rate limiting', async () => {
+    await controller.sendMessage('r1', { content: 'hi', type: 'text' as any, clientMessageId: 'abcdefgh' }, req);
+    expect(limiter.consume).toHaveBeenCalledWith('sendMessage', 'u1');
+    expect(messaging.send).toHaveBeenCalledWith('r1', 'u1', expect.objectContaining({ content: 'hi' }));
+  });
 
-    describe('createChatRoom', () => {
-        it('should create a chat room successfully', async () => {
-            const mockReq = { user: { id: 'user123' } };
-            const dto = { adId: 'ad123' };
-            const mockRoom = { roomId: 'room123', initiatorId: 'user123', adId: 'ad123' };
-            chatService.createChatRoom.mockResolvedValue(mockRoom);
+  it('read delegates to messaging', async () => {
+    await controller.markRead('r1', { lastMessageId: undefined }, req);
+    expect(messaging.markRead).toHaveBeenCalledWith('r1', 'u1', undefined);
+  });
 
-            const result = await controller.createChatRoom(mockReq, dto);
+  it('upload checks participation before issuing a ticket', async () => {
+    await controller.createUpload('r1', { kind: 'image', mimeType: 'image/jpeg', size: 100 }, req);
+    expect(chatService.getRoomForParticipant).toHaveBeenCalledWith('r1', 'u1');
+    expect(uploads.createTicket).toHaveBeenCalled();
+  });
 
-            expect(result.success).toBe(true);
-            expect(result.data.roomId).toBe('room123');
-            expect(chatService.createChatRoom).toHaveBeenCalledWith('user123', 'ad123');
-        });
+  it('keeps ChatError status codes (no blanket 400)', async () => {
+    chatService.getRoomMessages.mockRejectedValue(new ChatError(ChatErrorCode.NOT_PARTICIPANT, 'no'));
+    await expect(controller.getRoomMessages('r1', {}, req)).rejects.toMatchObject({ status: 403 });
+  });
 
-        it('should throw BadRequestException if user id is missing', async () => {
-            const mockReq = { user: {} };
-            const dto = { adId: 'ad123' };
-
-            await expect(controller.createChatRoom(mockReq, dto)).rejects.toThrow(BadRequestException);
-        });
-    });
-
-    describe('getUserChatRooms', () => {
-        it('should retrieve user chat rooms', async () => {
-            const mockReq = { user: { id: 'user123' } };
-            const mockRooms = [{ roomId: 'room1' }];
-            chatService.getUserChatRooms.mockResolvedValue(mockRooms);
-
-            const result = await controller.getUserChatRooms(mockReq);
-
-            expect(result.success).toBe(true);
-            expect(result.data).toEqual(mockRooms);
-            expect(chatService.getUserChatRooms).toHaveBeenCalledWith('user123');
-        });
-    });
-
-    describe('getRoomMessages', () => {
-        const mockReq = { user: { id: 'user123' } };
-
-        it('should retrieve room messages with pagination', async () => {
-            const roomId = 'room123';
-            const mockResult = { messages: [], total: 0 };
-            chatService.getRoomMessages.mockResolvedValue(mockResult);
-
-            const result = await controller.getRoomMessages(roomId, '50', 'cursor123', mockReq);
-
-            expect(result.success).toBe(true);
-            expect(result.data).toEqual(mockResult);
-            expect(chatService.getRoomMessages).toHaveBeenCalledWith(roomId, 'cursor123', 50, 'user123');
-        });
-
-        it('should throw BadRequestException if user id is missing', async () => {
-            await expect(controller.getRoomMessages('room1', '50', undefined, { user: {} }))
-                .rejects.toThrow(BadRequestException);
-        });
-
-        it('should preserve ForbiddenException from the service', async () => {
-            const { ForbiddenException } = require('@nestjs/common');
-            chatService.getRoomMessages.mockRejectedValue(new ForbiddenException('Not a participant of this room'));
-            await expect(controller.getRoomMessages('room1', '50', undefined, mockReq))
-                .rejects.toThrow(ForbiddenException);
-        });
-
-        it('should throw BadRequestException if service fails', async () => {
-            chatService.getRoomMessages.mockRejectedValue(new Error('Service Failed'));
-            await expect(controller.getRoomMessages('room1', '50', undefined, mockReq))
-                .rejects.toThrow(BadRequestException);
-        });
-    });
-
-    describe('checkExistingChatRoom', () => {
-        const adId = 'ad123';
-        const otherUserId = 'user456';
-        const mockReq = { user: { id: 'user123' } };
-
-        it('should return exists: true if room is found', async () => {
-            const mockRoom = { roomId: 'room1' };
-            chatService.findExistingChatRoom.mockResolvedValue(mockRoom);
-
-            const result = await controller.checkExistingChatRoom(adId, otherUserId, mockReq);
-
-            expect(result.success).toBe(true);
-            expect(result.data.exists).toBe(true);
-            expect(result.data.roomId).toBe('room1');
-        });
-
-        it('should return exists: false if no room is found', async () => {
-            chatService.findExistingChatRoom.mockResolvedValue(null);
-
-            const result = await controller.checkExistingChatRoom(adId, otherUserId, mockReq);
-
-            expect(result.success).toBe(true);
-            expect(result.data.exists).toBe(false);
-            expect(result.data.roomId).toBeNull();
-        });
-
-        it('should throw BadRequestException if user id is missing', async () => {
-            const invalidReq = { user: {} };
-            await expect(controller.checkExistingChatRoom(adId, otherUserId, invalidReq))
-                .rejects.toThrow(BadRequestException);
-        });
-    });
+  it('throws UNAUTHORIZED without a user', async () => {
+    await expect(controller.getUnreadCount({})).rejects.toMatchObject({ code: ChatErrorCode.UNAUTHORIZED });
+  });
 });

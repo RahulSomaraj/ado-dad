@@ -7,120 +7,83 @@ export interface ModerationResult {
   reason?: string;
 }
 
+/**
+ * Chat text moderation.
+ *
+ * Policy (chat redesign D6): only strong profanity/abuse BLOCKS a message.
+ * Everything else — links, phone numbers, emails, "hate/kill/die", repetition,
+ * caps — is recorded in `flags` for review but the message is delivered.
+ * Buyers and sellers legitimately share numbers and say "I'd hate to miss this".
+ */
 @Injectable()
 export class ContentModerationService {
   private readonly logger = new Logger(ContentModerationService.name);
 
-  // Simple profanity filter (in production, use a proper library)
-  private readonly profanityPatterns = [
-    /\b(fuck|shit|bitch|asshole|dick|pussy|fucking|shitty)\b/i,
-    /\b(kill|die|hate)\b/i,
+  /** Blocking: strong profanity / slurs only. */
+  private readonly blockingPatterns = [
+    /\b(fuck(?:ing|er|ed)?|motherfucker|bitch|asshole|cunt|dickhead|pussy)\b/i,
   ];
 
-  // Spam patterns
-  private readonly spamPatterns = [
-    /\b(buy\s+now|click\s+here|limited\s+time|act\s+now)\b/i,
-    /(https?:\/\/[^\s]+)/, // URLs
-    /(\w{20,})/, // Very long words
+  /** Non-blocking signals, name → pattern. */
+  private readonly flagPatterns: Array<[string, RegExp]> = [
+    ['mild_profanity', /\b(shit|shitty|dick)\b/i],
+    ['violent_language', /\b(kill|die|hate)\b/i],
+    ['link', /(https?:\/\/[^\s]+|www\.[^\s]+)/i],
+    ['email', /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/],
+    // Indian and international phone shapes: 98470 12345, +91 9847012345, 0484-2345678
+    ['phone', /(?:\+?\d[\s-]?){10,13}/],
+    ['very_long_word', /\w{30,}/],
   ];
 
-  // PII patterns
-  private readonly piiPatterns = [
-    /\b\d{3}-\d{2}-\d{4}\b/, // SSN
-    /\b\d{3}-\d{3}-\d{4}\b/, // Phone
-    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, // Email
-  ];
-
-  async moderateContent(
-    content: string,
-    userId: string,
-  ): Promise<ModerationResult> {
+  async moderateContent(content: string, userId: string): Promise<ModerationResult> {
     const flags: string[] = [];
     let score = 0;
 
     try {
-      // Check content length
-      if (content.length > 1000) {
-        flags.push('content_too_long');
-        score += 20;
-      }
-
-      if (content.length < 2) {
-        flags.push('content_too_short');
-        score += 10;
-      }
-
-      // Check for profanity
-      const profanityFound = this.profanityPatterns.some((pattern) =>
-        pattern.test(content),
-      );
-      if (profanityFound) {
+      if (this.blockingPatterns.some((p) => p.test(content))) {
         flags.push('profanity_detected');
-        score += 70; // Reject immediately
+        score = 100;
       }
 
-      // Check for spam indicators
-      const spamFound = this.spamPatterns.some((pattern) =>
-        pattern.test(content),
-      );
-      if (spamFound) {
-        flags.push('spam_indicators');
-        score += 30;
+      for (const [flag, pattern] of this.flagPatterns) {
+        if (pattern.test(content)) {
+          flags.push(flag);
+          score += 10;
+        }
       }
 
-      // Check for PII
-      const piiFound = this.piiPatterns.some((pattern) =>
-        pattern.test(content),
-      );
-      if (piiFound) {
-        flags.push('pii_detected');
-        score += 50;
+      const words = content.toLowerCase().split(/\s+/).filter(Boolean);
+      if (words.length) {
+        const counts = new Map<string, number>();
+        for (const w of words) counts.set(w, (counts.get(w) || 0) + 1);
+        if (Math.max(...counts.values()) > 8) {
+          flags.push('excessive_repetition');
+          score += 10;
+        }
       }
 
-      // Check for excessive repetition
-      const words = content.toLowerCase().split(/\s+/);
-      const wordCount = new Map<string, number>();
-      words.forEach((word) => {
-        wordCount.set(word, (wordCount.get(word) || 0) + 1);
-      });
-
-      const maxRepetition = Math.max(...wordCount.values());
-      if (maxRepetition > 5) {
-        flags.push('excessive_repetition');
-        score += 25;
-      }
-
-      // Check for all caps
-      const capsRatio = (content.match(/[A-Z]/g) || []).length / content.length;
-      if (capsRatio > 0.7 && content.length > 10) {
+      const letters = content.replace(/[^A-Za-z]/g, '');
+      if (letters.length > 12 && (content.match(/[A-Z]/g) || []).length / letters.length > 0.8) {
         flags.push('excessive_caps');
-        score += 15;
+        score += 5;
       }
 
-      // Determine if content is approved
-      const isApproved = score < 70; // Threshold for approval
-
-      // Log moderation results for monitoring
-      this.logger.log(
-        `Content moderation for user ${userId}: score=${score}, approved=${isApproved}, flags=${flags.join(',')}`,
-      );
+      const isApproved = !flags.includes('profanity_detected');
+      if (!isApproved) {
+        // Log the decision, never the content.
+        this.logger.warn(`Chat message blocked for user ${userId}: flags=${flags.join(',')}`);
+      }
 
       return {
         isApproved,
         flags,
-        score,
-        reason:
-          flags.length > 0 ? `Content flagged: ${flags.join(', ')}` : undefined,
+        score: Math.min(score, 100),
+        reason: isApproved ? undefined : 'Message contains language that is not allowed',
       };
     } catch (error) {
-      this.logger.error(`Error in content moderation: ${error.message}`);
-      // Fail open - approve content if moderation fails
-      return {
-        isApproved: true,
-        flags: ['moderation_error'],
-        score: 0,
-        reason: 'Moderation service error, content approved',
-      };
+      this.logger.error(`Error in content moderation: ${(error as Error).message}`);
+      // Fail open — never lose a message because moderation crashed.
+      return { isApproved: true, flags: ['moderation_error'], score: 0 };
     }
   }
 
