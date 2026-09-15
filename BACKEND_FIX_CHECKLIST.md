@@ -293,3 +293,49 @@ against Mongo/Redis.**
 - [ ] Body size limits, helmet, compression and graceful shutdown untouched
 - [ ] Post-pagination `$lookup` ordering in the list pipeline preserved
 - [ ] No response-shape change without a §Coordination entry — the Flutter client parses strictly
+
+---
+
+## SELL-FLOW (CREATE-06) — implemented
+
+Contract: `SELL_API_CONTRACT.md` v1 (15 Sep 2026). Written in a Cowork session against `develop`.
+`tsc -p tsconfig.build.json --noEmit`: 0 errors before, 0 after. New unit specs pass (45 tests).
+**Not run against Mongo/Redis/S3 yet.**
+
+### [x] Sell config — `GET /v2/sell/config?category=` (`src/sell/`)
+- [x] Public, `Cache-Control: public, max-age=300`, strong `ETag`, `If-None-Match` → 304; per-IP throttle 60/min
+- [x] Fuel/transmission types: active + not deleted, sorted by `sortOrder`, filtered like the app's `appliesTo` (a doc's `vehicleCategory`, if any; FuelType `category` is a fuel family and is ignored)
+- [x] Commercial vehicle types: active names from `commercialvehicletypes`; body types from `BodyTypeEnum`; 8 property types
+- [x] `manufacturerCategory`: private_vehicle → `passenger_car`, two_wheeler → `two_wheeler`, commercial_vehicle → `commercial_vehicle`, property → `null`
+- [x] Limits/features/shot lists/colours from `src/sell/sell.constants.ts` (shared with the create validator and media)
+
+### [x] Media — `POST /v2/media/intents`, `POST /v2/media/:id/complete` (`src/media/`)
+- [x] `Media` collection (`owner`, `key`, `kind`, `contentType`, `declaredSize`, `size`, `url`, `status`, `adId`), indexes `{owner,status}`, `{status,createdAt}`
+- [x] Presigned PUT (Content-Type signed, 900 s) on server-chosen key `media/<uid>/<uuid>.<ext>`; image jpeg/png/webp ≤ 10 MB, video mp4/quicktime ≤ 50 MB (415/413)
+- [x] Complete: `HeadObject` → size/type check → `uploaded`; invalid → object deleted, `rejected`, 413/415
+- [x] JwtAuthGuard + SuspensionGuard + per-user throttle (intents 120/h, complete 240/h)
+- [x] `MediaCleanupService`: hourly, Redis `SET NX` lock (one PM2 instance), rejects + deletes `pending|uploaded` media older than 72 h with no ad (`MEDIA_CLEANUP_DISABLED=true` turns it off)
+
+### [x] Harden `POST /v2/ads` (`src/ads-v2/`)
+- [x] Scoped `SellApiExceptionFilter` (create route, sell + media controllers): 422 `VALIDATION_FAILED` with `fields`, `ACCOUNT_SUSPENDED`, `RATE_LIMITED`, `IDEMPOTENCY_*`, 5xx `INTERNAL` + `traceId` (method + path logged, never bodies)
+- [x] `validateCreateAdV2` returns every field error; DTO decorators are type-only so the pipe does not stop at the first bad field
+- [x] `title` accepted (10–70) else generated; description 20–4000; price 1..1e9; location label OR lat+lng (0 valid)
+- [x] `mediaIds` (≤ 20, two-wheeler ≤ 15) + `videoMediaId` resolved and attached inside the transaction (order kept, owner + `uploaded` + unattached enforced by a conditional `updateMany`); video URL → `link`
+- [x] Legacy `images[]` only accepted from our bucket hosts (`S3Service.getMediaHosts`)
+- [x] Commercial type validated against active DB names; enum removed from the schema field and v2 DTO; `bodyType`/`payloadCapacity`/`axleCount` no longer schema-required; `axleCount` 1..10
+- [x] Mileage 0 allowed; year 1990..next year; two-wheeler `transmissionTypeId` optional (schema relaxed, repo no longer mints a random ObjectId)
+- [x] New optional fields: `ownerCount` (vehicle + commercial, sets `isFirstOwner`), `landAreaSqft`, `furnishing` (property); bedrooms/bathrooms required for apartment/house/villa, forbidden otherwise (legacy `0` ignored)
+- [x] Idempotency: `ads:v2:create:<userId>:<key>` `SET NX EX 900` with body hash → replay / 409 in-progress / 409 key-reused; released on pre-commit failure; fails open if Redis is down
+- [x] `session.withTransaction`; post-commit outbox, v2 list/by-id/seller-stats + v1 list cache invalidation, response build and idempotency store each best-effort
+- [x] SuspensionGuard + `@Throttle({ name: 'adsCreate', limit: 20, ttl: 3600, by: 'user' })` (new `UserThrottleGuard`; global `AuthThrottleGuard` skips `by: 'user'`)
+- [x] Response always has `id` and `status` (`pending`)
+- [x] `GET /v2/ads/:id` already serves pending ads (it only filters `isDeleted`), so the owner can open "View my ad"; 2W ads without transmission no longer show a "Not Found" transmission
+
+### [ ] Remaining
+- [ ] Deploy: MongoDB must be a replica set (transactions); `AWS_*` env present; confirm the bucket policy/CORS allows public GET and presigned PUT for the new `media/` prefix
+- [ ] Optional: S3 lifecycle rule to expire `media/` objects never attached (belt and braces for the cleanup job)
+- [ ] Optional: add `Idempotency-Key` and `If-None-Match` to CORS `allowedHeaders` in `main.ts` if a browser client will use these routes
+- [ ] Manual tests: config per category + 304; intent → PUT → complete (ok, oversize, wrong type); create with mediaIds (car, 2W without transmission, auto_rickshaws, plot, office); replay same key; same key different body → 409; suspended user → 403 `ACCOUNT_SUSPENDED`; 21st create in an hour → 429
+- [ ] Old app smoke: legacy `images[]` from `/upload/presigned-url` still creates (host allow-list); property `plot` with `bedrooms: 0` still creates
+- [ ] Pending ads are readable by anyone with the id (not only the owner) — decide whether non-owners should get 404 for `pending`/`rejected`
+- [ ] Coordination C4: the app can now take commercial types from `/v2/sell/config` instead of its workaround

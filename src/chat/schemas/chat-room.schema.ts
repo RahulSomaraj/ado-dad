@@ -74,6 +74,10 @@ export class ChatRoom {
   @Prop({ type: Map, of: Date, default: new Map() })
   lastReadAt: Map<string, Date>;
 
+  /** Per-user archive: `{ [userId]: archivedAt }`. Cleared for both when a new message arrives. */
+  @Prop({ type: Map, of: Date, default: new Map() })
+  archivedFor: Map<string, Date>;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -34,9 +34,10 @@ export class VehicleAd {
   @Prop({ required: true, min: 0 })
   mileage: number;
 
-  // Reference to existing vehicle-inventory TransmissionType (MongoDB ObjectId)
-  @Prop({ required: true, ref: 'TransmissionType', type: Types.ObjectId })
-  transmissionTypeId: Types.ObjectId;
+  // Reference to existing vehicle-inventory TransmissionType (MongoDB ObjectId).
+  // Optional: many two-wheelers (scooters) have no selectable transmission.
+  @Prop({ required: false, ref: 'TransmissionType', type: Types.ObjectId })
+  transmissionTypeId?: Types.ObjectId;
 
   // Reference to existing vehicle-inventory FuelType (MongoDB ObjectId)
   @Prop({ required: true, ref: 'FuelType', type: Types.ObjectId })
@@ -44,6 +45,9 @@ export class VehicleAd {
 
   @Prop({ required: false, trim: true })
   color?: string;
+
+  @Prop({ required: false, min: 1, max: 10 })
+  ownerCount?: number;
 
   @Prop({ default: false })
   isFirstOwner: boolean;

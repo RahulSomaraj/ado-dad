@@ -11,6 +11,7 @@ import {
   BadRequestException,
   Param,
   Query,
+  UseFilters,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -41,6 +42,9 @@ import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
 import { GetAdByIdSwagger } from './dto/get-ad-by-id.dto';
 import { Throttle } from '../common/guards/auth-throttle.guard';
 import { OptionalJwtAuthGuard } from '../auth/guard/optional-jwt-auth-guard';
+import { SuspensionGuard } from '../moderation/guards/suspension.guard';
+import { UserThrottleGuard } from '../common/guards/user-throttle.guard';
+import { SellApiExceptionFilter } from '../common/filters/sell-api-exception.filter';
 
 @ApiTags('Ads v2')
 @Controller('v2/ads')
@@ -55,7 +59,12 @@ export class AdsV2Controller {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  // CREATE-06: sell-flow error envelope (422 VALIDATION_FAILED fields, 409
+  // IDEMPOTENCY_*, 403 ACCOUNT_SUSPENDED, 429 RATE_LIMITED, 5xx traceId).
+  @UseFilters(SellApiExceptionFilter)
+  // 20 creates/hour per user (counted after auth by UserThrottleGuard).
+  @Throttle({ name: 'adsCreate', limit: 20, ttl: 3600, by: 'user' })
+  @UseGuards(JwtAuthGuard, RolesGuard, UserThrottleGuard, SuspensionGuard)
   @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
@@ -334,26 +343,22 @@ export class AdsV2Controller {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() req: any,
   ): Promise<DetailedAdResponseDto> {
-    try {
-      if (!req.user?.id) {
-        throw new BadRequestException('User ID not found in request');
-      }
-
-      const userId = req.user.id;
-      const userType = req.user.userType || req.user.role || 'USER';
-
-      const result = await this.createAdUc.exec({
-        dto,
-        userId,
-        userType,
-        idempotencyKey,
-      });
-
-      return result as DetailedAdResponseDto;
-    } catch (error) {
-      console.error('Error creating v2 advertisement:', error);
-      throw error;
+    if (!req.user?.id) {
+      throw new BadRequestException('User ID not found in request');
     }
+
+    const userId = String(req.user.id);
+    const userType = req.user.userType || req.user.role || 'USER';
+
+    // Errors are logged (without the body) by SellApiExceptionFilter.
+    const result = await this.createAdUc.exec({
+      dto,
+      userId,
+      userType,
+      idempotencyKey,
+    });
+
+    return result as DetailedAdResponseDto;
   }
 
   @Post('list')

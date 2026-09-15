@@ -41,6 +41,12 @@ export class PropertyAd {
   areaSqft: number;
 
   @Prop({ required: false, min: 0 })
+  landAreaSqft?: number;
+
+  @Prop({ required: false, enum: ['unfurnished', 'semi', 'full'] })
+  furnishing?: 'unfurnished' | 'semi' | 'full';
+
+  @Prop({ required: false, min: 0 })
   floor?: number;
 
   @Prop({ default: false })

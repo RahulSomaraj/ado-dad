@@ -11,7 +11,12 @@ export function mapToDetailedResponseDto(ad: any) {
     category: ad.category,
     isActive: ad.isActive ?? true,
     soldOut: ad.soldOut ?? false,
-    status: ad.status ?? 'active',
+    // New ads always start in moderation; Ad.status defaults to 'pending'.
+    status: ad.status ?? (ad.isApproved ? 'approved' : 'pending'),
+    isApproved: ad.isApproved ?? false,
+    link: ad.link,
+    latitude: ad.latitude,
+    longitude: ad.longitude,
     postedAt: ad.createdAt,
     updatedAt: ad.updatedAt,
     postedBy: ad.postedBy?.toString(),
@@ -32,6 +37,8 @@ export function mapToDetailedResponseDto(ad: any) {
           bathrooms: ad.propertyDetails[0].bathrooms,
           listingType: ad.propertyDetails[0].listingType,
           areaSqft: ad.propertyDetails[0].areaSqft,
+          landAreaSqft: ad.propertyDetails[0].landAreaSqft,
+          furnishing: ad.propertyDetails[0].furnishing,
           floor: ad.propertyDetails[0].floor,
           isFurnished: ad.propertyDetails[0].isFurnished,
           hasParking: ad.propertyDetails[0].hasParking,
@@ -51,6 +58,7 @@ export function mapToDetailedResponseDto(ad: any) {
             ad.vehicleDetails[0].transmissionTypeId?.toString(),
           fuelTypeId: ad.vehicleDetails[0].fuelTypeId?.toString(),
           color: ad.vehicleDetails[0].color,
+          ownerCount: ad.vehicleDetails[0].ownerCount,
           isFirstOwner: ad.vehicleDetails[0].isFirstOwner,
           hasInsurance: ad.vehicleDetails[0].hasInsurance,
           hasRcBook: ad.vehicleDetails[0].hasRcBook,
@@ -86,6 +94,8 @@ export function mapToDetailedResponseDto(ad: any) {
             ad.commercialVehicleDetails[0].transmissionTypeId?.toString(),
           fuelTypeId: ad.commercialVehicleDetails[0].fuelTypeId?.toString(),
           color: ad.commercialVehicleDetails[0].color,
+          ownerCount: ad.commercialVehicleDetails[0].ownerCount,
+          isFirstOwner: ad.commercialVehicleDetails[0].isFirstOwner,
           hasInsurance: ad.commercialVehicleDetails[0].hasInsurance,
           hasFitness: ad.commercialVehicleDetails[0].hasFitness,
           hasPermit: ad.commercialVehicleDetails[0].hasPermit,
@@ -117,6 +127,9 @@ export async function buildTitle(
   dto: CreateAdV2Dto,
   inventory: { getModelName: (id: string) => Promise<string | undefined> },
 ): Promise<string> {
+  const provided = dto.data?.title?.trim();
+  if (provided) return provided;
+
   if (dto.category === AdCategoryV2.PROPERTY) {
     // For property, use a simple title based on property type and location
     const propertyType = dto.property?.propertyType || 'Property';

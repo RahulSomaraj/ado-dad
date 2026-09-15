@@ -46,6 +46,11 @@ export class AdsCache {
     return this.redis.cacheGet<T>(key);
   }
 
+  /** Delete one exact cache key (e.g. a makeKey() entry). */
+  async del(key: string): Promise<void> {
+    await this.redis.cacheDel(key);
+  }
+
   async invalidateLists(): Promise<void> {
     const keys = await this.redis.sMembers(AdsCache.TAG_LIST);
     if (keys?.length) {

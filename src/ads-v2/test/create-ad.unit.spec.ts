@@ -1,482 +1,249 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
-// Use case and dependencies
+// VehicleInventoryService pulls in ManufacturersService, which imports via the
+// `src/…` absolute path the unit jest config cannot resolve. Every inventory
+// call is stubbed in these tests, so replace the module.
+jest.mock('../../vehicle-inventory/vehicle-inventory.service', () => ({
+  VehicleInventoryService: class VehicleInventoryService {},
+}));
 import { CreateAdUc } from '../application/use-cases/create-ad.uc';
-import { AdRepository } from '../infrastructure/repos/ad.repo';
-import { PropertyAdRepository } from '../infrastructure/repos/property-ad.repo';
-import { VehicleAdRepository } from '../infrastructure/repos/vehicle-ad.repo';
-import { CommercialVehicleAdRepository } from '../infrastructure/repos/commercial-vehicle-ad.repo';
-import { VehicleInventoryGateway } from '../infrastructure/services/vehicle-inventory.gateway';
 import { IdempotencyService } from '../infrastructure/services/idempotency.service';
-import { AdsCache } from '../infrastructure/services/ads-cache';
-import { CommercialIntentService } from '../infrastructure/services/commercial-intent.service';
-import { OutboxService } from '../infrastructure/services/outbox.service';
+import { AdCategoryV2, CreateAdV2Dto } from '../dto/create-ad-v2.dto';
+import {
+  ApiErrorCode,
+  ApiErrorException,
+  FieldValidationException,
+} from '../../common/errors/api-errors';
 
-// DTOs
-import { CreateAdV2Dto, AdCategoryV2 } from '../dto/create-ad-v2.dto';
+/** In-memory stand-in for the RedisService methods idempotency uses. */
+class FakeRedis {
+  store = new Map<string, string>();
+  down = false;
+  async setNx(key: string, value: string) {
+    if (this.down) return null;
+    if (this.store.has(key)) return false;
+    this.store.set(key, value);
+    return true;
+  }
+  async cacheGet<T>(key: string): Promise<T | null> {
+    const v = this.store.get(key);
+    return v ? (JSON.parse(v) as T) : null;
+  }
+  async cacheSet(key: string, value: unknown) {
+    this.store.set(key, JSON.stringify(value));
+  }
+  async cacheDel(key: string) {
+    this.store.delete(key);
+  }
+}
 
-describe('CreateAdUc (Unit Tests)', () => {
-  let useCase: CreateAdUc;
-  let adRepo: jest.Mocked<AdRepository>;
-  let propRepo: jest.Mocked<PropertyAdRepository>;
-  let vehRepo: jest.Mocked<VehicleAdRepository>;
-  let cvehRepo: jest.Mocked<CommercialVehicleAdRepository>;
-  let inventory: jest.Mocked<VehicleInventoryGateway>;
-  let idem: jest.Mocked<IdempotencyService>;
-  let cache: jest.Mocked<AdsCache>;
-  let intent: jest.Mocked<CommercialIntentService>;
-  let outbox: jest.Mocked<OutboxService>;
+const OID = (n: number) => n.toString(16).padStart(24, 'b');
+const USER = new Types.ObjectId().toString();
 
-  beforeEach(async () => {
-    const mockAdRepo = {
-      create: jest.fn(),
-      startSession: jest.fn(),
-      aggregateOneByIdDetailed: jest.fn(),
-    };
+const dto = (): CreateAdV2Dto =>
+  ({
+    category: AdCategoryV2.PRIVATE_VEHICLE,
+    data: {
+      description: 'Well maintained, single owner, full service history.',
+      price: 450000,
+      location: 'Kakkanad, Kochi',
+      mediaIds: [OID(1), OID(2)],
+    },
+    vehicle: {
+      vehicleType: 'four_wheeler',
+      manufacturerId: OID(10),
+      modelId: OID(11),
+      year: 2019,
+      mileage: 0,
+      transmissionTypeId: OID(12),
+      fuelTypeId: OID(13),
+      color: 'White',
+    },
+  }) as any;
 
-    const mockPropRepo = {
-      createFromDto: jest.fn(),
-    };
-
-    const mockVehRepo = {
-      createFromDto: jest.fn(),
-    };
-
-    const mockCvehRepo = {
-      createFromDto: jest.fn(),
-    };
-
-    const mockInventory = {
-      assertRefs: jest.fn(),
-      getModelName: jest.fn(),
-    };
-
-    const mockIdem = {
-      get: jest.fn(),
-      set: jest.fn(),
-    };
-
-    const mockCache = {
+function build(redis = new FakeRedis()) {
+  const adId = new Types.ObjectId();
+  const session = {
+    withTransaction: jest.fn(async (fn: () => Promise<void>) => fn()),
+    endSession: jest.fn(),
+  };
+  const deps = {
+    adRepo: {
+      startSession: jest.fn(async () => session),
+      create: jest.fn(async (doc: any) => ({ ...doc, _id: doc._id ?? adId })),
+      aggregateOneByIdDetailed: jest.fn(async (id: any) => ({
+        _id: id,
+        title: 'Swift 2019 (White)',
+        status: 'pending',
+        category: 'private_vehicle',
+      })),
+    },
+    propRepo: { createFromDto: jest.fn() },
+    vehRepo: { createFromDto: jest.fn() },
+    cvehRepo: { createFromDto: jest.fn() },
+    inventory: {
+      findInvalidRefs: jest.fn(async () => ({})),
+      getModelName: jest.fn(async () => 'Swift'),
+    },
+    idem: new IdempotencyService(redis as any),
+    cache: {
       invalidateLists: jest.fn(),
-    };
+      invalidateById: jest.fn(),
+      del: jest.fn(),
+      makeKey: jest.fn(() => 'k'),
+    },
+    intent: { applyIfCommercial: jest.fn(async (d: any) => d) },
+    outbox: { enqueue: jest.fn() },
+    geocoding: { reverseGeocode: jest.fn() },
+    hierarchy: { getLocationFilter: jest.fn() },
+    media: {
+      isOwnBucketUrl: jest.fn(() => true),
+      checkForAd: jest.fn(async () => ({})),
+      attachForAd: jest.fn(async () => ({
+        imageUrls: ['https://b/1.jpg', 'https://b/2.jpg'],
+      })),
+    },
+    sellConfig: { getActiveCommercialTypeNames: jest.fn(async () => new Set(['truck'])) },
+    legacy: { invalidateLists: jest.fn() },
+  };
+  const uc = new CreateAdUc(
+    deps.adRepo as any,
+    deps.propRepo as any,
+    deps.vehRepo as any,
+    deps.cvehRepo as any,
+    deps.inventory as any,
+    deps.idem,
+    deps.cache as any,
+    deps.intent as any,
+    deps.outbox as any,
+    deps.geocoding as any,
+    deps.hierarchy as any,
+    deps.media as any,
+    deps.sellConfig as any,
+    deps.legacy as any,
+  );
+  return { uc, deps, redis, session };
+}
 
-    const mockIntent = {
-      applyIfCommercial: jest.fn(),
-    };
+describe('CreateAdUc', () => {
+  it('creates inside withTransaction, attaches media in order and returns id + status', async () => {
+    const { uc, deps, session } = build();
+    const res: any = await uc.exec({ dto: dto(), userId: USER, userType: 'USER' });
 
-    const mockOutbox = {
-      enqueue: jest.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CreateAdUc,
-        { provide: AdRepository, useValue: mockAdRepo },
-        { provide: PropertyAdRepository, useValue: mockPropRepo },
-        { provide: VehicleAdRepository, useValue: mockVehRepo },
-        { provide: CommercialVehicleAdRepository, useValue: mockCvehRepo },
-        { provide: VehicleInventoryGateway, useValue: mockInventory },
-        { provide: IdempotencyService, useValue: mockIdem },
-        { provide: AdsCache, useValue: mockCache },
-        { provide: CommercialIntentService, useValue: mockIntent },
-        { provide: OutboxService, useValue: mockOutbox },
-      ],
-    }).compile();
-
-    useCase = module.get<CreateAdUc>(CreateAdUc);
-    adRepo = module.get(AdRepository);
-    propRepo = module.get(PropertyAdRepository);
-    vehRepo = module.get(VehicleAdRepository);
-    cvehRepo = module.get(CommercialVehicleAdRepository);
-    inventory = module.get(VehicleInventoryGateway);
-    idem = module.get(IdempotencyService);
-    cache = module.get(AdsCache);
-    intent = module.get(CommercialIntentService);
-    outbox = module.get(OutboxService);
+    expect(session.withTransaction).toHaveBeenCalledTimes(1);
+    expect(session.endSession).toHaveBeenCalled();
+    expect(deps.media.attachForAd).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: USER, mediaIds: [OID(1), OID(2)] }),
+    );
+    expect(deps.adRepo.create.mock.calls[0][0].images).toEqual([
+      'https://b/1.jpg',
+      'https://b/2.jpg',
+    ]);
+    expect(res.id).toBeDefined();
+    expect(res.status).toBe('pending');
+    expect(deps.cache.invalidateLists).toHaveBeenCalled();
+    expect(deps.legacy.invalidateLists).toHaveBeenCalled();
   });
 
-  describe('Property Advertisement', () => {
-    it('should create property advertisement successfully', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PROPERTY,
-        data: {
-          description: 'Beautiful 2BHK Apartment',
-          price: 8500000,
-          location: 'Mumbai, Maharashtra',
-          images: ['https://example.com/image1.jpg'],
-        },
-        property: {
-          propertyType: 'apartment',
-          bedrooms: 2,
-          bathrooms: 2,
-          areaSqft: 1200,
-          floor: 8,
-          isFurnished: true,
-          hasParking: true,
-          hasGarden: false,
-          amenities: ['Gym', 'Swimming Pool'],
-        },
-      };
+  it('uses the provided title instead of generating one', async () => {
+    const { uc, deps } = build();
+    const d: any = dto();
+    d.data.title = '2019 Maruti Suzuki Swift VXi';
+    await uc.exec({ dto: d, userId: USER, userType: 'USER' });
+    expect(deps.adRepo.create.mock.calls[0][0].title).toBe('2019 Maruti Suzuki Swift VXi');
+    expect(deps.inventory.getModelName).not.toHaveBeenCalled();
+  });
 
-      const mockSession = {
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        endSession: jest.fn(),
-        abortTransaction: jest.fn(),
-      };
+  it('returns all field errors together as FieldValidationException', async () => {
+    const { uc, deps } = build();
+    const d: any = dto();
+    delete d.vehicle.color;
+    d.data.price = 0;
+    deps.inventory.findInvalidRefs.mockResolvedValueOnce({ 'vehicle.modelId': 'Choose a model' } as any);
 
-      const mockAd = {
-        _id: new Types.ObjectId(),
-        title: '2BHK Apartment in Mumbai',
-        description: 'Beautiful 2BHK Apartment',
-        price: 8500000,
-        category: 'property',
-      };
+    await expect(uc.exec({ dto: d, userId: USER, userType: 'USER' })).rejects.toMatchObject({
+      fields: expect.objectContaining({
+        'vehicle.color': 'Choose a colour',
+        'data.price': expect.any(String),
+        'vehicle.modelId': 'Choose a model',
+      }),
+    });
+    expect(deps.adRepo.startSession).not.toHaveBeenCalled();
+  });
 
-      const mockDetailedAd = {
-        _id: mockAd._id,
-        title: '2BHK Apartment in Mumbai',
-        description: 'Beautiful 2BHK Apartment',
-        price: 8500000,
-        category: 'property',
-        propertyDetails: [
-          {
-            propertyType: 'apartment',
-            bedrooms: 2,
-            bathrooms: 2,
-            areaSqft: 1200,
-          },
-        ],
-      };
+  it('a post-commit failure never turns a committed create into an error', async () => {
+    const { uc, deps } = build();
+    deps.outbox.enqueue.mockRejectedValueOnce(new Error('mongo blip'));
+    deps.cache.invalidateLists.mockRejectedValueOnce(new Error('redis blip'));
+    deps.adRepo.aggregateOneByIdDetailed.mockRejectedValueOnce(new Error('read blip'));
+    const res: any = await uc.exec({ dto: dto(), userId: USER, userType: 'USER' });
+    expect(res.id).toBeDefined();
+    expect(res.status).toBe('pending');
+  });
 
-      // Setup mocks
-      adRepo.startSession.mockResolvedValue(mockSession as any);
-      adRepo.create.mockResolvedValue(mockAd as any);
-      propRepo.createFromDto.mockResolvedValue({} as any);
-      adRepo.aggregateOneByIdDetailed.mockResolvedValue(mockDetailedAd);
-      intent.applyIfCommercial.mockResolvedValue(dto);
+  describe('idempotency', () => {
+    const KEY = '1f3b8f48-1d7a-4c63-a8a2-7e5d9f5a3d6e';
 
-      const result = await useCase.exec({
-        dto,
-        userId: '507f1f77bcf86cd799439021',
-        userType: 'USER',
-      });
-
-      expect(adRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '2BHK Apartment in Mumbai',
-          description: 'Beautiful 2BHK Apartment',
-          price: 8500000,
-          category: 'property',
-        }),
-        { session: mockSession },
-      );
-
-      expect(propRepo.createFromDto).toHaveBeenCalledWith(
-        mockAd._id,
-        dto.property,
-        { session: mockSession },
-      );
-
-      expect(mockSession.commitTransaction).toHaveBeenCalled();
-      expect(cache.invalidateLists).toHaveBeenCalled();
-      expect(outbox.enqueue).toHaveBeenCalledWith(
-        'ad.created',
-        expect.any(Object),
-      );
-
-      expect(result.id).toBe(mockAd._id.toString());
-      expect(result.category).toBe('property');
+    it('replays the stored 201 for the same key + same body', async () => {
+      const { uc, deps } = build();
+      const first: any = await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      const second: any = await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      expect(second).toEqual(first);
+      expect(deps.adRepo.create).toHaveBeenCalledTimes(1);
     });
 
-    it('should fail with missing property data', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PROPERTY,
-        data: {
-          description: 'Beautiful 2BHK Apartment',
-          price: 8500000,
-          location: 'Mumbai, Maharashtra',
-        },
-        // Missing property data
-      };
+    it('scopes keys per user', async () => {
+      const { uc, deps } = build();
+      await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      await uc.exec({ dto: dto(), userId: new Types.ObjectId().toString(), userType: 'USER', idempotencyKey: KEY });
+      expect(deps.adRepo.create).toHaveBeenCalledTimes(2);
+    });
 
+    it('409 IDEMPOTENCY_IN_PROGRESS while the first request is running', async () => {
+      const { uc, redis } = build();
+      const hash = IdempotencyService.hashBody(dto());
+      redis.store.set(
+        `ads:v2:create:${USER}:${KEY}`,
+        JSON.stringify({ state: 'in_progress', bodyHash: hash, at: Date.now() }),
+      );
+      const err = await uc
+        .exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY })
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(ApiErrorException);
+      expect(err.code).toBe(ApiErrorCode.IDEMPOTENCY_IN_PROGRESS);
+      expect(err.getStatus()).toBe(409);
+    });
+
+    it('409 IDEMPOTENCY_KEY_REUSED for the same key with a different body', async () => {
+      const { uc } = build();
+      await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      const changed: any = dto();
+      changed.data.price = 460000;
+      const err = await uc
+        .exec({ dto: changed, userId: USER, userType: 'USER', idempotencyKey: KEY })
+        .catch((e) => e);
+      expect(err.code).toBe(ApiErrorCode.IDEMPOTENCY_KEY_REUSED);
+    });
+
+    it('releases the key when the create fails before commit so the client can retry', async () => {
+      const { uc, redis } = build();
+      const bad: any = dto();
+      delete bad.vehicle.color;
       await expect(
-        useCase.exec({
-          dto,
-          userId: '507f1f77bcf86cd799439021',
-          userType: 'USER',
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-  });
+        uc.exec({ dto: bad, userId: USER, userType: 'USER', idempotencyKey: KEY }),
+      ).rejects.toBeInstanceOf(FieldValidationException);
+      expect(redis.store.size).toBe(0);
 
-  describe('Vehicle Advertisement', () => {
-    it('should create vehicle advertisement successfully', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PRIVATE_VEHICLE,
-        data: {
-          description: 'Honda City 2020 Model',
-          price: 850000,
-          location: 'Delhi, NCR',
-          images: ['https://example.com/vehicle1.jpg'],
-        },
-        vehicle: {
-          vehicleType: 'four_wheeler',
-          manufacturerId: '507f1f77bcf86cd799439031',
-          modelId: '507f1f77bcf86cd799439041',
-          variantId: '507f1f77bcf86cd799439051',
-          year: 2020,
-          mileage: 25000,
-          transmissionTypeId: '507f1f77bcf86cd799439061',
-          fuelTypeId: '507f1f77bcf86cd799439071',
-          color: 'White',
-          isFirstOwner: true,
-          hasInsurance: true,
-          hasRcBook: true,
-          additionalFeatures: ['Sunroof', 'Leather Seats'],
-        },
-      };
-
-      const mockSession = {
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        endSession: jest.fn(),
-        abortTransaction: jest.fn(),
-      };
-
-      const mockAd = {
-        _id: new Types.ObjectId(),
-        title: 'Honda City 2020 (White)',
-        description: 'Honda City 2020 Model',
-        price: 850000,
-        category: 'private_vehicle',
-      };
-
-      const mockDetailedAd = {
-        _id: mockAd._id,
-        title: 'Honda City 2020 (White)',
-        description: 'Honda City 2020 Model',
-        price: 850000,
-        category: 'private_vehicle',
-        vehicleDetails: [
-          {
-            vehicleType: 'four_wheeler',
-            manufacturerId: '507f1f77bcf86cd799439031',
-            modelId: '507f1f77bcf86cd799439041',
-            year: 2020,
-            color: 'White',
-          },
-        ],
-      };
-
-      // Setup mocks
-      adRepo.startSession.mockResolvedValue(mockSession as any);
-      adRepo.create.mockResolvedValue(mockAd as any);
-      vehRepo.createFromDto.mockResolvedValue({} as any);
-      adRepo.aggregateOneByIdDetailed.mockResolvedValue(mockDetailedAd);
-      intent.applyIfCommercial.mockResolvedValue(dto);
-      inventory.assertRefs.mockResolvedValue(undefined);
-      inventory.getModelName.mockResolvedValue('Honda City');
-
-      const result = await useCase.exec({
-        dto,
-        userId: '507f1f77bcf86cd799439021',
-        userType: 'USER',
-      });
-
-      expect(inventory.assertRefs).toHaveBeenCalledWith(
-        '507f1f77bcf86cd799439031',
-        '507f1f77bcf86cd799439041',
-        '507f1f77bcf86cd799439051',
-        '507f1f77bcf86cd799439061',
-        '507f1f77bcf86cd799439071',
-      );
-
-      expect(vehRepo.createFromDto).toHaveBeenCalledWith(
-        mockAd._id,
-        dto.vehicle,
-        { session: mockSession },
-      );
-
-      expect(result.id).toBe(mockAd._id.toString());
-      expect(result.category).toBe('private_vehicle');
+      const ok: any = await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      expect(ok.id).toBeDefined();
     });
 
-    it('should fail with invalid inventory references', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PRIVATE_VEHICLE,
-        data: {
-          description: 'Honda City 2020 Model',
-          price: 850000,
-          location: 'Delhi, NCR',
-        },
-        vehicle: {
-          vehicleType: 'four_wheeler',
-          manufacturerId: 'invalid-id',
-          modelId: '507f1f77bcf86cd799439041',
-          year: 2020,
-          mileage: 25000,
-          transmissionTypeId: '507f1f77bcf86cd799439061',
-          fuelTypeId: '507f1f77bcf86cd799439071',
-          color: 'White',
-        },
-      };
-
-      inventory.assertRefs.mockRejectedValue(
-        new BadRequestException('Invalid manufacturer ID'),
-      );
-
-      await expect(
-        useCase.exec({
-          dto,
-          userId: '507f1f77bcf86cd799439021',
-          userType: 'USER',
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('Idempotency', () => {
-    it('should return cached result for duplicate idempotency key', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PROPERTY,
-        data: {
-          description: 'Test Property',
-          price: 5000000,
-          location: 'Test Location',
-        },
-        property: {
-          propertyType: 'apartment',
-          bedrooms: 1,
-          bathrooms: 1,
-          areaSqft: 800,
-        },
-      };
-
-      const cachedResult = {
-        id: '507f1f77bcf86cd799439011',
-        description: 'Test Property',
-        category: 'property',
-      };
-
-      idem.get.mockResolvedValue(cachedResult);
-
-      const result = await useCase.exec({
-        dto,
-        userId: '507f1f77bcf86cd799439021',
-        userType: 'USER',
-        idempotencyKey: 'test-key-123',
-      });
-
-      expect(idem.get).toHaveBeenCalledWith('ads:v2:create:test-key-123');
-      expect(result).toBe(cachedResult);
-      expect(adRepo.create).not.toHaveBeenCalled();
-    });
-
-    it('should store result in idempotency cache', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PROPERTY,
-        data: {
-          description: 'Test Property',
-          price: 5000000,
-          location: 'Test Location',
-        },
-        property: {
-          propertyType: 'apartment',
-          bedrooms: 1,
-          bathrooms: 1,
-          areaSqft: 800,
-        },
-      };
-
-      const mockSession = {
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        endSession: jest.fn(),
-        abortTransaction: jest.fn(),
-      };
-
-      const mockAd = {
-        _id: new Types.ObjectId(),
-        title: 'Test Property',
-        description: 'Test Property',
-        price: 5000000,
-        category: 'property',
-      };
-
-      const mockDetailedAd = {
-        _id: mockAd._id,
-        title: 'Test Property',
-        description: 'Test Property',
-        price: 5000000,
-        category: 'property',
-      };
-
-      // Setup mocks
-      idem.get.mockResolvedValue(null);
-      adRepo.startSession.mockResolvedValue(mockSession as any);
-      adRepo.create.mockResolvedValue(mockAd as any);
-      propRepo.createFromDto.mockResolvedValue({} as any);
-      adRepo.aggregateOneByIdDetailed.mockResolvedValue(mockDetailedAd);
-      intent.applyIfCommercial.mockResolvedValue(dto);
-
-      await useCase.exec({
-        dto,
-        userId: '507f1f77bcf86cd799439021',
-        userType: 'USER',
-        idempotencyKey: 'test-key-456',
-      });
-
-      expect(idem.set).toHaveBeenCalledWith(
-        'ads:v2:create:test-key-456',
-        expect.any(Object),
-        900, // 15 minutes TTL
-      );
-    });
-  });
-
-  describe('Transaction Rollback', () => {
-    it('should rollback transaction on error', async () => {
-      const dto: CreateAdV2Dto = {
-        category: AdCategoryV2.PROPERTY,
-        data: {
-          description: 'Test Property',
-          price: 5000000,
-          location: 'Test Location',
-        },
-        property: {
-          propertyType: 'apartment',
-          bedrooms: 1,
-          bathrooms: 1,
-          areaSqft: 800,
-        },
-      };
-
-      const mockSession = {
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        endSession: jest.fn(),
-        abortTransaction: jest.fn(),
-      };
-
-      // Setup mocks
-      adRepo.startSession.mockResolvedValue(mockSession as any);
-      adRepo.create.mockResolvedValue({ _id: new Types.ObjectId() } as any);
-      propRepo.createFromDto.mockRejectedValue(new Error('Database error'));
-      intent.applyIfCommercial.mockResolvedValue(dto);
-
-      await expect(
-        useCase.exec({
-          dto,
-          userId: '507f1f77bcf86cd799439021',
-          userType: 'USER',
-        }),
-      ).rejects.toThrow('Database error');
-
-      expect(mockSession.abortTransaction).toHaveBeenCalled();
-      expect(mockSession.endSession).toHaveBeenCalled();
+    it('fails open (no idempotency) when Redis is unavailable', async () => {
+      const redis = new FakeRedis();
+      redis.down = true;
+      const { uc, deps } = build(redis);
+      await uc.exec({ dto: dto(), userId: USER, userType: 'USER', idempotencyKey: KEY });
+      expect(deps.adRepo.create).toHaveBeenCalledTimes(1);
     });
   });
 });

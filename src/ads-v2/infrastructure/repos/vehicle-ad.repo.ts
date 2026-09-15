@@ -29,9 +29,13 @@ export class VehicleAdRepository {
         : undefined,
       year: vehicleData.year,
       mileage: vehicleData.mileage,
-      transmissionTypeId: new Types.ObjectId(vehicleData.transmissionTypeId),
+      // Optional for two-wheelers: never mint a random ObjectId for a missing ref.
+      transmissionTypeId: vehicleData.transmissionTypeId
+        ? new Types.ObjectId(vehicleData.transmissionTypeId)
+        : undefined,
       fuelTypeId: new Types.ObjectId(vehicleData.fuelTypeId),
       color: vehicleData.color,
+      ownerCount: vehicleData.ownerCount,
       isFirstOwner: !!vehicleData.isFirstOwner,
       hasInsurance: !!vehicleData.hasInsurance,
       hasRcBook: !!vehicleData.hasRcBook,

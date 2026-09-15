@@ -34,9 +34,13 @@ export class CommercialVehicleAdRepository {
       payloadCapacity: commercialData.payloadCapacity,
       payloadUnit: commercialData.payloadUnit,
       axleCount: commercialData.axleCount,
-      transmissionTypeId: new Types.ObjectId(commercialData.transmissionTypeId),
+      transmissionTypeId: commercialData.transmissionTypeId
+        ? new Types.ObjectId(commercialData.transmissionTypeId)
+        : undefined,
       fuelTypeId: new Types.ObjectId(commercialData.fuelTypeId),
       color: commercialData.color,
+      ownerCount: commercialData.ownerCount,
+      isFirstOwner: !!commercialData.isFirstOwner,
       hasInsurance: !!commercialData.hasInsurance,
       hasFitness: !!commercialData.hasFitness,
       hasPermit: !!commercialData.hasPermit,

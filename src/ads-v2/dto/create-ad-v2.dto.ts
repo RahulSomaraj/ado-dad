@@ -1,16 +1,10 @@
 import {
-  IsEnum,
-  IsNotEmpty,
   IsArray,
   IsNumber,
   IsOptional,
   IsString,
   IsBoolean,
-  IsMongoId,
   ValidateNested,
-  Min,
-  Max,
-  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -23,342 +17,311 @@ export enum AdCategoryV2 {
   TWO_WHEELER = 'two_wheeler',
 }
 
+/*
+ * Decorators here are deliberately type-only (plus @IsOptional so whitelist
+ * keeps the key). Ranges, enums and required-ness live in
+ * domain/ad.v2.validators.ts → validateCreateAdV2, which reports every field
+ * error in one 422 instead of the pipe stopping at the first decorator that
+ * fails. See SELL_API_CONTRACT §4.
+ */
+
 export class CommonData {
-  @ApiProperty({
-    description: 'Advertisement description',
-    example: 'Beautiful 2BHK Apartment in Prime Location',
+  @ApiPropertyOptional({
+    description: 'Title (10–70 chars). Generated from the details when omitted.',
+    example: '2019 Maruti Suzuki Swift VXi',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
+  title?: string;
+
+  @ApiProperty({ description: 'Description (20–4000 chars)', example: 'Single owner, full service history, new tyres.' })
+  @IsOptional()
+  @IsString()
   description!: string;
 
-  @ApiProperty({
-    description: 'Advertisement price',
-    example: 8500000,
-    minimum: 0,
-  })
+  @ApiProperty({ description: 'Price in ₹ (1 – 1,000,000,000)', example: 450000 })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
   price!: number;
 
   @ApiPropertyOptional({
-    description:
-      'Advertisement location (auto-generated from coordinates if not provided)',
-    example: 'Bandra West, Mumbai, Maharashtra',
+    description: 'Location label. Required unless latitude + longitude are sent (then reverse-geocoded).',
+    example: 'Kakkanad, Kochi',
   })
   @IsOptional()
   @IsString()
   location?: string;
 
-  @ApiProperty({
-    description: 'Latitude coordinate',
-    example: 19.076,
-  })
+  @ApiPropertyOptional({ description: 'Latitude (-90..90). 0 is valid.', example: 10.01 })
+  @IsOptional()
   @IsNumber()
-  @Min(-90)
-  @Max(90)
-  latitude!: number;
+  latitude?: number;
 
-  @ApiProperty({
-    description: 'Longitude coordinate',
-    example: 72.8777,
-  })
+  @ApiPropertyOptional({ description: 'Longitude (-180..180). 0 is valid.', example: 76.34 })
+  @IsOptional()
   @IsNumber()
-  @Min(-180)
-  @Max(180)
-  longitude!: number;
+  longitude?: number;
 
   @ApiPropertyOptional({
-    description: 'Advertisement images URLs',
+    description: 'Uploaded media ids from POST /v2/media/intents (+ /complete), in display order; index 0 is the cover. Preferred over images.',
     type: [String],
     maxItems: 20,
-    example: [
-      'https://example.com/image1.jpg',
-      'https://example.com/image2.jpg',
-    ],
   })
-  @IsArray()
-  @ArrayMaxSize(20)
-  @IsString({ each: true })
   @IsOptional()
-  images?: string[];
+  @IsArray()
+  @IsString({ each: true })
+  mediaIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Uploaded ad_video media id', example: '66f2b1ce8f50cfd2a6a3a999' })
+  @IsOptional()
+  @IsString()
+  videoMediaId?: string;
 
   @ApiPropertyOptional({
-    description: 'Advertisement link',
-    example: 'https://example.com/more-details',
+    description: 'Legacy: image URLs. Ignored when mediaIds is sent. Must be URLs on the AdoDad bucket.',
+    type: [String],
+    maxItems: 20,
   })
-  @IsString()
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  @ApiPropertyOptional({ description: 'Legacy video/link URL. Filled from videoMediaId when that is sent.' })
+  @IsOptional()
+  @IsString()
   link?: string;
 }
 
 export class PropertyData {
   @ApiProperty({
     description: 'Property type',
-    enum: ['apartment', 'house', 'villa', 'plot', 'commercial'],
+    enum: ['apartment', 'house', 'villa', 'plot', 'commercial', 'office', 'shop', 'warehouse'],
     example: 'apartment',
   })
-  @IsEnum(['apartment', 'house', 'villa', 'plot', 'commercial'] as any)
+  @IsOptional()
+  @IsString()
   propertyType!: string;
 
-  @ApiProperty({ description: 'Number of bedrooms', example: 2, minimum: 0 })
+  @ApiPropertyOptional({ description: 'Required for apartment|house|villa; must be omitted for other types', example: 2 })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
-  bedrooms!: number;
+  bedrooms?: number;
 
-  @ApiProperty({ description: 'Number of bathrooms', example: 2, minimum: 0 })
+  @ApiPropertyOptional({ description: 'Required for apartment|house|villa; must be omitted for other types', example: 2 })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
-  bathrooms!: number;
+  bathrooms?: number;
 
-  @ApiProperty({
-    description: 'Area in square feet',
-    example: 1200,
-    minimum: 0,
-  })
+  @ApiProperty({ description: 'Built-up area in sq ft (> 0)', example: 1200 })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
   areaSqft!: number;
 
-  @ApiPropertyOptional({
-    description: 'Listing type (rent or sell)',
-    enum: AdListingType,
-    example: AdListingType.RENT,
-  })
-  @IsEnum(AdListingType)
+  @ApiPropertyOptional({ description: 'Land / plot area in sq ft (> 0)', example: 2400 })
   @IsOptional()
+  @IsNumber()
+  landAreaSqft?: number;
+
+  @ApiPropertyOptional({ description: 'Listing type', enum: AdListingType, example: AdListingType.SELL })
+  @IsOptional()
+  @IsString()
   listingType?: AdListingType;
 
-  @ApiPropertyOptional({ description: 'Floor number', example: 8 })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Floor number (0..200)', example: 8 })
   @IsOptional()
+  @IsNumber()
   floor?: number;
 
-  @ApiPropertyOptional({ description: 'Is furnished', example: true })
-  @IsBoolean()
+  @ApiPropertyOptional({ description: 'Is furnished (derived from furnishing when omitted)', example: true })
   @IsOptional()
+  @IsBoolean()
   isFurnished?: boolean;
 
-  @ApiPropertyOptional({ description: 'Has parking', example: true })
-  @IsBoolean()
+  @ApiPropertyOptional({ enum: ['unfurnished', 'semi', 'full'], example: 'semi' })
   @IsOptional()
+  @IsString()
+  furnishing?: 'unfurnished' | 'semi' | 'full';
+
+  @ApiPropertyOptional({ description: 'Has parking', example: true })
+  @IsOptional()
+  @IsBoolean()
   hasParking?: boolean;
 
   @ApiPropertyOptional({ description: 'Has garden', example: false })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   hasGarden?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Amenities',
-    type: [String],
-    example: ['Gym', 'Swimming Pool', 'Security'],
-  })
+  @ApiPropertyOptional({ type: [String], example: ['Lift', 'Security'] })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
   amenities?: string[];
 }
 
 export class VehicleData {
-  @ApiProperty({
-    description: 'Vehicle type',
+  @ApiPropertyOptional({
+    description: 'Vehicle type (defaults from the category when omitted)',
     enum: ['two_wheeler', 'four_wheeler'],
     example: 'four_wheeler',
   })
-  @IsEnum(['two_wheeler', 'four_wheeler'] as any)
+  @IsOptional()
+  @IsString()
   vehicleType!: string;
 
-  @ApiProperty({
-    description: 'Manufacturer ID',
-    example: '66f2b1ce8f50cfd2a6a3a111',
-  })
-  @IsMongoId()
+  @ApiProperty({ description: 'Manufacturer ID', example: '66f2b1ce8f50cfd2a6a3a111' })
+  @IsOptional()
+  @IsString()
   manufacturerId!: string;
 
   @ApiProperty({ description: 'Model ID', example: '66f2b1ce8f50cfd2a6a3a222' })
-  @IsMongoId()
+  @IsOptional()
+  @IsString()
   modelId!: string;
 
-  @ApiPropertyOptional({
-    description: 'Variant ID',
-    example: '66f2b1ce8f50cfd2a6a3a333',
-  })
-  @IsMongoId()
+  @ApiPropertyOptional({ description: 'Variant ID', example: '66f2b1ce8f50cfd2a6a3a333' })
   @IsOptional()
+  @IsString()
   variantId?: string;
 
-  @ApiProperty({
-    description: 'Manufacturing year',
-    example: 2020,
-    minimum: 1900,
-    maximum: 2025,
-  })
+  @ApiProperty({ description: 'Manufacturing year (yearMin..yearMax from /v2/sell/config)', example: 2020 })
+  @IsOptional()
   @IsNumber()
-  @Min(1900)
-  @Max(new Date().getFullYear() + 1)
   year!: number;
 
-  @ApiProperty({ description: 'Mileage', example: 25000, minimum: 0 })
+  @ApiProperty({ description: 'Kilometres driven (0..999999). 0 is valid.', example: 25000 })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
   mileage!: number;
 
-  @ApiProperty({
-    description: 'Transmission type ID',
+  @ApiPropertyOptional({
+    description: 'Transmission type ID (optional for two_wheeler, required otherwise)',
     example: '66f2b1ce8f50cfd2a6a3a444',
   })
-  @IsMongoId()
-  transmissionTypeId!: string;
+  @IsOptional()
+  @IsString()
+  transmissionTypeId?: string;
 
-  @ApiProperty({
-    description: 'Fuel type ID',
-    example: '66f2b1ce8f50cfd2a6a3a555',
-  })
-  @IsMongoId()
+  @ApiProperty({ description: 'Fuel type ID', example: '66f2b1ce8f50cfd2a6a3a555' })
+  @IsOptional()
+  @IsString()
   fuelTypeId!: string;
 
-  @ApiProperty({ description: 'Vehicle color', example: 'White' })
+  @ApiProperty({ description: 'Vehicle colour', example: 'White' })
+  @IsOptional()
   @IsString()
   color!: string;
 
-  @ApiPropertyOptional({ description: 'Is first owner', example: true })
-  @IsBoolean()
+  @ApiPropertyOptional({ description: 'Number of owners (1..10). Sets isFirstOwner = ownerCount === 1.', example: 1 })
   @IsOptional()
+  @IsNumber()
+  ownerCount?: number;
+
+  @ApiPropertyOptional({ description: 'Is first owner', example: true })
+  @IsOptional()
+  @IsBoolean()
   isFirstOwner?: boolean;
 
   @ApiPropertyOptional({ description: 'Has insurance', example: true })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   hasInsurance?: boolean;
 
   @ApiPropertyOptional({ description: 'Has RC book', example: true })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   hasRcBook?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Additional features',
-    type: [String],
-    example: ['Sunroof', 'Leather Seats', 'Navigation System'],
-  })
+  @ApiPropertyOptional({ type: [String], example: ['Sunroof', 'Reverse camera'] })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
   additionalFeatures?: string[];
 }
 
 export class CommercialVehicleData extends VehicleData {
-  @ApiPropertyOptional({
-    description: 'Commercial vehicle type',
-    enum: ['truck', 'bus', 'van', 'tractor', 'trailer'],
+  @ApiProperty({
+    description: 'Active `name` from GET /v2/sell/config commercialVehicleTypes (e.g. truck, auto_rickshaws, taxi_cab)',
     example: 'truck',
   })
-  @IsEnum(['truck', 'bus', 'van', 'tractor', 'trailer'] as any)
   @IsOptional()
+  @IsString()
   commercialVehicleType?: string;
 
   @ApiPropertyOptional({
     description: 'Body type',
-    enum: ['flatbed', 'refrigerated', 'tanker', 'container', 'dump'],
+    enum: ['flatbed', 'container', 'refrigerated', 'tanker', 'dump', 'pickup', 'box', 'passenger'],
     example: 'flatbed',
   })
-  @IsEnum(['flatbed', 'refrigerated', 'tanker', 'container', 'dump'] as any)
   @IsOptional()
+  @IsString()
   bodyType?: string;
 
-  @ApiPropertyOptional({
-    description: 'Payload capacity',
-    example: 5000,
-    minimum: 0,
-  })
-  @IsNumber()
-  @Min(0)
+  @ApiPropertyOptional({ description: 'Payload capacity', example: 5000 })
   @IsOptional()
+  @IsNumber()
   payloadCapacity?: number;
 
-  @ApiPropertyOptional({ description: 'Payload unit', example: 'kg' })
-  @IsString()
+  @ApiPropertyOptional({ enum: ['kg', 'tonne'], example: 'kg' })
   @IsOptional()
+  @IsString()
   payloadUnit?: string;
 
-  @ApiPropertyOptional({
-    description: 'Number of axles',
-    example: 2,
-    minimum: 0,
-  })
-  @IsNumber()
-  @Min(0)
+  @ApiPropertyOptional({ description: 'Number of axles (1..10)', example: 2 })
   @IsOptional()
+  @IsNumber()
   axleCount?: number;
 
-  @ApiPropertyOptional({
-    description: 'Has fitness certificate',
-    example: true,
-  })
-  @IsBoolean()
+  @ApiPropertyOptional({ description: 'Has fitness certificate', example: true })
   @IsOptional()
+  @IsBoolean()
   hasFitness?: boolean;
 
   @ApiPropertyOptional({ description: 'Has permit', example: true })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   hasPermit?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Seating capacity',
-    example: 3,
-    minimum: 1,
-  })
-  @IsNumber()
-  @Min(1)
+  @ApiPropertyOptional({ description: 'Seating capacity (1..100)', example: 3 })
   @IsOptional()
+  @IsNumber()
   seatingCapacity?: number;
 }
 
 export class CreateAdV2Dto {
-  @ApiProperty({
-    description: 'Advertisement category',
-    enum: AdCategoryV2,
-    example: AdCategoryV2.PROPERTY,
-  })
-  @IsEnum(AdCategoryV2)
+  @ApiProperty({ description: 'Advertisement category', enum: AdCategoryV2, example: AdCategoryV2.PROPERTY })
+  @IsOptional()
+  @IsString()
   category!: AdCategoryV2;
 
-  @ApiProperty({
-    description: 'Common advertisement data',
-    type: CommonData,
-  })
+  @ApiProperty({ description: 'Common advertisement data', type: CommonData })
+  @IsOptional()
   @ValidateNested()
   @Type(() => CommonData)
   data!: CommonData;
 
-  @ApiPropertyOptional({
-    description: 'Property-specific data (required for property category)',
-    type: PropertyData,
-  })
+  @ApiPropertyOptional({ description: 'Property-specific data (required for property)', type: PropertyData })
+  @IsOptional()
   @ValidateNested()
   @Type(() => PropertyData)
-  @IsOptional()
   property?: PropertyData;
 
   @ApiPropertyOptional({
-    description:
-      'Vehicle-specific data (required for private_vehicle and two_wheeler categories)',
+    description: 'Vehicle-specific data (required for private_vehicle and two_wheeler)',
     type: VehicleData,
   })
+  @IsOptional()
   @ValidateNested()
   @Type(() => VehicleData)
-  @IsOptional()
   vehicle?: VehicleData;
 
   @ApiPropertyOptional({
-    description:
-      'Commercial vehicle-specific data (required for commercial_vehicle category)',
+    description: 'Commercial vehicle-specific data (required for commercial_vehicle)',
     type: CommercialVehicleData,
   })
+  @IsOptional()
   @ValidateNested()
   @Type(() => CommercialVehicleData)
-  @IsOptional()
   commercial?: CommercialVehicleData;
 }

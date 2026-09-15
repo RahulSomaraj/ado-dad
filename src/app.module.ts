@@ -53,6 +53,8 @@ import { User, UserSchema } from './users/schemas/user.schema';
 // Configuration service
 import { configService } from './config/mongo.config';
 import { ModerationModule } from './moderation/moderation.module';
+import { SellModule } from './sell/sell.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -130,6 +132,8 @@ import { ModerationModule } from './moderation/moderation.module';
     NotificationsModule,
     AppVersionModule,
     ModerationModule,
+    SellModule, // CREATE-06: GET /v2/sell/config
+    MediaModule, // CREATE-06: POST /v2/media/intents, /:id/complete
     RedisModule,
   ],
   providers: [

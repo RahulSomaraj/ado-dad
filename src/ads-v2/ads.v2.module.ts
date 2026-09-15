@@ -24,7 +24,13 @@ import { VehicleInventoryGateway } from './infrastructure/services/vehicle-inven
 import { CommercialIntentService } from './infrastructure/services/commercial-intent.service';
 import { OutboxService } from './infrastructure/services/outbox.service';
 
+import { LegacyAdsCacheInvalidator } from './infrastructure/services/legacy-ads-cache.invalidator';
+
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
+import { MediaModule } from '../media/media.module';
+import { SellModule } from '../sell/sell.module';
+import { SuspensionGuard } from '../moderation/guards/suspension.guard';
+import { UserThrottleGuard } from '../common/guards/user-throttle.guard';
 import { CommercialVehicleDetectionService } from '../ads/services/commercial-vehicle-detection.service';
 import { GeocodingService } from '../common/services/geocoding.service';
 import { LocationHierarchyService } from '../common/services/location-hierarchy.service';
@@ -77,6 +83,8 @@ const OutboxSchema = {
       { name: 'Outbox', schema: OutboxSchema },
     ]),
     VehicleInventoryModule,
+    MediaModule, // MediaService: resolve + attach mediaIds on create
+    SellModule, // SellConfigService: active commercial vehicle type names
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -108,6 +116,11 @@ const OutboxSchema = {
     VehicleInventoryGateway,
     CommercialIntentService,
     OutboxService,
+    LegacyAdsCacheInvalidator,
+
+    // Guards used on POST /v2/ads
+    SuspensionGuard,
+    UserThrottleGuard,
 
     // External services
     CommercialVehicleDetectionService,

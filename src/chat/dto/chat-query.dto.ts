@@ -11,7 +11,7 @@ import {
   Min,
 } from 'class-validator';
 
-export const ROOM_FILTERS = ['all', 'unread', 'buying', 'selling'] as const;
+export const ROOM_FILTERS = ['all', 'unread', 'buying', 'selling', 'archived'] as const;
 export type RoomFilter = (typeof ROOM_FILTERS)[number];
 
 export class ListRoomsQueryDto {

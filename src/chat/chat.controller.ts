@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -129,6 +130,28 @@ export class ChatController {
     const userId = this.userId(req);
     await this.rateLimiter.consume('markRead', userId);
     return { success: true, data: await this.messaging.markRead(roomId, userId, body?.lastMessageId) };
+  }
+
+  @Post('rooms/:roomId/archive')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Archive the conversation for the current user only' })
+  async archive(@Param('roomId') roomId: string, @Request() req: any) {
+    return { success: true, data: await this.messaging.setArchived(roomId, this.userId(req), true) };
+  }
+
+  @Delete('rooms/:roomId/archive')
+  @ApiOperation({ summary: 'Unarchive the conversation for the current user' })
+  async unarchive(@Param('roomId') roomId: string, @Request() req: any) {
+    return { success: true, data: await this.messaging.setArchived(roomId, this.userId(req), false) };
+  }
+
+  @Post('rooms/:roomId/unread')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Mark the conversation as unread for the current user' })
+  async markUnread(@Param('roomId') roomId: string, @Request() req: any) {
+    const userId = this.userId(req);
+    await this.rateLimiter.consume('markRead', userId);
+    return { success: true, data: await this.messaging.markUnread(roomId, userId) };
   }
 
   @Post('rooms/:roomId/uploads')

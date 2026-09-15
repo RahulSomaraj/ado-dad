@@ -28,11 +28,15 @@ export class CommercialVehicleAd {
   @Prop({ required: true, ref: 'Ad', type: Types.ObjectId })
   ad: Types.ObjectId;
 
-  @Prop({ required: true, enum: CommercialVehicleTypeEnum })
-  commercialVehicleType: CommercialVehicleTypeEnum;
+  // Name from the `commercialvehicletypes` collection (e.g. truck,
+  // auto_rickshaws, taxi_cab). Not an enum: the collection is the source of
+  // truth and is validated by the create paths. CommercialVehicleTypeEnum is
+  // kept only as the list of legacy defaults.
+  @Prop({ required: true, trim: true })
+  commercialVehicleType: string;
 
-  @Prop({ required: true, enum: BodyTypeEnum })
-  bodyType: BodyTypeEnum;
+  @Prop({ required: false, enum: BodyTypeEnum })
+  bodyType?: BodyTypeEnum;
 
   // Reference to existing vehicle-inventory Manufacturer (MongoDB ObjectId)
   @Prop({ required: true, ref: 'Manufacturer', type: Types.ObjectId })
@@ -52,14 +56,14 @@ export class CommercialVehicleAd {
   @Prop({ required: true, min: 0 })
   mileage: number;
 
-  @Prop({ required: true, min: 0 })
-  payloadCapacity: number;
+  @Prop({ required: false, min: 0 })
+  payloadCapacity?: number;
 
   @Prop({ required: false, trim: true })
   payloadUnit?: string;
 
-  @Prop({ required: true, min: 1, max: 10 })
-  axleCount: number;
+  @Prop({ required: false, min: 1, max: 10 })
+  axleCount?: number;
 
   // Reference to existing vehicle-inventory TransmissionType (MongoDB ObjectId)
   @Prop({ required: true, ref: 'TransmissionType', type: Types.ObjectId })
@@ -71,6 +75,12 @@ export class CommercialVehicleAd {
 
   @Prop({ required: false, trim: true })
   color?: string;
+
+  @Prop({ required: false, min: 1, max: 10 })
+  ownerCount?: number;
+
+  @Prop({ default: false })
+  isFirstOwner: boolean;
 
   @Prop({ default: false })
   hasInsurance: boolean;

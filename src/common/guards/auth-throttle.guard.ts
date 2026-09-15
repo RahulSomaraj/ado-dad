@@ -14,6 +14,12 @@ export interface ThrottleOptions {
   ttl: number; // window in seconds
   keyFields?: string[]; // body fields to include in the bucket key (e.g. username/email)
   name?: string; // logical bucket name
+  /**
+   * 'ip' (default): counted here, per client IP, before auth runs.
+   * 'user': skipped here and counted by UserThrottleGuard, which must be
+   * listed after JwtAuthGuard in @UseGuards so `req.user` is populated.
+   */
+  by?: 'ip' | 'user';
 }
 
 export const AUTH_THROTTLE_KEY = 'authThrottle';
@@ -38,6 +44,7 @@ export class AuthThrottleGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
     if (!opts) return true;
+    if (opts.by === 'user') return true; // see UserThrottleGuard
 
     const req: any = context.switchToHttp().getRequest();
     if (!req) return true;

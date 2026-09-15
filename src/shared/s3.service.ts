@@ -4,6 +4,8 @@ import {
   S3Client,
   PutObjectCommand,
   PutObjectCommandInput,
+  HeadObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
@@ -88,6 +90,48 @@ export class S3Service {
       `${this.bucketName}.s3.amazonaws.com`,
       ...extra,
     ].map((h) => h.toLowerCase());
+  }
+
+  /** True when `rawUrl` is an https URL served from this bucket (see getMediaHosts). */
+  isOwnMediaUrl(rawUrl: string): boolean {
+    if (typeof rawUrl !== 'string' || rawUrl.length > 2048) return false;
+    try {
+      const url = new URL(rawUrl);
+      if (url.protocol !== 'https:') return false;
+      return this.getMediaHosts().includes(url.hostname.toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * HEAD an object. Resolves null when it does not exist; rethrows anything else.
+   */
+  async headObject(
+    key: string,
+  ): Promise<{ contentLength: number; contentType: string } | null> {
+    try {
+      const out = await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+      return {
+        contentLength: Number(out.ContentLength ?? 0),
+        contentType: String(out.ContentType ?? '').toLowerCase(),
+      };
+    } catch (error: any) {
+      const status = error?.$metadata?.httpStatusCode;
+      if (status === 404 || error?.name === 'NotFound' || error?.name === 'NoSuchKey') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /** Delete an object; missing objects are not an error in S3. */
+  async deleteObject(key: string): Promise<void> {
+    await this.s3.send(
+      new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }),
+    );
   }
 
   /**

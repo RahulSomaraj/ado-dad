@@ -190,6 +190,31 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Atomic SET key value NX EX ttl.
+   * Returns true when the key was created, false when it already existed, and
+   * null when Redis is unavailable (callers decide whether to fail open).
+   */
+  async setNx(
+    key: string,
+    value: string,
+    ttlSec: number,
+  ): Promise<boolean | null> {
+    if (!this.isClientReady()) {
+      return null;
+    }
+    try {
+      const result = await this.redisClient.set(this.getKey(key), value, {
+        NX: true,
+        EX: ttlSec,
+      });
+      return result === 'OK';
+    } catch (error) {
+      this.logger.error(`Error in setNx for key ${key}:`, error);
+      return null;
+    }
+  }
+
   async get(key: string): Promise<string | null> {
     if (!this.isConnected || !this.redisClient) {
       this.logger.debug(`Redis not connected, returning null for key: ${key}`);

@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { VehicleInventoryService } from '../../../vehicle-inventory/vehicle-inventory.service';
 import { RedisService } from '../../../shared/redis.service';
 
@@ -147,6 +151,49 @@ export class VehicleInventoryGateway {
         throw new BadRequestException(`Invalid fuel type ID: ${fuelTypeId}`);
       }
     }
+  }
+
+  /**
+   * Like assertRefs, but checks every reference and returns field errors keyed
+   * by request path (`<prefix>.manufacturerId`, …) instead of throwing on the
+   * first bad one. Undefined optional refs (variant, transmission) are skipped.
+   */
+  async findInvalidRefs(
+    prefix: string,
+    refs: {
+      manufacturerId?: string;
+      modelId?: string;
+      variantId?: string;
+      transmissionTypeId?: string;
+      fuelTypeId?: string;
+    },
+  ): Promise<Record<string, string>> {
+    const checks: [keyof typeof refs, string, (id: string) => Promise<unknown>][] = [
+      ['manufacturerId', 'Choose a brand', (id) => this.inventory.findManufacturerById(id)],
+      ['modelId', 'Choose a model', (id) => this.inventory.findVehicleModelById(id)],
+      ['variantId', 'Choose a valid variant', (id) => this.inventory.findVehicleVariantById(id)],
+      ['transmissionTypeId', 'Choose a transmission', (id) => this.inventory.findTransmissionTypeById(id)],
+      ['fuelTypeId', 'Choose a fuel type', (id) => this.inventory.findFuelTypeById(id)],
+    ];
+    const errors: Record<string, string> = {};
+    await Promise.all(
+      checks.map(async ([field, message, find]) => {
+        const id = refs[field];
+        if (!id) return;
+        try {
+          const found = await find(id);
+          if (!found) errors[`${prefix}.${field}`] = message;
+        } catch (error) {
+          // Not found / malformed id → field error; infrastructure errors → 5xx.
+          if (error instanceof NotFoundException || error instanceof BadRequestException) {
+            errors[`${prefix}.${field}`] = message;
+          } else {
+            throw error;
+          }
+        }
+      }),
+    );
+    return errors;
   }
 
   async getModelName(modelId: string): Promise<string | undefined> {

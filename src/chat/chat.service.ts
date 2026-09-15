@@ -34,6 +34,8 @@ export interface RoomView {
   updatedAt?: Date;
   lastMessageAt?: Date | null;
   unreadCount: number;
+  /** Archived by the requesting user (hidden from their list until a new message). */
+  archived: boolean;
   otherUser: {
     id: string;
     name: string;
@@ -42,7 +44,15 @@ export interface RoomView {
     countryCode?: string;
   } | null;
   ad: { id: string; title: string; price: number | null; image: string | null; status: AdAvailability } | null;
-  lastMessage: { id: string; type: string; preview: string; senderId: string; createdAt: Date } | null;
+  lastMessage: {
+    id: string;
+    type: string;
+    preview: string;
+    senderId: string;
+    createdAt: Date;
+    /** Only for my own last message: has the other participant read it? */
+    status: 'sent' | 'read' | null;
+  } | null;
   // ---- legacy keys (store builds read these) ----
   initiatorId: string;
   adPosterId: string;
@@ -125,12 +135,14 @@ export class ChatService {
     return map[key];
   }
 
-  static previewFor(type: string, content?: string): string {
+  static previewFor(type: string, content?: string, attachments?: Array<{ duration?: number }>): string {
     switch (type) {
       case MessageType.IMAGE:
         return content?.trim() ? `Photo · ${content.trim()}`.slice(0, PREVIEW_LEN) : 'Photo';
-      case MessageType.AUDIO:
-        return 'Voice message';
+      case MessageType.AUDIO: {
+        const d = Math.round(Number(attachments?.[0]?.duration ?? 0));
+        return d > 0 ? `Voice message · ${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}` : 'Voice message';
+      }
       case MessageType.FILE:
         return 'File';
       default:
@@ -291,7 +303,10 @@ export class ChatService {
     const limit = paged ? query.limit! : LEGACY_LIST_CAP;
     const filter: RoomFilter = query.filter ?? 'all';
 
-    const match: Record<string, any> = { status: { $ne: ChatRoomStatus.ARCHIVED } };
+    const match: Record<string, any> = {
+      status: { $ne: ChatRoomStatus.ARCHIVED },
+      [`archivedFor.${userId}`]: filter === 'archived' ? { $exists: true } : { $exists: false },
+    };
     if (filter === 'buying') match.initiatorId = uid;
     else if (filter === 'selling') match.adPosterId = uid;
     else match.$or = [{ initiatorId: uid }, { adPosterId: uid }];
@@ -419,7 +434,7 @@ export class ChatService {
       r.lastMessage = {
         id: m.id,
         type: m.type,
-        preview: ChatService.previewFor(m.type, m.content),
+        preview: ChatService.previewFor(m.type, m.content, m.attachments),
         senderId: m.senderId,
         createdAt: m.createdAt,
       };
@@ -441,6 +456,11 @@ export class ChatService {
     const uid = String(userId);
     const availability = ChatService.adAvailability(ad);
     const lm = room.lastMessage?.id ? room.lastMessage : null;
+    let lmStatus: 'sent' | 'read' | null = null;
+    if (lm && String(lm.senderId) === uid) {
+      const otherRead = this.mapValue<Date>(room.lastReadAt, this.otherParticipant(room, uid));
+      lmStatus = otherRead && new Date(otherRead).getTime() >= new Date(lm.createdAt).getTime() ? 'read' : 'sent';
+    }
     const price = typeof ad?.price === 'number' ? ad.price : null;
     const title = ad?.title || (ad ? 'Listing' : 'Listing removed');
     return {
@@ -453,6 +473,7 @@ export class ChatService {
       updatedAt: room.updatedAt,
       lastMessageAt: room.lastMessageAt ?? null,
       unreadCount: Number(this.mapValue<number>(room.unreadCounts, uid) ?? 0),
+      archived: !!this.mapValue<Date>(room.archivedFor, uid),
       otherUser: other
         ? {
             id: String(other._id),
@@ -470,6 +491,7 @@ export class ChatService {
             preview: lm.preview,
             senderId: String(lm.senderId),
             createdAt: lm.createdAt,
+            status: lmStatus,
           }
         : null,
       initiatorId: String(room.initiatorId),
@@ -624,7 +646,7 @@ export class ChatService {
     const lastMessage = {
       id: doc._id,
       type,
-      preview: ChatService.previewFor(type, content),
+      preview: ChatService.previewFor(type, content, normalizedAttachments),
       senderId: new Types.ObjectId(senderId),
       createdAt,
     };
@@ -632,7 +654,13 @@ export class ChatService {
     if (recipientId !== String(senderId)) inc[`unreadCounts.${recipientId}`] = 1; // self-chat: no unread
     await this.chatRoomModel.updateOne(
       { _id: room._id },
-      { $set: { lastMessage, lastMessageAt: createdAt }, $inc: inc, $currentDate: { updatedAt: true } },
+      {
+        $set: { lastMessage, lastMessageAt: createdAt },
+        $inc: inc,
+        // A new message brings an archived chat back for both people.
+        $unset: { [`archivedFor.${senderId}`]: '', [`archivedFor.${recipientId}`]: '' },
+        $currentDate: { updatedAt: true },
+      },
     );
     // Keep the in-memory doc consistent for callers that build views from it.
     (room as any).lastMessage = lastMessage;
@@ -841,6 +869,26 @@ export class ChatService {
   }
 
   /** Total unread across the user's active rooms, for the nav badge. */
+  /** Per-user archive: hides the chat from this user's list only. */
+  async setArchivedForUser(roomId: string, userId: string, archived: boolean): Promise<void> {
+    const room = await this.getRoomForParticipant(roomId, userId);
+    await this.chatRoomModel.updateOne(
+      { _id: (room as any)._id },
+      archived
+        ? { $set: { [`archivedFor.${userId}`]: new Date() } }
+        : { $unset: { [`archivedFor.${userId}`]: '' } },
+    );
+  }
+
+  /** "Mark as unread": badge the chat again without touching message read state. */
+  async markRoomUnread(roomId: string, userId: string): Promise<void> {
+    const room = await this.getRoomForParticipant(roomId, userId);
+    await this.chatRoomModel.updateOne(
+      { _id: (room as any)._id },
+      { $max: { [`unreadCounts.${userId}`]: 1 } },
+    );
+  }
+
   async getUnreadSummary(userId: string): Promise<{ total: number; rooms: number }> {
     const uid = new Types.ObjectId(this.validateObjectId(userId, 'user id'));
     const field = `$unreadCounts.${userId}`;
@@ -850,6 +898,7 @@ export class ChatService {
           $match: {
             $or: [{ initiatorId: uid }, { adPosterId: uid }],
             status: { $ne: ChatRoomStatus.ARCHIVED },
+            [`archivedFor.${userId}`]: { $exists: false },
             [`unreadCounts.${userId}`]: { $gt: 0 },
           },
         },

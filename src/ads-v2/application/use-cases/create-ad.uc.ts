@@ -1,5 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { Types } from 'mongoose';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ClientSession, Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { PropertyAdRepository } from '../../infrastructure/repos/property-ad.repo';
 import { VehicleAdRepository } from '../../infrastructure/repos/vehicle-ad.repo';
@@ -9,19 +9,41 @@ import { IdempotencyService } from '../../infrastructure/services/idempotency.se
 import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { CommercialIntentService } from '../../infrastructure/services/commercial-intent.service';
 import { OutboxService } from '../../infrastructure/services/outbox.service';
+import { LegacyAdsCacheInvalidator } from '../../infrastructure/services/legacy-ads-cache.invalidator';
 import { GeocodingService } from '../../../common/services/geocoding.service';
 import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
+import { MediaService } from '../../../media/media.service';
+import { SellConfigService } from '../../../sell/sell-config.service';
+import {
+  ApiErrorCode,
+  ApiErrorException,
+  FieldErrors,
+  FieldValidationException,
+} from '../../../common/errors/api-errors';
 import { CreateAdV2Dto, AdCategoryV2 } from '../../dto/create-ad-v2.dto';
 import {
   mapToDetailedResponseDto,
   buildTitle,
 } from '../../domain/ad.v2.mappers';
-import { validateCreateCombination } from '../../domain/ad.v2.validators';
+import {
+  normalizeCreateAdV2,
+  validateCreateAdV2,
+} from '../../domain/ad.v2.validators';
 
-const TTL = { LIST: 120, BY_ID: 900 };
+/** Idempotency record lifetime (contract: EX 900). */
+const IDEMPOTENCY_TTL_SEC = 15 * 60;
+
+type LocationHierarchy = {
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+};
 
 @Injectable()
 export class CreateAdUc {
+  private readonly logger = new Logger(CreateAdUc.name);
+
   constructor(
     private readonly adRepo: AdRepository,
     private readonly propRepo: PropertyAdRepository,
@@ -34,6 +56,9 @@ export class CreateAdUc {
     private readonly outbox: OutboxService,
     private readonly geocodingService: GeocodingService,
     private readonly locationHierarchyService: LocationHierarchyService,
+    private readonly media: MediaService,
+    private readonly sellConfig: SellConfigService,
+    private readonly legacyCache: LegacyAdsCacheInvalidator,
   ) {}
 
   async exec(input: {
@@ -42,225 +67,270 @@ export class CreateAdUc {
     userType: string;
     idempotencyKey?: string;
   }) {
-    const { dto, userId, userType, idempotencyKey } = input;
+    const { userId, userType } = input;
+    const rawKey = input.idempotencyKey?.trim();
 
-    // 1) Idempotency guard (returns previous result if exists)
-    const idemKey = idempotencyKey
-      ? `ads:v2:create:${idempotencyKey}`
-      : undefined;
-    if (idemKey) {
-      const prior = await this.idem.get(idemKey);
-      if (prior) {
-        return prior;
-      }
-    }
-
-    // 2) Domain validation for combination shape
-    validateCreateCombination(dto);
-
-    // 3) Optional auto-detection for commercial
-    const enrichedDto = await this.intent.applyIfCommercial(dto);
-
-    // 3.5) Auto-generate location and hierarchy from coordinates if not provided
-    let locationHierarchy: {
-      city?: string;
-      district?: string;
-      state?: string;
-      country?: string;
-    } = {};
-
-    if (
-      !enrichedDto.data.location &&
-      enrichedDto.data.latitude &&
-      enrichedDto.data.longitude
-    ) {
-      try {
-        const geocodingResult = await this.geocodingService.reverseGeocode(
-          enrichedDto.data.latitude,
-          enrichedDto.data.longitude,
+    // 1) Idempotency claim — scoped to the caller, atomic (SET NX), body-bound.
+    let idemKey: string | undefined;
+    let bodyHash = '';
+    if (rawKey) {
+      if (!IdempotencyService.isValidKey(rawKey)) {
+        throw new ApiErrorException(
+          HttpStatus.BAD_REQUEST,
+          ApiErrorCode.BAD_REQUEST,
+          'Invalid Idempotency-Key header',
         );
-        enrichedDto.data.location = geocodingResult.location;
-        locationHierarchy.city = geocodingResult.city;
-        locationHierarchy.state = geocodingResult.state;
-        locationHierarchy.country = geocodingResult.country;
-
-        // Get district from location hierarchy service
-        try {
-          const locationFilter = this.locationHierarchyService.getLocationFilter(
-            enrichedDto.data.latitude,
-            enrichedDto.data.longitude,
-          );
-          locationHierarchy.district = locationFilter.district;
-        } catch (error) {
-          // Silently fail if location hierarchy service fails
-        }
-      } catch (error) {
-        // If geocoding fails, use coordinates as fallback
-        enrichedDto.data.location = `${enrichedDto.data.latitude.toFixed(4)}, ${enrichedDto.data.longitude.toFixed(4)}`;
       }
-    } else if (enrichedDto.data.latitude && enrichedDto.data.longitude) {
-      // Location provided but still extract hierarchy for filtering
-      try {
-        const geocodingResult = await this.geocodingService.reverseGeocode(
-          enrichedDto.data.latitude,
-          enrichedDto.data.longitude,
-        );
-        locationHierarchy.city = geocodingResult.city;
-        locationHierarchy.state = geocodingResult.state;
-        locationHierarchy.country = geocodingResult.country;
-
-        // Get district from location hierarchy service
-        try {
-          const locationFilter = this.locationHierarchyService.getLocationFilter(
-            enrichedDto.data.latitude,
-            enrichedDto.data.longitude,
-          );
-          locationHierarchy.district = locationFilter.district;
-        } catch (error) {
-          // Silently fail if location hierarchy service fails
-        }
-      } catch (error) {
-        // Silently fail - hierarchy is optional
-      }
+      bodyHash = IdempotencyService.hashBody(input.dto);
+      const key = `ads:v2:create:${userId}:${rawKey}`;
+      const claim = await this.idem.begin<any>(key, bodyHash, IDEMPOTENCY_TTL_SEC);
+      if (claim.kind === 'replay') return claim.response;
+      if (claim.kind === 'started') idemKey = key;
+      // 'unavailable' → Redis down: proceed without idempotency (fail open).
     }
 
-    // 4) Inventory integrity checks (vehicle/commercial only)
-    if (enrichedDto.category !== AdCategoryV2.PROPERTY) {
-      const veh =
-        enrichedDto.category === AdCategoryV2.COMMERCIAL_VEHICLE
-          ? enrichedDto.commercial!
-          : enrichedDto.vehicle!;
-      await this.inventory.assertRefs(
-        veh.manufacturerId,
-        veh.modelId,
-        veh.variantId,
-        veh.transmissionTypeId,
-        veh.fuelTypeId,
-      );
-    }
-
-    // 5) Transactional create
-    const session = await this.adRepo.startSession();
-    session.startTransaction();
-
+    let committed = false;
     try {
-      // Title generation (for vehicles)
-      const title = await buildTitle(enrichedDto, this.inventory);
-
-      // Prepare geoLocation if coordinates are provided
-      const geoLocation:
-        | { type: 'Point'; coordinates: [number, number] }
-        | undefined =
-        enrichedDto.data.latitude !== undefined &&
-        enrichedDto.data.longitude !== undefined
-          ? {
-              type: 'Point' as const,
-              coordinates: [
-                enrichedDto.data.longitude,
-                enrichedDto.data.latitude,
-              ] as [number, number], // [longitude, latitude]
-            }
-          : undefined;
-
-      const savedAd = await this.adRepo.create(
-        {
-          title,
-          description: enrichedDto.data.description,
-          price: enrichedDto.data.price,
-          images: (enrichedDto.data.images ?? []).slice(0, 20),
-          location: enrichedDto.data.location,
-          latitude: enrichedDto.data.latitude,
-          longitude: enrichedDto.data.longitude,
-          geoLocation,
-          city: locationHierarchy.city,
-          district: locationHierarchy.district,
-          state: locationHierarchy.state,
-          country: locationHierarchy.country,
-          link: enrichedDto.data.link,
-          postedBy: new Types.ObjectId(userId),
-          category: enrichedDto.category as any, // Cast to match schema enum
-          isActive: true,
-          soldOut: false, // Always set soldOut to false by default
-          isApproved: false, // Always set isApproved to false by default
-        },
-        { session },
-      );
-
-      // Create category-specific subdocument
-      switch (enrichedDto.category) {
-        case AdCategoryV2.PROPERTY:
-          if (!enrichedDto.property) {
-            throw new BadRequestException('Property data is required');
-          }
-          await this.propRepo.createFromDto(savedAd._id, enrichedDto.property, {
-            session,
-          });
-          break;
-
-        case AdCategoryV2.PRIVATE_VEHICLE:
-        case AdCategoryV2.TWO_WHEELER:
-          if (!enrichedDto.vehicle) {
-            throw new BadRequestException('Vehicle data is required');
-          }
-          await this.vehRepo.createFromDto(savedAd._id, enrichedDto.vehicle, {
-            session,
-          });
-          break;
-
-        case AdCategoryV2.COMMERCIAL_VEHICLE:
-          if (!enrichedDto.commercial) {
-            throw new BadRequestException(
-              'Commercial vehicle data is required',
-            );
-          }
-          await this.cvehRepo.createFromDto(
-            savedAd._id,
-            enrichedDto.commercial,
-            { session },
-          );
-          break;
-
-        default:
-          throw new BadRequestException(
-            `Invalid category: ${enrichedDto.category}`,
-          );
-      }
-
-      await session.commitTransaction();
-      session.endSession();
-
-      // 6) Outbox event (async enrichments)
-      await this.outbox.enqueue('ad.created', {
-        adId: savedAd._id.toString(),
-        category: enrichedDto.category,
-        userId: userId,
-        userType: userType,
+      const response = await this.createOnce(input.dto, userId, userType, () => {
+        committed = true;
       });
 
-      // 7) Invalidate list caches
-      await this.cache.invalidateLists();
-
-      // 8) Hydrate read model for response
-      const detailed = await this.adRepo.aggregateOneByIdDetailed(savedAd._id);
-      if (!detailed) {
-        throw new BadRequestException(
-          'Failed to retrieve created advertisement',
-        );
-      }
-
-      const response = mapToDetailedResponseDto(detailed);
-
-      // 9) Idempotency store
       if (idemKey) {
-        await this.idem.set(idemKey, response, 15 * 60); // 15 minutes TTL
+        try {
+          await this.idem.complete(idemKey, bodyHash, response, IDEMPOTENCY_TTL_SEC);
+        } catch (error) {
+          this.logger.warn(`Idempotency store failed: ${(error as Error)?.message}`);
+        }
       }
-
       return response;
     } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      console.error('Error creating advertisement:', error);
+      if (idemKey && !committed) {
+        await this.idem.release(idemKey).catch(() => undefined);
+      }
       throw error;
     }
+  }
+
+  private async createOnce(
+    rawDto: CreateAdV2Dto,
+    userId: string,
+    userType: string,
+    onCommitted: () => void,
+  ) {
+    // Work on a copy: the idempotency hash was taken over the request as sent.
+    const dto = normalizeCreateAdV2(JSON.parse(JSON.stringify(rawDto ?? {})));
+
+    // 2) Commercial auto-detection only fills gaps (bodyType, payload, …).
+    const enriched = normalizeCreateAdV2(
+      dto?.category === AdCategoryV2.COMMERCIAL_VEHICLE && dto.commercial
+        ? await this.intent.applyIfCommercial(dto)
+        : dto,
+    );
+
+    // 3) All synchronous field rules, reported together.
+    const commercialVehicleTypes =
+      enriched?.category === AdCategoryV2.COMMERCIAL_VEHICLE
+        ? await this.sellConfig.getActiveCommercialTypeNames()
+        : new Set<string>();
+    const fields: FieldErrors = validateCreateAdV2(enriched, {
+      commercialVehicleTypes,
+      isAllowedImageUrl: (url) => this.media.isOwnBucketUrl(url),
+    });
+
+    // 4) Async checks (only where the sync shape is valid, to avoid noise).
+    const data: any = enriched.data ?? {};
+    const hasMediaIds = Array.isArray(data.mediaIds) && data.mediaIds.length > 0;
+    const asyncChecks: Promise<FieldErrors>[] = [];
+    if (!fields['data.mediaIds'] && !fields['data.videoMediaId']) {
+      if (hasMediaIds || data.videoMediaId) {
+        asyncChecks.push(
+          this.media.checkForAd(userId, hasMediaIds ? data.mediaIds : [], data.videoMediaId),
+        );
+      }
+    }
+    if (enriched.category !== AdCategoryV2.PROPERTY) {
+      const prefix =
+        enriched.category === AdCategoryV2.COMMERCIAL_VEHICLE ? 'commercial' : 'vehicle';
+      const veh: any =
+        prefix === 'commercial' ? enriched.commercial : enriched.vehicle;
+      if (veh && typeof veh === 'object') {
+        const refs: Record<string, string | undefined> = {};
+        for (const k of [
+          'manufacturerId',
+          'modelId',
+          'variantId',
+          'transmissionTypeId',
+          'fuelTypeId',
+        ]) {
+          if (!fields[`${prefix}.${k}`] && veh[k]) refs[k] = veh[k];
+        }
+        asyncChecks.push(this.inventory.findInvalidRefs(prefix, refs));
+      }
+    }
+    for (const extra of await Promise.all(asyncChecks)) {
+      for (const [k, v] of Object.entries(extra)) if (!fields[k]) fields[k] = v;
+    }
+    if (Object.keys(fields).length) {
+      throw new FieldValidationException(fields);
+    }
+
+    // 5) Location: geocode only fills what is missing. 0 is a valid coordinate.
+    const locationHierarchy = await this.resolveLocation(data);
+
+    const title = await buildTitle(enriched, this.inventory);
+    const geoLocation =
+      data.latitude != null && data.longitude != null
+        ? {
+            type: 'Point' as const,
+            coordinates: [data.longitude, data.latitude] as [number, number],
+          }
+        : undefined;
+
+    // 6) Transaction: Ad + detail + media attach. withTransaction retries
+    //    transient errors and never calls abort after a successful commit.
+    const session: ClientSession = await this.adRepo.startSession();
+    let savedAdId!: Types.ObjectId;
+    try {
+      await session.withTransaction(async () => {
+        const adId = new Types.ObjectId();
+        let images: string[] = hasMediaIds ? [] : (data.images ?? []).slice(0, 20);
+        let link: string | undefined = data.link;
+
+        if (hasMediaIds || data.videoMediaId) {
+          const resolved = await this.media.attachForAd({
+            ownerId: userId,
+            adId,
+            mediaIds: hasMediaIds ? data.mediaIds : [],
+            videoMediaId: data.videoMediaId,
+            session,
+          });
+          if (hasMediaIds) images = resolved.imageUrls;
+          // The app plays `link` as the ad video (see add_*_form.dart).
+          if (resolved.videoUrl) link = resolved.videoUrl;
+        }
+
+        const savedAd = await this.adRepo.create(
+          {
+            _id: adId,
+            title,
+            description: data.description,
+            price: data.price,
+            images,
+            location: data.location,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            geoLocation,
+            city: locationHierarchy.city,
+            district: locationHierarchy.district,
+            state: locationHierarchy.state,
+            country: locationHierarchy.country,
+            link,
+            postedBy: new Types.ObjectId(userId),
+            category: enriched.category as any,
+            isActive: true,
+            soldOut: false,
+            isApproved: false,
+          },
+          { session },
+        );
+
+        switch (enriched.category) {
+          case AdCategoryV2.PROPERTY:
+            await this.propRepo.createFromDto(savedAd._id, enriched.property, { session });
+            break;
+          case AdCategoryV2.PRIVATE_VEHICLE:
+          case AdCategoryV2.TWO_WHEELER:
+            await this.vehRepo.createFromDto(savedAd._id, enriched.vehicle, { session });
+            break;
+          case AdCategoryV2.COMMERCIAL_VEHICLE:
+            await this.cvehRepo.createFromDto(savedAd._id, enriched.commercial, { session });
+            break;
+        }
+        savedAdId = savedAd._id;
+      });
+    } finally {
+      await session.endSession();
+    }
+    onCommitted();
+
+    // 7) Post-commit. Each step is best-effort: a committed ad is never an error.
+    const adIdStr = savedAdId.toString();
+    try {
+      await this.outbox.enqueue('ad.created', {
+        adId: adIdStr,
+        category: enriched.category,
+        userId,
+        userType,
+      });
+    } catch (error) {
+      this.logger.warn(`outbox enqueue failed for ${adIdStr}: ${(error as Error)?.message}`);
+    }
+    try {
+      await this.cache.invalidateLists();
+    } catch (error) {
+      this.logger.warn(`v2 list cache invalidation failed: ${(error as Error)?.message}`);
+    }
+    try {
+      await this.cache.invalidateById(adIdStr);
+      await this.cache.del(this.cache.makeKey({ op: 'sellerStats', id: userId }));
+    } catch (error) {
+      this.logger.warn(`v2 by-id/seller cache invalidation failed: ${(error as Error)?.message}`);
+    }
+    try {
+      await this.legacyCache.invalidateLists();
+    } catch (error) {
+      this.logger.warn(`v1 cache invalidation failed: ${(error as Error)?.message}`);
+    }
+
+    try {
+      const detailed = await this.adRepo.aggregateOneByIdDetailed(savedAdId);
+      if (detailed) return mapToDetailedResponseDto(detailed);
+    } catch (error) {
+      this.logger.warn(`response hydrate failed for ${adIdStr}: ${(error as Error)?.message}`);
+    }
+    // Minimal but contract-complete fallback.
+    return {
+      id: adIdStr,
+      status: 'pending',
+      title,
+      description: data.description,
+      price: data.price,
+      category: enriched.category,
+      location: data.location,
+      isActive: true,
+      soldOut: false,
+      isApproved: false,
+      postedBy: userId,
+    };
+  }
+
+  private async resolveLocation(data: any): Promise<LocationHierarchy> {
+    const hierarchy: LocationHierarchy = {};
+    const hasCoords = data.latitude != null && data.longitude != null;
+    if (!hasCoords) return hierarchy;
+
+    try {
+      const geo = await this.geocodingService.reverseGeocode(
+        data.latitude,
+        data.longitude,
+      );
+      if (!data.location && geo?.location) data.location = geo.location;
+      hierarchy.city = geo?.city;
+      hierarchy.state = geo?.state;
+      hierarchy.country = geo?.country;
+    } catch {
+      if (!data.location) {
+        data.location = `${Number(data.latitude).toFixed(4)}, ${Number(data.longitude).toFixed(4)}`;
+      }
+    }
+    try {
+      hierarchy.district = this.locationHierarchyService.getLocationFilter(
+        data.latitude,
+        data.longitude,
+      ).district;
+    } catch {
+      // optional
+    }
+    return hierarchy;
   }
 }

@@ -303,9 +303,10 @@ export class GetAdByIdUc {
           this.inventory.getModel(vehicleDetails.modelId || ''),
           this.inventory.getVariant(vehicleDetails.variantId || ''),
           this.inventory.getFuelType(vehicleDetails.fuelTypeId || ''),
-          this.inventory.getTransmissionType(
-            vehicleDetails.transmissionTypeId || '',
-          ),
+          // Two-wheelers may have no transmission: no "Not Found" placeholder.
+          vehicleDetails.transmissionTypeId
+            ? this.inventory.getTransmissionType(vehicleDetails.transmissionTypeId)
+            : Promise.resolve(undefined),
         ]);
 
       processedVehicleDetails = {

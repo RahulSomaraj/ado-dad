@@ -155,7 +155,7 @@ describe('ChatService', () => {
       });
       expect(res.message.attachments[0].mimeType).toBe('audio/mp4');
       expect(res.message.attachments[0].duration).toBe(12);
-      expect(roomModel.updateOne.mock.calls[0][1].$set.lastMessage.preview).toBe('Voice message');
+      expect(roomModel.updateOne.mock.calls[0][1].$set.lastMessage.preview).toBe('Voice message · 0:12');
     });
 
     it('does not create unread for self-chat', async () => {
@@ -248,12 +248,63 @@ describe('ChatService', () => {
     it('rejects a garbage cursor', async () => {
       await expectCode(service.listRooms(seller, { limit: 2, cursor: 'nope' }), ChatErrorCode.VALIDATION);
     });
+
+    it('hides chats I archived, and lists only them for filter=archived', async () => {
+      await service.listRooms(seller, { limit: 20 });
+      expect(roomModel.aggregate.mock.calls[0][0][0].$match[`archivedFor.${seller}`]).toEqual({ $exists: false });
+      await service.listRooms(seller, { limit: 20, filter: 'archived' });
+      expect(roomModel.aggregate.mock.calls[1][0][0].$match[`archivedFor.${seller}`]).toEqual({ $exists: true });
+    });
+
+    it('gives my own last message a read/sent status from the other side lastReadAt', async () => {
+      const sentAt = new Date('2026-09-15T04:00:00Z');
+      const base = {
+        ...room,
+        lastMessage: { id: new Types.ObjectId(), type: 'text', preview: 'Yes', senderId: new Types.ObjectId(seller), createdAt: sentAt },
+        other: [],
+        adDoc: [],
+      };
+      roomModel.aggregate = jest.fn(() =>
+        q([
+          { ...base, lastReadAt: { [buyer]: new Date(sentAt.getTime() + 1000) } },
+          { ...base, _id: new Types.ObjectId(), lastReadAt: { [buyer]: new Date(sentAt.getTime() - 1000) } },
+        ]),
+      );
+      const { rooms } = await service.listRooms(seller, { limit: 20 });
+      expect(rooms[0].lastMessage?.status).toBe('read');
+      expect(rooms[1].lastMessage?.status).toBe('sent');
+      const asBuyer = await service.listRooms(buyer, { limit: 20 });
+      expect(asBuyer.rooms[0].lastMessage?.status).toBeNull();
+    });
+  });
+
+  describe('archive / mark unread', () => {
+    it('archives per user and unarchives', async () => {
+      await service.setArchivedForUser(room.roomId, buyer, true);
+      expect(Object.keys(roomModel.updateOne.mock.calls[0][1].$set)).toEqual([`archivedFor.${buyer}`]);
+      await service.setArchivedForUser(room.roomId, buyer, false);
+      expect(roomModel.updateOne.mock.calls[1][1].$unset).toEqual({ [`archivedFor.${buyer}`]: '' });
+    });
+
+    it('marks unread with at least 1 and refuses strangers', async () => {
+      await service.markRoomUnread(room.roomId, buyer);
+      expect(roomModel.updateOne.mock.calls[0][1]).toEqual({ $max: { [`unreadCounts.${buyer}`]: 1 } });
+      await expectCode(service.markRoomUnread(room.roomId, stranger), ChatErrorCode.NOT_PARTICIPANT);
+    });
+
+    it('a new message unarchives the chat for both people', async () => {
+      await service.sendMessage(room.roomId, buyer, { type: MessageType.TEXT, content: 'hi', clientMessageId: 'c-1' } as any);
+      const update = roomModel.updateOne.mock.calls.at(-1)[1];
+      expect(update.$unset).toEqual({ [`archivedFor.${buyer}`]: '', [`archivedFor.${seller}`]: '' });
+    });
   });
 
   describe('previewFor', () => {
     it('summarises each type', () => {
       expect(ChatService.previewFor('image')).toBe('Photo');
       expect(ChatService.previewFor('audio')).toBe('Voice message');
+      expect(ChatService.previewFor('audio', undefined, [{ duration: 24 }])).toBe('Voice message · 0:24');
+      expect(ChatService.previewFor('audio', undefined, [{ duration: 125 }])).toBe('Voice message · 2:05');
       expect(ChatService.previewFor('text', '  multi\n line  ')).toBe('multi line');
     });
   });

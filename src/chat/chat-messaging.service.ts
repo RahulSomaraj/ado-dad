@@ -35,7 +35,7 @@ export class ChatMessagingService {
         roomId: room.roomId,
         recipientId,
         senderName: sender?.name ?? 'New message',
-        preview: ChatService.previewFor(message.type, message.content),
+        preview: ChatService.previewFor(message.type, message.content, message.attachments),
       });
     }
     return message;
@@ -49,8 +49,21 @@ export class ChatMessagingService {
       lastReadAt,
       lastMessageId: lastMessageId ?? null,
     });
-    void this.fanOutConversation(room.roomId, [userId]);
+    // The other side's list shows my read state as the tick on their last message.
+    void this.fanOutConversation(room.roomId, [userId, otherUserId]);
     return { roomId: room.roomId, unreadCount: 0, lastReadAt, otherUserId };
+  }
+
+  async setArchived(roomId: string, userId: string, archived: boolean) {
+    await this.chatService.setArchivedForUser(roomId, userId, archived);
+    void this.fanOutConversation(roomId, [userId]);
+    return { roomId, archived };
+  }
+
+  async markUnread(roomId: string, userId: string) {
+    await this.chatService.markRoomUnread(roomId, userId);
+    void this.fanOutConversation(roomId, [userId]);
+    return { roomId };
   }
 
   /** Push each user's own view of the room (unread count and role differ per user). */
