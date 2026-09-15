@@ -10,6 +10,9 @@ export enum AdCategory {
   TWO_WHEELER = 'two_wheeler',
 }
 
+/** Max entries kept in Ad.priceHistory. */
+export const PRICE_HISTORY_LIMIT = 20;
+
 export enum AdStatus {
   PENDING = 'pending',
   APPROVED = 'approved',
@@ -97,6 +100,23 @@ export class Ad {
 
   @Prop({ default: 0 })
   viewCount?: number;
+
+  /**
+   * Previous asking prices, oldest first. Each entry is the price the ad had
+   * *until* `changedAt`, appended by AdsService.update when the price changes.
+   * Capped at PRICE_HISTORY_LIMIT entries. Powers the "₹15,000 lower" line.
+   */
+  @Prop({
+    type: [
+      {
+        _id: false,
+        price: { type: Number, required: true, min: 0 },
+        changedAt: { type: Date, required: true },
+      },
+    ],
+    default: undefined,
+  })
+  priceHistory?: { price: number; changedAt: Date }[];
 
   // Soft delete fields
   @Prop({ default: false })

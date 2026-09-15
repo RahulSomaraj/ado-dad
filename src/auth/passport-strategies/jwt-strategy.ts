@@ -19,6 +19,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
+      // P0-6: assert the claims we actually mint. Verified safe first —
+      // UsersService.generateAccessToken() (users.service.ts:1180-1186) signs
+      // both of these, and access tokens live 1 h, which bounds the blast
+      // radius if an older token is still in flight. This matches the
+      // verifyOptions already declared on the app-level JwtModule
+      // (app.module.ts:104-107), which this strategy was silently ignoring.
+      //
+      // Note this does NOT separate access from refresh tokens — both are
+      // signed with the same secret, issuer and audience, differing only in
+      // expiry. Adding a `typ` claim is the fix for that; tracked separately.
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
     });
   }
 

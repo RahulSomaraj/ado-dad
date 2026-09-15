@@ -7,7 +7,14 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
-import { Ad, AdDocument, AdCategory, AdStatus } from '../schemas/ad.schema';
+import {
+  Ad,
+  AdDocument,
+  AdCategory,
+  AdStatus,
+  PRICE_HISTORY_LIMIT,
+} from '../schemas/ad.schema';
+
 import {
   PropertyAd,
   PropertyAdDocument,
@@ -61,6 +68,22 @@ import {
   convertDistanceToKm,
   LocationHierarchy,
 } from './ads.service.utils';
+
+/**
+ * Appends the price an ad had until now to its history, oldest first, keeping
+ * the last PRICE_HISTORY_LIMIT entries. Exported for unit tests.
+ */
+export function appendPriceHistory(
+  history: { price: number; changedAt: Date }[] | undefined | null,
+  outgoingPrice: number,
+  now: Date = new Date(),
+): { price: number; changedAt: Date }[] {
+  const next = [
+    ...(history ?? []).map((h) => ({ price: h.price, changedAt: h.changedAt })),
+    { price: outgoingPrice, changedAt: now },
+  ];
+  return next.slice(-PRICE_HISTORY_LIMIT);
+}
 
 @Injectable()
 export class AdsService {
@@ -1794,6 +1817,15 @@ export class AdsService {
     if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
     if (typeof updateData.isActive === 'boolean')
       adUpdate.isActive = updateData.isActive;
+    // Record the outgoing price before it's overwritten, so the detail page
+    // can show "₹15,000 lower than 3 days ago".
+    if (
+      typeof adUpdate.price === 'number' &&
+      typeof ad.price === 'number' &&
+      adUpdate.price !== ad.price
+    ) {
+      adUpdate.priceHistory = appendPriceHistory(ad.priceHistory, ad.price);
+    }
     if (Object.keys(adUpdate).length) {
       Object.assign(ad, adUpdate);
       await ad.save();

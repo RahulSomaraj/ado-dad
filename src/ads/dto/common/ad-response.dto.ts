@@ -77,6 +77,7 @@ export class AdResponseDto {
     countryCode?: string;
     phoneNumber?: string;
     profilePic?: string;
+    isVerified?: boolean;
   };
 
   @ApiProperty({ description: 'Is advertisement approved' })
@@ -335,6 +336,26 @@ export class DetailedAdResponseDto extends AdResponseDto {
 
   @ApiPropertyOptional({ description: 'View count' })
   viewCount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Last 5 previous prices, oldest first. Each is the price the ad had until changedAt.',
+  })
+  priceHistory?: Array<{ price: number; changedAt: Date }>;
+
+  @ApiPropertyOptional({
+    description: 'Price before the most recent change (absent if never changed)',
+  })
+  previousPrice?: number;
+
+  @ApiPropertyOptional({ description: 'When the price last changed' })
+  priceChangedAt?: Date;
+
+  @ApiPropertyOptional({
+    description:
+      'False when latitude/longitude are the default fallback, not the ad real position',
+  })
+  hasCoordinates?: boolean;
 
   @ApiPropertyOptional({ description: 'Has user chat with this ad' })
   hasUserChat?: boolean;

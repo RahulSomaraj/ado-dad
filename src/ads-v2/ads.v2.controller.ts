@@ -10,6 +10,7 @@ import {
   Req,
   BadRequestException,
   Param,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -447,6 +448,8 @@ export class AdsV2Controller {
   async getById(
     @Param('id') id: string,
     @Req() req: any,
+    @Query('lat') latRaw?: string,
+    @Query('lng') lngRaw?: string,
   ): Promise<DetailedAdResponseDto> {
     // Validate ID parameter
     if (!id || typeof id !== 'string' || id.trim().length === 0) {
@@ -459,12 +462,26 @@ export class AdsV2Controller {
     // Optional authentication: populated by OptionalJwtAuthGuard, null when the
     // caller is anonymous (or suspended/banned).
     const userId: string | undefined = req.user?.id;
+    const userType: string | undefined = req.user?.type;
+
+    // Optional viewer position → `distance` in the response. Ignored unless
+    // both are valid coordinates; never an error, the page works without it.
+    const lat = latRaw != null && latRaw !== '' ? Number(latRaw) : NaN;
+    const lng = lngRaw != null && lngRaw !== '' ? Number(lngRaw) : NaN;
+    const hasPosition =
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lng) <= 180;
 
     // Call the use case to get advertisement by ID
     // userId will be undefined if no valid token is provided
     return await this.getAdByIdUc.exec({
       adId: adId,
       userId: userId || undefined,
+      userType,
+      lat: hasPosition ? lat : undefined,
+      lng: hasPosition ? lng : undefined,
     });
   }
 }

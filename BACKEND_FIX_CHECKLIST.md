@@ -78,24 +78,33 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked · ⛓ ne
 
 ## P1 — Major performance
 
-### [ ] P1-2 ⭐ — Make the geo path cacheable (geo-bucket the list cache key) *(F1, Critical)*
+### [~] P1-2 ⭐ — Make the geo path cacheable (geo-bucket the list cache key) *(F1, Critical)*
 `src/ads-v2/application/use-cases/list-ads.uc.ts:109-160`
 **This is the designated first performance task.**
 
 - [ ] **Capture the baseline first** (see §Measurement) — no baseline, no ship
-- [ ] Stop returning `null` from `generateListCacheKey()` when `latitude`/`longitude` are present (`:131-135`, `:148-152`)
-- [ ] Quantise coords: `geoBucket = ${lat.toFixed(2)}:${lng.toFixed(2)}` (≈1.1 km cells)
-- [ ] Include the **effective** radius in the key (`maxDistance`, or the fallback threshold actually used — not the requested one)
-- [ ] Extend Scenario 1 (no filters) and Scenario 2 (category + textual location) to accept a geo component
-- [ ] Add Scenario 3: `category + geoBucket`
-- [ ] Keep returning `null` for high-cardinality shapes: free-text `search`, price ranges, multi-select id filters
-- [ ] Keep `CACHE_TTL` at 300 s; keep writing through `AdsCache.setList` so existing tag invalidation on ad writes keeps working
-- [ ] **Guard:** cached `CachedListData` must stay user-agnostic — `isFavorite` is applied *after* the cache read (`exec()` `:83-88`). `userId` must never enter the key
-- [ ] Add Redis hit/miss counters for `ads:v2:list:*`
-- [ ] Publish before/after numbers
+- [x] Stop returning `null` from `generateListCacheKey()` when `latitude`/`longitude` are present (`:131-135`, `:148-152`)
+- [x] Quantise coords: `geoBucket = ${lat.toFixed(2)}:${lng.toFixed(2)}` (≈1.1 km cells)
+- [x] Include the radius in the key — the **requested** `maxDistance`, or `auto` when omitted. The fallback ladder is deterministic for a given filter set, so `auto` identifies that shape unambiguously; there is no need (and no way, at key-generation time) to know which rung will win
+- [x] Replaced the three scenario branches with a single allow-list key builder — `category`, `location`, `geo`, `listingType`, pagination, sort, `includeTotal`. **This also fixed a live cache-poisoning bug:** the old Scenario 1/2 guards ignored `manufacturerIds`, `modelIds`, `propertyTypes`, the year/bedroom/area ranges and the boolean property filters, so e.g. `{ propertyTypes: ['villa'] }` matched "Scenario 1: all ads" and could be served an entry built for a different filter set
+- [x] Keep returning `null` for high-cardinality shapes: free-text `search`, price ranges, multi-select id filters
+- [x] Keep `CACHE_TTL` at 300 s; keep writing through `AdsCache.setList` so existing tag invalidation on ad writes keeps working
+- [x] **Guard:** cached `CachedListData` must stay user-agnostic — `isFavorite` is applied *after* the cache read (`exec()` `:83-88`). `userId` must never enter the key
+- [x] Hit/miss/uncacheable counters — in-process, logged every 500 list requests as `ads:v2:list cache — requests=… hitRate=…%`, so no metrics dependency was added
+- [ ] **Capture the after-numbers and compare** — the only step left on this item
 
 **Do not** in this task: change the response shape, remove the count query, or touch `$geoNear`.
 **Accept:** two users 500 m apart with the same filters share one cache entry. Hit rate goes from 0 % to a meaningful fraction. p95 falls for cached buckets; cold-bucket latency unchanged.
+
+### [x] P1-2b — v1 writes must invalidate the v2 caches *(new finding, prerequisite for P1-2)*
+`src/ads/services/ads.service.ts` · `src/ads/ads.module.ts`
+
+Found while shipping P1-2: `AdsService.invalidateAdCache()` only cleared v1's own `AdsService.CACHE_PREFIX` keys. Every write still goes through v1, so nothing ever cleared the `ads:v2:*` namespace. Before P1-2 that only affected two narrow cached shapes; after it, an edited/sold/deleted ad would sit in the v2 feed for up to 5 minutes.
+
+- [x] Inject `AdsCache` into `AdsService` and call `invalidateLists()` + `invalidateById(adId)` from `invalidateAdCache()`
+- [x] Provide `AdsCache` in `AdsModule` (it only depends on the global `RedisService`, so no module cycle and no shared state)
+- [x] `updateSoldOut()` now calls `invalidateAdCache()` — **it previously invalidated nothing at all**, in either namespace
+- [ ] Verify by hand: edit an ad → refetch the feed immediately → the change is visible; mark an ad sold → it disappears from the feed at once
 
 ### [ ] P1-3 ⛓C1 — Kill the duplicate count aggregation *(F2, Critical)*
 `src/ads-v2/application/use-cases/list-ads.uc.ts:396-408, 805-830`
@@ -109,24 +118,25 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked · ⛓ ne
 
 **Accept:** one aggregation per list request. `hasNext` still correct on the last page and on an exactly-full page.
 
-### [ ] P1-5 — Cache `GET /v2/ads/:id` *(F3, High)*
+### [~] P1-5 — Cache `GET /v2/ads/:id` *(F3, High)*
 `src/ads-v2/application/use-cases/get-ad-by-id.uc.ts` · `ads-cache.ts`
 
-- [ ] Read through `AdsCache.getById` before hitting Mongo
-- [ ] Write through `AdsCache.setById` (TTL 300 s) — currently `setById` exists and is called from nowhere
-- [ ] Invalidate via `AdsCache.invalidateById` on: v2 create, v1 update, v1 mark-sold, v1 delete, admin approve/reject, moderation actions
-- [ ] Keep the cached payload user-agnostic — apply `isFavorite` and any view-count side effects after the cache read
-- [ ] Confirm a view-count increment (if any) is not skipped by the cache
+- [x] Read through the cache before hitting Mongo — added `AdsCache.byIdKey()` so the read uses the same key format `setById` writes
+- [x] Write through `AdsCache.setById` (TTL 300 s) — it existed and was called from nowhere
+- [x] Invalidate via `AdsCache.invalidateById` on v1 update / delete / approval / mark-sold — covered by P1-2b, since all four route through `invalidateAdCache()`
+- [x] Cached payload stays user-agnostic: stored in the `anonymous` slot, with `isFavorite`, `favoritesCount`, chats and ratings layered on after the read, and the response spread into a fresh object so the cached one is never mutated
+- [x] View count stays exact: the fire-and-forget `$inc` became `AdRepository.incrementViewCount()` (a `findOneAndUpdate` returning the new value, run inside the same `Promise.all`) — same single write, but the displayed count no longer comes from a cached snapshot
 
-**Accept:** second open of the same ad serves from Redis; editing the ad reflects immediately.
+**Accept:** second open of the same ad serves from Redis (no aggregation in the Mongo profiler); editing the ad reflects immediately; the view count still advances by one per open.
+- [ ] Measure before/after
 
-### [ ] P1-6 — Cache vehicle-inventory reference data *(F6, Medium)*
+### [~] P1-6 — Cache vehicle-inventory reference data *(F6, Medium)*
 `src/ads-v2/infrastructure/services/vehicle-inventory.gateway.ts:180-205` · `vehicle-inventory.service.ts`
 
-- [ ] Cache manufacturers / models / variants / fuel types / transmission types in Redis, key `ads:v2:inventory:<type>`, TTL 1 h
-- [ ] Wrap `VehicleInventoryGateway.get*ByIds` so `batchFetchInventoryItems` (`list-ads.uc.ts:876-985`) stops issuing 5 Mongo queries per list response
-- [ ] Cache the `/vehicle-inventory/*` controller reads the filter sheet calls
-- [ ] Add an admin-triggered invalidation (or accept the 1 h staleness explicitly)
+- [x] Cached in Redis under `ads:v2:inventory:<kind>:<id>`, TTL 1 h — **per id, not per collection**, so the list batch path and the single-item detail path share entries
+- [x] All five `get*ByIds` and all five singular `get*` methods now read through the cache and load only the misses; fails open on any Redis error. `assertRefs()` deliberately still reads Mongo — validation must stay authoritative
+- [ ] Cache the `/vehicle-inventory/*` controller reads that the filter sheet calls (separate service, not yet done)
+- [ ] Add an admin-triggered invalidation, or accept the 1 h staleness explicitly (currently accepted)
 
 **Accept:** a warm list request issues 0 inventory queries to Mongo.
 
@@ -145,13 +155,13 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked · ⛓ ne
 - [ ] Frontend switches `fetchAllAds` to `_dio.get` and enables conditional requests
 - [ ] Remove POST one release after the client has migrated
 
-### [ ] P2-4 — Invalidate the favourites cache *(F9, Medium — correctness)*
+### [x] P2-4 — Invalidate the favourites cache *(F9, Medium — correctness)*
 `src/favorites/favorite.service.ts` · `list-ads.uc.ts:1460-1497`
 
-- [ ] `DEL ads:v2:userFavorites:{userId}` on favourite **add**
-- [ ] `DEL ads:v2:userFavorites:{userId}` on favourite **remove**
-- [ ] Do the same on any bulk/clear favourites path
-- [ ] Replace the `Array.includes` scan in `addIsFavoriteToAds` with a `Set` (O(n·m) → O(n))
+- [x] `DEL ads:v2:userFavorites:{userId}` on favourite **add**
+- [x] `DEL ads:v2:userFavorites:{userId}` on favourite **remove** (both the toggle branch in `addFavorite` and `removeFavorite`)
+- [x] Also on `updateFavorite` (re-points a favourite at a different ad). Invalidation is wrapped in try/catch — a Redis failure must never fail the favourite itself
+- [x] `addIsFavoriteToAds` now builds a `Set` (O(n·m) → O(n)), with an early exit when the user has no favourites
 
 **Accept:** toggle a heart, refetch the list immediately — state is correct with no 5-minute lag and no optimistic-update revert.
 
@@ -172,26 +182,26 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked · ⛓ ne
 
 ## P3 — Optimization
 
-### [ ] P3-2 — Delete the dead `locationScore` stage *(F4, High)*
-- [ ] Remove the `$addFields` locationScore stage (`location-hierarchy.service.ts:324-400`, wired at `list-ads.uc.ts:348-353`)
-- [ ] Remove `locationScore` from the `$project` (`:778`)
-- [ ] Confirm nothing sorts on it — the `$sort` was deliberately removed (see comment at `:615-623`)
-- [ ] Check the frontend never reads `locationScore` off a row
+### [x] P3-2 — Delete the dead `locationScore` stage *(F4, High)*
+- [x] Removed the `$addFields` locationScore push from the list pipeline. `LocationHierarchyService.getLocationScoringStage()` itself is left in place — dead code now, delete it once nothing else references it
+- [x] Removed `locationScore` from the `$project`
+- [x] Confirmed nothing sorts on it — the `$sort` was deliberately removed earlier, and `$geoNear` already emits nearest-first
+- [ ] Check the frontend never reads `locationScore` off a row — **the one open item here**, since the field has left the response
 - [ ] Measure: it runs before `$skip`/`$limit`, i.e. over every doc in the radius
 
-### [ ] P3-3 — Query timeouts and pool sizing *(F8, Medium)*
-- [ ] Add `maxTimeMS` (start at 5 000 ms) to every ads aggregation in `ad.repo.ts:394-396`
-- [ ] Decide `allowDiskUse` explicitly
-- [ ] Add a read preference if reading from a secondary is acceptable
+### [~] P3-3 — Query timeouts and pool sizing *(F8, Medium)*
+- [x] `maxTimeMS: 5000` on both `AdRepository.aggregate()` and `aggregateOneByIdDetailed()`, overridable per call
+- [x] `allowDiskUse` decided explicitly: left **off**, with a comment saying a stage that needs disk is a pipeline bug to fix rather than a flag to flip
+- [ ] Add a read preference if reading from a secondary is acceptable (not done — needs a call on replica-set topology and staleness)
 - [ ] Only **after** P1-2/P1-3 reduce load: re-measure pool checkout wait, then raise `maxPoolSize` off 10 (`app.module.ts:79`)
 - [ ] Alert on `maxTimeMS` expirations so timeouts don't hide a regression
 
-### [ ] P3-5 — Cap the distance fallback *(F5, High)*
+### [x] P3-5 — Cap the distance fallback *(F5, High)*
 `list-ads.uc.ts:194-222`
 
-- [ ] Replace `[50, 100, 200, 500, 1000]` with at most two radii (e.g. `[200, 1000]`)
-- [ ] Or: widen `maxDistance` once and sort by distance instead of looping
-- [ ] Make sure the non-geo page-1 fallback still triggers for genuinely empty regions
+- [x] `[50, 100, 200, 500, 1000]` → `[200, 1000]`. Result-equivalent for dense areas — `$geoNear` returns nearest-first, so a 200 km radius yields the same first page as a 50 km one whenever anything exists within 50 km — and at most two aggregations instead of six in sparse ones
+- [x] (alternative not needed — see above)
+- [x] The non-geo page-1 fallback after the ladder is untouched and still triggers for genuinely empty regions
 - [ ] Measure worst-case latency in a sparse pincode before/after
 
 ### [ ] P3-7 — Re-test a compound `2dsphere` index *(F10 note)*
@@ -211,10 +221,46 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked · ⛓ ne
 ## P4 — Cleanup
 
 - [ ] **P4-2** Prune redundant single-field `Ad` indexes that duplicate compound prefixes — `{isActive:1}`, `{soldOut:1}`, `{isApproved:1}`, `{status:1}` (`ad.schema.ts:120-175`). Confirm each with `explain()` before dropping; drop one per deploy.
-- [ ] **P4-3** Delete `src/app.module.ts.bak`, `temp-task-def.json`, `updated-task-def.json`, `new-task-def.json`
+- [ ] **P4-3** Delete `src/app.module.ts.bak`, `temp-task-def.json`, `updated-task-def.json`, `new-task-def.json` — **must be done locally**: this session can write files to the repo but cannot delete them
 - [ ] **S7** Local hygiene: the Firebase service-account JSON and `.env*` files in the repo root are correctly gitignored — confirm they have never been committed (`git log --all --full-history -- '*firebase-adminsdk*'`) and rotate if they were
 
 ---
+
+## D — Ad detail page support (2026-09-15, for mobile pass 5)
+
+Written in a Cowork session; `tsc --noEmit` over `ads.v2.module` + `ads.module`
+is clean and the new unit spec passes (9 tests). **Not committed, not run
+against Mongo/Redis.**
+
+### [~] D-1 — Sold ads load on `GET /v2/ads/:id`
+`get-ad-by-id.uc.ts` — removed `soldOut: false` from `$match`. Lists still exclude sold ads.
+- [x] Response already carried `soldOut`; the app now renders a SOLD state
+- [ ] Smoke: mark an ad sold → open it from chat / wishlist → 200 with `soldOut: true`
+- [ ] Decide separately: should `isRemovedByAdmin` / `status: rejected` ads 404 for non-owners? (they don't today)
+
+### [~] D-2 — Chat rooms on detail are owner/staff-only; exact `chatsCount`
+- [x] `chats` (participant names/emails, last message text) now only for `postedBy === userId` or `SA`/`AD`/`MO`; everyone else gets `[]`
+- [x] `chatsCount` = `countDocuments` (was `rooms.length` after `.limit(10)`)
+- [ ] Check ado_dad_admin still shows chats on the ad page (admin token → `type` `SA`/`AD`)
+
+### [~] D-3 — `priceHistory`
+- [x] `Ad.priceHistory: [{ price, changedAt }]` (no `_id`, capped at `PRICE_HISTORY_LIMIT` = 20)
+- [x] `AdsService.update` appends the outgoing price when `price` changes (`appendPriceHistory`, unit-tested)
+- [x] Detail response: `priceHistory` (last 5), `previousPrice`, `priceChangedAt`
+- [ ] Smoke: edit price 5,00,000 → 4,85,000 → detail has `previousPrice: 500000`
+- Note: only v1 `PATCH /ads/:id` changes price today; if a v2 update path is added it must call `appendPriceHistory` too
+
+### [~] D-4 — `distance` + `hasCoordinates` on detail
+- [x] `GET /v2/ads/:id?lat=&lng=` (optional, validated, silently ignored if bad) → `distance` km (1 dp, haversine)
+- [x] `hasCoordinates: false` when lat/lng are the 9.3311/76.9222 fallback; no distance then
+- [x] Computed after the cache read, so the shared cache entry stays viewer-independent
+
+### [x] D-5 — Seller `isVerified` on detail
+- [x] Added to the users `$lookup` projection and `user` object
+
+### Follow-ups found here
+- [ ] Detail still returns seller `email` publicly; the mobile app no longer reads it — candidate to strip (check admin first)
+- [ ] `ads.service.spec.ts` fails on `develop` before these changes: missing `AdsCache` provider in the testing module, and jest has no `moduleNameMapper` for `src/…` absolute imports (`manufacturers.service.ts:18`)
 
 ## Coordination gates (do not ship unilaterally)
 

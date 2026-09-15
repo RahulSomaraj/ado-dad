@@ -14,6 +14,31 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { RedisIoAdapter } from './shared/redis-io.adapter';
 import { Connection } from 'mongoose';
 
+import * as dns from 'node:dns';
+
+// Local-only DNS workaround. On some Windows setups Node's bundled c-ares
+// cannot read the system DNS config and falls back to 127.0.0.1, so the
+// mongodb+srv lookup dies with ECONNREFUSED; forcing IPv4 also avoids long
+// stalls on networks that advertise IPv6 but cannot route it.
+//
+// This never runs on the server. setServers is process-wide, so public
+// resolvers would break private names (VPC endpoints, peered Atlas, internal
+// Redis) and would route the SSRF guard's lookups off-network too.
+if (process.env.NODE_ENV !== 'production') {
+  dns.setDefaultResultOrder('ipv4first');
+
+  // Override the dev defaults with e.g. DNS_SERVERS=1.1.1.1,9.9.9.9
+  const dnsServers = (process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (dnsServers.length) {
+    dns.setServers(dnsServers);
+  }
+}
+
+// ...rest of main.ts
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
@@ -41,6 +66,13 @@ async function bootstrap() {
         '(e.g. CORS_ORIGINS=https://app.ado-dad.com,https://admin.ado-dad.com).',
     );
   }
+
+  // Request logging — must be the very first middleware. enableCors() below
+  // is itself an app.use(cors(...)), and cors answers an OPTIONS preflight by
+  // ending the response without calling next(), so anything registered after
+  // it never sees preflights. Registering here also covers the 413s from the
+  // body-size limits further down.
+  app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   app.enableCors({
     origin: corsOrigins.length ? corsOrigins : '*',
@@ -218,8 +250,6 @@ async function bootstrap() {
       limit: '5mb',
     }),
   );
-  app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
-
   const server = await app.listen(PORT, '0.0.0.0', () => {
     Logger.log(`🚀 Server listening on port ${PORT}`);
     Logger.log(`📚 Swagger UI: http://localhost:${PORT}/docs`);

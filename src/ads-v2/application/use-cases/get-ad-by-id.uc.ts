@@ -22,7 +22,42 @@ import {
   ChatMessageDocument,
 } from '../../../chat/schemas/chat-message.schema';
 import { InjectModel } from '@nestjs/mongoose';
+import { UserType } from '../../../users/enums/user.types';
 import { Model } from 'mongoose';
+
+/** Fallback coordinates the response uses when an ad has none (Pathanamthitta). */
+const DEFAULT_LATITUDE = 9.3311;
+const DEFAULT_LONGITUDE = 76.9222;
+
+/**
+ * Great-circle distance in km (1 decimal) between the viewer and the ad, or
+ * null when either position is unknown. Exported for unit tests.
+ */
+export function distanceKm(
+  lat: number | undefined,
+  lng: number | undefined,
+  ad: { latitude?: number; longitude?: number; hasCoordinates?: boolean },
+): number | null {
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    ad.hasCoordinates === false ||
+    typeof ad.latitude !== 'number' ||
+    typeof ad.longitude !== 'number'
+  ) {
+    return null;
+  }
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(ad.latitude - lat);
+  const dLng = toRad(ad.longitude - lng);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat)) * Math.cos(toRad(ad.latitude)) * Math.sin(dLng / 2) ** 2;
+  const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(km * 10) / 10;
+}
 
 @Injectable()
 export class GetAdByIdUc {
@@ -53,8 +88,13 @@ export class GetAdByIdUc {
   async exec(input: {
     adId: string;
     userId?: string;
+    /** Caller's UserType ('SA', 'AD', 'MO' see chat rooms like the owner). */
+    userType?: string;
+    /** Viewer position, for `distance`. Both or neither. */
+    lat?: number;
+    lng?: number;
   }): Promise<DetailedAdResponseDto> {
-    const { adId, userId } = input;
+    const { adId, userId, userType, lat, lng } = input;
 
     // Validate ObjectId
     if (!Types.ObjectId.isValid(adId)) {
@@ -70,7 +110,9 @@ export class GetAdByIdUc {
         $match: {
           _id: new Types.ObjectId(adId),
           isDeleted: { $ne: true },
-          soldOut: false, // Exclude sold-out ads
+          // Sold ads stay readable: chat history, shares, wishlist and
+          // notifications all link here, and the app renders a SOLD state.
+          // (Lists still exclude them.)
         },
       },
 
@@ -90,6 +132,7 @@ export class GetAdByIdUc {
                 countryCode: 1,
                 phoneNumber: 1,
                 profilePic: 1,
+                isVerified: 1,
                 type: 1,
                 createdAt: 1,
                 isDeleted: 1,
@@ -164,7 +207,8 @@ export class GetAdByIdUc {
         })
         : Promise.resolve(null),
 
-      // 4. Chat Data (Refactored to return data instead of mutating DTO)
+      // 4. Chat data. Room list (participants, last message) is owner-only;
+      //    counts are public. Ownership is resolved inside from the ad.
       this.getChatData(adId, userId),
 
       // 5. Ratings
@@ -210,11 +254,24 @@ export class GetAdByIdUc {
     detailed.favoritesCount = favoritesCount;
     detailed.isFavorite = !!userFavorite;
 
-    // Populate chat data
-    detailed.chats = chatData.chats;
+    // Populate chat data. Other buyers' conversations (names, emails, last
+    // message text) are only for the ad's owner — this is a public endpoint.
+    const isOwner = !!userId && detailed.postedBy === userId;
+    const isStaff =
+      userType === UserType.SUPER_ADMIN ||
+      userType === UserType.ADMIN ||
+      userType === UserType.MODERATOR;
+    detailed.chats = isOwner || isStaff ? chatData.chats : [];
     detailed.chatsCount = chatData.chatsCount;
     if (userId) {
       detailed.hasUserChat = chatData.hasUserChat;
+    }
+
+    // Distance from the viewer, when they sent a position and the ad has real
+    // coordinates (mapToDetailedResponseDto substitutes a default otherwise).
+    const distance = distanceKm(lat, lng, detailed);
+    if (distance != null) {
+      detailed.distance = distance;
     }
 
     // Populate ratings
@@ -298,8 +355,16 @@ export class GetAdByIdUc {
         countryCode: ad.user.countryCode,
         phoneNumber: ad.user.phoneNumber,
         profilePic: ad.user.profilePic,
+        isVerified: ad.user.isVerified === true,
       }
       : undefined;
+
+    const history: { price: number; changedAt: Date }[] = Array.isArray(
+      ad.priceHistory,
+    )
+      ? ad.priceHistory
+      : [];
+    const lastChange = history.length ? history[history.length - 1] : undefined;
 
     return {
       id: ad._id.toString(),
@@ -308,8 +373,9 @@ export class GetAdByIdUc {
       price: ad.price,
       images: ad.images || [],
       location: ad.location,
-      latitude: ad.latitude || 9.3311,
-      longitude: ad.longitude || 76.9222,
+      latitude: ad.latitude || DEFAULT_LATITUDE,
+      longitude: ad.longitude || DEFAULT_LONGITUDE,
+      hasCoordinates: typeof ad.latitude === 'number' && typeof ad.longitude === 'number',
       link: ad.link || '',
       category: ad.category,
       isActive: ad.isActive,
@@ -324,6 +390,12 @@ export class GetAdByIdUc {
       propertyDetails: ad.propertyDetails?.[0] || undefined,
       vehicleDetails: processedVehicleDetails,
       commercialVehicleDetails: processedCommercialVehicleDetails,
+      priceHistory: history.slice(-5).map((h) => ({
+        price: h.price,
+        changedAt: h.changedAt,
+      })),
+      previousPrice: lastChange?.price,
+      priceChangedAt: lastChange?.changedAt,
     };
   }
 
@@ -355,9 +427,15 @@ export class GetAdByIdUc {
         })
         : Promise.resolve(null);
 
-      const [chatRooms, userChatRoom] = await Promise.all([
+      // Exact total — chatRooms is capped at 10 by the list query above.
+      const chatsCountPromise = this.chatRoomModel.countDocuments({
+        adId: new Types.ObjectId(adId),
+      });
+
+      const [chatRooms, userChatRoom, chatsCount] = await Promise.all([
         chatRoomsPromise,
         userChatPromise,
+        chatsCountPromise,
       ]);
 
       // Get last message for each chat room (parallelized map)
@@ -397,7 +475,7 @@ export class GetAdByIdUc {
 
       return {
         chats: chatRoomsWithMessages,
-        chatsCount: chatRooms.length,
+        chatsCount,
         hasUserChat: !!userChatRoom,
       };
     } catch (error) {
