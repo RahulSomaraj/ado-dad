@@ -36,15 +36,21 @@ export class ChatEventsService {
   /** True when the user has at least one live socket on any instance (Redis adapter aware). */
   async isUserOnline(userId: string): Promise<boolean> {
     if (!this.server) return false;
+    let timer: NodeJS.Timeout | undefined;
     try {
       const sockets = await Promise.race([
         this.server.in(userChannel(userId)).fetchSockets(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), 1500);
+        }),
       ]);
       return sockets.length > 0;
     } catch (err) {
       this.logger.warn(`Presence lookup failed for ${userId}: ${(err as Error).message}`);
       return false;
+    } finally {
+      // Don't leave the 1.5 s timer alive after a fast answer (kept jest workers open).
+      if (timer) clearTimeout(timer);
     }
   }
 }
