@@ -22,6 +22,24 @@ export class LegacyAdsCacheInvalidator {
     private readonly config: ConfigService,
   ) {}
 
+  /** v1 detail cache entries: `ads:getById:<id>:<userId|anonymous>`. */
+  async invalidateById(adId: string): Promise<void> {
+    const prefix: string =
+      this.config.get<string>('REDIS_CONFIG.keyPrefix') || 'adodad:';
+    try {
+      const keys = await this.redis.keys(`ads:getById:${adId}:*`);
+      await Promise.all(
+        keys.map((k) =>
+          this.redis.cacheDel(k.startsWith(prefix) ? k.slice(prefix.length) : k),
+        ),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `v1 getById cache invalidation failed: ${(error as Error)?.message}`,
+      );
+    }
+  }
+
   async invalidateLists(): Promise<void> {
     const prefix: string =
       this.config.get<string>('REDIS_CONFIG.keyPrefix') || 'adodad:';

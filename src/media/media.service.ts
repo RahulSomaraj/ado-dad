@@ -296,6 +296,51 @@ export class MediaService {
     };
   }
 
+  /**
+   * Edit support: media currently attached to `adId` whose URL is not in
+   * `keepUrls` become `orphaned` (adId kept for audit). Returns their S3 keys
+   * so the caller can delete the objects after commit.
+   */
+  async orphanForAd(params: {
+    adId: Types.ObjectId;
+    keepUrls: string[];
+    session: ClientSession;
+  }): Promise<string[]> {
+    const { adId, keepUrls, session } = params;
+    const keep = new Set(keepUrls.filter(Boolean));
+    const attached = await this.mediaModel
+      .find({ adId, status: MediaStatus.ATTACHED })
+      .session(session)
+      .lean<Media[]>()
+      .exec();
+    const gone = attached.filter(
+      (m) => !keep.has(m.url || this.s3.getPublicUrl(m.key)),
+    );
+    if (!gone.length) return [];
+    await this.mediaModel.updateMany(
+      { _id: { $in: gone.map((m) => m._id) }, status: MediaStatus.ATTACHED },
+      { $set: { status: MediaStatus.ORPHANED } },
+      { session },
+    );
+    return gone.map((m) => m.key);
+  }
+
+  /** Best-effort S3 deletes (never throws). Returns how many succeeded. */
+  async deleteObjectsBestEffort(keys: string[]): Promise<number> {
+    let ok = 0;
+    for (const key of keys) {
+      try {
+        await this.s3.deleteObject(key);
+        ok++;
+      } catch (error) {
+        this.logger.warn(
+          `Could not delete orphaned object ${key}: ${(error as Error)?.message}`,
+        );
+      }
+    }
+    return ok;
+  }
+
   private collectIds(mediaIds?: string[], videoMediaId?: string): string[] {
     const all = [...(Array.isArray(mediaIds) ? mediaIds : [])];
     if (videoMediaId) all.push(videoMediaId);

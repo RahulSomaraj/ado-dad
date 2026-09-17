@@ -339,3 +339,11 @@ Contract: `SELL_API_CONTRACT.md` v1 (15 Sep 2026). Written in a Cowork session a
 - [ ] Old app smoke: legacy `images[]` from `/upload/presigned-url` still creates (host allow-list); property `plot` with `bedrooms: 0` still creates
 - [ ] Pending ads are readable by anyone with the id (not only the owner) — decide whether non-owners should get 404 for `pending`/`rejected`
 - [ ] Coordination C4: the app can now take commercial types from `/v2/sell/config` instead of its workaround
+
+### [x] SELL-FLOW edit — `GET /v2/ads/:id/edit`, `PATCH /v2/ads/:id`
+- [x] Edit payload in the create body shape (`data.media [{url}]`, `data.videoUrl`, one category block + `manufacturerName`/`modelName`/`variantName`); owner or SA, else 404
+- [x] PATCH: full replace validated with `validateCreateAdV2`; `data.media` = `{mediaId}` (new upload) or `{url}` (already on the ad); `videoMediaId` / `videoUrl` (must equal current) / `removeVideo`; category change → 422
+- [x] Transaction: Ad `$set`/`$unset` (price history via `appendPriceHistory`), detail doc replace, new media attached, removed media → `orphaned` (adId kept), S3 objects deleted best-effort after commit
+- [x] JwtAuthGuard + SuspensionGuard + 60/h per user; caches: v2 byId + lists, v1 byId + lists
+- [ ] Open decision: should edits of approved ads go back to moderation? (status/approval untouched today)
+- [ ] Deploy steps and smoke tests: `DEPLOY_SELL_FLOW.md`

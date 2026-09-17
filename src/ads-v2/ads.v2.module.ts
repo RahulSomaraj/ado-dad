@@ -10,6 +10,8 @@ import { ListAdsUc } from './application/use-cases/list-ads.uc';
 import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
 import { ProfileStatsUc } from './application/use-cases/profile-stats.uc';
 import { SellerStatsUc } from './application/use-cases/seller-stats.uc';
+import { GetAdForEditUc } from './application/use-cases/get-ad-for-edit.uc';
+import { UpdateAdUc } from './application/use-cases/update-ad.uc';
 
 // Repositories
 import { AdRepository } from './infrastructure/repos/ad.repo';
@@ -103,6 +105,8 @@ const OutboxSchema = {
     GetAdByIdUc,
     ProfileStatsUc,
     SellerStatsUc,
+    GetAdForEditUc,
+    UpdateAdUc,
 
     // Repositories
     AdRepository,

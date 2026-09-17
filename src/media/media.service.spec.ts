@@ -111,6 +111,36 @@ describe('MediaService', () => {
     });
   });
 
+  describe('orphanForAd', () => {
+    it('orphans attached media no longer on the ad and returns their keys', async () => {
+      const m = { ...pendingImage(), status: MediaStatus.ATTACHED, url: 'https://b/gone.jpg' };
+      const { svc, model } = build(m);
+      const keys = await svc.orphanForAd({
+        adId: new Types.ObjectId(),
+        keepUrls: ['https://b/kept.jpg'],
+        session: {} as any,
+      });
+      expect(keys).toEqual([m.key]);
+      expect(model.updateMany).toHaveBeenCalledWith(
+        expect.anything(),
+        { $set: { status: MediaStatus.ORPHANED } },
+        expect.anything(),
+      );
+    });
+
+    it('keeps media whose url is still used', async () => {
+      const m = { ...pendingImage(), status: MediaStatus.ATTACHED, url: 'https://b/kept.jpg' };
+      const { svc, model } = build(m);
+      const keys = await svc.orphanForAd({
+        adId: new Types.ObjectId(),
+        keepUrls: ['https://b/kept.jpg'],
+        session: {} as any,
+      });
+      expect(keys).toEqual([]);
+      expect(model.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('attachForAd', () => {
     it('rejects media that is not uploaded yet', async () => {
       const m = pendingImage();

@@ -12,6 +12,7 @@ import {
   Param,
   Query,
   UseFilters,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -45,6 +46,9 @@ import { OptionalJwtAuthGuard } from '../auth/guard/optional-jwt-auth-guard';
 import { SuspensionGuard } from '../moderation/guards/suspension.guard';
 import { UserThrottleGuard } from '../common/guards/user-throttle.guard';
 import { SellApiExceptionFilter } from '../common/filters/sell-api-exception.filter';
+import { GetAdForEditUc } from './application/use-cases/get-ad-for-edit.uc';
+import { UpdateAdUc } from './application/use-cases/update-ad.uc';
+import { UpdateAdV2Dto } from './dto/update-ad-v2.dto';
 
 @ApiTags('Ads v2')
 @Controller('v2/ads')
@@ -55,6 +59,8 @@ export class AdsV2Controller {
     private readonly getAdByIdUc: GetAdByIdUc,
     private readonly profileStatsUc: ProfileStatsUc,
     private readonly sellerStatsUc: SellerStatsUc,
+    private readonly getAdForEditUc: GetAdForEditUc,
+    private readonly updateAdUc: UpdateAdUc,
   ) {}
 
   @Post()
@@ -441,6 +447,49 @@ export class AdsV2Controller {
       throw new BadRequestException('Seller id is required');
     }
     return this.sellerStatsUc.exec(id.trim());
+  }
+
+  @Get(':id/edit')
+  @HttpCode(HttpStatus.OK)
+  @UseFilters(SellApiExceptionFilter)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ad in POST /v2/ads body shape, for pre-filling the edit form',
+    description:
+      'Owner or super admin only; anything else is 404 NOT_FOUND. Returns { id, status, category, data: { title, description, price, location, latitude, longitude, media: [{url}], videoUrl }, and one of vehicle | commercial | property (with manufacturerName, modelName, variantName for vehicles) }.',
+  })
+  async getForEdit(@Param('id') id: string, @Req() req: any) {
+    return this.getAdForEditUc.exec({
+      adId: String(id ?? '').trim(),
+      userId: String(req.user.id),
+      userType: req.user.type,
+    });
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @UseFilters(SellApiExceptionFilter)
+  @Throttle({ name: 'adsUpdate', limit: 60, ttl: 3600, by: 'user' })
+  @UseGuards(JwtAuthGuard, UserThrottleGuard, SuspensionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Edit an ad (full replace of editable fields)',
+    description:
+      'Same body as POST /v2/ads, with data.media [{mediaId}|{url}], data.videoMediaId | data.videoUrl | data.removeVideo. Category cannot change. Status/approval are not changed. Idempotency-Key is accepted and ignored.',
+  })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdV2Dto,
+    @Req() req: any,
+  ): Promise<DetailedAdResponseDto> {
+    const result = await this.updateAdUc.exec({
+      adId: String(id ?? '').trim(),
+      dto,
+      userId: String(req.user.id),
+      userType: req.user.type,
+    });
+    return result as DetailedAdResponseDto;
   }
 
   @Get(':id')

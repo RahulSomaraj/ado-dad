@@ -8,6 +8,7 @@ export enum MediaStatus {
   UPLOADED = 'uploaded', // HeadObject verified size + type
   ATTACHED = 'attached', // referenced by an ad (adId set)
   REJECTED = 'rejected', // invalid object or expired; S3 object deleted
+  ORPHANED = 'orphaned', // was attached, then removed from its ad by an edit (adId kept)
 }
 
 export enum MediaKindEnum {
