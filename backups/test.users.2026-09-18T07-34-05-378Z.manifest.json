@@ -1,0 +1,88 @@
+{
+  "takenAt": "2026-09-18T07:34:05.685Z",
+  "host": "production-cluster.xhgfz.mongodb.net",
+  "database": "test",
+  "environment": "production",
+  "collection": "users",
+  "documentsExpected": 1003,
+  "documentsWritten": 1003,
+  "documentsAtFinish": 1003,
+  "bytesOnDisk": 94942,
+  "gzip": true,
+  "format": "newline-delimited canonical Extended JSON",
+  "dataFile": "C:\\pendrive\\personal\\ado-dad-repo\\ado-dad\\backups\\test.users.2026-09-18T07-34-05-378Z.jsonl.gz",
+  "indexes": [
+    {
+      "v": 2,
+      "key": {
+        "_id": 1
+      },
+      "name": "_id_"
+    },
+    {
+      "v": 2,
+      "key": {
+        "email": 1
+      },
+      "name": "email_1",
+      "background": true,
+      "unique": true
+    },
+    {
+      "v": 2,
+      "key": {
+        "phoneNumber": 1
+      },
+      "name": "phoneNumber_1",
+      "background": true,
+      "unique": true
+    },
+    {
+      "v": 2,
+      "key": {
+        "_fts": "text",
+        "_ftsx": 1
+      },
+      "name": "name_text_email_text_phoneNumber_text",
+      "background": true,
+      "weights": {
+        "email": 1,
+        "name": 1,
+        "phoneNumber": 1
+      },
+      "default_language": "english",
+      "language_override": "language",
+      "textIndexVersion": 3
+    },
+    {
+      "v": 2,
+      "key": {
+        "countryCode": 1,
+        "phoneNumber": 1
+      },
+      "name": "countryCode_1_phoneNumber_1",
+      "background": true,
+      "unique": true
+    },
+    {
+      "v": 2,
+      "key": {
+        "moderationStatus": 1
+      },
+      "name": "moderationStatus_1",
+      "background": true
+    },
+    {
+      "v": 2,
+      "key": {
+        "suspendedUntil": 1
+      },
+      "name": "suspendedUntil_1",
+      "background": true
+    }
+  ],
+  "restore": {
+    "documents": "mongoimport --uri \"<MONGO_URI>\" --collection users --type json --file \"C:\\pendrive\\personal\\ado-dad-repo\\ado-dad\\backups\\test.users.2026-09-18T07-34-05-378Z.jsonl\"   (gunzip the file first)",
+    "indexes": "Index definitions are in the \"indexes\" array above; recreate with db.<collection>.createIndex(key, options) for any that are missing."
+  }
+}

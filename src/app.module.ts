@@ -37,6 +37,8 @@ import { ChatModule } from './chat/chat.module';
 import { UserReportModule } from './users/user-report.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AppVersionModule } from './app-version/app-version.module';
+import { SearchModule } from './search/search.module';
+import { describeTarget } from './common/database/db-safety.util';
 
 // Services
 import { EmailService } from './utils/email.service';
@@ -72,9 +74,41 @@ import { MediaModule } from './media/media.module';
       useFactory: async (configService: ConfigService) => {
         const mongoConfig =
           configService.get('MONGO_URI') || 'mongodb://localhost:27017/ado-dad';
+        const target = describeTarget(mongoConfig);
+
         Logger.log(
-          `Connecting to MongoDB: ${mongoConfig.replace(/\/\/.*@/, '//***:***@')}`,
+          `Connecting to MongoDB: ${target.redactedUri} ` +
+            `[${target.environment}: ${target.reason}]`,
         );
+
+        /**
+         * SAFETY (S-PROD-1): Mongoose builds every `schema.index()` declaration
+         * automatically on boot when `autoIndex` is left at its default of true.
+         * With this checkout routinely pointed at production, that means a merged
+         * schema edit is enough to start an index build on a live collection —
+         * no script, no review, no chance to pick the window. On `ads` that is a
+         * long, IO-heavy build, and for a text index it fails outright because
+         * Mongo allows only one per collection.
+         *
+         * Indexes are therefore created deliberately, by migration scripts, on
+         * every environment that is not local. Set MONGO_AUTO_INDEX=true to opt
+         * back in for a local database.
+         */
+        const autoIndex =
+          (process.env.MONGO_AUTO_INDEX ?? '').toLowerCase() === 'true' ||
+          target.environment === 'local';
+
+        if (!autoIndex) {
+          Logger.log(
+            'Mongoose autoIndex is DISABLED — indexes are managed by migration scripts ' +
+              '(npm run search:indexes). Set MONGO_AUTO_INDEX=true only for a local database.',
+          );
+        } else {
+          Logger.warn(
+            `Mongoose autoIndex is ENABLED against "${target.database}". ` +
+              'Schema index changes will build on boot.',
+          );
+        }
 
         return {
           uri: mongoConfig,
@@ -82,6 +116,10 @@ import { MediaModule } from './media/media.module';
           serverSelectionTimeoutMS: 5000,
           socketTimeoutMS: 45000,
           bufferCommands: false,
+          autoIndex,
+          // Creating a collection implicitly is harmless, but it follows
+          // autoIndex by default in Mongoose 6+; keep them explicit and aligned.
+          autoCreate: autoIndex,
         };
       },
       inject: [ConfigService],
@@ -134,6 +172,7 @@ import { MediaModule } from './media/media.module';
     ModerationModule,
     SellModule, // CREATE-06: GET /v2/sell/config
     MediaModule, // CREATE-06: POST /v2/media/intents, /:id/complete
+    SearchModule, // S1/S2: query-understanding lexicon + parser (no routes yet)
     RedisModule,
   ],
   providers: [

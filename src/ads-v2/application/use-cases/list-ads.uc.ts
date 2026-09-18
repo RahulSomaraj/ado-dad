@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { AdRepository } from '../../infrastructure/repos/ad.repo';
 import { VehicleInventoryGateway } from '../../infrastructure/services/vehicle-inventory.gateway';
@@ -14,6 +14,19 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
 import { AdStatus } from '../../../ads/schemas/ad.schema';
+import { escapeRegExp } from '../../../common/security/regex.util';
+import { SearchQueryService } from '../../../search/services/search-query.service';
+import { ParsedQuery, SearchChip } from '../../../search/dto/parsed-query';
+
+/**
+ * S0-1: user-supplied text must never reach `$regex` unescaped — a query of
+ * `.*` scans everything and `(a+)+$` is a CPU bomb (ReDoS). Every regex built
+ * from `search` or `location` in this file goes through this helper.
+ */
+const literalRegex = (value: string) => ({
+  $regex: escapeRegExp(value),
+  $options: 'i',
+});
 
 export interface PaginatedAdsResponse {
   data: DetailedAdResponseDto[];
@@ -27,6 +40,21 @@ export interface PaginatedAdsResponse {
   nextCursor?: string | null;
   /** Set when using cursor pagination; use this for the previous page. */
   prevCursor?: string | null;
+  /**
+   * How the raw search string was interpreted. Present only when the parser ran
+   * and produced something. The app renders `chips` as removable pills so the
+   * user can see and undo the inference — which is what makes filtering on a
+   * guess acceptable.
+   */
+  query?: {
+    raw: string;
+    category?: string;
+    location?: { kind: string; slug: string; displayName: string };
+    freeText: string;
+    confidence: number;
+    applied: boolean;
+    chips: SearchChip[];
+  };
 }
 
 export interface CachedListData {
@@ -66,12 +94,94 @@ export class ListAdsUc {
     @InjectModel(Favorite.name)
     private readonly favoriteModel: Model<FavoriteDocument>,
     private readonly locationHierarchyService: LocationHierarchyService,
+    @Optional() private readonly searchQuery?: SearchQueryService,
   ) { }
+
+  /**
+   * S4-lite: turn a raw `search` string into structured filters before anything
+   * else runs.
+   *
+   * This is the fix for "searching cars returns property ads". Until now the
+   * term went straight to `$text`, which stems "cars" to "car" and matches every
+   * flat whose description mentions "car parking". `category` was a filter the
+   * API accepted but nothing ever derived.
+   *
+   * Three rules, in order of importance:
+   *
+   *  1. An explicit filter from the caller ALWAYS wins. If the app sent
+   *     `category=two_wheeler`, a parsed "cars" is discarded, not merged.
+   *  2. Below `MIN_FILTER_CONFIDENCE` nothing is applied at all. "car wash
+   *     service centre" matches one lexicon word out of four and must not be
+   *     forced into Cars.
+   *  3. The unmatched remainder becomes the free-text term. "cars in kollam"
+   *     leaves nothing behind, so the query stops being a text search entirely —
+   *     which also makes it cacheable for the first time.
+   *
+   * Off by default. Set SEARCH_PARSER_ENABLED=true to turn it on; unsetting it
+   * reverts to the old behaviour without a deploy.
+   */
+  private async resolveFilters(
+    filters: ListAdsV2Dto,
+  ): Promise<{ effective: ListAdsV2Dto; parsed?: ParsedQuery }> {
+    if ((process.env.SEARCH_PARSER_ENABLED ?? '').toLowerCase() !== 'true') {
+      return { effective: filters };
+    }
+    if (!this.searchQuery || !filters.search?.trim()) {
+      return { effective: filters };
+    }
+
+    let parsed: ParsedQuery;
+    try {
+      parsed = await this.searchQuery.parse(filters.search);
+    } catch (err) {
+      // Query understanding is an enhancement; never let it break listing.
+      this.logger.warn(`Search parse failed, falling back to raw text: ${(err as Error).message}`);
+      return { effective: filters };
+    }
+
+    if (!parsed.applyAsFilter) {
+      return { effective: filters, parsed };
+    }
+
+    const effective: ListAdsV2Dto = { ...filters };
+    // Rule 1: only fill what the caller left empty.
+    const fill = <K extends keyof ListAdsV2Dto>(key: K, value: ListAdsV2Dto[K]) => {
+      const current = effective[key] as unknown;
+      const unset =
+        current === undefined ||
+        current === null ||
+        current === '' ||
+        (Array.isArray(current) && current.length === 0);
+      if (unset && value !== undefined) effective[key] = value;
+    };
+
+    fill('category', parsed.category as ListAdsV2Dto['category']);
+    fill('propertyTypes', parsed.propertyTypes);
+    fill('listingType', parsed.listingType as ListAdsV2Dto['listingType']);
+    fill('commercialVehicleTypes', parsed.commercialVehicleTypes);
+    fill('manufacturerIds', parsed.manufacturerIds);
+    fill('modelIds', parsed.modelIds);
+    fill('fuelTypeIds', parsed.fuelTypeIds);
+    fill('transmissionTypeIds', parsed.transmissionTypeIds);
+    fill('minPrice', parsed.minPrice);
+    fill('maxPrice', parsed.maxPrice);
+    fill('minYear', parsed.minYear);
+    fill('maxYear', parsed.maxYear);
+    fill('minBedrooms', parsed.bedrooms);
+
+    // Rule 3: whatever the lexicon did not claim stays as the text term.
+    effective.search = parsed.freeText || undefined;
+
+    return { effective, parsed };
+  }
 
   async exec(
     filters: ListAdsV2Dto,
     userId?: string,
   ): Promise<PaginatedAdsResponse> {
+    const { effective, parsed } = await this.resolveFilters(filters);
+    filters = effective;
+
     // 1. Check if this request should be cached
     const cacheKey = this.generateListCacheKey(filters);
 
@@ -116,6 +226,25 @@ export class ListAdsUc {
       hasPrev: baseData.hasPrev,
       nextCursor: baseData.nextCursor,
       prevCursor: baseData.prevCursor,
+      ...(parsed
+        ? {
+            query: {
+              raw: parsed.raw,
+              category: parsed.category,
+              location: parsed.location
+                ? {
+                    kind: parsed.location.kind,
+                    slug: parsed.location.slug,
+                    displayName: parsed.location.displayName,
+                  }
+                : undefined,
+              freeText: parsed.freeText,
+              confidence: parsed.confidence,
+              applied: parsed.applyAsFilter,
+              chips: parsed.chips,
+            },
+          }
+        : {}),
     };
   }
 
@@ -247,6 +376,86 @@ export class ListAdsUc {
   }
 
   /**
+   * Run an aggregation, degrading gracefully if the text index is missing.
+   *
+   * S-PROD-2: MongoDB allows only one text index per collection, so swapping
+   * `title_text_description_text` for `ad_search_v2` means dropping the old one
+   * first. For as long as the new index is building, every `$text` query on
+   * `ads` fails with error 27 ("text index required for $text query").
+   *
+   * Without this, that window is a stream of 500s on the busiest endpoint in the
+   * product. With it, search degrades to an escaped regex over title and
+   * description — measurably worse results, but a working app — and says so in
+   * the logs once per occurrence rather than once per request.
+   */
+  private async aggregateWithTextFallback(
+    pipeline: any[],
+    searchTerm?: string,
+  ): Promise<any[]> {
+    try {
+      return await this.adRepo.aggregate(pipeline);
+    } catch (err) {
+      if (!ListAdsUc.isMissingTextIndexError(err)) throw err;
+
+      this.reportTextIndexMissing();
+
+      const degraded = ListAdsUc.replaceTextStage(pipeline, searchTerm);
+      if (!degraded) throw err;
+      return await this.adRepo.aggregate(degraded);
+    }
+  }
+
+  /** Mongo error 27 / IndexNotFound for a $text query with no text index. */
+  private static isMissingTextIndexError(err: unknown): boolean {
+    const e = err as { code?: number; codeName?: string; message?: string };
+    if (!e) return false;
+    if (e.code === 27) return true;
+    if (e.codeName === 'IndexNotFound') return true;
+    return /text index required for \$text query/i.test(e.message ?? '');
+  }
+
+  /**
+   * Swap every `$text` predicate for an escaped regex on title/description.
+   * Returns null when the pipeline has no `$text`, so an unrelated error is
+   * re-thrown rather than silently retried.
+   */
+  private static replaceTextStage(pipeline: any[], searchTerm?: string): any[] | null {
+    if (!searchTerm) return null;
+    let replaced = false;
+
+    const degraded = pipeline.map((stage) => {
+      const match = stage?.$match;
+      if (!match || !match.$text) return stage;
+      replaced = true;
+      const { $text, ...rest } = match;
+      return {
+        $match: {
+          ...rest,
+          $or: [
+            { title: literalRegex(searchTerm) },
+            { description: literalRegex(searchTerm) },
+          ],
+        },
+      };
+    });
+
+    return replaced ? degraded : null;
+  }
+
+  /** Log the degradation at most once a minute, not once per request. */
+  private lastTextIndexWarningAt = 0;
+  private reportTextIndexMissing(): void {
+    const now = Date.now();
+    if (now - this.lastTextIndexWarningAt < 60_000) return;
+    this.lastTextIndexWarningAt = now;
+    this.logger.error(
+      'No text index on `ads` — $text queries are failing, search has degraded to regex. ' +
+        'If an index migration is running this is expected until it completes; ' +
+        'otherwise run: npm run search:indexes -- --status',
+    );
+  }
+
+  /**
    * Fetch list data from database with automatic distance fallback
    */
   private async fetchListDataFromDatabase(
@@ -273,12 +482,15 @@ export class ListAdsUc {
   private async fetchWithDistanceFallback(
     filters: ListAdsV2Dto,
   ): Promise<CachedListData> {
-    // P3-5: was [50, 100, 200, 500, 1000]. Each rung re-ran the COMPLETE
-    // aggregation, so one request in a sparse region could cost six of them.
-    // Two rungs are enough: $geoNear already returns nearest-first, so a 200 km
-    // radius yields the same first page as a 50 km one whenever there is
-    // anything within 50 km — the narrower rungs bought nothing but scans.
-    const distanceThresholds = [200, 1000]; // km
+    // P3-5 trimmed this from [50, 100, 200, 500, 1000] to [200, 1000] because
+    // each rung re-runs the COMPLETE aggregation. S0-2 restores 50 km as the
+    // FIRST rung: "nearest-first ordering is equivalent" only holds for the
+    // ordering, not for what the user is shown — a 200 km first rung silently
+    // fills a Kollam feed with Kochi and Coimbatore ads, which is the bug this
+    // search pass exists to fix. 50 km is also far cheaper than 200 km in a
+    // dense district, so the common case gets faster, not slower; only genuinely
+    // sparse regions pay for the extra rung.
+    const distanceThresholds = [50, 200, 1000]; // km
     let lastResult: CachedListData | null = null;
 
     for (const distance of distanceThresholds) {
@@ -448,7 +660,7 @@ export class ListAdsUc {
     if (location) {
       pipeline.push({
         $match: {
-          location: { $regex: location, $options: 'i' },
+          location: literalRegex(location),
         },
       });
     }
@@ -463,13 +675,15 @@ export class ListAdsUc {
       });
     }
 
-    // Search with geo: use regex (cannot use $text when $geoNear is first)
+    // Search with geo: use regex (cannot use $text when $geoNear is first).
+    // S4 replaces this whole branch with $geoWithin + $text so there is a single
+    // search semantic; until then the regex is at least escaped (S0-1).
     if (hasSearch && hasGeo) {
       pipeline.push({
         $match: {
           $or: [
-            { title: { $regex: searchTrimmed, $options: 'i' } },
-            { description: { $regex: searchTrimmed, $options: 'i' } },
+            { title: literalRegex(searchTrimmed as string) },
+            { description: literalRegex(searchTrimmed as string) },
           ],
         },
       });
@@ -492,7 +706,7 @@ export class ListAdsUc {
       if (category) stages.push({ $match: { category } });
       if (location) {
         stages.push({
-          $match: { location: { $regex: location, $options: 'i' } },
+          $match: { location: literalRegex(location) },
         });
       }
       if (minPrice || maxPrice) {
@@ -505,8 +719,8 @@ export class ListAdsUc {
         stages.push({
           $match: {
             $or: [
-              { title: { $regex: searchTrimmed, $options: 'i' } },
-              { description: { $regex: searchTrimmed, $options: 'i' } },
+              { title: literalRegex(searchTrimmed as string) },
+              { description: literalRegex(searchTrimmed as string) },
             ],
           },
         });
@@ -886,9 +1100,12 @@ export class ListAdsUc {
     }
 
     const [rawData, countResult] = await Promise.all([
-      this.adRepo.aggregate(pipeline),
+      this.aggregateWithTextFallback(pipeline, searchTrimmed),
       runCount
-        ? this.adRepo.aggregate(buildSimplifiedCountPipeline())
+        ? this.aggregateWithTextFallback(
+            buildSimplifiedCountPipeline(),
+            searchTrimmed,
+          )
         : Promise.resolve([{ total: 0 }]),
     ]);
 

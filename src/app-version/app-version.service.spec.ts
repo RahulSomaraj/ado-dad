@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { AppVersionService } from './app-version.service';
 import { AppVersion } from './schemas/app-version.schema';
@@ -77,6 +77,27 @@ describe('AppVersionService', () => {
         });
     });
 
+    describe('updateVersion build validation', () => {
+        it('rejects minSupported above latest after merging with stored config', async () => {
+            mockAppVersionModel.findOneAndUpdate.mockClear();
+            mockAppVersionModel.findOne.mockResolvedValue({ ...mockAppVersion, androidLatestBuild: 10 });
+
+            await expect(
+                service.updateVersion({ androidMinSupportedBuild: 11 }),
+            ).rejects.toThrow(BadRequestException);
+            expect(mockAppVersionModel.findOneAndUpdate).not.toHaveBeenCalled();
+        });
+
+        it('accepts a consistent build policy', async () => {
+            mockAppVersionModel.findOne.mockResolvedValue({ ...mockAppVersion, androidLatestBuild: 10 });
+            mockAppVersionModel.findOneAndUpdate.mockResolvedValue({ ...mockAppVersion, androidLatestBuild: 12, androidMinSupportedBuild: 11 });
+
+            const result = await service.updateVersion({ androidLatestBuild: 12, androidMinSupportedBuild: 11 });
+
+            expect(result.success).toBe(true);
+        });
+    });
+
     describe('getVersion', () => {
         it('should return app version information', async () => {
             mockAppVersionModel.findOne.mockResolvedValue(mockAppVersion);
@@ -87,6 +108,25 @@ describe('AppVersionService', () => {
             expect(result.success).toBe(true);
             expect(result.data.versions.ios).toBe(mockAppVersion.iosLatestVersion);
             expect(result.data.storeUrls.android).toBe(mockAppVersion.androidStoreUrl);
+            // Build policy not configured yet -> nulls, app falls back to legacy fields
+            expect(result.data.builds.android).toEqual({ latest: null, minSupported: null });
+            expect(result.data.releaseNotes).toBeNull();
+        });
+
+        it('should expose build-number policy when configured', async () => {
+            mockAppVersionModel.findOne.mockResolvedValue({
+                ...mockAppVersion,
+                androidLatestBuild: 12,
+                androidMinSupportedBuild: 9,
+                iosLatestBuild: 11,
+                releaseNotes: 'Bug fixes',
+            });
+
+            const result = await service.getVersion();
+
+            expect(result.data.builds.android).toEqual({ latest: 12, minSupported: 9 });
+            expect(result.data.builds.ios).toEqual({ latest: 11, minSupported: null });
+            expect(result.data.releaseNotes).toBe('Bug fixes');
         });
 
         it('should throw NotFoundException if configuration is not found', async () => {

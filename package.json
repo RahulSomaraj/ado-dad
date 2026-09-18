@@ -54,7 +54,13 @@
     "fix:commercial-vehicle-data": "ts-node src/ads/scripts/fix-commercial-vehicle-data.ts",
     "validate:data": "ts-node -e \"import('./src/ads/scripts/fix-commercial-vehicle-data.ts').then(m => m.fixCommercialVehicleData())\"",
     "data:consistency-check": "curl -X GET \"http://localhost:5001/ads/validation/consistency\" -H \"Authorization: Bearer YOUR_TOKEN\"",
-    "data:cleanup": "curl -X POST \"http://localhost:5001/ads/validation/cleanup\" -H \"Authorization: Bearer YOUR_TOKEN\""
+    "data:cleanup": "curl -X POST \"http://localhost:5001/ads/validation/cleanup\" -H \"Authorization: Bearer YOUR_TOKEN\"",
+    "search:seed": "ts-node -r tsconfig-paths/register src/search/seed/run-search-seed.ts",
+    "search:seed:derive": "ts-node -r tsconfig-paths/register src/search/seed/run-search-seed.ts --derive",
+    "search:test": "jest src/search src/common/database",
+    "search:preflight": "ts-node -r tsconfig-paths/register src/search/scripts/search-preflight.ts",
+    "search:indexes": "ts-node -r tsconfig-paths/register src/search/scripts/search-index-migration.ts",
+    "db:backup": "ts-node -r tsconfig-paths/register src/common/database/scripts/backup-collection.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.744.0",
@@ -188,7 +194,7 @@
           "outputName": "unit-test-results.xml",
           "classNameTemplate": "{classname}",
           "titleTemplate": "{title}",
-          "ancestorSeparator": " \u203a ",
+          "ancestorSeparator": " › ",
           "usePathForSuiteName": true
         }
       ]
