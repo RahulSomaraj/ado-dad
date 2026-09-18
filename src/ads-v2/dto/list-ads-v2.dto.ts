@@ -27,7 +27,10 @@ export class ListAdsV2Dto {
 
   @ApiPropertyOptional({
     description:
-      'Enhanced search term across ad content and vehicle inventory details. Searches in: title, description, manufacturer names, model names, variant names, fuel types, and transmission types',
+      'Free-text search term. Currently matches the ad title and description only — ' +
+      'manufacturer, model, variant, fuel and transmission names are NOT searchable yet ' +
+      '(see docs/search_redesign_plan.md, phase S3, which denormalises them onto the ad). ' +
+      'Treated as a literal string: regex metacharacters are escaped.',
     example: 'honda civic automatic',
   })
   @IsOptional()

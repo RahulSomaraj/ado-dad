@@ -14,28 +14,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { RedisIoAdapter } from './shared/redis-io.adapter';
 import { Connection } from 'mongoose';
 
-import * as dns from 'node:dns';
+import { applyLocalDnsWorkaround } from './common/database/dns-bootstrap';
 
-// Local-only DNS workaround. On some Windows setups Node's bundled c-ares
-// cannot read the system DNS config and falls back to 127.0.0.1, so the
-// mongodb+srv lookup dies with ECONNREFUSED; forcing IPv4 also avoids long
-// stalls on networks that advertise IPv6 but cannot route it.
-//
-// This never runs on the server. setServers is process-wide, so public
-// resolvers would break private names (VPC endpoints, peered Atlas, internal
-// Redis) and would route the SSRF guard's lookups off-network too.
-if (process.env.NODE_ENV !== 'production') {
-  dns.setDefaultResultOrder('ipv4first');
-
-  // Override the dev defaults with e.g. DNS_SERVERS=1.1.1.1,9.9.9.9
-  const dnsServers = (process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (dnsServers.length) {
-    dns.setServers(dnsServers);
-  }
-}
+// Extracted so maintenance scripts (search:preflight, search:indexes,
+// search:seed) get the same DNS handling. Previously this lived inline here,
+// which meant anything bootstrapping AppModule directly could not resolve the
+// Atlas SRV record at all. Behaviour is unchanged: no-op when
+// NODE_ENV=production.
+applyLocalDnsWorkaround();
 
 // ...rest of main.ts
 

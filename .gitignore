@@ -195,3 +195,12 @@ dist
 .yarn/install-state.gz
 .pnp.*
 nul
+
+# Database backups and migration artefacts — NEVER commit these.
+# They contain production data (ads, and the users collection incl. email,
+# phoneNumber and password hashes).
+backups/
+.migration-backups/
+*.jsonl
+*.jsonl.gz
+Claude outputs/

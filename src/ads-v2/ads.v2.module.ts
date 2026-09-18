@@ -31,6 +31,7 @@ import { LegacyAdsCacheInvalidator } from './infrastructure/services/legacy-ads-
 import { VehicleInventoryModule } from '../vehicle-inventory/vehicle-inventory.module';
 import { MediaModule } from '../media/media.module';
 import { SellModule } from '../sell/sell.module';
+import { SearchModule } from '../search/search.module';
 import { SuspensionGuard } from '../moderation/guards/suspension.guard';
 import { UserThrottleGuard } from '../common/guards/user-throttle.guard';
 import { CommercialVehicleDetectionService } from '../ads/services/commercial-vehicle-detection.service';
@@ -87,6 +88,7 @@ const OutboxSchema = {
     VehicleInventoryModule,
     MediaModule, // MediaService: resolve + attach mediaIds on create
     SellModule, // SellConfigService: active commercial vehicle type names
+    SearchModule, // S4-lite: SearchQueryService for query understanding
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
