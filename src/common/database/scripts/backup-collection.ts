@@ -2,7 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EJSON } from 'bson';
-import { createWriteStream, mkdirSync, statSync } from 'fs';
+import { createWriteStream, existsSync, mkdirSync, statSync } from 'fs';
+import { homedir } from 'os';
 import { createGzip } from 'zlib';
 import { join, resolve } from 'path';
 import { pipeline } from 'stream/promises';
@@ -47,8 +48,14 @@ async function bootstrap() {
   const script = 'db:backup';
   const collectionName =
     typeof flags.values.collection === 'string' ? flags.values.collection : 'ads';
+  // Default OUTSIDE the repository. A backup of `users` contains email,
+  // phoneNumber and password hashes; the first version of this script defaulted
+  // to ./backups inside the checkout and the dump was committed and pushed
+  // within the hour. The default must be somewhere git will never see.
   const outDir = resolve(
-    typeof flags.values.out === 'string' ? flags.values.out : './backups',
+    typeof flags.values.out === 'string'
+      ? flags.values.out
+      : join(homedir(), 'adodad-backups'),
   );
   const gzip = flags.values['no-gzip'] !== true;
   const batchSize = Number(flags.values.batch ?? 500);
@@ -76,6 +83,24 @@ async function bootstrap() {
     if (count === 0) {
       console.log(`⚠  ${collectionName} is empty — nothing to back up. Stopping.`);
       return;
+    }
+
+    // Refuse to write inside a git work tree unless explicitly forced. Walking
+    // up for a .git entry is cheap and catches the ./backups mistake at source.
+    if (flags.values['allow-in-repo'] !== true) {
+      for (let dir = outDir; ; ) {
+        if (existsSync(join(dir, '.git'))) {
+          throw new Error(
+            `Refusing to write a database backup inside a git repository (${dir}).\n` +
+              `  A users dump contains email, phoneNumber and password hashes.\n` +
+              `  Use --out <path outside the repo>, or --allow-in-repo if the\n` +
+              `  directory is definitely git-ignored.`,
+          );
+        }
+        const parent = resolve(dir, '..');
+        if (parent === dir) break;
+        dir = parent;
+      }
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');

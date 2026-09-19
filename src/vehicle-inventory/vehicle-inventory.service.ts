@@ -1225,6 +1225,11 @@ export class VehicleInventoryService {
         engineSpecs: 1,
         performanceSpecs: 1,
         seatingCapacity: 1,
+        // The manufacturer's own colour names for this trim. Additive: the
+        // sell flow reads them to offer "Pearl Arctic White" instead of the
+        // generic ten, and the alternative was a per-variant detail call.
+        colors: 1,
+        images: 1,
         isActive: 1,
         isDeleted: 1,
         createdAt: 1,
@@ -1247,6 +1252,8 @@ export class VehicleInventoryService {
       engineSpecs: variant.engineSpecs,
       performanceSpecs: variant.performanceSpecs,
       seatingCapacity: variant.seatingCapacity,
+      colors: variant.colors,
+      images: variant.images,
       isActive: variant.isActive,
       isDeleted: variant.isDeleted,
       createdAt: variant.createdAt,
