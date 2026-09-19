@@ -6,7 +6,7 @@
  * Plain constants only — safe to import from any module without DI cycles.
  */
 
-export const SELL_CONFIG_VERSION = '2026-09-15.1';
+export const SELL_CONFIG_VERSION = '2026-09-20.1';
 
 export type SellCategory =
   | 'private_vehicle'
@@ -183,10 +183,52 @@ export const MANUFACTURER_CATEGORY: Record<SellCategory, string | null> = {
 /**
  * Category used to filter fuel/transmission types. Mirrors the app's
  * `appliesTo(<category>)`: a type with no `vehicleCategory` applies to all.
+ *
+ * NOTE: neither `FuelType` nor `TransmissionType` currently carries a
+ * `vehicleCategory` field, so this alone never narrows anything — see
+ * CATEGORY_FUEL_TYPES below, which is what actually does the work. This stays
+ * so the schema-level filter keeps working if that field is ever added.
  */
 export const INVENTORY_TYPE_CATEGORY: Record<SellCategory, string | null> = {
   private_vehicle: 'passenger_car',
   two_wheeler: 'two_wheeler',
   commercial_vehicle: 'commercial_vehicle',
   property: null,
+};
+
+/**
+ * Which fuel types a category may offer, by `FuelType.name` (case- and
+ * punctuation-insensitive). `null` = no restriction, serve every active type.
+ *
+ * Why this exists: `SellConfigService.activeRefs` filters on a
+ * `vehicleCategory` field that is not on the FuelType/TransmissionType
+ * schemas, so every category was served the whole list — a scooter seller was
+ * offered Diesel, CNG, Hybrid, Plugin Hybrid and Flex Fuel. Rather than add a
+ * column and back-fill it (a migration against live data), the restriction
+ * lives here, next to the other per-category lists this file already owns
+ * (SELL_FEATURES, SELL_SHOT_LISTS, BODY_TYPE_LABELS).
+ *
+ * A name listed here that does not exist in the collection is simply ignored,
+ * and an empty result falls back to the unfiltered list, so a rename in the
+ * catalogue can never leave a category with no options.
+ */
+export const CATEGORY_FUEL_TYPES: Record<SellCategory, string[] | null> = {
+  // Cars genuinely span the whole list.
+  private_vehicle: null,
+  // CNG two-wheelers exist (Bajaj Freedom 125), so the list is not just
+  // petrol and electric.
+  two_wheeler: ['Petrol', 'Electric', 'CNG'],
+  commercial_vehicle: null,
+  property: [],
+};
+
+/** Same, for `TransmissionType.name`. */
+export const CATEGORY_TRANSMISSION_TYPES: Record<SellCategory, string[] | null> = {
+  private_vehicle: null,
+  // Geared bikes are Manual; scooters are Automatic, and CVT where the
+  // catalogue distinguishes it. AMT, DCT, IMT and Semi-Automatic are car
+  // gearboxes and never appeared on an Indian two-wheeler.
+  two_wheeler: ['Manual', 'Automatic', 'CVT'],
+  commercial_vehicle: null,
+  property: [],
 };

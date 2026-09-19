@@ -17,6 +17,8 @@ import {
 import { BodyTypeEnum } from '../ads/schemas/commercial-vehicle-ad.schema';
 import {
   BODY_TYPE_LABELS,
+  CATEGORY_FUEL_TYPES,
+  CATEGORY_TRANSMISSION_TYPES,
   INVENTORY_TYPE_CATEGORY,
   MANUFACTURER_CATEGORY,
   PROPERTY_TYPES,
@@ -100,9 +102,19 @@ export class SellConfigService {
     const typeCategory = INVENTORY_TYPE_CATEGORY[category];
 
     const [fuelTypes, transmissionTypes, commercialTypes] = await Promise.all([
-      isVehicle ? this.activeRefs(this.fuelTypeModel, typeCategory) : [],
       isVehicle
-        ? this.activeRefs(this.transmissionTypeModel, typeCategory)
+        ? this.activeRefs(
+            this.fuelTypeModel,
+            typeCategory,
+            CATEGORY_FUEL_TYPES[category],
+          )
+        : [],
+      isVehicle
+        ? this.activeRefs(
+            this.transmissionTypeModel,
+            typeCategory,
+            CATEGORY_TRANSMISSION_TYPES[category],
+          )
         : [],
       category === 'commercial_vehicle' ? this.activeCommercialTypes() : [],
     ]);
@@ -130,31 +142,68 @@ export class SellConfigService {
   }
 
   /**
-   * Active, non-deleted fuel/transmission types sorted by sortOrder.
-   * Same rule as the app's `appliesTo(category)`: a document with a
-   * `vehicleCategory` only applies to that category; without one it applies
-   * to all. (The FuelType `category` field is a fuel family — liquid/gas/… —
-   * not a vehicle category, so it is deliberately ignored here.)
+   * Active, non-deleted fuel/transmission types sorted by sortOrder, narrowed
+   * to what [category] may offer.
+   *
+   * Two filters, in order. The first is the original schema-level rule: a
+   * document with a `vehicleCategory` applies only to that category, one
+   * without applies to all. Neither collection actually carries that field
+   * today, so it is a no-op kept for when one does. The second is
+   * [allowedNames] — CATEGORY_FUEL_TYPES / CATEGORY_TRANSMISSION_TYPES — which
+   * is what stops a two-wheeler seller being offered Diesel and Dual-Clutch.
+   *
+   * (The FuelType `category` field is a fuel family — liquid/gas/… — not a
+   * vehicle category, so it is deliberately ignored here.)
    */
+  private static normaliseName(value: unknown): string {
+    return String(value ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
   private async activeRefs(
     model: Model<any>,
     vehicleCategory: string | null,
+    allowedNames: string[] | null = null,
   ): Promise<SellConfigRef[]> {
     const docs: any[] = await model
       .find({ isDeleted: { $ne: true }, isActive: { $ne: false } })
       .sort({ sortOrder: 1, name: 1 })
       .lean()
       .exec();
-    return docs
-      .filter((d) => {
-        const own = typeof d.vehicleCategory === 'string' ? d.vehicleCategory : '';
-        return !vehicleCategory || !own || own === vehicleCategory;
-      })
-      .map((d) => ({
-        id: String(d._id),
-        name: String(d.name),
-        displayName: String(d.displayName ?? d.name),
-      }));
+
+    const byCategory = docs.filter((d) => {
+      const own = typeof d.vehicleCategory === 'string' ? d.vehicleCategory : '';
+      return !vehicleCategory || !own || own === vehicleCategory;
+    });
+
+    // Narrow to the names this category may offer. A name in the list that no
+    // longer exists is ignored; if the filter would leave the category with
+    // nothing at all, the unfiltered list is served instead, so a rename in
+    // the catalogue degrades to today's behaviour rather than to an empty
+    // form the seller cannot complete.
+    let narrowed = byCategory;
+    if (allowedNames && allowedNames.length > 0) {
+      const allowed = new Set(
+        allowedNames.map((n) => SellConfigService.normaliseName(n)),
+      );
+      const matched = byCategory.filter((d) =>
+        allowed.has(SellConfigService.normaliseName(d.name)),
+      );
+      if (matched.length > 0) {
+        narrowed = matched;
+      } else {
+        this.logger.warn(
+          `No ${model.modelName} matched [${allowedNames.join(', ')}] — serving the full list instead.`,
+        );
+      }
+    }
+
+    return narrowed.map((d) => ({
+      id: String(d._id),
+      name: String(d.name),
+      displayName: String(d.displayName ?? d.name),
+    }));
   }
 
   private async activeCommercialTypes(): Promise<SellConfigRef[]> {
