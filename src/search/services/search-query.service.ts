@@ -5,9 +5,13 @@ import { LocationKind } from '../schemas/location-term.schema';
 import { SearchTermType } from '../schemas/search-term.schema';
 import {
   Ambiguity,
+  CATEGORY_STRENGTH_SHARE,
+  CategorySource,
   ChipKind,
+  Correction,
   MIN_FILTER_CONFIDENCE,
   ParsedQuery,
+  QueryStrength,
   SearchChip,
   emptyParsedQuery,
 } from '../dto/parsed-query';
@@ -30,6 +34,18 @@ const VEHICLE_CATEGORIES: ReadonlySet<string> = new Set([
   AdCategoryV2.TWO_WHEELER,
 ]);
 
+const ENTITY_TYPES: ReadonlySet<SearchTermType> = new Set([
+  SearchTermType.MANUFACTURER,
+  SearchTermType.MODEL,
+  SearchTermType.VARIANT,
+]);
+
+const ATTRIBUTE_TYPES: ReadonlySet<SearchTermType> = new Set([
+  SearchTermType.FUEL_TYPE,
+  SearchTermType.TRANSMISSION,
+  SearchTermType.ATTRIBUTE,
+]);
+
 /** How specific a location kind is; a city beats the district containing it. */
 const KIND_SPECIFICITY: Record<LocationKind, number> = {
   [LocationKind.CITY]: 4,
@@ -38,8 +54,21 @@ const KIND_SPECIFICITY: Record<LocationKind, number> = {
   [LocationKind.COUNTRY]: 1,
 };
 
+/**
+ * What claimed a token. Drives two things: which tokens stay in the text clause
+ * of the hybrid query (entities, attributes and hints do; structural words do
+ * not) and the strength classification.
+ */
+type ConsumedBy = 'structural' | 'entity' | 'attribute' | 'hint';
+
 interface Accumulator {
-  category?: { value: AdCategoryV2; weight: number; phrase: string; span: [number, number] };
+  category?: {
+    value: AdCategoryV2;
+    weight: number;
+    phrase: string;
+    span: [number, number];
+    source: CategorySource;
+  };
   propertyTypes: Map<string, { label: string; span: [number, number] }>;
   commercialVehicleTypes: Map<string, { label: string; span: [number, number] }>;
   listingType?: { value: AdListingType; label: string; span: [number, number] };
@@ -49,6 +78,9 @@ interface Accumulator {
   fuelTypes: Map<string, { name: string; span: [number, number] }>;
   transmissions: Map<string, { name: string; span: [number, number] }>;
   location?: { entry: GazetteerEntry; span: [number, number] };
+  /** Categories the matched brands sell in (from the materialised payload). */
+  brandCategories: Set<string>;
+  corrections: Correction[];
   ambiguities: Ambiguity[];
   /** Total weight of vehicle-flavoured evidence vs property-flavoured. */
   vehicleWeight: number;
@@ -60,12 +92,21 @@ interface Accumulator {
  *
  * Contract: this service only ever *proposes*. It never reads the database for
  * ads and never decides whether a filter is applied — the caller merges the
- * result under the user's explicit filters, which always win, and consults
- * `applyAsFilter` before hard-filtering on anything here.
+ * result under the user's explicit filters, which always win.
+ *
+ * Two rules the planner relies on:
+ *  - `normalized` always carries the whole query and `textQuery` always carries
+ *    every non-structural word. Recognising a word never deletes it.
+ *  - A seed *hint* ("creta" from the DUAL_HINT list, with no catalogue model
+ *    behind it) can suggest a category but never counts as a catalogue match,
+ *    so an unmaterialised lexicon degrades to text search, not to "all cars".
  */
 @Injectable()
 export class SearchQueryService {
   private readonly logger = new Logger(SearchQueryService.name);
+
+  /** Spelling correction against the lexicon. Off only for tests or emergencies. */
+  fuzzyEnabled = (process.env.SEARCH_FUZZY_ENABLED ?? 'true').toLowerCase() !== 'false';
 
   constructor(private readonly lexicon: LexiconService) {}
 
@@ -80,6 +121,7 @@ export class SearchQueryService {
 
     const normalized = tokens.map((t) => t.text).join(' ');
     const consumed = new Array<boolean>(tokens.length).fill(false);
+    const consumedBy = new Array<ConsumedBy | undefined>(tokens.length).fill(undefined);
     const chips: SearchChip[] = [];
 
     const acc: Accumulator = {
@@ -90,19 +132,29 @@ export class SearchQueryService {
       variants: new Map(),
       fuelTypes: new Map(),
       transmissions: new Map(),
+      brandCategories: new Set(),
+      corrections: [],
       ambiguities: [],
       vehicleWeight: 0,
       propertyWeight: 0,
     };
 
     const locationBias = this.computeLocationBias(tokens);
-    this.scanNgrams(tokens, consumed, locationBias, acc);
+    this.scanNgrams(tokens, consumed, consumedBy, locationBias, acc);
 
     // Numeric intents over whatever the lexicon did not claim.
     const numerics = extractNumerics(tokens, consumed);
+    for (const f of numerics) {
+      const isYear = f.field === 'minYear' || f.field === 'maxYear';
+      for (const i of f.consumed) {
+        if (i < 0 || i >= tokens.length) continue;
+        // The year digits themselves stay in the text clause (searchText carries
+        // the year); the comparator words and money/BHK tokens are structural.
+        consumedBy[i] = isYear && /^\d{4}$/.test(tokens[i].text) ? 'attribute' : 'structural';
+      }
+    }
 
-    const parsed = this.assemble(query, normalized, tokens, consumed, acc, numerics, chips);
-    return parsed;
+    return this.assemble(query, normalized, tokens, consumed, consumedBy, acc, numerics, chips);
   }
 
   // ---------------------------------------------------------------------------
@@ -128,12 +180,13 @@ export class SearchQueryService {
   }
 
   // ---------------------------------------------------------------------------
-  // Stage 2 — longest-match n-gram scan
+  // Stage 2 — longest-match n-gram scan, with spelling correction on a miss
   // ---------------------------------------------------------------------------
 
   private scanNgrams(
     tokens: RawToken[],
     consumed: boolean[],
+    consumedBy: (ConsumedBy | undefined)[],
     locationBias: boolean[],
     acc: Accumulator,
   ): void {
@@ -157,32 +210,97 @@ export class SearchQueryService {
 
         const gram = tokens.slice(i, i + n).map((t) => t.text).join(' ');
         const span: [number, number] = [tokens[i].start, tokens[i + n - 1].end];
-
-        const lexHits = this.lexicon.lookupTerm(gram, n);
-        const geoHits = this.lexicon.lookupLocation(gram, n);
-
         const preferGeo = locationBias[i];
+
+        let lexHits = this.lexicon.lookupTerm(gram, n);
+        let geoHits = this.lexicon.lookupLocation(gram, n);
+        let corrections: Correction[] = [];
+
+        // Exact miss: try the gram with each unknown token corrected against the
+        // vocabulary. Only kept if the corrected gram is a real phrase.
+        if (lexHits.length === 0 && geoHits.length === 0 && this.fuzzyEnabled) {
+          const fixed = this.correctGram(tokens, i, n, preferGeo);
+          if (fixed) {
+            lexHits = this.lexicon.lookupTerm(fixed.gram, n);
+            geoHits = this.lexicon.lookupLocation(fixed.gram, n);
+            if (lexHits.length > 0 || geoHits.length > 0) corrections = fixed.corrections;
+          }
+        }
+
         const first = preferGeo ? geoHits : lexHits;
         const second = preferGeo ? lexHits : geoHits;
 
+        let kind: ConsumedBy | undefined;
         if (first.length > 0) {
-          preferGeo
-            ? this.applyLocation(geoHits, span, gram, acc)
-            : this.applyTerms(lexHits, span, gram, acc);
+          if (preferGeo) {
+            this.applyLocation(geoHits, span, gram, acc);
+            kind = 'structural';
+          } else {
+            this.applyTerms(lexHits, span, gram, acc);
+            kind = SearchQueryService.kindOf(lexHits);
+          }
           matched = true;
         } else if (second.length > 0) {
-          preferGeo
-            ? this.applyTerms(lexHits, span, gram, acc)
-            : this.applyLocation(geoHits, span, gram, acc);
+          if (preferGeo) {
+            this.applyTerms(lexHits, span, gram, acc);
+            kind = SearchQueryService.kindOf(lexHits);
+          } else {
+            this.applyLocation(geoHits, span, gram, acc);
+            kind = 'structural';
+          }
           matched = true;
         }
 
         if (matched) {
-          for (let k = i; k < i + n; k++) consumed[k] = true;
+          for (let k = i; k < i + n; k++) {
+            consumed[k] = true;
+            consumedBy[k] = kind;
+          }
+          acc.corrections.push(...corrections);
           i += n - 1;
         }
       }
     }
+  }
+
+  /**
+   * Rebuild an n-gram with every unknown token replaced by its unique spelling
+   * correction. Returns null when a token cannot be corrected unambiguously or
+   * when nothing needed correcting (an exact miss stays a miss).
+   */
+  private correctGram(
+    tokens: RawToken[],
+    start: number,
+    n: number,
+    preferGeo: boolean,
+  ): { gram: string; corrections: Correction[] } | null {
+    const parts: string[] = [];
+    const corrections: Correction[] = [];
+    for (let k = start; k < start + n; k++) {
+      const t = tokens[k].text;
+      if (IGNORED_TOKENS.has(t) || !/\p{L}/u.test(t) || this.lexicon.hasToken(t)) {
+        parts.push(t);
+        continue;
+      }
+      const hit = this.lexicon.correctToken(t, preferGeo);
+      if (!hit) return null;
+      parts.push(hit.to);
+      corrections.push({
+        from: t,
+        to: hit.to,
+        via: hit.via,
+        sourceSpan: [tokens[k].start, tokens[k].end],
+      });
+    }
+    if (corrections.length === 0) return null;
+    return { gram: parts.join(' '), corrections };
+  }
+
+  private static kindOf(entries: LexiconEntry[]): ConsumedBy {
+    if (entries.some((e) => ENTITY_TYPES.has(e.type) && !e.payload?.hintOnly)) return 'entity';
+    if (entries.some((e) => ATTRIBUTE_TYPES.has(e.type))) return 'attribute';
+    if (entries.every((e) => e.payload?.hintOnly)) return 'hint';
+    return 'structural';
   }
 
   // ---------------------------------------------------------------------------
@@ -201,8 +319,21 @@ export class SearchQueryService {
     for (const entry of entries) {
       const p = entry.payload ?? {};
 
+      if (p.hintOnly) {
+        // A hint may suggest a category and nothing else. It never becomes a
+        // brand/model filter, so a stale lexicon cannot fabricate one.
+        if (p.category) {
+          this.setCategory(acc, p.category as AdCategoryV2, entry.weight, phrase, span, 'hint');
+          VEHICLE_CATEGORIES.has(p.category)
+            ? (acc.vehicleWeight += entry.weight)
+            : (acc.propertyWeight += entry.weight);
+        }
+        continue;
+      }
+
       if (p.category) {
-        this.setCategory(acc, p.category as AdCategoryV2, entry.weight, phrase, span);
+        const source: CategorySource = ENTITY_TYPES.has(entry.type) ? 'entity' : 'seed';
+        this.setCategory(acc, p.category as AdCategoryV2, entry.weight, phrase, span, source);
       }
       if (p.propertyType) {
         acc.propertyTypes.set(p.propertyType, {
@@ -225,15 +356,24 @@ export class SearchQueryService {
           span,
         };
       }
-      if (p.manufacturerId) {
-        acc.manufacturers.set(p.manufacturerId, {
-          name: p.manufacturerName ?? phrase,
-          span,
-        });
+      if (p.manufacturerId || p.manufacturerIds?.length) {
+        // One brand name may map to several manufacturer documents (one per
+        // vehicle category); every id is kept so the filter reaches all of them.
+        const ids = p.manufacturerIds?.length ? p.manufacturerIds : [p.manufacturerId as string];
+        for (const id of ids) {
+          // First mention wins the span: "hyundai creta" keeps the brand chip on
+          // "hyundai" even though the model payload names the brand again.
+          if (!acc.manufacturers.has(id)) {
+            acc.manufacturers.set(id, { name: p.manufacturerName ?? phrase, span });
+          }
+        }
+        for (const c of p.categories ?? []) acc.brandCategories.add(c);
         acc.vehicleWeight += entry.weight;
       }
       if (p.modelId) {
-        acc.models.set(p.modelId, { name: p.modelName ?? phrase, span });
+        if (!acc.models.has(p.modelId)) {
+          acc.models.set(p.modelId, { name: p.modelName ?? phrase, span });
+        }
         acc.vehicleWeight += entry.weight;
       }
       if (p.variantId) {
@@ -266,15 +406,23 @@ export class SearchQueryService {
     weight: number,
     phrase: string,
     span: [number, number],
+    source: CategorySource,
   ): void {
     if (!acc.category) {
-      acc.category = { value, weight, phrase, span };
+      acc.category = { value, weight, phrase, span, source };
       return;
     }
     if (acc.category.value === value) {
       // Reinforcement — keep the earliest span so the chip covers the word the
-      // user actually typed first.
+      // user actually typed first. A real match upgrades a hint.
       acc.category.weight = Math.max(acc.category.weight, weight);
+      if (acc.category.source === 'hint' && source !== 'hint') acc.category.source = source;
+      return;
+    }
+    // A hint never argues with a real match, in either direction.
+    if (source === 'hint') return;
+    if (acc.category.source === 'hint') {
+      acc.category = { value, weight, phrase, span, source };
       return;
     }
     if (weight > acc.category.weight) {
@@ -284,7 +432,7 @@ export class SearchQueryService {
         alternatives: [acc.category.value],
         phrase,
       });
-      acc.category = { value, weight, phrase, span };
+      acc.category = { value, weight, phrase, span, source };
     } else {
       acc.ambiguities.push({
         field: 'category',
@@ -337,7 +485,7 @@ export class SearchQueryService {
   }
 
   // ---------------------------------------------------------------------------
-  // Stage 4 — consistency, chips, confidence
+  // Stage 4 — consistency, chips, strength
   // ---------------------------------------------------------------------------
 
   private assemble(
@@ -345,6 +493,7 @@ export class SearchQueryService {
     normalized: string,
     tokens: RawToken[],
     consumed: boolean[],
+    consumedBy: (ConsumedBy | undefined)[],
     acc: Accumulator,
     numerics: ReturnType<typeof extractNumerics>,
     chips: SearchChip[],
@@ -361,6 +510,7 @@ export class SearchQueryService {
           weight: 95,
           phrase: 'implied',
           span: meta.span,
+          source: 'implied',
         };
       } else if (acc.commercialVehicleTypes.size > 0) {
         const [, meta] = [...acc.commercialVehicleTypes.entries()][0];
@@ -369,6 +519,7 @@ export class SearchQueryService {
           weight: 70,
           phrase: 'implied',
           span: meta.span,
+          source: 'implied',
         };
       }
     }
@@ -380,6 +531,21 @@ export class SearchQueryService {
         weight: 60,
         phrase: 'implied',
         span: [tokens[0].start, tokens[0].end],
+        source: 'implied',
+      };
+    }
+
+    // A brand that sells in exactly one category decides the category; a brand
+    // that sells in several (Honda: cars and bikes) leaves it to the planner,
+    // which filters on the whole set instead of dropping the brand.
+    if (!acc.category && acc.manufacturers.size > 0 && acc.brandCategories.size === 1) {
+      const [, meta] = [...acc.manufacturers.entries()][0];
+      acc.category = {
+        value: [...acc.brandCategories][0] as AdCategoryV2,
+        weight: 75,
+        phrase: 'implied',
+        span: meta.span,
+        source: 'entity',
       };
     }
 
@@ -414,11 +580,13 @@ export class SearchQueryService {
         acc.models.clear();
         acc.variants.clear();
         acc.commercialVehicleTypes.clear();
+        acc.brandCategories.clear();
         acc.category = {
           value: AdCategoryV2.PROPERTY,
           weight: 95,
           phrase: 'implied',
           span: acc.category?.span ?? [0, 0],
+          source: 'implied',
         };
       }
     }
@@ -435,7 +603,17 @@ export class SearchQueryService {
 
     if (acc.category) {
       out.category = acc.category.value;
-      chip('category', CATEGORY_LABELS[acc.category.value], 'category', acc.category.value, acc.category.span);
+      out.categorySource = acc.category.source;
+      chip(
+        'category',
+        CATEGORY_LABELS[acc.category.value],
+        'category',
+        acc.category.value,
+        acc.category.span,
+        acc.category.source === 'hint' || acc.category.source === 'implied' ? true : undefined,
+      );
+    } else if (acc.brandCategories.size > 1) {
+      out.brandCategories = [...acc.brandCategories] as AdCategoryV2[];
     }
     if (acc.propertyTypes.size > 0) {
       out.propertyTypes = [...acc.propertyTypes.keys()];
@@ -455,9 +633,17 @@ export class SearchQueryService {
     }
     if (acc.manufacturers.size > 0) {
       out.manufacturerIds = [...acc.manufacturers.keys()];
-      out.manufacturerNames = [...acc.manufacturers.values()].map((v) => v.name);
+      // One chip per brand NAME: "honda" is two manufacturer documents but one
+      // pill in the UI, carrying every id it stands for.
+      const byName = new Map<string, { ids: string[]; span: [number, number] }>();
       for (const [id, meta] of acc.manufacturers) {
-        chip('brand', meta.name, 'manufacturerIds', id, meta.span);
+        const b = byName.get(meta.name);
+        if (b) b.ids.push(id);
+        else byName.set(meta.name, { ids: [id], span: meta.span });
+      }
+      out.manufacturerNames = [...byName.keys()];
+      for (const [name, b] of byName) {
+        chip('brand', name, 'manufacturerIds', b.ids.length === 1 ? b.ids[0] : b.ids, b.span);
       }
     }
     if (acc.models.size > 0) {
@@ -508,6 +694,10 @@ export class SearchQueryService {
           break;
         case 'minYear':
           out.minYear = f.value;
+          // A bare "2020" is recorded as a floor for the legacy filter path, but
+          // what the user most likely meant is "a 2020 one": the planner boosts
+          // the exact year instead of filtering.
+          if (f.inferred) out.exactYear = f.value;
           chip('year', f.label, 'minYear', f.value, span, f.inferred);
           break;
         case 'maxYear':
@@ -521,27 +711,84 @@ export class SearchQueryService {
       }
     }
 
-    // --- leftovers ----------------------------------------------------------
+    // --- corrections --------------------------------------------------------
+    out.corrections = acc.corrections;
+    const correctedText = new Map<number, string>();
+    for (const c of acc.corrections) {
+      const idx = tokens.findIndex((t) => t.start === c.sourceSpan[0] && t.end === c.sourceSpan[1]);
+      if (idx >= 0) correctedText.set(idx, c.to);
+      chip('correction', `${c.from} → ${c.to}`, 'search', c.to, c.sourceSpan, true);
+    }
+    const textOf = (i: number) => correctedText.get(i) ?? tokens[i].text;
+
+    // --- text terms ---------------------------------------------------------
+    // Legacy: what the pre-planner path sends to $text — unclaimed words plus
+    // words claimed only by a hint (a hint is not a filter, so the word must
+    // still be searched).
     out.freeText = tokens
-      .filter((t, i) => !consumed[i] && !IGNORED_TOKENS.has(t.text))
-      .map((t) => t.text)
+      .map((t, i) => ({ t, i }))
+      .filter(
+        ({ t, i }) =>
+          !IGNORED_TOKENS.has(t.text) && (!consumed[i] || consumedBy[i] === 'hint'),
+      )
+      .map(({ i }) => textOf(i))
       .join(' ');
 
-    // --- confidence ---------------------------------------------------------
-    const meaningful = tokens.filter((t) => !IGNORED_TOKENS.has(t.text));
-    const meaningfulConsumed = tokens.filter(
-      (t, i) => consumed[i] && !IGNORED_TOKENS.has(t.text),
-    );
-    let confidence = meaningful.length === 0 ? 0 : meaningfulConsumed.length / meaningful.length;
+    // Hybrid text clause: everything that is not a structural filter word.
+    out.textQuery = tokens
+      .map((t, i) => ({ t, i }))
+      .filter(
+        ({ t, i }) =>
+          !IGNORED_TOKENS.has(t.text) &&
+          (!consumed[i] || consumedBy[i] !== 'structural'),
+      )
+      .map(({ i }) => textOf(i))
+      .join(' ');
+
+    // --- confidence & strength ---------------------------------------------
+    const meaningfulIdx = tokens
+      .map((t, i) => (IGNORED_TOKENS.has(t.text) ? -1 : i))
+      .filter((i) => i >= 0);
+    const recognisedIdx = meaningfulIdx.filter((i) => consumed[i]);
+    const share = meaningfulIdx.length === 0 ? 0 : recognisedIdx.length / meaningfulIdx.length;
+
+    let confidence = share;
     confidence -= 0.15 * acc.ambiguities.length;
     confidence -= 0.05 * numerics.filter((f) => f.inferred).length;
     out.confidence = Math.max(0, Math.min(1, Number(confidence.toFixed(3))));
 
+    out.catalogueMatch =
+      acc.manufacturers.size > 0 || acc.models.size > 0 || acc.variants.size > 0;
+    out.strength = this.classify(meaningfulIdx, recognisedIdx, consumedBy, acc, out.catalogueMatch);
+
     out.chips = chips.sort((a, b) => a.sourceSpan[0] - b.sourceSpan[0]);
     out.ambiguities = acc.ambiguities;
-    out.applyAsFilter = out.confidence >= MIN_FILTER_CONFIDENCE;
+    out.applyAsFilter =
+      out.confidence >= MIN_FILTER_CONFIDENCE &&
+      out.strength !== 'weak' &&
+      out.strength !== 'none' &&
+      // The legacy path can only apply brand/model filters inside a known
+      // vehicle category; without one it would drop them silently.
+      !(out.catalogueMatch && !out.category);
 
     return out;
+  }
+
+  private classify(
+    meaningfulIdx: number[],
+    recognisedIdx: number[],
+    consumedBy: (ConsumedBy | undefined)[],
+    acc: Accumulator,
+    catalogueMatch: boolean,
+  ): QueryStrength {
+    if (meaningfulIdx.length === 0 || recognisedIdx.length === 0) return 'none';
+    const share = recognisedIdx.length / meaningfulIdx.length;
+
+    if (catalogueMatch) {
+      return share === 1 && acc.ambiguities.length === 0 ? 'strong' : 'partial';
+    }
+    if (recognisedIdx.every((i) => consumedBy[i] === 'hint')) return 'weak';
+    return share >= CATEGORY_STRENGTH_SHARE ? 'category' : 'weak';
   }
 
   private spanOf(tokens: RawToken[], indices: number[]): [number, number] {

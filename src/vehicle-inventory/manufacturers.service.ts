@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { SearchDocSyncService } from '../search/services/search-doc-sync.service';
 import type { PipelineStage, Query, SortOrder, FilterQuery } from 'mongoose';
 import {
   Manufacturer,
@@ -32,6 +34,8 @@ export class ManufacturersService {
     @InjectModel(Manufacturer.name)
     private readonly manufacturerModel: Model<ManufacturerDocument>,
     private readonly redisService: RedisService,
+    // A renamed brand must reach the ads' search documents (optional for unit tests).
+    @Optional() private readonly searchDocSync?: SearchDocSyncService,
   ) {}
 
   // ---- helpers ------------------------------------------------------------
@@ -238,6 +242,7 @@ export class ManufacturersService {
       // Invalidate caches after update
       await this.invalidateManufacturerCaches();
 
+      this.searchDocSync?.rebuildForCatalogueInBackground({ manufacturerId: id });
       return manufacturer;
     } catch (error) {
       if (error.code === 11000) {

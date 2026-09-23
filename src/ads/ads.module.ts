@@ -44,6 +44,7 @@ import { S3Service } from '../shared/s3.service';
 import { GeocodingService } from '../common/services/geocoding.service';
 import { LocationHierarchyService } from '../common/services/location-hierarchy.service';
 import { AdsCache } from '../ads-v2/infrastructure/services/ads-cache';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -61,6 +62,8 @@ import { AdsCache } from '../ads-v2/infrastructure/services/ads-cache';
     ]),
     // External modules
     VehicleInventoryModule,
+    // Search document maintenance after v1 writes (SearchDocSyncService).
+    SearchModule,
   ],
   controllers: [AdsController, LookupController],
   providers: [

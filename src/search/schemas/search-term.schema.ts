@@ -52,10 +52,20 @@ export interface SearchTermPayload {
 
   /** MANUFACTURER / MODEL / VARIANT — ObjectId strings from vehicle-inventory. */
   manufacturerId?: string;
+  /**
+   * MANUFACTURER — every manufacturer document that shares this name. The
+   * catalogue keeps one document per (brand, vehicle category), so "honda" is
+   * two ids (cars, bikes). `manufacturerId` is the first of them.
+   */
+  manufacturerIds?: string[];
   manufacturerName?: string;
   modelId?: string;
+  /** MODEL / VARIANT — every catalogue model this phrase names (duplicates merged). */
+  modelIds?: string[];
   modelName?: string;
   variantId?: string;
+  /** VARIANT — every catalogue variant this phrase names (duplicates merged). */
+  variantIds?: string[];
   variantName?: string;
 
   fuelTypeId?: string;
@@ -65,6 +75,20 @@ export interface SearchTermPayload {
 
   /** Human label used on the UI chip. Falls back to the term itself. */
   label?: string;
+
+  /**
+   * MANUFACTURER — every ad category this brand's catalogue models fall under
+   * (Honda: private_vehicle AND two_wheeler). Written by the materializer so
+   * the parser never has to guess a category for a brand-only query.
+   */
+  categories?: string[];
+
+  /**
+   * Seed rows that only HINT at a category ("creta" → Cars) and must never be
+   * treated as a catalogue match. The materialized MODEL row for the same
+   * phrase, when it exists, is what carries the model id.
+   */
+  hintOnly?: boolean;
 }
 
 /**

@@ -101,6 +101,38 @@ export class Ad {
   @Prop({ default: 0 })
   viewCount?: number;
 
+  // ---- Search document (see search/services/ad-search-doc.builder.ts) ----
+  // Denormalised brand/model/variant/fuel/transmission/year/place words and
+  // exact-match keys, so search never needs a $lookup before pagination.
+  // Written by the v2 use cases inside their transaction, by
+  // SearchDocSyncService after every v1 write, and by `npm run search:backfill`.
+  @Prop({ type: String, required: false })
+  searchText?: string;
+
+  @Prop({ type: [String], required: false, default: undefined })
+  searchKeys?: string[];
+
+  @Prop({ type: Number, required: false })
+  vehicleYear?: number;
+
+  @Prop({ type: Number, required: false })
+  bedrooms?: number;
+
+  @Prop({ type: Number, required: false })
+  areaSqft?: number;
+
+  @Prop({ type: Number, required: false })
+  imageCount?: number;
+
+  @Prop({ type: Boolean, required: false })
+  sellerVerified?: boolean;
+
+  @Prop({ type: Number, required: false })
+  searchDocVersion?: number;
+
+  @Prop({ type: Date, required: false })
+  searchDocBuiltAt?: Date;
+
   /**
    * Previous asking prices, oldest first. Each entry is the price the ad had
    * *until* `changedAt`, appended by AdsService.update when the price changes.
@@ -169,8 +201,25 @@ AdSchema.index({ approvedBy: 1, isApproved: 1 }, { background: true });
 AdSchema.index({ link: 1 }, { background: true });
 AdSchema.index({ isDeleted: 1 }, { background: true });
 AdSchema.index({ postedBy: 1, isDeleted: 1 }, { background: true });
-// Text index for search (title + description) - one text index per collection
-AdSchema.index({ title: 'text', description: 'text' }, { background: true });
+// Text index for search — one text index per collection. `ad_search_v2` covers
+// the denormalised searchText as well as title/description. Outside local
+// development this is built by `npm run search:indexes -- --swap-text`, never
+// by autoIndex (see app.module.ts). Locally, drop `title_text_description_text`
+// once so the new declaration can build.
+AdSchema.index(
+  { title: 'text', searchText: 'text', description: 'text' },
+  {
+    name: 'ad_search_v2',
+    weights: { searchText: 10, title: 6, description: 1 },
+    default_language: 'english',
+    background: true,
+  },
+);
+// Structured retrieval for the hybrid search: entity/attribute keys + visibility + recency.
+AdSchema.index(
+  { searchKeys: 1, isActive: 1, isApproved: 1, createdAt: -1 },
+  { name: 'ad_searchKeys_visible_createdAt', background: true },
+);
 // 2dsphere index for geographic queries (legacy latitude/longitude)
 AdSchema.index({ latitude: 1, longitude: 1 }, { background: true });
 // 2dsphere index for GeoJSON location queries (MUST be first for $geoNear)

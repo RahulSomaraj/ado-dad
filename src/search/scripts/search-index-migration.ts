@@ -46,27 +46,21 @@ const NEW_TEXT_INDEX_SPEC: Record<string, any> = {
 };
 const NEW_TEXT_INDEX_OPTIONS = {
   name: NEW_TEXT_INDEX_NAME,
-  weights: { title: 12, searchText: 6, description: 1 },
+  // searchText is curated (brand, model, variant, fuel, year, place) so it
+  // outweighs the free-form title; the description is a weak tie-breaker.
+  weights: { searchText: 10, title: 6, description: 1 },
   default_language: 'english',
   background: true,
 };
 
-/** Supporting indexes for S3/S4. These are additive and carry no swap risk. */
+/**
+ * Supporting indexes for the hybrid search. Additive, no swap risk. Must match
+ * the declarations in ads/schemas/ad.schema.ts (which only autoIndex locally).
+ */
 const SUPPORTING_INDEXES: Array<{ key: Record<string, any>; options: Record<string, any> }> = [
-  { key: { searchTags: 1 }, options: { name: 'ad_searchTags', background: true } },
   {
-    key: {
-      isDeleted: 1, isActive: 1, isApproved: 1, soldOut: 1,
-      districtSlug: 1, category: 1, createdAt: -1,
-    },
-    options: { name: 'ad_visible_district_category_createdAt', background: true },
-  },
-  {
-    key: {
-      isDeleted: 1, isActive: 1, isApproved: 1, soldOut: 1,
-      districtSlug: 1, category: 1, price: 1,
-    },
-    options: { name: 'ad_visible_district_category_price', background: true },
+    key: { searchKeys: 1, isActive: 1, isApproved: 1, createdAt: -1 },
+    options: { name: 'ad_searchKeys_visible_createdAt', background: true },
   },
 ];
 

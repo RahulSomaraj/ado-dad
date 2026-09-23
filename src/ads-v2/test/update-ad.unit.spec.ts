@@ -85,6 +85,16 @@ function build(ad = storedAd()) {
     },
     sellConfig: { getActiveCommercialTypeNames: jest.fn(async () => new Set(['truck'])) },
     legacy: { invalidateById: jest.fn(), invalidateLists: jest.fn() },
+    searchDoc: {
+      build: jest.fn(async () => ({
+        searchText: 'stub',
+        searchKeys: ['cat:stub'],
+        imageCount: 0,
+        sellerVerified: false,
+        searchDocVersion: 1,
+        searchDocBuiltAt: new Date(),
+      })),
+    },
   };
   const uc = new UpdateAdUc(
     deps.adRepo as any,
@@ -99,6 +109,7 @@ function build(ad = storedAd()) {
     deps.media as any,
     deps.sellConfig as any,
     deps.legacy as any,
+    deps.searchDoc as any,
   );
   return { uc, deps, ad, session };
 }

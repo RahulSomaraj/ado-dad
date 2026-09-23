@@ -7,6 +7,7 @@ import { AdsV2Controller } from './ads.v2.controller';
 import { LocationConfigController } from './controllers/location-config.controller';
 import { CreateAdUc } from './application/use-cases/create-ad.uc';
 import { ListAdsUc } from './application/use-cases/list-ads.uc';
+import { SearchAdsExecutor } from './application/use-cases/list-ads.search';
 import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
 import { ProfileStatsUc } from './application/use-cases/profile-stats.uc';
 import { SellerStatsUc } from './application/use-cases/seller-stats.uc';
@@ -104,6 +105,7 @@ const OutboxSchema = {
     // Use cases
     CreateAdUc,
     ListAdsUc,
+    SearchAdsExecutor, // tier-1 hybrid search path used by ListAdsUc
     GetAdByIdUc,
     ProfileStatsUc,
     SellerStatsUc,

@@ -9,6 +9,7 @@ import {
   Max,
   IsArray,
   IsMongoId,
+  MaxLength,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -27,14 +28,18 @@ export class ListAdsV2Dto {
 
   @ApiPropertyOptional({
     description:
-      'Free-text search term. Currently matches the ad title and description only — ' +
-      'manufacturer, model, variant, fuel and transmission names are NOT searchable yet ' +
-      '(see docs/search_redesign_plan.md, phase S3, which denormalises them onto the ad). ' +
-      'Treated as a literal string: regex metacharacters are escaped.',
-    example: 'honda civic automatic',
+      'Free-text search. Understood the way people type it: brand, model, variant, fuel, ' +
+      'transmission, year, budget, BHK and place names become structured filters or ranking ' +
+      'boosts (typos are corrected against the catalogue), and the words are always also ' +
+      'matched against the ad text. The response `query` block shows the interpretation ' +
+      '(chips, corrections, conflicts). Max 120 characters. Requires SEARCH_V3_RETRIEVAL on ' +
+      'the server; otherwise the legacy title/description match runs.',
+    example: 'hyundai creta 2020 petrol in kollam',
+    maxLength: 120,
   })
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   search?: string;
 
   @ApiPropertyOptional({
@@ -143,14 +148,19 @@ export class ListAdsV2Dto {
   limit?: number = 20;
 
   @ApiPropertyOptional({
-    description: 'Sort field',
-    enum: ['createdAt', 'updatedAt', 'price', 'title'],
+    description:
+      'Sort field. Feed: createdAt (default), updatedAt, price, title. ' +
+      'Search (with `search`): the default is scored relevance (nearby, recent, best match); ' +
+      'send `newest` for newest-first, `price`, `year` or `distance` for explicit orders. ' +
+      '`relevance` is accepted as an explicit alias of the default. Cursor pagination is not ' +
+      'available on scored searches; use page/limit (max page 50).',
+    enum: ['createdAt', 'updatedAt', 'price', 'title', 'relevance', 'newest', 'year', 'distance'],
     default: 'createdAt',
     example: 'createdAt',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['createdAt', 'updatedAt', 'price', 'title'])
+  @IsIn(['createdAt', 'updatedAt', 'price', 'title', 'relevance', 'newest', 'year', 'distance'])
   sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({

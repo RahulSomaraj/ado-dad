@@ -115,20 +115,55 @@ export class InventoryLexiconMaterializer {
       });
     };
 
-    // ---- manufacturers -----------------------------------------------------
-    const manufacturers = await this.manufacturerModel
-      .find({ isDeleted: { $ne: true }, isActive: { $ne: false } })
-      .select('_id name displayName vehicleCategory')
-      .lean()
-      .exec();
+    // ---- load the catalogue --------------------------------------------------
+    const [manufacturers, models] = await Promise.all([
+      this.manufacturerModel
+        .find({ isDeleted: { $ne: true }, isActive: { $ne: false } })
+        .select('_id name displayName vehicleCategory')
+        .lean()
+        .exec(),
+      this.vehicleModelModel
+        .find({ isDeleted: { $ne: true } })
+        .select('_id name displayName manufacturer vehicleType isCommercialVehicle commercialVehicleType')
+        .lean()
+        .exec(),
+    ]);
 
+    // Which ad categories each brand sells in, derived from its models. A brand
+    // with exactly one category lets the parser decide the category on its own;
+    // Honda (cars + bikes are separate manufacturer docs, but "honda" resolves
+    // to both) carries the whole set so the planner filters on all of them.
+    const categoriesByManufacturer = new Map<string, Set<string>>();
+    const uncategorised: string[] = [];
+    for (const mdl of models as any[]) {
+      const category = this.categoryOf(mdl);
+      if (!category) {
+        uncategorised.push(`${mdl.displayName || mdl.name} (${mdl._id})`);
+        continue;
+      }
+      const key = String(mdl.manufacturer);
+      const set = categoriesByManufacturer.get(key) ?? new Set<string>();
+      set.add(category);
+      categoriesByManufacturer.set(key, set);
+    }
+    if (uncategorised.length > 0) {
+      this.logger.warn(
+        `${uncategorised.length} catalogue model(s) have no vehicleType/isCommercialVehicle and cannot be ` +
+          `categorised — searches for them fall back to text: ${uncategorised.slice(0, 10).join(', ')}` +
+          (uncategorised.length > 10 ? ', …' : ''),
+      );
+    }
+
+    // ---- manufacturers -----------------------------------------------------
     const manufacturerById = new Map<string, any>();
     for (const m of manufacturers as any[]) {
       manufacturerById.set(String(m._id), m);
+      const categories = [...(categoriesByManufacturer.get(String(m._id)) ?? [])];
       const payload: SearchTermPayload = {
         manufacturerId: String(m._id),
         manufacturerName: m.displayName || m.name,
         label: m.displayName || m.name,
+        ...(categories.length > 0 ? { categories } : {}),
       };
       const names = new Set<string>([m.name, m.displayName].filter(Boolean));
       for (const alias of MANUFACTURER_ALIASES[normalizePhrase(m.name)] ?? []) {
@@ -138,12 +173,6 @@ export class InventoryLexiconMaterializer {
     }
 
     // ---- models ------------------------------------------------------------
-    const models = await this.vehicleModelModel
-      .find({ isDeleted: { $ne: true } })
-      .select('_id name displayName manufacturer vehicleType isCommercialVehicle commercialVehicleType')
-      .lean()
-      .exec();
-
     const modelById = new Map<string, any>();
     for (const mdl of models as any[]) {
       modelById.set(String(mdl._id), mdl);
@@ -162,7 +191,7 @@ export class InventoryLexiconMaterializer {
             }
           : {}),
         ...(category ? { category } : {}),
-        ...(mdl.commercialVehicleType
+        ...(InventoryLexiconMaterializer.isCommercial(mdl) && mdl.commercialVehicleType
           ? { commercialVehicleType: mdl.commercialVehicleType }
           : {}),
       };
@@ -259,7 +288,57 @@ export class InventoryLexiconMaterializer {
     for (const r of rows) {
       const key = `${r.term}|${r.type}`;
       const existing = deduped.get(key);
-      if (!existing || r.weight > existing.weight) deduped.set(key, r);
+      if (!existing) {
+        deduped.set(key, r);
+        continue;
+      }
+      const union = (a?: string[], aOne?: string, b?: string[], bOne?: string) =>
+        [...new Set([...(a ?? (aOne ? [aOne] : [])), ...(b ?? (bOne ? [bOne] : []))])];
+      if (r.type === SearchTermType.MANUFACTURER && existing.type === SearchTermType.MANUFACTURER) {
+        // Same brand name, different manufacturer documents (one per vehicle
+        // category). Keep every id and every category, so "honda" reaches both
+        // the car and the bike catalogue instead of whichever came first.
+        const categories = new Set<string>([
+          ...(existing.payload.categories ?? []),
+          ...(r.payload.categories ?? []),
+        ]);
+        existing.payload = {
+          ...existing.payload,
+          manufacturerIds: union(existing.payload.manufacturerIds, existing.payload.manufacturerId, r.payload.manufacturerIds, r.payload.manufacturerId),
+          ...(categories.size > 0 ? { categories: [...categories] } : {}),
+        };
+        existing.weight = Math.max(existing.weight, r.weight);
+        continue;
+      }
+      if (r.type === SearchTermType.MODEL && existing.type === SearchTermType.MODEL) {
+        // Same model name filed twice in the catalogue ("I-Pace" and "Jaguar
+        // I-Pace", or the same name under two manufacturer documents). Searching
+        // the phrase must reach every one of them, so the ids are merged; the
+        // higher-weight entry keeps the label and category.
+        const keep = r.weight > existing.weight ? r : existing;
+        const other = keep === r ? existing : r;
+        keep.payload = {
+          ...keep.payload,
+          modelIds: union(keep.payload.modelIds, keep.payload.modelId, other.payload.modelIds, other.payload.modelId),
+          manufacturerIds: union(keep.payload.manufacturerIds, keep.payload.manufacturerId, other.payload.manufacturerIds, other.payload.manufacturerId),
+          ...(keep.payload.category || !other.payload.category ? {} : { category: other.payload.category }),
+        };
+        keep.weight = Math.max(existing.weight, r.weight);
+        deduped.set(key, keep);
+        continue;
+      }
+      if (r.type === SearchTermType.VARIANT && existing.type === SearchTermType.VARIANT) {
+        const keep = r.weight > existing.weight ? r : existing;
+        const other = keep === r ? existing : r;
+        keep.payload = {
+          ...keep.payload,
+          variantIds: union(keep.payload.variantIds, keep.payload.variantId, other.payload.variantIds, other.payload.variantId),
+          modelIds: union(keep.payload.modelIds, keep.payload.modelId, other.payload.modelIds, other.payload.modelId),
+        };
+        deduped.set(key, keep);
+        continue;
+      }
+      if (r.weight > existing.weight) deduped.set(key, r);
     }
 
     const ops = [...deduped.values()].map((r) => ({
@@ -309,16 +388,22 @@ export class InventoryLexiconMaterializer {
 
   /** Map a catalogue model onto the ad category its ads are filed under. */
   private categoryOf(model: any): AdCategoryV2 | undefined {
-    if (model.isCommercialVehicle || model.commercialVehicleType) {
+    // Only the explicit flag (or a truck body) makes a model commercial. The
+    // catalogue import writes `commercialVehicleType: 'passenger'` onto
+    // ordinary cars as a body class, so that field alone is NOT evidence —
+    // treating it as such filed every Creta under Commercial Vehicles.
+    if (InventoryLexiconMaterializer.isCommercial(model)) {
       return AdCategoryV2.COMMERCIAL_VEHICLE;
     }
     if (model.vehicleType === VehicleTypes.TWOWHEELER) {
       return AdCategoryV2.TWO_WHEELER;
     }
-    if (model.vehicleType === VehicleTypes.TRUCK) {
-      return AdCategoryV2.COMMERCIAL_VEHICLE;
-    }
     if (model.vehicleType) return AdCategoryV2.PRIVATE_VEHICLE;
     return undefined;
+  }
+
+  /** The single definition of "this catalogue model is a commercial vehicle". */
+  static isCommercial(model: any): boolean {
+    return model?.isCommercialVehicle === true || model?.vehicleType === VehicleTypes.TRUCK;
   }
 }

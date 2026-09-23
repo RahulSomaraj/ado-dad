@@ -32,6 +32,7 @@ import {
 } from './schemas/manufacturer.schema';
 import { ManufacturersModule } from './manufacturers.module';
 import { TestDataSafetyModule } from '../common/test-data-safety.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -45,6 +46,8 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
     ]),
     ManufacturersModule,
     TestDataSafetyModule,
+    // Search document rebuild when catalogue names change.
+    SearchModule,
   ],
   controllers: [VehicleInventoryController, ManufacturersController],
   providers: [
