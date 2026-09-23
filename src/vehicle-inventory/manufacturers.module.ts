@@ -9,6 +9,7 @@ import {
 } from './schemas/manufacturer.schema';
 import { RedisModule } from '../shared/redis.module';
 import { TestDataSafetyModule } from '../common/test-data-safety.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -17,6 +18,8 @@ import { TestDataSafetyModule } from '../common/test-data-safety.module';
     ]),
     RedisModule,
     TestDataSafetyModule,
+    // Search document rebuild when catalogue names change.
+    SearchModule,
   ],
   controllers: [ManufacturersController],
   providers: [ManufacturersService, SafeManufacturerSeedService],

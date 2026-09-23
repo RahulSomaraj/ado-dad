@@ -1,0 +1,29 @@
+{
+  "name": "ads_search",
+  "definition": {
+    "mappings": {
+      "dynamic": false,
+      "fields": {
+        "searchText": { "type": "string", "analyzer": "lucene.standard" },
+        "title": { "type": "string", "analyzer": "lucene.standard" },
+        "description": { "type": "string", "analyzer": "lucene.standard" },
+        "location": { "type": "string", "analyzer": "lucene.standard" },
+        "searchKeys": { "type": "token" },
+        "category": { "type": "token" },
+        "isActive": { "type": "boolean" },
+        "isApproved": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" },
+        "soldOut": { "type": "boolean" },
+        "sellerVerified": { "type": "boolean" },
+        "price": { "type": "number" },
+        "vehicleYear": { "type": "number" },
+        "bedrooms": { "type": "number" },
+        "areaSqft": { "type": "number" },
+        "imageCount": { "type": "number" },
+        "createdAt": { "type": "date" },
+        "geoLocation": { "type": "geo" },
+        "postedBy": { "type": "objectId" }
+      }
+    }
+  }
+}

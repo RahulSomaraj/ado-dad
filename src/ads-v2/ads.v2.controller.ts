@@ -49,6 +49,8 @@ import { SellApiExceptionFilter } from '../common/filters/sell-api-exception.fil
 import { GetAdForEditUc } from './application/use-cases/get-ad-for-edit.uc';
 import { UpdateAdUc } from './application/use-cases/update-ad.uc';
 import { UpdateAdV2Dto } from './dto/update-ad-v2.dto';
+import { SearchEventDto } from './dto/search-event.dto';
+import { SearchEventsService } from '../search/events/search-events.service';
 
 @ApiTags('Ads v2')
 @Controller('v2/ads')
@@ -61,6 +63,7 @@ export class AdsV2Controller {
     private readonly sellerStatsUc: SellerStatsUc,
     private readonly getAdForEditUc: GetAdForEditUc,
     private readonly updateAdUc: UpdateAdUc,
+    private readonly searchEvents: SearchEventsService,
   ) {}
 
   @Post()
@@ -380,13 +383,40 @@ export class AdsV2Controller {
   async list(@Body() dto: ListAdsV2Dto, @Req() req: any) {
     try {
       const userId: string | undefined = req.user?.id;
+      // Search context: an anonymous session id for event logging, and the
+      // debug switch (never honoured in production).
+      const sessionId = this.headerString(req, 'x-session-id');
+      const debug =
+        process.env.NODE_ENV !== 'production' && this.headerString(req, 'x-search-debug') === '1';
 
-      const result = await this.listAdsUc.exec(dto, userId || undefined);
+      const result = await this.listAdsUc.exec(dto, userId || undefined, { sessionId, debug });
       return result;
     } catch (error) {
       console.error('Error listing v2 advertisements:', error);
       throw error;
     }
+  }
+
+  @Post('search/events')
+  @HttpCode(HttpStatus.ACCEPTED)
+  // Click/contact feedback on search results (audit §C.11). Public, throttled,
+  // anonymous: it carries an event id and an ad id, nothing about the person.
+  @Throttle({ name: 'searchEvents', limit: 120, ttl: 60 })
+  @ApiOperation({
+    summary: 'Report a click, contact or favourite on a search result',
+    description:
+      'Send `query.eventId` from the list response, the ad id, its 0-based position and the action. ' +
+      'Used to tune ranking and suggestions; fire-and-forget from the app.',
+  })
+  async searchEvent(@Body() dto: SearchEventDto) {
+    const recorded = await this.searchEvents.recordClick(dto);
+    return { recorded };
+  }
+
+  private headerString(req: any, name: string): string | undefined {
+    const v = req?.headers?.[name];
+    const s = Array.isArray(v) ? v[0] : v;
+    return typeof s === 'string' && s.trim() ? s.trim() : undefined;
   }
 
   @Get('me/stats')

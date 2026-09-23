@@ -2,8 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+  ForbiddenException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -53,6 +52,7 @@ import { AdsCache } from '../../ads-v2/infrastructure/services/ads-cache';
 import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
 import { GeocodingService } from '../../common/services/geocoding.service';
 import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
+import { SearchDocSyncService } from '../../search/services/search-doc-sync.service';
 import { UserType } from '../../users/enums/user.types';
 import {
   buildGeoNearStage,
@@ -113,7 +113,16 @@ export class AdsService {
     private readonly geocodingService: GeocodingService,
     private readonly locationHierarchyService: LocationHierarchyService,
     private readonly adsV2Cache: AdsCache,
+    // Optional so the legacy unit tests that construct AdsService by hand keep
+    // working. When present, every v1 write refreshes the ad's search document.
+    @Optional() private readonly searchDocSync?: SearchDocSyncService,
   ) { }
+
+  /** Best-effort search-document refresh after a v1 write. Never throws. */
+  private syncSearchDoc(adId: unknown, why: string): void {
+    if (!this.searchDocSync || !adId) return;
+    void this.searchDocSync.rebuildAdSafe(String(adId), why);
+  }
 
   /**
    * Aggregate ad statistics for the admin dashboard:
@@ -1543,6 +1552,7 @@ export class AdsService {
     });
     await propertyAd.save();
 
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
     return this.findOne((savedAd._id as any).toString());
   }
 
@@ -1612,6 +1622,7 @@ export class AdsService {
     });
     await vehicleAd.save();
 
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
     return this.findOne((savedAd._id as Types.ObjectId).toString());
   }
 
@@ -1694,7 +1705,8 @@ export class AdsService {
       await session.commitTransaction();
       session.endSession();
 
-      return this.findOne((savedAd._id as Types.ObjectId).toString());
+      this.syncSearchDoc((savedAd as any)._id, 'v1 create');
+    return this.findOne((savedAd._id as Types.ObjectId).toString());
     } catch (e) {
       await session.abortTransaction();
       session.endSession();
@@ -1770,6 +1782,7 @@ export class AdsService {
     });
     await vehicleAd.save();
 
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
     return this.findOne((savedAd._id as any).toString());
   }
 
@@ -1845,6 +1858,7 @@ export class AdsService {
     }
 
     await this.invalidateAdCache(id, userId);
+    this.syncSearchDoc(id, 'v1 update');
     return this.findOne(id);
   }
 
@@ -1918,6 +1932,9 @@ export class AdsService {
 
     // Invalidate cache to ensure fresh data
     await this.invalidateAdCache(id, approvedBy);
+    // Approval is when an ad becomes searchable: make sure its search document
+    // exists even if the create-time build was missed (older ads, admin tools).
+    this.syncSearchDoc(id, 'v1 approval');
 
     return this.findOne(id);
   }

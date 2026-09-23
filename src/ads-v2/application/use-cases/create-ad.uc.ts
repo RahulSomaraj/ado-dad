@@ -10,6 +10,7 @@ import { AdsCache } from '../../infrastructure/services/ads-cache';
 import { CommercialIntentService } from '../../infrastructure/services/commercial-intent.service';
 import { OutboxService } from '../../infrastructure/services/outbox.service';
 import { LegacyAdsCacheInvalidator } from '../../infrastructure/services/legacy-ads-cache.invalidator';
+import { AdSearchDocBuilder, searchDocFields } from '../../../search/services/ad-search-doc.builder';
 import { GeocodingService } from '../../../common/services/geocoding.service';
 import { LocationHierarchyService } from '../../../common/services/location-hierarchy.service';
 import { MediaService } from '../../../media/media.service';
@@ -59,6 +60,7 @@ export class CreateAdUc {
     private readonly media: MediaService,
     private readonly sellConfig: SellConfigService,
     private readonly legacyCache: LegacyAdsCacheInvalidator,
+    private readonly searchDoc: AdSearchDocBuilder,
   ) {}
 
   async exec(input: {
@@ -178,6 +180,23 @@ export class CreateAdUc {
     const locationHierarchy = await this.resolveLocation(data);
 
     const title = await buildTitle(enriched, this.inventory);
+    // Search document (brand/model/variant words + exact-match keys), built
+    // here so a v2 ad is never observable without it. Image count is known
+    // before the media attach: it is the number of ids or urls supplied.
+    const searchDoc = await this.searchDoc.build(
+      {
+        category: enriched.category,
+        images: hasMediaIds ? data.mediaIds : (data.images ?? []).slice(0, 20),
+        location: data.location,
+        city: locationHierarchy.city,
+        district: locationHierarchy.district,
+        state: locationHierarchy.state,
+        vehicle: enriched.vehicle ?? null,
+        commercial: enriched.commercial ?? null,
+        property: enriched.property ?? null,
+      },
+      userId,
+    );
     const geoLocation =
       data.latitude != null && data.longitude != null
         ? {
@@ -230,6 +249,7 @@ export class CreateAdUc {
             isActive: true,
             soldOut: false,
             isApproved: false,
+            ...searchDocFields(searchDoc),
           },
           { session },
         );

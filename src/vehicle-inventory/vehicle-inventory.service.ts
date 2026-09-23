@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import type { PipelineStage, SortOrder } from 'mongoose';
+import { SearchDocSyncService } from '../search/services/search-doc-sync.service';
 import {
   VehicleModel,
   VehicleModelDocument,
@@ -65,6 +67,9 @@ export class VehicleInventoryService {
     private readonly transmissionTypeModel: Model<TransmissionTypeDocument>,
     private readonly redisService: RedisService,
     private readonly manufacturersService: ManufacturersService,
+    // A renamed model/variant must reach the ads' search documents; optional
+    // so unit tests that build this service by hand keep working.
+    @Optional() private readonly searchDocSync?: SearchDocSyncService,
   ) { }
 
   // ---- helpers ------------------------------------------------------------
@@ -209,6 +214,7 @@ export class VehicleInventoryService {
         throw new NotFoundException(`Vehicle model with id ${id} not found`);
       }
 
+      this.searchDocSync?.rebuildForCatalogueInBackground({ modelId: id });
       return vehicleModel;
     } catch (error) {
       if (error.code === 11000) {
@@ -916,6 +922,7 @@ export class VehicleInventoryService {
         throw new NotFoundException(`Vehicle variant with id ${id} not found`);
       }
 
+      this.searchDocSync?.rebuildForCatalogueInBackground({ variantId: id });
       return vehicleVariant;
     } catch (error) {
       if (

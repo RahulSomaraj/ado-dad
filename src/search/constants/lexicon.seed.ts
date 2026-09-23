@@ -122,13 +122,17 @@ export const LISTING_TYPE_TERMS: SeedTerm[] = [
  * Terms that are BOTH a category hint and a model hint. The model half is filled
  * in by the materializer when it finds a matching catalogue entry; the category
  * half is always safe, so "bullet" at minimum lands the user in two-wheelers.
+ *
+ * `hintOnly` marks them so the parser never counts one as a catalogue match:
+ * without the materialized MODEL row, "creta" means "search the text 'creta'
+ * within Cars", never "show every car".
  */
 export const DUAL_HINT_TERMS: SeedTerm[] = [
   { type: SearchTermType.CATEGORY, weight: 70,
-    payload: { category: AdCategoryV2.TWO_WHEELER, label: 'Bikes' },
+    payload: { category: AdCategoryV2.TWO_WHEELER, label: 'Bikes', hintOnly: true },
     terms: ['bullet', 'activa', 'pulsar', 'splendor', 'jupiter', 'dio', 'access', 'apache', 'fz', 'r15', 'classic 350'] },
   { type: SearchTermType.CATEGORY, weight: 70,
-    payload: { category: AdCategoryV2.PRIVATE_VEHICLE, label: 'Cars' },
+    payload: { category: AdCategoryV2.PRIVATE_VEHICLE, label: 'Cars', hintOnly: true },
     terms: ['swift', 'alto', 'i20', 'i10', 'creta', 'baleno', 'wagonr', 'wagon r', 'innova', 'fortuner', 'ertiga', 'dzire', 'xuv', 'thar', 'nexon'] },
 ];
 

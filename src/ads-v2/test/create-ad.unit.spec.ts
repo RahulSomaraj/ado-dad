@@ -105,6 +105,16 @@ function build(redis = new FakeRedis()) {
     },
     sellConfig: { getActiveCommercialTypeNames: jest.fn(async () => new Set(['truck'])) },
     legacy: { invalidateLists: jest.fn() },
+    searchDoc: {
+      build: jest.fn(async () => ({
+        searchText: 'stub',
+        searchKeys: ['cat:stub'],
+        imageCount: 0,
+        sellerVerified: false,
+        searchDocVersion: 1,
+        searchDocBuiltAt: new Date(),
+      })),
+    },
   };
   const uc = new CreateAdUc(
     deps.adRepo as any,
@@ -121,6 +131,7 @@ function build(redis = new FakeRedis()) {
     deps.media as any,
     deps.sellConfig as any,
     deps.legacy as any,
+    deps.searchDoc as any,
   );
   return { uc, deps, redis, session };
 }

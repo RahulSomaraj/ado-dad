@@ -26,6 +26,7 @@ import {
   validateCreateAdV2,
 } from '../../domain/ad.v2.validators';
 import { loadEditableAd } from './get-ad-for-edit.uc';
+import { AdSearchDocBuilder, searchDocToUpdate } from '../../../search/services/ad-search-doc.builder';
 
 const FIELD_MEDIA = 'data.media';
 const isObjectId = (v: unknown) =>
@@ -55,6 +56,7 @@ export class UpdateAdUc {
     private readonly media: MediaService,
     private readonly sellConfig: SellConfigService,
     private readonly legacyCache: LegacyAdsCacheInvalidator,
+    private readonly searchDoc: AdSearchDocBuilder,
   ) {}
 
   async exec(input: {
@@ -160,6 +162,21 @@ export class UpdateAdUc {
     const title = await buildTitle(enriched, this.inventory);
     const hasCoords = data.latitude != null && data.longitude != null;
     const priceChanged = Number(ad.price) !== Number(data.price);
+    const searchDoc = await this.searchDoc.build(
+      {
+        category: ad.category,
+        images: entries,
+        location: data.location,
+        city: hierarchy.city,
+        district: hierarchy.district,
+        state: hierarchy.state,
+        vehicle: enriched.vehicle ?? null,
+        commercial: enriched.commercial ?? null,
+        property: enriched.property ?? null,
+      },
+      ad.postedBy,
+    );
+    const searchUpdate = searchDocToUpdate(searchDoc);
 
     // ---- 6) Transaction ----
     let orphanKeys: string[] = [];
@@ -216,6 +233,8 @@ export class UpdateAdUc {
           $set.priceHistory = appendPriceHistory(ad.priceHistory, ad.price);
         }
 
+        Object.assign($set, searchUpdate.$set);
+        Object.assign($unset, searchUpdate.$unset);
         const update: Record<string, any> = { $set };
         if (Object.keys($unset).length) update.$unset = $unset;
         await this.adRepo.updateOne({ _id: adId, isDeleted: { $ne: true } }, update, { session });

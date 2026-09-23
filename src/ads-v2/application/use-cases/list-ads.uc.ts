@@ -17,6 +17,7 @@ import { AdStatus } from '../../../ads/schemas/ad.schema';
 import { escapeRegExp } from '../../../common/security/regex.util';
 import { SearchQueryService } from '../../../search/services/search-query.service';
 import { ParsedQuery, SearchChip } from '../../../search/dto/parsed-query';
+import { SearchAdsExecutor, SearchContext } from './list-ads.search';
 
 /**
  * S0-1: user-supplied text must never reach `$regex` unescaped — a query of
@@ -54,6 +55,8 @@ export interface PaginatedAdsResponse {
     confidence: number;
     applied: boolean;
     chips: SearchChip[];
+    /** Tier-1 search path adds eventId, strength, strategy, engine, relaxations, conflicts, radius… */
+    [extra: string]: unknown;
   };
 }
 
@@ -95,6 +98,9 @@ export class ListAdsUc {
     private readonly favoriteModel: Model<FavoriteDocument>,
     private readonly locationHierarchyService: LocationHierarchyService,
     @Optional() private readonly searchQuery?: SearchQueryService,
+    // Tier-1 hybrid search (SEARCH_V3_RETRIEVAL=true). Optional so the legacy
+    // path and the unit tests that build this class by hand keep working.
+    @Optional() private readonly searchExecutor?: SearchAdsExecutor,
   ) { }
 
   /**
@@ -178,7 +184,32 @@ export class ListAdsUc {
   async exec(
     filters: ListAdsV2Dto,
     userId?: string,
+    ctx: Omit<SearchContext, 'userId'> = {},
   ): Promise<PaginatedAdsResponse> {
+    // Tier-1 hybrid search: a search string on the new retrieval path. The
+    // feed (no search string) and the flag-off state are the legacy path below.
+    if (filters.search?.trim() && this.searchExecutor?.isEnabled()) {
+      try {
+        const base = await this.searchExecutor.exec(
+          filters,
+          { ...ctx, userId },
+          (ids) => this.hydrateByIds(ids),
+        );
+        const favourites = userId ? await this.getUserFavorites(userId) : [];
+        return { ...base, data: this.addIsFavoriteToAds(base.data, favourites) };
+      } catch (err) {
+        // The search endpoint must keep answering. Whatever broke in the new
+        // path (an index missing, an adapter bug), serve the legacy path and
+        // make the failure visible in the logs rather than to the user.
+        this.reportHybridFailure(err);
+      }
+    }
+
+    // Search-only sort names have no meaning on the legacy path.
+    if (filters.sortBy && ['relevance', 'newest', 'year', 'distance'].includes(filters.sortBy)) {
+      filters = { ...filters, sortBy: 'createdAt' };
+    }
+
     const { effective, parsed } = await this.resolveFilters(filters);
     filters = effective;
 
@@ -1168,6 +1199,99 @@ export class ListAdsUc {
       prevCursor: prevCursorOut ?? undefined,
       cachedAt: Date.now(),
     };
+  }
+
+  private lastHybridFailureAt = 0;
+  private reportHybridFailure(err: unknown): void {
+    const now = Date.now();
+    const e = err as Error;
+    if (now - this.lastHybridFailureAt > 60_000) {
+      this.lastHybridFailureAt = now;
+      this.logger.error(
+        `Hybrid search failed, serving the legacy path: ${e?.message ?? err}. ` +
+          'Run: npm run search:validate',
+        e?.stack,
+      );
+    } else {
+      this.logger.warn(`Hybrid search failed again (legacy path served): ${e?.message ?? err}`);
+    }
+  }
+
+  /**
+   * Hydrate a page of ids returned by a search engine into the same response
+   * shape the feed produces: the post-pagination lookups of
+   * fetchWithOriginalLogic, then the inventory batch fetch and the DTO mapping.
+   * Order is preserved from `ids` (that is the ranking).
+   */
+  private async hydrateByIds(ids: Types.ObjectId[]): Promise<DetailedAdResponseDto[]> {
+    if (ids.length === 0) return [];
+    const pipeline: any[] = [
+      { $match: { _id: { $in: ids } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            {
+              $project: {
+                _id: 1, name: 1, email: 1, countryCode: 1, phoneNumber: 1, profilePic: 1,
+                type: 1, isVerified: 1, createdAt: 1, isDeleted: 1,
+              },
+            },
+          ],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'propertyads', localField: '_id', foreignField: 'ad', as: 'propertyDetails' } },
+      { $lookup: { from: 'vehicleads', localField: '_id', foreignField: 'ad', as: 'vehicleDetails' } },
+      {
+        $lookup: {
+          from: 'commercialvehicleads', localField: '_id', foreignField: 'ad', as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $addFields: {
+          id: '$_id',
+          postedAt: '$createdAt',
+          user: {
+            id: '$user._id',
+            name: '$user.name',
+            email: '$user.email',
+            countryCode: '$user.countryCode',
+            phoneNumber: '$user.phoneNumber',
+            profilePic: '$user.profilePic',
+          },
+          isFavorite: false,
+          propertyDetails: { $arrayElemAt: ['$propertyDetails', 0] },
+          vehicleDetails: { $arrayElemAt: ['$vehicleDetails', 0] },
+          commercialVehicleDetails: { $arrayElemAt: ['$commercialVehicleDetails', 0] },
+        },
+      },
+      {
+        $project: {
+          _id: 1, title: 1, description: 1, price: 1, images: 1, location: 1, latitude: 1,
+          longitude: 1, category: 1, isActive: 1, soldOut: 1, isApproved: 1, approvedBy: 1,
+          postedBy: 1, createdAt: 1, updatedAt: 1, viewCount: 1, id: 1, postedAt: 1, user: 1,
+          isFavorite: 1, propertyDetails: 1, vehicleDetails: 1, commercialVehicleDetails: 1,
+        },
+      },
+    ];
+    const rows = await this.adRepo.aggregate(pipeline);
+    const byId = new Map<string, any>(rows.map((r: any) => [String(r._id), r]));
+    const ordered = ids.map((id) => byId.get(String(id))).filter(Boolean);
+    const inventoryMaps = await this.batchFetchInventoryItems(ordered);
+    return ordered.map((ad) =>
+      this.mapToDetailedResponseDtoWithInventory(
+        ad,
+        inventoryMaps.manufacturers,
+        inventoryMaps.models,
+        inventoryMaps.variants,
+        inventoryMaps.fuelTypes,
+        inventoryMaps.transmissionTypes,
+      ),
+    );
   }
 
   /**

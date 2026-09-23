@@ -15,7 +15,8 @@ export type ChipKind =
   | 'cv_type'
   | 'price'
   | 'year'
-  | 'bedrooms';
+  | 'bedrooms'
+  | 'correction';
 
 /**
  * One removable pill in the results header. `sourceSpan` indexes into the RAW
@@ -31,8 +32,9 @@ export interface SearchChip {
   sourceSpan: [number, number];
   /**
    * True when the parser inferred this rather than reading it literally — bare
-   * budgets ("5 lakh" with no "under") are the main case. The UI may render
-   * these differently; removing one is always allowed.
+   * budgets ("5 lakh" with no "under") and category hints from a seed word with
+   * no catalogue match are the main cases. The UI may render these differently;
+   * removing one is always allowed.
    */
   inferred?: boolean;
 }
@@ -58,15 +60,51 @@ export interface Ambiguity {
   phrase: string;
 }
 
+/** A typo the parser corrected against the lexicon before matching. */
+export interface Correction {
+  from: string;
+  to: string;
+  via: 'edit' | 'phonetic';
+  /** Span of the ORIGINAL token in the raw query. */
+  sourceSpan: [number, number];
+}
+
+/**
+ * How much of the query the parser understood, and how.
+ *
+ *  strong   — every meaningful word is a catalogue entity (brand/model/variant),
+ *             an attribute, a number or a place, with no ambiguity: "creta",
+ *             "hyundai creta 2020 petrol".
+ *  partial  — a catalogue entity plus words the lexicon does not know: "red creta".
+ *  category — no catalogue entity, but most words are category / property-type /
+ *             listing / location / numeric words: "cars in kochi", "2bhk flat".
+ *  weak     — only a seed hint with no catalogue match, or only a minority of the
+ *             words recognised: "creta" on an unmaterialised lexicon,
+ *             "car wash service center".
+ *  none     — nothing recognised.
+ */
+export type QueryStrength = 'strong' | 'partial' | 'category' | 'weak' | 'none';
+
+/** Where the parsed category came from. */
+export type CategorySource = 'seed' | 'hint' | 'entity' | 'implied';
+
 /**
  * The parser's whole output. Everything here is a *suggestion*: the caller
  * merges it under any filter the user set explicitly, which always wins.
  */
 export interface ParsedQuery {
   raw: string;
+  /** Lowercased, transliterated, single-spaced form of the WHOLE query. Never loses a word. */
   normalized: string;
 
   category?: AdCategoryV2;
+  categorySource?: CategorySource;
+  /**
+   * Categories a matched brand sells in, when the brand alone could not decide
+   * the category (Honda: cars AND bikes). The planner filters on this set when
+   * `category` is unset.
+   */
+  brandCategories?: AdCategoryV2[];
   propertyTypes?: string[];
   listingType?: AdListingType;
   commercialVehicleTypes?: string[];
@@ -85,10 +123,30 @@ export interface ParsedQuery {
   maxPrice?: number;
   minYear?: number;
   maxYear?: number;
+  /**
+   * A bare year the user typed ("creta 2020"). `minYear` is still set for the
+   * legacy filter path; the planner treats this as an exact-year BOOST instead.
+   */
+  exactYear?: number;
   bedrooms?: number;
 
-  /** Tokens the lexicon did not claim. Feeds $text; never a hard filter. */
+  /**
+   * Tokens the lexicon did not claim, plus tokens claimed only by a seed hint.
+   * Legacy `$text` term for the pre-planner list path; never a hard filter.
+   */
   freeText: string;
+  /**
+   * What the text clause of the hybrid query should search: every token except
+   * the ones that became structural filters (category words, property types,
+   * listing words, places, money, BHK). Entity, attribute and unknown tokens
+   * are kept, with spelling corrections applied. Empty means "no text clause".
+   */
+  textQuery: string;
+
+  /** True when a brand, model or variant from the catalogue matched (exact or corrected). */
+  catalogueMatch: boolean;
+  strength: QueryStrength;
+  corrections: Correction[];
 
   chips: SearchChip[];
   ambiguities: Ambiguity[];
@@ -97,9 +155,10 @@ export interface ParsedQuery {
   confidence: number;
 
   /**
-   * False when confidence is too low to filter on. The caller then treats the
-   * parsed category as a ranking boost instead of a `$match`, so a query like
-   * "carpenter tools" is never forced into Cars.
+   * Legacy flag for the pre-planner list path. False when confidence is too low
+   * to filter on, when the match is only a seed hint, or when a catalogue entity
+   * matched but no category could be derived for it (the legacy path would
+   * silently drop the entity filter). The planner does not use this.
    */
   applyAsFilter: boolean;
 }
@@ -107,11 +166,18 @@ export interface ParsedQuery {
 /** Below this, structured hints become ranking boosts rather than filters. */
 export const MIN_FILTER_CONFIDENCE = 0.34;
 
+/** At or above this share of recognised words a non-catalogue query is 'category' strength. */
+export const CATEGORY_STRENGTH_SHARE = 0.5;
+
 export function emptyParsedQuery(raw: string): ParsedQuery {
   return {
     raw,
     normalized: '',
     freeText: '',
+    textQuery: '',
+    catalogueMatch: false,
+    strength: 'none',
+    corrections: [],
     chips: [],
     ambiguities: [],
     confidence: 0,

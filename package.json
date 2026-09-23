@@ -60,6 +60,11 @@
     "search:test": "jest src/search src/common/database",
     "search:preflight": "ts-node -r tsconfig-paths/register src/search/scripts/search-preflight.ts",
     "search:indexes": "ts-node -r tsconfig-paths/register src/search/scripts/search-index-migration.ts",
+    "search:backfill": "ts-node -r tsconfig-paths/register src/search/scripts/search-backfill.ts",
+    "search:validate": "ts-node -r tsconfig-paths/register src/search/scripts/search-validate.ts",
+    "search:explain": "ts-node -r tsconfig-paths/register src/search/scripts/search-explain.ts",
+    "search:atlas-index": "ts-node -r tsconfig-paths/register src/search/scripts/search-atlas-index.ts",
+    "search:test:contract": "jest src/search/test/adapters.contract.spec.ts --runInBand",
     "db:backup": "ts-node -r tsconfig-paths/register src/common/database/scripts/backup-collection.ts"
   },
   "dependencies": {
