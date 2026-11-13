@@ -73,7 +73,9 @@ export class AdResponseDto {
   user?: {
     id: string;
     name: string;
-    email: string;
+    // Optional since P0-1: the v2 list response no longer carries seller
+    // email/phone; the detail response still sets them.
+    email?: string;
     countryCode?: string;
     phoneNumber?: string;
     profilePic?: string;
@@ -364,7 +366,9 @@ export class DetailedAdResponseDto extends AdResponseDto {
   approvedByUser?: {
     id: string;
     name: string;
-    email: string;
+    // Optional since P0-1: the v2 list response no longer carries seller
+    // email/phone; the detail response still sets them.
+    email?: string;
   };
 }
 

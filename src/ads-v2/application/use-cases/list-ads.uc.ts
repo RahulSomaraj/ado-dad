@@ -991,9 +991,6 @@ export class ListAdsUc {
             $project: {
               _id: 1,
               name: 1,
-              email: 1,
-              countryCode: 1,
-              phoneNumber: 1,
               profilePic: 1,
               type: 1,
               isVerified: 1,
@@ -1057,9 +1054,6 @@ export class ListAdsUc {
         user: {
           id: '$user._id',
           name: '$user.name',
-          email: '$user.email',
-          countryCode: '$user.countryCode',
-          phoneNumber: '$user.phoneNumber',
           profilePic: '$user.profilePic',
         },
         isFavorite: false, // Will be set per user
@@ -1236,7 +1230,7 @@ export class ListAdsUc {
           pipeline: [
             {
               $project: {
-                _id: 1, name: 1, email: 1, countryCode: 1, phoneNumber: 1, profilePic: 1,
+                _id: 1, name: 1, profilePic: 1,
                 type: 1, isVerified: 1, createdAt: 1, isDeleted: 1,
               },
             },
@@ -1258,9 +1252,6 @@ export class ListAdsUc {
           user: {
             id: '$user._id',
             name: '$user.name',
-            email: '$user.email',
-            countryCode: '$user.countryCode',
-            phoneNumber: '$user.phoneNumber',
             profilePic: '$user.profilePic',
           },
           isFavorite: false,
@@ -1865,9 +1856,6 @@ export class ListAdsUc {
         ? {
             id: ad.user._id?.toString() || String(ad.user._id),
             name: ad.user.name,
-            email: ad.user.email,
-            countryCode: ad.user.countryCode,
-            phoneNumber: ad.user.phoneNumber,
             profilePic: ad.user.profilePic || 'default-profile-pic-url',
           }
         : undefined,

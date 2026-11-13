@@ -3,7 +3,10 @@ import { RedisService } from '../../../shared/redis.service';
 
 @Injectable()
 export class AdsCache {
-  private static readonly PREFIX = 'ads:v2:';
+  // r2: key version bumped when the cached list shape changed (P0-1 removed
+  // seller email/phone/countryCode) so stale PII-carrying entries are never
+  // served after deploy; orphaned old keys expire via TTL.
+  private static readonly PREFIX = 'ads:v2:r2:';
   private static readonly TAG_LIST = 'ads:v2:tag:list';
   private static readonly TAG_BY_ID = (id: string) => `ads:v2:tag:byId:${id}`;
 
