@@ -6,6 +6,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { validateEnv } from './config/env.validation';
 import { JwtModule } from '@nestjs/jwt';
 import helmet from 'helmet';
 
@@ -66,6 +67,7 @@ import { MediaModule } from './media/media.module';
       isGlobal: true,
       cache: true,
       envFilePath: ['.env.local', '.env'],
+      validate: validateEnv,
     }),
 
     // Database
