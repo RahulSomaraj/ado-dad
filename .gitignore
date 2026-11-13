@@ -204,3 +204,6 @@ backups/
 *.jsonl
 *.jsonl.gz
 Claude outputs/
+
+# generated test artifacts
+test-results/
