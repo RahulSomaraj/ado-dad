@@ -25,11 +25,21 @@ export class RefreshTokenStrategy extends PassportStrategy(
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
       ignoreExpiration: false,
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
       secretOrKey: (() => { const s = process.env.TOKEN_KEY; if (!s) { throw new Error('TOKEN_KEY is required for RefreshTokenStrategy'); } return s; })(),
     });
   }
 
   async validate(payload: any) {
+    // Reject access tokens presented as refresh tokens. Legacy refresh
+    // tokens without a typ claim pass during migration.
+    if (payload.typ && payload.typ !== 'refresh') {
+      throw new HttpException(
+        { status: HttpStatus.UNAUTHORIZED, error: 'Invalid token type' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
     const refreshToken = payload.refreshToken;
     const existingLogins = await this.authTokenModel.find().exec();
 

@@ -26,15 +26,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // verifyOptions already declared on the app-level JwtModule
       // (app.module.ts:104-107), which this strategy was silently ignoring.
       //
-      // Note this does NOT separate access from refresh tokens — both are
-      // signed with the same secret, issuer and audience, differing only in
-      // expiry. Adding a `typ` claim is the fix for that; tracked separately.
+      // Access/refresh separation: tokens now carry a `typ` claim
+      // (users.service.ts generateAccessToken/generateRefreshToken) and
+      // validate() below rejects typ:'refresh'. Legacy tokens without typ
+      // are accepted during migration; once all refresh tokens from before
+      // the typ rollout have expired (REFRESH_TOKEN_EXPIRY, default 60d),
+      // tighten validate() to REQUIRE typ === 'access'.
       issuer: 'ado-dad-api',
       audience: 'ado-dad-users',
     });
   }
 
   async validate(payload: any) {
+    // Reject refresh tokens presented as access tokens. Legacy tokens
+    // without a typ claim pass during migration (see constructor note).
+    if (payload.typ && payload.typ !== 'access') {
+      throw new HttpException(
+        { status: HttpStatus.UNAUTHORIZED, error: 'Invalid token type' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
     // Try to find user by ID (handle both string and ObjectId)
     let user;
     try {

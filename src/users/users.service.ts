@@ -1178,7 +1178,9 @@ export class UsersService {
    * Generate access token
    */
   private async generateAccessToken(payload: TokenPayload): Promise<string> {
-    return this.jwtService.sign(payload, {
+    // typ distinguishes access from refresh tokens, which are otherwise
+    // signed with the same secret/issuer/audience (P0-6 follow-up).
+    return this.jwtService.sign({ ...payload, typ: 'access' }, {
       secret: this.configService.get('TOKEN_KEY'),
       expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
       issuer: 'ado-dad-api',
@@ -1190,7 +1192,7 @@ export class UsersService {
    * Generate refresh token
    */
   private async generateRefreshToken(payload: TokenPayload): Promise<string> {
-    return this.jwtService.sign(payload, {
+    return this.jwtService.sign({ ...payload, typ: 'refresh' }, {
       secret: this.configService.get('TOKEN_KEY'),
       expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRY') || '60d',
       issuer: 'ado-dad-api',
