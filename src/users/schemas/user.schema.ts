@@ -1,11 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import { UserType } from '../enums/user.types';
 
-export enum UserType {
-  USER = 'user',
-  ADMIN = 'admin',
-  SHOWROOM = 'showroom',
+/** Moderation lifecycle status for a user (denormalized for fast filtering). */
+export enum ModerationStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  BANNED = 'banned',
 }
 
 @Schema({ timestamps: true })
@@ -13,23 +15,27 @@ export class User extends Document {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true })
+  countryCode: string;
+
+  @Prop({ required: true, trim: true })
   phoneNumber: string;
 
   @Prop({ required: true })
   password: string;
-
-  @Prop({ unique: true })
-  username?: string;
 
   @Prop({ enum: UserType, required: true })
   type: UserType;
 
   @Prop({ default: 'default-profile-pic-url' })
   profilePic?: string;
+
+  // Verified seller badge (KYC / manual verification)
+  @Prop({ default: false })
+  isVerified?: boolean;
 
   @Prop()
   otp?: string;
@@ -39,6 +45,16 @@ export class User extends Document {
 
   @Prop({ default: false })
   isDeleted?: boolean;
+
+  // ---- Moderation (denormalized; source of truth is UserStrike/Suspension) ----
+  @Prop({ default: 0 })
+  strikeCount?: number;
+
+  @Prop({ enum: ModerationStatus, default: ModerationStatus.ACTIVE })
+  moderationStatus?: ModerationStatus;
+
+  @Prop({ type: Date, required: false })
+  suspendedUntil?: Date;
 
   // Method to compare password
   async comparePassword(password: string): Promise<boolean> {
@@ -58,8 +74,27 @@ export class User extends Document {
 // Create the schema for the User class
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Pre-save hook to hash password before saving
+// Indexes for performance
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ countryCode: 1, phoneNumber: 1 }, { unique: true });
+UserSchema.index({ name: 'text', email: 'text', phoneNumber: 'text' });
+UserSchema.index({ moderationStatus: 1 });
+UserSchema.index({ suspendedUntil: 1 });
+
+// Pre-save hook to normalize countryCode and hash password before saving
 UserSchema.pre('save', async function (next) {
+  // Normalize countryCode: ensure it has + prefix and is trimmed
+  if (this.countryCode) {
+    // Remove any whitespace
+    let normalized = String(this.countryCode).trim();
+    // Ensure it starts with + (if not already, add it)
+    if (!normalized.startsWith('+')) {
+      normalized = '+' + normalized.replace(/^\+/, ''); // Remove existing + if any, then add one
+    }
+    this.countryCode = normalized;
+  }
+
+  // Hash password before saving
   if (this.isModified('password') || this.isNew) {
     this.password = await bcrypt.hash(this.password, 10);
   }

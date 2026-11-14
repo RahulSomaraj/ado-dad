@@ -5,37 +5,76 @@ import {
   IsEnum,
   IsNotEmpty,
   IsOptional,
-  IsPhoneNumber,
+  IsUrl,
+  IsIn,
+  Matches,
+  IsNumberString,
 } from 'class-validator';
+import { UserType } from '../enums/user.types';
+import { IsPhoneNumberWithCountry } from '../../common/decorators/phone-number-validator.decorator';
+import { getSupportedPhoneCodes } from '../../common/utils/phone-validator.util';
+
+const supportedPhoneCodes = getSupportedPhoneCodes();
 
 export class UpdateUserDto {
   @ApiPropertyOptional({ example: 'John Doe' })
   @IsString()
+  @IsNotEmpty()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ example: '+123456789' })
-  @IsPhoneNumber('IN')
-  @IsNotEmpty()
-  phone: string;
+  @ApiPropertyOptional({
+    example: '+91',
+    description: 'Phone country code with + prefix (e.g., +91, +971, +1)',
+    enum: supportedPhoneCodes.slice(0, 50), // Show first 50 in Swagger
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^\+\d{1,4}$/, {
+    message: 'Country code must be in format +XX (e.g., +91, +971, +1)',
+  })
+  @IsIn(supportedPhoneCodes, {
+    message: `Country code must be a valid phone country code (e.g., +91, +971, +1)`,
+  })
+  countryCode?: string;
 
-  @ApiProperty({ example: 'john@example.com' })
+  @ApiPropertyOptional({
+    example: '9876543210',
+    description: 'Phone number without country code',
+  })
+  @IsString()
+  @IsOptional()
+  // @IsPhoneNumberWithCountry('+91', {
+  //   message: 'Invalid phone number format',
+  // })
+  @IsNumberString({ no_symbols: true }, { 
+    message: 'Phone number must contain only numbers' 
+  })
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'john@example.com' })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
-  @ApiProperty({ example: 'password123' })
+  @ApiPropertyOptional({ example: 'password123' })
   @IsString()
   @IsNotEmpty()
-  password: string;
+  @IsOptional()
+  password?: string;
 
-  @ApiProperty({ example: 'user', enum: ['user'] })
-  @IsEnum(['user'])
+  @ApiPropertyOptional({ example: 'SA', enum: UserType })
+  @IsEnum(UserType)
   @IsNotEmpty()
-  type: 'user';
+  @IsOptional()
+  type?: UserType;
 
-  @ApiProperty({ example: 'admin' })
-  @IsString()
-  @IsNotEmpty()
-  createdBy: string;
+  @ApiPropertyOptional({
+    example: 'https://example.com/profile.jpg',
+    description: 'Profile picture URL (optional)',
+  })
+  @IsOptional()
+  @IsUrl()
+  profilePic?: string;
 }

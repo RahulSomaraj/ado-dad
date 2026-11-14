@@ -1,13 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, MaxLength, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  MaxLength,
+  IsMongoId,
+} from 'class-validator';
 
 export class CreateRatingDto {
   @ApiProperty({
     description: 'User ID',
     example: '63a79bfb1234567890abcdef',
   })
+  @IsOptional()
   @IsMongoId()
-  user: string;
+  user?: string;
 
   @ApiProperty({
     description: 'Product ID',

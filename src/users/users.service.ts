@@ -1,83 +1,1726 @@
-import { Injectable } from '@nestjs/common';
+import { escapeRegExp } from '../common/security/regex.util';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User } from './schemas/user.schema';  // Import the User schema
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { Model, Types } from 'mongoose';
+import * as bcrypt from 'bcrypt';
+
+import { User } from './schemas/user.schema';
 import { EmailService } from '../utils/email.service';
 import { generateOTP } from '../utils/otp-generator';
+import { AuthTokens } from '../auth/schemas/schema.refresh-token';
+import { GetUsersDto, UserResponseDto } from './dto/get-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { LoginResponse } from './dto/login-response.dto';
+import { UserType } from './enums/user.types';
+import { RedisService } from '../shared/redis.service';
+import { AdDocument } from 'src/ads/schemas/ad.schema';
+
+interface PaginatedUsersResponse {
+  users: Partial<User>[];
+  totalPages: number;
+  currentPage: number;
+  totalUsers: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+interface TokenPayload {
+  id: string;
+  email: string;
+  userType: string;
+  iat?: number;
+  exp?: number;
+}
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
+  // Cache TTL constants (in seconds)
+  private static readonly CACHE_TTL = {
+    USER_BY_ID: 300, // 5 minutes for individual user
+    USER_LIST: 300, // 5 minutes for user lists
+    OTP_RATE_LIMIT: 600, // 10 minutes for OTP rate limiting (max 5 per 10 minutes)
+  };
+
+  // Cache version for better invalidation
+  private cacheVersion = 1;
+
   constructor(
-    @InjectModel('User') private userModel: Model<User>,  // Inject the model by name 'User'
-    private emailService: EmailService,
+    @InjectModel('User') private readonly userModel: Model<User>,
+    @InjectModel('Ad') private readonly adModel: Model<AdDocument>,
+    private readonly emailService: EmailService,
+    private readonly redisService: RedisService,
+    @InjectModel(AuthTokens.name)
+    private readonly authTokenModel: Model<AuthTokens>,
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async getAllUsers(page: number, limit: number, filters: any) {
-    const query = { ...filters, isDeleted: false };
-    const users = await this.userModel
-      .find(query)
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .exec();
-    const count = await this.userModel.countDocuments(query);
-    return { users, totalPages: Math.ceil(count / limit), currentPage: page };
+  /**
+   * Returns user counts for the admin dashboard.
+   * `total` is the number of normal users (type NU); a per-type breakdown is
+   * also included. Soft-deleted users are excluded.
+   */
+  async getUserCount(): Promise<{
+    total: number;
+    normalUsers: number;
+    showrooms: number;
+    admins: number;
+    byType: Record<string, number>;
+  }> {
+    const notDeleted = { isDeleted: { $ne: true } };
+    const [normalUsers, showrooms, admins, superAdmins] = await Promise.all([
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.USER })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.SHOWROOM })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.ADMIN })
+        .exec(),
+      this.userModel
+        .countDocuments({ ...notDeleted, type: UserType.SUPER_ADMIN })
+        .exec(),
+    ]);
+
+    return {
+      total: normalUsers,
+      normalUsers,
+      showrooms,
+      admins: admins + superAdmins,
+      byType: {
+        [UserType.USER]: normalUsers,
+        [UserType.SHOWROOM]: showrooms,
+        [UserType.ADMIN]: admins,
+        [UserType.SUPER_ADMIN]: superAdmins,
+      },
+    };
   }
 
-  async getUserById(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
-    return user;
+  // Reusable field sets
+  private static readonly BASE_PROJECTION =
+    '_id name email type countryCode phoneNumber profilePic createdAt updatedAt strikeCount moderationStatus suspendedUntil';
+
+  // Limited projection for unauthenticated users
+  private static readonly PUBLIC_PROJECTION = '_id name email type createdAt';
+
+  // Deterministic cache key helper
+  private key(obj: Record<string, unknown>): string {
+    const parts = Object.keys(obj)
+      .sort()
+      .map((k) => `${k}=${JSON.stringify(obj[k])}`)
+      .join('&');
+    return `v${this.cacheVersion}:${parts}`;
   }
 
-  async createUser(userData: any): Promise<User> {
-    const newUser = new this.userModel(userData);
-    return newUser.save();
-  }
+  /**
+   * Get all users with pagination, filtering, and sorting (Public API - No Authentication)
+   */
+  async getAllUsersPublic(
+    getUsersDto: GetUsersDto,
+  ): Promise<PaginatedUsersResponse> {
+    try {
+      const cacheKey = `users:public:list:${this.key({
+        page: getUsersDto.page ?? 1,
+        limit: getUsersDto.limit ?? 10,
+        search: (getUsersDto.search || '').trim(),
+        type: getUsersDto.type || 'any',
+        sort: getUsersDto.sort || 'createdAt:desc',
+      })}`;
+      const cached =
+        await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
+      if (cached) return cached;
 
-  async updateUser(id: string, updateData: any): Promise<User> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user || user.isDeleted) throw new Error('User not found or deleted');
-    // Cast user as User type to satisfy TypeScript
-    const updatedUser = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
-    return updatedUser!;
-  }
-  
+      const { page = 1, limit = 10, search, type, sort } = getUsersDto;
 
-  async deleteUser(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user) throw new Error('User not found');
-    user.isDeleted = true;
-    await user.save();
-    return user;
-  }
+      // Validate pagination parameters
+      const validatedPage = Math.max(1, page);
+      const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 users per page
 
-  // Send OTP to a user via email
-  async sendOTP(email: string): Promise<void> {
-    const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
-    
-    // Call the generateAndSendOTP method from the schema to generate OTP and send email
-    await user.generateAndSendOTP(this.emailService, generateOTP);
-  }
+      // Build query with filters - PUBLIC API only shows USER types for security
+      const query: any = { isDeleted: { $ne: true } };
 
-  // Verify the OTP
-  async verifyOTP(email: string, otp: string): Promise<string> {
-    const user = await this.userModel.findOne({ email }).exec();
-    if (!user) throw new Error('User not found');
-    
-    // Check if OTP matches
-    if (user.otp !== otp) throw new Error('Invalid OTP');
-    
-    // Check if OTP expired (making sure otpExpires is defined)
-    if (!user.otpExpires || user.otpExpires < new Date()) {
-      throw new Error('OTP expired');
+      // Add search functionality - search across all fields
+      if (search?.trim()) {
+        const searchTerm = search.trim();
+        const searchRegex = new RegExp(escapeRegExp(searchTerm), 'i'); // case-insensitive
+        query.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { countryCode: searchRegex },
+          { type: searchRegex },
+          { profilePic: searchRegex },
+        ];
+      }
+
+      // Public API - only allow filtering to USER and SHOWROOM types (admin profiles should not be publicly accessible)
+      if (type) {
+        // Only allow USER and SHOWROOM types to be filtered in public API
+        if (type === UserType.USER || type === UserType.SHOWROOM) {
+          query.type = type;
+        } else {
+          // For security, return empty results if trying to filter for ADMIN or SUPER_ADMIN types
+          query.type = { $in: [] };
+        }
+      } else {
+        // Default to USER and SHOWROOM types when no type filter is specified
+        query.type = { $in: [UserType.USER, UserType.SHOWROOM] };
+      }
+
+      // Build sort options
+      const sortOptions = this.buildSortOptions(sort);
+
+      // Execute query with pagination - PUBLIC API uses limited projection (no PII)
+      const [users, totalUsers] = await Promise.all([
+        this.userModel
+          .find(query)
+          .sort(sortOptions)
+          .skip((validatedPage - 1) * validatedLimit)
+          .limit(validatedLimit)
+          .select(UsersService.PUBLIC_PROJECTION)
+          .lean()
+          .exec(),
+        this.userModel.countDocuments(query).exec(),
+      ]);
+
+      const totalPages = Math.ceil(totalUsers / validatedLimit);
+
+      this.logger.debug(
+        `Retrieved ${users.length} users out of ${totalUsers} total (Public API)`,
+      );
+
+      const response: PaginatedUsersResponse = {
+        users: users as any[],
+        totalPages,
+        currentPage: validatedPage,
+        totalUsers,
+        hasNext: validatedPage < totalPages,
+        hasPrev: validatedPage > 1,
+      };
+
+      await this.redisService.cacheSet(
+        cacheKey,
+        response,
+        UsersService.CACHE_TTL.USER_LIST,
+      );
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to get users (Public API):', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve users',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-    
-    // Clear OTP and expiration date after verification
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
-    return 'OTP verified successfully';
   }
-  
+
+  /**
+   * Get all users with pagination, filtering, and sorting (Authenticated)
+   */
+  async getAllUsers(
+    getUsersDto: GetUsersDto,
+    currentUser: User | null,
+  ): Promise<PaginatedUsersResponse> {
+    try {
+      const cacheKey = `users:list:${this.key({
+        page: getUsersDto.page ?? 1,
+        limit: getUsersDto.limit ?? 10,
+        search: (getUsersDto.search || '').trim(),
+        type: getUsersDto.type || 'any',
+        sort: getUsersDto.sort || 'createdAt:desc',
+        uid:
+          (currentUser as any)?._id?.toString?.() ||
+          (currentUser as any)?.id ||
+          'na',
+      })}`;
+      const cached =
+        await this.redisService.cacheGet<PaginatedUsersResponse>(cacheKey);
+      if (cached) return cached;
+      const { page = 1, limit = 10, search, type, sort } = getUsersDto;
+
+      // Validate pagination parameters
+      const validatedPage = Math.max(1, page);
+      const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 users per page
+
+      // Build query with filters
+      const query: any = { isDeleted: { $ne: true } };
+
+      // Add search functionality - search across all fields
+      if (search?.trim()) {
+        const searchTerm = search.trim();
+        const searchRegex = new RegExp(escapeRegExp(searchTerm), 'i'); // case-insensitive
+        query.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { countryCode: searchRegex },
+          { type: searchRegex },
+          { profilePic: searchRegex },
+        ];
+      }
+
+      // Role-based visibility (compose with explicit `type` filter if present)
+      let allowedTypes: UserType[] | undefined;
+      if (!currentUser) {
+        // No authentication - only show basic USER types with limited fields
+        allowedTypes = [UserType.USER];
+      } else if (
+        currentUser.type === UserType.SUPER_ADMIN ||
+        currentUser.type === UserType.ADMIN ||
+        currentUser.type === UserType.SHOWROOM
+      ) {
+        allowedTypes = undefined; // see all
+      } else if (currentUser.type === UserType.USER) {
+        // Normal users can see USER and SHOWROOM types only
+        allowedTypes = [UserType.USER, UserType.SHOWROOM];
+      } else {
+        // Fallback: only USER types
+        allowedTypes = [UserType.USER];
+      }
+      if (type && allowedTypes) {
+        // both role and explicit type → intersection
+        if (allowedTypes.includes(type as UserType)) {
+          query.type = type;
+        } else {
+          // empty set → force no results cheaply
+          query.type = { $in: [] };
+        }
+      } else if (!type && allowedTypes) {
+        query.type = { $in: allowedTypes };
+      } else if (type && !allowedTypes) {
+        query.type = type;
+      }
+
+      // Build sort options
+      const sortOptions = this.buildSortOptions(sort);
+
+      // Choose projection based on authentication status
+      const projection = currentUser
+        ? UsersService.BASE_PROJECTION
+        : UsersService.PUBLIC_PROJECTION;
+
+      // Execute query with pagination
+      const [users, totalUsers] = await Promise.all([
+        this.userModel
+          .find(query)
+          .sort(sortOptions)
+          .skip((validatedPage - 1) * validatedLimit)
+          .limit(validatedLimit)
+          .select(projection)
+          .lean()
+          .exec(),
+        this.userModel.countDocuments(query).exec(),
+      ]);
+
+      const totalPages = Math.ceil(totalUsers / validatedLimit);
+
+      this.logger.debug(
+        `Retrieved ${users.length} users out of ${totalUsers} total`,
+      );
+
+      const response: PaginatedUsersResponse = {
+        users: users as any[],
+        totalPages,
+        currentPage: validatedPage,
+        totalUsers,
+        hasNext: validatedPage < totalPages,
+        hasPrev: validatedPage > 1,
+      };
+      await this.redisService.cacheSet(
+        cacheKey,
+        response,
+        UsersService.CACHE_TTL.USER_LIST,
+      );
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to get users:', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve users',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get user by ID (Public API - No Authentication)
+   */
+  async getUserByIdPublic(id: string): Promise<any> {
+    try {
+      const cacheKey = `users:public:byId:${this.key({ id })}`;
+      const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
+      if (cached) return cached;
+
+      if (!this.isValidObjectId(id)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      // Public API - use limited projection (no PII)
+      // Only show USER and SHOWROOM types for security - admin profiles should not be publicly accessible
+      const user = await this.userModel
+        .findOne({
+          _id: id,
+          isDeleted: { $ne: true },
+          type: { $in: [UserType.USER, UserType.SHOWROOM] },
+        })
+        .select(UsersService.PUBLIC_PROJECTION)
+        .lean()
+        .exec();
+
+      if (!user) {
+        throw new NotFoundException('User not found or deleted');
+      }
+
+      await this.redisService.cacheSet(
+        cacheKey,
+        user,
+        UsersService.CACHE_TTL.USER_BY_ID,
+      );
+      return user;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error('Failed to get user by ID (Public API):', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get user by ID (Authenticated)
+   */
+  async getUserById(id: string, currentUser?: User | null): Promise<any> {
+    try {
+      const cacheKey = `users:byId:${this.key({ id })}`;
+      const cached = await this.redisService.cacheGet<Partial<User>>(cacheKey);
+      if (cached) return cached;
+      if (!this.isValidObjectId(id)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      // Choose projection based on authentication status
+      const projection = currentUser
+        ? UsersService.BASE_PROJECTION
+        : UsersService.PUBLIC_PROJECTION;
+
+      // Build query with role-based filtering
+      const query: any = { _id: id, isDeleted: { $ne: true } };
+
+      // Role-based visibility - restrict what user types normal users can see
+      if (currentUser) {
+        if (
+          currentUser.type === UserType.SUPER_ADMIN ||
+          currentUser.type === UserType.ADMIN ||
+          currentUser.type === UserType.SHOWROOM
+        ) {
+          // SUPER_ADMIN, ADMIN, and SHOWROOM can see all user types - no restriction
+        } else if (currentUser.type === UserType.USER) {
+          // Normal users can see USER and SHOWROOM types only
+          query.type = { $in: [UserType.USER, UserType.SHOWROOM] };
+        } else {
+          // Fallback: only USER types
+          query.type = UserType.USER;
+        }
+      } else {
+        // No authentication - only show USER types
+        query.type = UserType.USER;
+      }
+
+      // Ensure deleted users are excluded at query-time (bug fix)
+      const user = await this.userModel
+        .findOne(query)
+        .select(projection)
+        .lean()
+        .exec();
+
+      if (!user) {
+        throw new NotFoundException('User not found or deleted');
+      }
+
+      await this.redisService.cacheSet(
+        cacheKey,
+        user,
+        UsersService.CACHE_TTL.USER_BY_ID,
+      );
+      return user;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(`Failed to get user by ID ${id}:`, error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to retrieve user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Create a new user
+   */
+  async createUser(userData: CreateUserDto): Promise<UserResponseDto> {
+    try {
+      this.logger.log(`Creating new user: ${userData.email}`);
+
+      // Normalize countryCode to ensure it has + prefix
+      if (userData.countryCode) {
+        let normalized = String(userData.countryCode).trim();
+        if (!normalized.startsWith('+')) {
+          normalized = '+' + normalized.replace(/^\+/, '');
+        }
+        userData.countryCode = normalized;
+      } else {
+        userData.countryCode = '+91';
+      }
+
+      // Validate input data
+      await this.validateUserData(userData);
+
+      // Check for existing users
+      await this.checkExistingUser(
+        userData.email,
+        userData.countryCode,
+        userData.phoneNumber,
+      );
+
+      // Create new user
+      const newUser = new this.userModel(userData);
+      const savedUser = await newUser.save();
+
+      this.logger.log(`User created successfully: ${savedUser.email}`);
+
+      // Return user without sensitive data
+      const { password, otp, otpExpires, ...userResponse } =
+        savedUser.toObject();
+      // Map to UserResponseDto
+      const response: UserResponseDto = {
+        _id: (savedUser as any)._id.toString(),
+        name: userResponse.name,
+        email: userResponse.email,
+        countryCode: userResponse.countryCode,
+        phoneNumber: userResponse.phoneNumber,
+        type: userResponse.type,
+        profilePic: userResponse.profilePic,
+        isDeleted: userResponse.isDeleted,
+      };
+
+      // Cache the newly created user and invalidate list caches
+      await this.redisService.cacheSet(
+        `users:byId:${this.key({ id: (savedUser as any)._id.toString() })}`,
+        response,
+        UsersService.CACHE_TTL.USER_BY_ID,
+      );
+      await this.invalidateUsersListCaches();
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to create user ${userData.email}:`, error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to create user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Update user details
+   */
+  async updateUser(
+    id: string,
+    updateData: UpdateUserDto,
+  ): Promise<Partial<User>> {
+    try {
+      if (!this.isValidObjectId(id)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      this.logger.log(`Updating user: ${id}`);
+
+      // Check if user exists
+      const existingUser = await this.userModel.findById(id).exec();
+      if (!existingUser || existingUser.isDeleted) {
+        throw new NotFoundException('User not found or deleted');
+      }
+
+      // Normalize countryCode to ensure it has + prefix
+      if (updateData.countryCode) {
+        let normalized = String(updateData.countryCode).trim();
+        if (!normalized.startsWith('+')) {
+          normalized = '+' + normalized.replace(/^\+/, '');
+        }
+        updateData.countryCode = normalized;
+      }
+
+      // Validate update data
+      if (
+        updateData.email ||
+        (updateData.phoneNumber && updateData.countryCode)
+      ) {
+        await this.checkExistingUserForUpdate(
+          id,
+          updateData.email,
+          updateData.countryCode,
+          updateData.phoneNumber,
+        );
+      }
+
+      // Handle password change specially to ensure it gets hashed
+      if (updateData.password) {
+        this.assertStrongPassword(updateData.password);
+        // Use save() method to trigger pre-save hook for password hashing
+        existingUser.password = updateData.password;
+        await existingUser.save();
+
+        // Remove password from updateData to avoid double processing
+        const { password, ...updateDataWithoutPassword } = updateData;
+
+        // Update other fields if any
+        if (Object.keys(updateDataWithoutPassword).length > 0) {
+          await this.userModel
+            .findByIdAndUpdate(id, updateDataWithoutPassword, {
+              new: true,
+              runValidators: true,
+            })
+            .exec();
+        }
+
+        // Fetch updated user without password field
+        const updatedUser = await this.userModel
+          .findById(id)
+          .select(
+            '_id name email type countryCode phoneNumber profilePic updatedAt',
+          )
+          .exec();
+
+        if (!updatedUser) {
+          throw new NotFoundException('User not found');
+        }
+
+        this.logger.log(`User updated successfully: ${updatedUser.email}`);
+        await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
+        await this.invalidateUsersListCaches();
+        return updatedUser;
+      }
+
+      // Update user (no password change)
+      const updatedUser = await this.userModel
+        .findByIdAndUpdate(id, updateData, {
+          new: true,
+          runValidators: true,
+          select:
+            '_id name email type countryCode phoneNumber profilePic updatedAt',
+        })
+        .exec();
+
+      if (!updatedUser) {
+        throw new NotFoundException('User not found');
+      }
+
+      this.logger.log(`User updated successfully: ${updatedUser.email}`);
+
+      await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
+      await this.invalidateUsersListCaches();
+      return updatedUser;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(`Failed to update user ${id}:`, error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to update user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Soft delete user
+   */
+  async deleteUser(id: string): Promise<{ message: string }> {
+    try {
+      if (!this.isValidObjectId(id)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      this.logger.log(`Soft deleting user: ${id}`);
+
+      const user = await this.userModel.findById(id).exec();
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.isDeleted) {
+        throw new BadRequestException('User is already deleted');
+      }
+
+      user.isDeleted = true;
+      const inactiveAds = await this.adModel.updateMany(
+        { postedBy: user._id },
+        { $set: { isActive: false } },
+      );
+
+      await user.save();
+
+      this.logger.log(`User soft deleted successfully: ${user.email}`);
+      this.logger.log(`soft deleted active ads`);
+
+      await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
+      await this.invalidateUsersListCaches();
+      return { message: 'User deleted successfully' };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(`Failed to delete user ${id}:`, error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to delete user',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Delete my data - soft delete all ads of the user
+   */
+  async deleteMyData(
+    userId: string,
+  ): Promise<{ message: string; deletedAdsCount: number }> {
+    try {
+      if (!this.isValidObjectId(userId)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      this.logger.log(`Deleting all ads for user: ${userId}`);
+
+      // Soft delete all ads of the user by setting isDeleted to true and deletedAt timestamp
+      const deletedAt = new Date();
+      const result = await this.adModel.updateMany(
+        { postedBy: userId, isDeleted: { $ne: true } },
+        { $set: { isDeleted: true, isActive: false, deletedAt } },
+      );
+
+      const deletedAdsCount = result.modifiedCount || 0;
+
+      this.logger.log(
+        `Soft deleted ${deletedAdsCount} ads for user: ${userId}`,
+      );
+
+      // Invalidate ad-related caches
+      await this.invalidateUsersListCaches();
+
+      return {
+        message: 'All your ads have been soft deleted successfully',
+        deletedAdsCount,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to delete data for user ${userId}:`, error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to delete user data',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Send OTP via email
+   */
+  async sendOTP(identifier: string): Promise<{ message: string }> {
+    try {
+      this.logger.log(`Sending OTP to: ${identifier}`);
+      // Throttle OTP sends per email (max 5 per 10 minutes)
+      try {
+        const rateKeyId = (identifier || '').toString().toLowerCase();
+        const count = await this.redisService.incrementRateLimit(
+          `send_otp:${rateKeyId}`,
+          UsersService.CACHE_TTL.OTP_RATE_LIMIT,
+        );
+        if (count > 5) {
+          throw new BadRequestException(
+            'Too many OTP requests. Please try again later.',
+          );
+        }
+      } catch (e) {
+        // If Redis unavailable, continue without rate limit
+        this.logger.warn('Rate limit check failed (Redis down?)');
+      }
+
+      const raw = (identifier || '').toString();
+      const identifierLower = raw.toLowerCase();
+      const identifierDigits = raw.replace(/\D/g, '');
+
+      const isEmail = /.+@.+\..+/.test(identifierLower);
+      let user: User | null = null;
+
+      if (isEmail) {
+        user = await this.userModel
+          .findOne({
+            email: identifierLower,
+            isDeleted: { $ne: true },
+          })
+          .exec();
+      } else {
+        // Try to parse phone number with country code
+        const { parsePhoneNumber } =
+          await import('../common/utils/phone-validator.util');
+        const parsed = parsePhoneNumber(identifierDigits);
+
+        if (parsed) {
+          // Search with country code and phone number
+          user = await this.userModel
+            .findOne({
+              countryCode: parsed.countryCode,
+              phoneNumber: parsed.phoneNumber,
+              isDeleted: { $ne: true },
+            })
+            .exec();
+        }
+
+        // Fallback: search by phone number only (for backward compatibility)
+        if (!user) {
+          user = await this.userModel
+            .findOne({
+              phoneNumber: identifierDigits,
+              isDeleted: { $ne: true },
+            })
+            .exec();
+        }
+      }
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const otp = generateOTP();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await this.userModel.updateOne(
+        { _id: user._id },
+        { $set: { otp, otpExpires } },
+      );
+
+      if (isEmail) {
+        await this.emailService.sendOtp(user.email, otp);
+        this.logger.log(`OTP sent via email to: ${user.email}`);
+      } else {
+        try {
+          // Format phone number with country code for SMS
+          // countryCode is now a phone code (e.g., '+91'), so we can use it directly
+          const { formatPhoneNumber, phoneCodeToIsoCode } =
+            await import('../common/utils/phone-validator.util');
+          let fullPhoneNumber: string;
+
+          if (user.countryCode) {
+            if (user.countryCode.startsWith('+')) {
+              // It's already a phone code (e.g., '+91')
+              fullPhoneNumber = `${user.countryCode}${user.phoneNumber}`;
+            } else {
+              // It's an ISO code (e.g., 'IN') - convert for backward compatibility
+              fullPhoneNumber = formatPhoneNumber(
+                user.countryCode,
+                user.phoneNumber,
+              );
+            }
+          } else {
+            // Fallback: assume India
+            fullPhoneNumber = `+91${user.phoneNumber}`;
+          }
+
+          await this.sendOtpSmsViaMsg91(
+            fullPhoneNumber,
+            otp,
+            user.name || 'User',
+          );
+          this.logger.log(`OTP sent via SMS to: ${fullPhoneNumber}`);
+        } catch (smsError) {
+          this.logger.error('Failed to send OTP via SMS:', smsError as any);
+        }
+      }
+
+      await this.invalidateUsersListCaches();
+      return { message: 'OTP sent successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to send OTP to ${identifier}:`, error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Failed to send OTP',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async sendOtpSmsViaMsg91(
+    rawPhoneNumber: string,
+    otp: string,
+    name: string,
+  ): Promise<void> {
+    const https = await import('https');
+
+    const authKey = this.configService.get<string>('MSG91_AUTHKEY');
+    const templateId = this.configService.get<string>('MSG91_TEMPLATE_ID');
+    const shortUrl = this.configService.get<string>('MSG91_SHORT_URL') || '0';
+    const shortUrlExpiry = this.configService.get<string>(
+      'MSG91_SHORT_URL_EXPIRY',
+    );
+
+    if (!authKey || !templateId) {
+      this.logger.warn('MSG91 credentials not configured; skipping SMS send');
+      return;
+    }
+
+    const digits = rawPhoneNumber.replace(/\D/g, '');
+    const local10 = digits.slice(-10);
+    const mobiles = `91${local10}`;
+
+    const payload: Record<string, any> = {
+      template_id: templateId,
+      short_url: shortUrl,
+      realTimeResponse: '1',
+      recipients: [
+        {
+          mobiles,
+          OTP: otp,
+          NAME: name,
+        },
+      ],
+    };
+
+    if (shortUrl === '1' && shortUrlExpiry) {
+      payload.short_url_expiry = shortUrlExpiry;
+    }
+
+    const options = {
+      method: 'POST',
+      hostname: 'control.msg91.com',
+      port: 443,
+      path: '/api/v5/flow',
+      headers: {
+        accept: 'application/json',
+        authkey: authKey,
+        'content-type': 'application/json',
+      },
+    } as const;
+
+    await new Promise<void>((resolve, reject) => {
+      const req = (https as any).request(options, (res: any) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString();
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            this.logger.debug(`MSG91 response: ${body}`);
+            resolve();
+          } else {
+            this.logger.error(`MSG91 error ${res.statusCode}: ${body}`);
+            reject(new Error(`MSG91 responded with status ${res.statusCode}`));
+          }
+        });
+      });
+
+      req.on('error', (err: Error) => reject(err));
+      req.write(JSON.stringify(payload));
+      req.end();
+    });
+  }
+
+  /**
+   * Verify OTP
+   */
+  async verifyOTP(identifier: string, otp: string): Promise<LoginResponse> {
+    try {
+      this.logger.log(`Verifying OTP for: ${identifier}`);
+
+      // Validate input
+      if (!identifier || !identifier.toString().trim()) {
+        throw new BadRequestException(
+          'Identifier (email or phone number) is required',
+        );
+      }
+
+      if (!otp || !otp.toString().trim()) {
+        throw new BadRequestException('OTP is required');
+      }
+
+      // Validate OTP format (should be 6 digits)
+      const otpString = otp.toString().trim();
+      if (!/^\d{6}$/.test(otpString)) {
+        throw new BadRequestException('OTP must be a 6-digit number');
+      }
+
+      const raw = identifier.toString().trim();
+      const identifierLower = raw.toLowerCase();
+      const identifierDigits = raw.replace(/\D/g, '');
+      const isEmail = /.+@.+\..+/.test(identifierLower);
+
+      // Validate identifier format
+      if (isEmail && identifierLower.length < 5) {
+        throw new BadRequestException('Invalid email format');
+      }
+
+      // NOTE: Phone number validation for minimum 10 digits has been commented out
+      // to support international phone numbers. International phone numbers can have
+      // a minimum of 7 digits and a maximum of 15 digits according to ITU-T E.164 standard.
+      // The actual validation is now handled by the phone-validator.util.ts which uses
+      // google-libphonenumber library for country-specific validation.
+      // if (!isEmail && identifierDigits.length < 10) {
+      //   throw new BadRequestException(
+      //     'Invalid phone number format. Must contain at least 10 digits',
+      //   );
+      // }
+
+      // First, find user by identifier to check if user exists
+      const userQuery: any = {
+        isDeleted: { $ne: true },
+      };
+
+      if (isEmail) {
+        userQuery.email = identifierLower;
+      } else {
+        // Try to parse phone number with country code
+        const { parsePhoneNumber } =
+          await import('../common/utils/phone-validator.util');
+        const parsed = parsePhoneNumber(identifierDigits);
+
+        if (parsed) {
+          // If the raw input started with +, the user likely intended a specific country code
+          if (raw.startsWith('+')) {
+            userQuery.countryCode = parsed.countryCode;
+            userQuery.phoneNumber = parsed.phoneNumber;
+          } else {
+            // Otherwise, search broadly: either strictly as parsed (e.g. India default) OR just by phone number
+            // This handles cases where a 10-digit number from another country (e.g. Afghanistan)
+            // is parsed as strict India (+91) but should match the +93 user.
+            userQuery.$or = [
+              {
+                countryCode: parsed.countryCode,
+                phoneNumber: parsed.phoneNumber,
+              },
+              { phoneNumber: parsed.phoneNumber },
+            ];
+          }
+        } else {
+          // Fallback: search by phone number only (for backward compatibility)
+          userQuery.phoneNumber = identifierDigits;
+        }
+      }
+
+      const user = await this.userModel.findOne(userQuery).exec();
+
+      if (!user) {
+        throw new NotFoundException(
+          'User not found with the provided identifier',
+        );
+      }
+
+      // Check if user has an OTP stored
+      if (!user.otp) {
+        throw new BadRequestException(
+          'No OTP found. Please request a new OTP first',
+        );
+      }
+
+      // Check if OTP has expired
+      if (!user.otpExpires || user.otpExpires <= new Date()) {
+        throw new BadRequestException(
+          'OTP has expired. Please request a new OTP',
+        );
+      }
+
+      // Verify OTP matches
+      if (user.otp !== otpString) {
+        throw new BadRequestException(
+          'Invalid OTP. Please check and try again',
+        );
+      }
+
+      // Clear OTP after successful verification
+      await this.userModel.updateOne(
+        { _id: user._id },
+        { $unset: { otp: 1, otpExpires: 1 } },
+      );
+
+      try {
+        // Generate tokens like login
+        const tokenPayload: TokenPayload = {
+          id: user._id?.toString() || '',
+          email: user.email,
+          userType: user.type,
+        };
+
+        const [accessToken, refreshToken] = await Promise.all([
+          this.generateAccessToken(tokenPayload),
+          this.generateRefreshToken(tokenPayload),
+        ]);
+
+        // Extract 'iat' from the refresh token
+        const { iat } = await this.jwtService.verify(refreshToken, {
+          secret: this.configService.get('TOKEN_KEY'),
+        });
+
+        // Save refresh token
+        await this.saveRefreshToken(
+          user._id?.toString() || '',
+          refreshToken,
+          iat,
+        );
+
+        this.logger.log(`OTP verified successfully for: ${identifier}`);
+
+        await this.invalidateUsersListCaches();
+        return {
+          id: user._id?.toString() || '',
+          token: `Bearer ${accessToken}`,
+          refreshToken,
+          userName: user.name,
+          email: user.email,
+          userType: user.type,
+          countryCode: user.countryCode || 'IN', // Default to IN for backward compatibility
+          phoneNumber: user.phoneNumber,
+          profilePic: user.profilePic,
+        };
+      } catch (tokenError) {
+        this.logger.error(
+          `Token generation failed for OTP verification: ${identifier}`,
+          tokenError,
+        );
+        throw new HttpException(
+          {
+            status: HttpStatus.INTERNAL_SERVER_ERROR,
+            error:
+              'OTP verified successfully but failed to generate authentication tokens. Please try again',
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed to verify OTP for ${identifier}:`, error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error:
+            'An unexpected error occurred while verifying OTP. Please try again later',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Generate access token
+   */
+  private async generateAccessToken(payload: TokenPayload): Promise<string> {
+    // typ distinguishes access from refresh tokens, which are otherwise
+    // signed with the same secret/issuer/audience (P0-6 follow-up).
+    return this.jwtService.sign({ ...payload, typ: 'access' }, {
+      secret: this.configService.get('TOKEN_KEY'),
+      expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRY') || '1h',
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
+    });
+  }
+
+  /**
+   * Generate refresh token
+   */
+  private async generateRefreshToken(payload: TokenPayload): Promise<string> {
+    return this.jwtService.sign({ ...payload, typ: 'refresh' }, {
+      secret: this.configService.get('TOKEN_KEY'),
+      expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRY') || '60d',
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
+    });
+  }
+
+  /**
+   * Save refresh token to database
+   */
+  private async saveRefreshToken(
+    userId: string,
+    refreshToken: string,
+    iat: number,
+  ): Promise<void> {
+    // Clean up existing tokens with same iat
+    await this.authTokenModel.deleteMany({
+      userId,
+      iat,
+    });
+
+    // Save new refresh token
+    await new this.authTokenModel({
+      userId,
+      token: refreshToken,
+      iat,
+    }).save();
+  }
+
+  /**
+   * Utility methods
+   */
+  private buildSortOptions(sort?: string): Record<string, 1 | -1> {
+    const defaultSort: Record<string, 1 | -1> = { createdAt: -1 };
+
+    if (!sort) return defaultSort;
+
+    const [field, order] = sort.split(':');
+    const validFields = ['name', 'email', 'type', 'createdAt', 'updatedAt'];
+    const validOrders = ['asc', 'desc'];
+
+    if (!validFields.includes(field) || !validOrders.includes(order)) {
+      return defaultSort;
+    }
+
+    return { [field]: order === 'asc' ? 1 : -1 };
+  }
+
+  private isValidObjectId(id: string): boolean {
+    return Types.ObjectId.isValid(id);
+  }
+
+  private async validateUserData(userData: CreateUserDto): Promise<void> {
+    if (
+      !userData.email ||
+      !userData.phoneNumber ||
+      !userData.countryCode ||
+      !userData.name ||
+      !userData.password
+    ) {
+      throw new BadRequestException('All required fields must be provided');
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userData.email)) {
+      throw new BadRequestException('Invalid email format');
+    }
+
+    // Phone number validation with country code
+    // Convert phone code (e.g., '+91') to ISO code (e.g., 'IN') for validation
+    const {
+      validatePhoneNumber,
+      validatePhoneNumberWithPhoneCode,
+      phoneCodeToIsoCode,
+    } = await import('../common/utils/phone-validator.util');
+
+    let validation;
+    if (userData.countryCode.startsWith('+')) {
+      // It's a phone code (e.g., '+91')
+      validation = validatePhoneNumberWithPhoneCode(
+        userData.phoneNumber,
+        userData.countryCode,
+      );
+    } else {
+      // It's an ISO code (e.g., 'IN') - for backward compatibility
+      validation = validatePhoneNumber(
+        userData.phoneNumber,
+        userData.countryCode,
+      );
+    }
+
+    if (!validation.valid) {
+      throw new BadRequestException(validation.error || 'Invalid phone number');
+    }
+  }
+
+  private async checkExistingUser(
+    email: string,
+    countryCode: string,
+    phoneNumber: string,
+  ): Promise<void> {
+    const existingUser = await this.userModel
+      .findOne({
+        $or: [{ email: email.toLowerCase() }, { countryCode, phoneNumber }],
+        isDeleted: { $ne: true },
+      })
+      .exec();
+
+    if (existingUser) {
+      if (existingUser.email.toLowerCase() === email.toLowerCase()) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User already exists with this email',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (
+        existingUser.countryCode === countryCode &&
+        existingUser.phoneNumber === phoneNumber
+      ) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User already exists with this phone number',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
+  private async checkExistingUserForUpdate(
+    userId: string,
+    email?: string,
+    countryCode?: string,
+    phoneNumber?: string,
+  ): Promise<void> {
+    const query: any = {
+      _id: { $ne: userId },
+      isDeleted: { $ne: true },
+    };
+
+    const ors: any[] = [];
+    if (email) ors.push({ email: email.toLowerCase() });
+    if (phoneNumber && countryCode) {
+      ors.push({ countryCode, phoneNumber });
+    }
+    if (ors.length > 0) query.$or = ors;
+
+    const existingUser = await this.userModel.findOne(query).exec();
+
+    if (existingUser) {
+      if (email && existingUser.email.toLowerCase() === email.toLowerCase()) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User already exists with this email',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (
+        phoneNumber &&
+        countryCode &&
+        existingUser.countryCode === countryCode &&
+        existingUser.phoneNumber === phoneNumber
+      ) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            error: 'User already exists with this phone number',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
+  private async invalidateUsersListCaches(): Promise<void> {
+    try {
+      // Increment cache version to invalidate all cached data
+      this.cacheVersion++;
+      this.logger.debug(`Cache version incremented to ${this.cacheVersion}`);
+
+      // Clear existing keys for immediate invalidation (broader patterns)
+      const patterns = [
+        'users:list:*',
+        'users:public:list:*',
+        'users:*:byId:*',
+        'users:public:byId:*',
+      ];
+
+      for (const pattern of patterns) {
+        try {
+          const keys = await this.redisService.keys(pattern);
+          if (keys?.length) {
+            await Promise.all(keys.map((k) => this.redisService.cacheDel(k)));
+          }
+        } catch (e) {
+          this.logger.warn(
+            `Failed to clear cache pattern ${pattern}`,
+            e as any,
+          );
+        }
+      }
+    } catch (e) {
+      this.logger.warn('Failed to invalidate users list caches', e as any);
+    }
+  }
+
+  /**
+   * Get current cache version
+   */
+  getCacheVersion(): number {
+    return this.cacheVersion;
+  }
+
+  /**
+   * Force cache invalidation by incrementing version
+   */
+  async forceCacheInvalidation(): Promise<{
+    message: string;
+    newVersion: number;
+  }> {
+    this.cacheVersion++;
+    this.logger.log(
+      `Forced cache invalidation. New version: ${this.cacheVersion}`,
+    );
+
+    // Clear all user-related caches
+    try {
+      const userKeys = await this.redisService.keys('users:*');
+      if (userKeys?.length) {
+        await Promise.all(userKeys.map((k) => this.redisService.cacheDel(k)));
+      }
+    } catch (e) {
+      this.logger.warn(
+        'Failed to clear user caches during forced invalidation',
+        e as any,
+      );
+    }
+
+    return {
+      message: 'Cache invalidation completed',
+      newVersion: this.cacheVersion,
+    };
+  }
+
+  /**
+   * Change user password.
+   */
+  async changePassword(
+    id: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user || (user as any).isDeleted) {
+      throw new NotFoundException('User not found or deleted');
+    }
+    const ok = await bcrypt.compare(currentPassword, (user as any).password);
+    if (!ok) {
+      throw new BadRequestException('Current password incorrect');
+    }
+    this.assertStrongPassword(newPassword);
+    // Set plain text password - the pre-save hook will handle hashing
+    (user as any).password = newPassword;
+    await user.save();
+    try {
+      await this.authTokenModel.deleteMany({ userId: user._id }).exec();
+    } catch (e) {
+      this.logger.warn(
+        'Failed to revoke refresh tokens after password change',
+        e as any,
+      );
+    }
+    await this.redisService.cacheDel(`users:byId:${this.key({ id })}`);
+    await this.invalidateUsersListCaches();
+    return { message: 'Password changed successfully' };
+  }
+
+  private assertStrongPassword(pw: string) {
+    if (typeof pw !== 'string' || pw.length < 8) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters long',
+      );
+    }
+    const hasUpper = /[A-Z]/.test(pw);
+    const hasLower = /[a-z]/.test(pw);
+    const hasDigit = /\d/.test(pw);
+    const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+    if (!(hasUpper && hasLower && hasDigit && hasSpecial)) {
+      throw new BadRequestException(
+        'Password must include upper, lower, number, and special character',
+      );
+    }
+  }
+
+  /**
+   * Cache warming method to pre-populate frequently accessed data
+   */
+  async warmCache(): Promise<{ message: string; warmedCount: number }> {
+    try {
+      this.logger.log('Starting cache warming for frequently accessed users');
+
+      // Get recent active users (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentUsers = await this.userModel
+        .find({
+          isDeleted: { $ne: true },
+          createdAt: { $gte: thirtyDaysAgo },
+        })
+        .select(UsersService.BASE_PROJECTION)
+        .limit(50) // Limit to prevent overwhelming the cache
+        .lean()
+        .exec();
+
+      let warmedCount = 0;
+
+      // Cache individual users
+      for (const user of recentUsers) {
+        try {
+          await this.redisService.cacheSet(
+            `users:byId:${this.key({ id: (user as any)._id.toString() })}`,
+            user,
+            UsersService.CACHE_TTL.USER_BY_ID,
+          );
+          warmedCount++;
+        } catch (error) {
+          this.logger.warn(`Failed to warm cache for user ${user._id}:`, error);
+        }
+      }
+
+      // Cache default user list (first page)
+      try {
+        await this.getAllUsers({ page: 1, limit: 10 }, {
+          type: UserType.SUPER_ADMIN,
+        } as unknown as User);
+        warmedCount++;
+      } catch (error) {
+        this.logger.warn('Failed to warm default user list cache:', error);
+      }
+
+      this.logger.log(`Cache warming completed. Warmed ${warmedCount} items`);
+      return {
+        message: 'Cache warming completed successfully',
+        warmedCount,
+      };
+    } catch (error) {
+      this.logger.error('Cache warming failed:', error);
+      throw new HttpException(
+        {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Cache warming failed',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Forgot password - send reset email if user exists
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      // 1. Check if user exists with this email
+      const user = await this.userModel.findOne({ email }).lean();
+
+      if (!user) {
+        // Return success message even if user doesn't exist (security best practice)
+        return {
+          message: 'User Not found. Please Check your email.',
+        };
+      }
+
+      // 2. Generate reset token
+      const resetToken = this.generateResetToken();
+
+      // 3. Store reset token in cache with expiry (1 hour)
+      const cacheKey = `password_reset:${user._id}`;
+      await this.redisService.cacheSet(cacheKey, resetToken, 3600); // 1 hour TTL
+
+      // 4. Generate reset link
+      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&userId=${user._id}`;
+
+      // 5. Send email with reset link
+      await this.sendPasswordResetEmail(user.email, user.name, resetLink);
+
+      return {
+        message: 'Please Signin to your email and reset your password.',
+      };
+    } catch (error) {
+      this.logger.error('Error in forgotPassword:', error);
+      // Return success message even on error (security best practice)
+      return {
+        message: 'If the email exists, a password reset link has been sent.',
+      };
+    }
+  }
+
+  /**
+   * Generate a secure reset token
+   */
+  private generateResetToken(): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Reset password using token
+   */
+  async resetPassword(
+    userId: string,
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    try {
+      // 1. Validate user ID format
+      if (!this.isValidObjectId(userId)) {
+        throw new BadRequestException('Invalid user ID format');
+      }
+
+      // 2. Check if token exists in cache
+      const cacheKey = `password_reset:${userId}`;
+      const storedToken = await this.redisService.cacheGet(cacheKey);
+
+      if (!storedToken || storedToken !== token) {
+        throw new UnauthorizedException(
+          'Invalid or expired reset token. Please request a new reset link.',
+        );
+      }
+
+      // 3. Validate user exists and is not deleted
+      const user = await this.userModel.findById(userId).exec();
+      if (!user || user.isDeleted) {
+        throw new NotFoundException('User not found or deleted');
+      }
+
+      // 4. Validate new password strength
+      this.assertStrongPassword(newPassword);
+
+      // 5. Update user password (use save() to trigger pre-save hook for hashing)
+      user.password = newPassword;
+      await user.save();
+
+      // 6. Revoke all refresh tokens (security best practice)
+      try {
+        await this.authTokenModel.deleteMany({ userId }).exec();
+      } catch (e) {
+        this.logger.warn(
+          'Failed to revoke refresh tokens after password reset',
+          e as any,
+        );
+      }
+
+      // 7. Remove token from cache (one-time use)
+      await this.redisService.cacheDel(cacheKey);
+
+      // 8. Invalidate user cache
+      await this.redisService.cacheDel(
+        `users:byId:${this.key({ id: userId })}`,
+      );
+      await this.invalidateUsersListCaches();
+
+      this.logger.log(`Password reset successfully for user ${userId}`);
+
+      return {
+        message:
+          'Password reset successfully. You can now login with your new password.',
+      };
+    } catch (error) {
+      this.logger.error('Error in resetPassword:', error);
+      // Re-throw HTTP exceptions as-is
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      // For unexpected errors, throw a generic BadRequestException
+      throw new BadRequestException(
+        'Failed to reset password. Please request a new reset link.',
+      );
+    }
+  }
+
+  /**
+   * Send password reset email
+   */
+  private async sendPasswordResetEmail(
+    email: string,
+    name: string,
+    resetLink: string,
+  ): Promise<void> {
+    try {
+      const {
+        EMAIL_TEMPLATES,
+        EMAIL_TEMPLATE_VARIABLES,
+      } = require('../common/constants/email-templates');
+
+      // Replace template variables
+      const htmlContent = EMAIL_TEMPLATES.FORGOT_PASSWORD.html.replace(
+        EMAIL_TEMPLATE_VARIABLES.FORGOT_PASSWORD.resetLink,
+        resetLink,
+      );
+
+      const textContent = EMAIL_TEMPLATES.FORGOT_PASSWORD.text.replace(
+        EMAIL_TEMPLATE_VARIABLES.FORGOT_PASSWORD.resetLink,
+        resetLink,
+      );
+
+      await this.emailService.sendEmail({
+        to: email,
+        subject: EMAIL_TEMPLATES.FORGOT_PASSWORD.subject,
+        html: htmlContent,
+        text: textContent,
+      });
+      this.logger.log(`Password reset email sent to ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${email}:`,
+        error,
+      );
+      throw error;
+    }
+  }
 }

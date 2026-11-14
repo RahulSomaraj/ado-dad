@@ -1,0 +1,221 @@
+{
+  "property_example": {
+    "category": "property",
+    "data": {
+      "title": "Beautiful 2BHK Apartment in Prime Location",
+      "description": "Spacious and well-maintained 2BHK apartment located in the heart of the city. This property offers modern amenities, excellent connectivity, and a peaceful neighborhood. Perfect for families looking for a comfortable living space.",
+      "price": 8500000,
+      "location": "Bandra West, Mumbai, Maharashtra",
+      "images": [
+        "https://example.com/property/living-room.jpg",
+        "https://example.com/property/bedroom.jpg",
+        "https://example.com/property/kitchen.jpg",
+        "https://example.com/property/bathroom.jpg"
+      ],
+      "propertyType": "apartment",
+      "bedrooms": 2,
+      "bathrooms": 2,
+      "areaSqft": 1200,
+      "floor": 8,
+      "isFurnished": true,
+      "hasParking": true,
+      "hasGarden": false,
+      "amenities": [
+        "Gym",
+        "Swimming Pool",
+        "Garden",
+        "Security",
+        "Lift",
+        "24/7 Water Supply",
+        "Power Backup",
+        "Children's Play Area"
+      ]
+    }
+  },
+  "private_vehicle_example": {
+    "category": "private_vehicle",
+    "data": {
+      "title": "Honda City 2020 Model - Single Owner",
+      "description": "Well-maintained Honda City in excellent condition. Single owner, full service history, no accidents. Perfect for daily commute. All documents are in order and ready for transfer.",
+      "price": 850000,
+      "location": "Dwarka, Delhi, NCR",
+      "images": [
+        "https://example.com/vehicle/exterior.jpg",
+        "https://example.com/vehicle/interior.jpg",
+        "https://example.com/vehicle/engine.jpg",
+        "https://example.com/vehicle/dashboard.jpg"
+      ],
+      "vehicleType": "four_wheeler",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "variantId": "507f1f77bcf86cd799439013",
+      "year": 2020,
+      "mileage": 25000,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "White",
+      "isFirstOwner": true,
+      "hasInsurance": true,
+      "hasRcBook": true,
+      "additionalFeatures": [
+        "Sunroof",
+        "Leather Seats",
+        "Navigation System",
+        "Reverse Camera",
+        "Bluetooth Connectivity",
+        "Climate Control",
+        "Alloy Wheels",
+        "Fog Lamps"
+      ]
+    }
+  },
+  "commercial_vehicle_example": {
+    "category": "commercial_vehicle",
+    "data": {
+      "title": "Tata 407 Truck - Excellent Condition",
+      "description": "Heavy duty Tata 407 truck in excellent condition. Perfect for logistics and transportation business. Well-maintained with all necessary permits. Ready for immediate use.",
+      "price": 1800000,
+      "location": "Pune, Maharashtra",
+      "images": [
+        "https://example.com/truck/exterior.jpg",
+        "https://example.com/truck/cargo-area.jpg",
+        "https://example.com/truck/engine.jpg",
+        "https://example.com/truck/cabin.jpg"
+      ],
+      "vehicleType": "four_wheeler",
+      "commercialVehicleType": "truck",
+      "bodyType": "flatbed",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "variantId": "507f1f77bcf86cd799439013",
+      "year": 2019,
+      "mileage": 75000,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "Blue",
+      "payloadCapacity": 5000,
+      "payloadUnit": "kg",
+      "axleCount": 2,
+      "hasInsurance": true,
+      "hasFitness": true,
+      "hasPermit": true,
+      "additionalFeatures": [
+        "GPS Tracking",
+        "Climate Control",
+        "Safety Features",
+        "Anti-lock Braking System",
+        "Load Sensing Valve",
+        "Tachograph",
+        "Fire Extinguisher",
+        "First Aid Kit"
+      ],
+      "seatingCapacity": 3
+    }
+  },
+  "two_wheeler_example": {
+    "category": "two_wheeler",
+    "data": {
+      "title": "Honda Activa 6G - 2021 Model",
+      "description": "Honda Activa 6G in pristine condition. Single owner, low mileage, excellent fuel efficiency. Perfect for daily commute. All documents ready for transfer.",
+      "price": 65000,
+      "location": "Koramangala, Bangalore, Karnataka",
+      "images": [
+        "https://example.com/scooter/exterior.jpg",
+        "https://example.com/scooter/dashboard.jpg",
+        "https://example.com/scooter/engine.jpg",
+        "https://example.com/scooter/under-seat.jpg"
+      ],
+      "vehicleType": "two_wheeler",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "variantId": "507f1f77bcf86cd799439013",
+      "year": 2021,
+      "mileage": 12000,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "Red",
+      "isFirstOwner": true,
+      "hasInsurance": true,
+      "hasRcBook": true,
+      "additionalFeatures": [
+        "Digital Console",
+        "LED Headlight",
+        "Mobile Charging Port",
+        "External Fuel Filler",
+        "Combi Brake System",
+        "Side Stand Indicator",
+        "Service Due Indicator",
+        "Honda Smart Voice Control"
+      ]
+    }
+  },
+  "minimal_property_example": {
+    "category": "property",
+    "data": {
+      "title": "1BHK Flat for Rent",
+      "description": "Small 1BHK flat available for rent in a quiet neighborhood.",
+      "price": 15000,
+      "location": "Andheri East, Mumbai",
+      "propertyType": "apartment",
+      "bedrooms": 1,
+      "bathrooms": 1,
+      "areaSqft": 500
+    }
+  },
+  "minimal_vehicle_example": {
+    "category": "private_vehicle",
+    "data": {
+      "title": "Maruti Swift 2018",
+      "description": "Good condition Maruti Swift for sale.",
+      "price": 450000,
+      "location": "Gurgaon, Haryana",
+      "vehicleType": "four_wheeler",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "year": 2018,
+      "mileage": 45000,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "Silver"
+    }
+  },
+  "minimal_commercial_vehicle_example": {
+    "category": "commercial_vehicle",
+    "data": {
+      "title": "Mahindra Pickup Truck",
+      "description": "Mahindra pickup truck in good condition for commercial use.",
+      "price": 800000,
+      "location": "Chennai, Tamil Nadu",
+      "vehicleType": "four_wheeler",
+      "commercialVehicleType": "truck",
+      "bodyType": "pickup",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "year": 2020,
+      "mileage": 35000,
+      "payloadCapacity": 1000,
+      "payloadUnit": "kg",
+      "axleCount": 2,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "White"
+    }
+  },
+  "minimal_two_wheeler_example": {
+    "category": "two_wheeler",
+    "data": {
+      "title": "Bajaj Pulsar 150",
+      "description": "Bajaj Pulsar 150 in good condition for sale.",
+      "price": 35000,
+      "location": "Hyderabad, Telangana",
+      "vehicleType": "two_wheeler",
+      "manufacturerId": "507f1f77bcf86cd799439011",
+      "modelId": "507f1f77bcf86cd799439012",
+      "year": 2019,
+      "mileage": 25000,
+      "transmissionTypeId": "507f1f77bcf86cd799439014",
+      "fuelTypeId": "507f1f77bcf86cd799439015",
+      "color": "Black"
+    }
+  }
+}

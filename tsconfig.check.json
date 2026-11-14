@@ -1,0 +1,2 @@
+{ "extends": "./tsconfig.json", "compilerOptions": { "noEmit": true, "incremental": false },
+  "files": ["src/chat/chat.module.ts", "src/shared/upload.controller.ts", "src/chat/scripts/backfill-chat-rooms.ts", "src/chat/scripts/chat-smoke.ts", "src/chat/scripts/chat-indexes.ts"] }

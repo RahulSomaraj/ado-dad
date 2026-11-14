@@ -1,0 +1,23 @@
+# Development Dockerfile for NestJS application
+FROM node:20.19.1-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies including PM2
+RUN npm i --legacy-peer-deps && npm install -g pm2
+
+# Copy source code
+COPY . .
+
+# Expose ports
+EXPOSE 3000 9229
+
+# Start the application in development mode with PM2
+CMD ["pm2-runtime", "start", "ecosystem.config.js", "--env", "development"] 

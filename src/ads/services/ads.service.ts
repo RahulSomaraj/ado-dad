@@ -1,0 +1,3502 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException, Optional } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+
+import {
+  Ad,
+  AdDocument,
+  AdCategory,
+  AdStatus,
+  PRICE_HISTORY_LIMIT,
+} from '../schemas/ad.schema';
+
+import {
+  PropertyAd,
+  PropertyAdDocument,
+  PropertyTypeEnum,
+} from '../schemas/property-ad.schema';
+import { VehicleAd, VehicleAdDocument } from '../schemas/vehicle-ad.schema';
+import {
+  CommercialVehicleAd,
+  CommercialVehicleAdDocument,
+} from '../schemas/commercial-vehicle-ad.schema';
+import {
+  Favorite,
+  FavoriteDocument,
+} from '../../favorites/schemas/schema.favorite';
+import {
+  ChatRoom,
+  ChatRoomDocument,
+} from '../../chat/schemas/chat-room.schema';
+import {
+  ChatMessage,
+  ChatMessageDocument,
+} from '../../chat/schemas/chat-message.schema';
+
+import { FilterAdDto } from '../dto/common/filter-ad.dto';
+import {
+  AdResponseDto,
+  DetailedAdResponseDto,
+  PaginatedDetailedAdResponseDto,
+} from '../dto/common/ad-response.dto';
+
+import { CreateAdDto } from '../dto/common/create-ad.dto';
+
+import { VehicleInventoryService } from '../../vehicle-inventory/vehicle-inventory.service';
+import { RedisService } from '../../shared/redis.service';
+import { AdsCache } from '../../ads-v2/infrastructure/services/ads-cache';
+import { CommercialVehicleDetectionService } from './commercial-vehicle-detection.service';
+import { GeocodingService } from '../../common/services/geocoding.service';
+import { LocationHierarchyService } from '../../common/services/location-hierarchy.service';
+import { SearchDocSyncService } from '../../search/services/search-doc-sync.service';
+import { UserType } from '../../users/enums/user.types';
+import {
+  buildGeoNearStage,
+  buildLocationHierarchyMatch,
+  buildLocationScoreStage,
+  buildUserLookupStage,
+  buildManufacturerLookupStages,
+  buildPropertyAdLookupStages,
+  buildVehicleAdLookupStages,
+  buildCommercialVehicleAdLookupStages,
+  buildVehicleFilterMatcher,
+  normalizeFilters,
+  convertDistanceToKm,
+  LocationHierarchy,
+} from './ads.service.utils';
+
+/**
+ * Appends the price an ad had until now to its history, oldest first, keeping
+ * the last PRICE_HISTORY_LIMIT entries. Exported for unit tests.
+ */
+export function appendPriceHistory(
+  history: { price: number; changedAt: Date }[] | undefined | null,
+  outgoingPrice: number,
+  now: Date = new Date(),
+): { price: number; changedAt: Date }[] {
+  const next = [
+    ...(history ?? []).map((h) => ({ price: h.price, changedAt: h.changedAt })),
+    { price: outgoingPrice, changedAt: now },
+  ];
+  return next.slice(-PRICE_HISTORY_LIMIT);
+}
+
+@Injectable()
+export class AdsService {
+  private static readonly CACHE_PREFIX = 'ads:';
+  private static readonly TTL = {
+    LIST: 120, // list queries
+    BY_ID: 900, // detailed ad cache
+  } as const;
+  constructor(
+    @InjectModel(Ad.name)
+    private readonly adModel: Model<AdDocument>,
+    @InjectModel(PropertyAd.name)
+    private readonly propertyAdModel: Model<PropertyAdDocument>,
+    @InjectModel(VehicleAd.name)
+    private readonly vehicleAdModel: Model<VehicleAdDocument>,
+    @InjectModel(CommercialVehicleAd.name)
+    private readonly commercialVehicleAdModel: Model<CommercialVehicleAdDocument>,
+    @InjectModel(Favorite.name)
+    private readonly favoriteModel: Model<FavoriteDocument>,
+    @InjectModel(ChatRoom.name)
+    private readonly chatRoomModel: Model<ChatRoomDocument>,
+    @InjectModel(ChatMessage.name)
+    private readonly messageModel: Model<ChatMessageDocument>,
+    private readonly vehicleInventoryService: VehicleInventoryService,
+    private readonly redisService: RedisService,
+    private readonly commercialVehicleDetectionService: CommercialVehicleDetectionService,
+    private readonly geocodingService: GeocodingService,
+    private readonly locationHierarchyService: LocationHierarchyService,
+    private readonly adsV2Cache: AdsCache,
+    // Optional so the legacy unit tests that construct AdsService by hand keep
+    // working. When present, every v1 write refreshes the ad's search document.
+    @Optional() private readonly searchDocSync?: SearchDocSyncService,
+  ) { }
+
+  /** Best-effort search-document refresh after a v1 write. Never throws. */
+  private syncSearchDoc(adId: unknown, why: string): void {
+    if (!this.searchDocSync || !adId) return;
+    void this.searchDocSync.rebuildAdSafe(String(adId), why);
+  }
+
+  /**
+   * Aggregate ad statistics for the admin dashboard:
+   * total listings, approved/pending counts, sold count, and the total
+   * monetary value of all (non-deleted) listings.
+   */
+  async getAdsStats(): Promise<{
+    total: number;
+    approved: number;
+    pending: number;
+    sold: number;
+    totalValue: number;
+  }> {
+    const notDeleted = { isDeleted: { $ne: true } };
+    const [total, approved, pending, sold, valueAgg] = await Promise.all([
+      this.adModel.countDocuments({ ...notDeleted }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, isApproved: true }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, isApproved: false }).exec(),
+      this.adModel.countDocuments({ ...notDeleted, soldOut: true }).exec(),
+      this.adModel
+        .aggregate([
+          { $match: { ...notDeleted } },
+          { $group: { _id: null, total: { $sum: '$price' } } },
+        ])
+        .exec(),
+    ]);
+
+    const totalValue =
+      Array.isArray(valueAgg) && valueAgg.length > 0
+        ? (valueAgg[0].total as number)
+        : 0;
+
+    return { total, approved, pending, sold, totalValue };
+  }
+
+  /**
+   * Per-day count of ads created over the last `days` days (inclusive of
+   * today). Days with no ads are returned with a count of 0 so the series is
+   * always continuous. Dates are bucketed in UTC.
+   */
+  async getDailyAdsCounts(
+    days = 7,
+  ): Promise<Array<{ date: string; count: number }>> {
+    const safeDays = Math.min(Math.max(Number(days) || 7, 1), 90);
+
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - (safeDays - 1));
+
+    const agg = await this.adModel
+      .aggregate([
+        {
+          $match: {
+            isDeleted: { $ne: true },
+            createdAt: { $gte: since },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: 'UTC',
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .exec();
+
+    const counts = new Map<string, number>(
+      (agg as Array<{ _id: string; count: number }>).map((a) => [
+        a._id,
+        a.count,
+      ]),
+    );
+
+    const series: Array<{ date: string; count: number }> = [];
+    for (let i = 0; i < safeDays; i++) {
+      const d = new Date(since);
+      d.setUTCDate(since.getUTCDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      series.push({ date: key, count: counts.get(key) ?? 0 });
+    }
+    return series;
+  }
+
+  /** ---------- HELPERS ---------- */
+  private isValidId(id?: string) {
+    return !!id && Types.ObjectId.isValid(id);
+  }
+
+  private toObjectId(id?: string) {
+    return this.isValidId(id) ? new Types.ObjectId(id) : undefined;
+  }
+
+  private toObjectIdArray(ids?: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) return undefined;
+    const arr = ids
+      .map((x) => this.toObjectId(x))
+      .filter(Boolean) as Types.ObjectId[];
+    return arr.length ? arr : undefined;
+  }
+
+  private nonEmpty<T extends object>(obj: T | undefined | null): T | undefined {
+    return obj && Object.keys(obj).length > 0 ? obj : undefined;
+  }
+
+  private normalize(obj: any): any {
+    if (obj == null) return obj;
+    if (Array.isArray(obj)) return obj.map((v) => this.normalize(v));
+    if (typeof obj === 'object') {
+      const entries = Object.entries(obj)
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, this.normalize(v)]);
+      return Object.fromEntries(entries);
+    }
+    return obj;
+  }
+
+  private clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  private coerceSort(
+    sortBy?: string,
+    sortOrder?: string,
+  ): { field: string; dir: 1 | -1 } {
+    const allowed: Record<string, 1> = {
+      createdAt: 1,
+      updatedAt: 1,
+      price: 1,
+      title: 1,
+      category: 1,
+    };
+    const field = sortBy && allowed[sortBy] ? sortBy : 'createdAt';
+    const dir = sortOrder === 'ASC' ? 1 : -1;
+    return { field, dir };
+  }
+
+  private key(parts: Record<string, unknown>): string {
+    const norm = Object.keys(parts)
+      .filter(
+        (k) => parts[k] !== undefined && parts[k] !== null && parts[k] !== '',
+      )
+      .sort()
+      .map((k) => `${k}=${JSON.stringify(parts[k])}`)
+      .join('&');
+    return `${AdsService.CACHE_PREFIX}${norm}`;
+  }
+
+  /** ---------- FIND ALL (optimized with $geoNear and modular helpers) ---------- */
+  async findAll(filters: FilterAdDto): Promise<PaginatedDetailedAdResponseDto> {
+    // Normalize filters for cache key
+    const safeFilters = normalizeFilters(filters);
+    const cacheKey = this.key({ scope: 'findAll', ...safeFilters });
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    // Extract and validate parameters
+    let {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      search,
+      latitude,
+      longitude,
+      location,
+      country,
+      state,
+      district,
+      city,
+    } = filters;
+
+    // Normalize coordinates
+    if (latitude !== undefined) {
+      latitude =
+        typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
+      if (isNaN(latitude)) latitude = undefined;
+    }
+    if (longitude !== undefined) {
+      longitude =
+        typeof longitude === 'string'
+          ? parseFloat(longitude)
+          : Number(longitude);
+      if (isNaN(longitude)) longitude = undefined;
+    }
+
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // Build aggregation pipeline
+    const pipeline: any[] = [];
+
+    // Base visibility filter (always first if not using $geoNear)
+    const baseMatch: any = {
+      isDeleted: { $ne: true },
+      isApproved: true,
+    };
+    if (filters.category) baseMatch.category = filters.category;
+
+    // Location hierarchy from coordinates or explicit filters
+    let locationHierarchy: LocationHierarchy = {};
+    let hasExplicitHierarchyFilters = false;
+
+    if (country || state || district || city) {
+      // User explicitly provided hierarchy filters
+      locationHierarchy = { country, state, district, city };
+      hasExplicitHierarchyFilters = true;
+    } else if (latitude !== undefined && longitude !== undefined) {
+      // Auto-resolve hierarchy from coordinates (for scoring only, not filtering)
+      const locationFilter = this.locationHierarchyService.getLocationFilter(
+        latitude,
+        longitude,
+      );
+      locationHierarchy = {
+        country: locationFilter.country,
+        state: locationFilter.state,
+        district: locationFilter.district,
+        city: undefined, // City not available from locationHierarchyService yet
+      };
+      // Don't filter by auto-resolved hierarchy - only use for scoring
+      hasExplicitHierarchyFilters = false;
+    }
+
+    // Use $geoNear when coordinates provided (MUST be first stage)
+    if (latitude !== undefined && longitude !== undefined) {
+      pipeline.push(buildGeoNearStage(latitude, longitude, 50));
+      // Add base match after $geoNear
+      pipeline.push({ $match: baseMatch });
+    } else {
+      // No coordinates - use regular match
+      pipeline.push({ $match: baseMatch });
+    }
+
+    // Location hierarchy filtering (city > district > state > country)
+    // Only apply if hierarchy filters were EXPLICITLY provided in query
+    // If auto-resolved from coordinates, don't filter (just use for scoring)
+    if (hasExplicitHierarchyFilters) {
+      const hierarchyConditions =
+        buildLocationHierarchyMatch(locationHierarchy);
+      if (hierarchyConditions.length > 0) {
+        // Explicit hierarchy filters provided - apply them
+        // But also include docs without hierarchy fields (for backward compatibility)
+        pipeline.push({
+          $match: {
+            $or: [
+              ...hierarchyConditions,
+              // Include documents without hierarchy fields (backward compatibility)
+              {
+                $and: [
+                  { city: { $exists: false } },
+                  { district: { $exists: false } },
+                  { state: { $exists: false } },
+                  { country: { $exists: false } },
+                ],
+              },
+            ],
+          },
+        });
+      }
+    }
+
+    // Text-based location filter (fallback)
+    if (location) {
+      pipeline.push({
+        $match: {
+          location: { $regex: location, $options: 'i' },
+        },
+      });
+    }
+
+    // Add location scoring if coordinates provided
+    if (latitude !== undefined && longitude !== undefined) {
+      pipeline.push(buildLocationScoreStage(locationHierarchy));
+    }
+
+    // Price and search BEFORE lookups to reduce documents early
+    if (filters.minPrice != null || filters.maxPrice != null) {
+      const priceMatch: any = {};
+      if (filters.minPrice != null) priceMatch.$gte = Number(filters.minPrice);
+      if (filters.maxPrice != null) priceMatch.$lte = Number(filters.maxPrice);
+      pipeline.push({ $match: { price: priceMatch } });
+    }
+
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { location: { $regex: searchTerm, $options: 'i' } },
+          ],
+        },
+      });
+    }
+
+    const vehicleFilter = buildVehicleFilterMatcher(filters);
+    const needLookupsBeforePagination =
+      vehicleFilter != null || filters.isPremiumManufacturer !== undefined;
+
+    let data: any[];
+    let total: number;
+
+    if (!needLookupsBeforePagination) {
+      // Fast path: paginate first, then run lookups only on the page (e.g. 20 docs)
+      const countPipeline = [...pipeline];
+      countPipeline.push({ $count: 'count' });
+
+      const sortStage: any = {};
+      if (latitude !== undefined && longitude !== undefined) {
+        sortStage.locationScore = -1;
+      }
+      sortStage[sortField] = sortDirection;
+      pipeline.push({ $sort: sortStage });
+      pipeline.push({ $skip: (page - 1) * limit });
+      pipeline.push({ $limit: limit });
+
+      pipeline.push(...buildUserLookupStage());
+      pipeline.push(...buildManufacturerLookupStages());
+      pipeline.push(...buildPropertyAdLookupStages());
+      pipeline.push(...buildVehicleAdLookupStages());
+      pipeline.push(...buildCommercialVehicleAdLookupStages());
+
+      pipeline.push({
+        $project: {
+          manufacturerInfo: 0,
+          commercialManufacturerInfo: 0,
+        },
+      });
+      if (latitude !== undefined && longitude !== undefined) {
+        pipeline.push({
+          $addFields: {
+            distance: {
+              $cond: {
+                if: { $ne: ['$distance', null] },
+                then: { $divide: ['$distance', 1000] },
+                else: null,
+              },
+            },
+          },
+        });
+      }
+
+      const [dataResult, countResult] = await Promise.all([
+        this.adModel.aggregate(pipeline).collation({ locale: 'en', strength: 2 }),
+        this.adModel.aggregate(countPipeline).collation({ locale: 'en', strength: 2 }),
+      ]);
+      data = dataResult ?? [];
+      total = countResult?.[0]?.count ?? 0;
+    } else {
+      // Vehicle/premium filters need lookups first
+      pipeline.push(...buildUserLookupStage());
+      pipeline.push(...buildManufacturerLookupStages());
+      pipeline.push(...buildPropertyAdLookupStages());
+      pipeline.push(...buildVehicleAdLookupStages());
+      pipeline.push(...buildCommercialVehicleAdLookupStages());
+      if (vehicleFilter) {
+        pipeline.push({ $match: vehicleFilter });
+      }
+      if (filters.isPremiumManufacturer !== undefined) {
+        pipeline.push({
+          $match: {
+            $or: [
+              {
+                $and: [
+                  { vehicleDetails: { $exists: true, $ne: [] } },
+                  {
+                    'manufacturerInfo.isPremium': filters.isPremiumManufacturer,
+                  },
+                ],
+              },
+              {
+                $and: [
+                  { commercialVehicleDetails: { $exists: true, $ne: [] } },
+                  {
+                    'commercialManufacturerInfo.isPremium':
+                      filters.isPremiumManufacturer,
+                  },
+                ],
+              },
+            ],
+          },
+        });
+      }
+
+      const sortStage: any = {};
+      if (latitude !== undefined && longitude !== undefined) {
+        sortStage.locationScore = -1;
+      }
+      sortStage[sortField] = sortDirection;
+      pipeline.push({ $sort: sortStage });
+      pipeline.push({
+        $project: {
+          manufacturerInfo: 0,
+          commercialManufacturerInfo: 0,
+        },
+      });
+      if (latitude !== undefined && longitude !== undefined) {
+        pipeline.push({
+          $addFields: {
+            distance: {
+              $cond: {
+                if: { $ne: ['$distance', null] },
+                then: { $divide: ['$distance', 1000] },
+                else: null,
+              },
+            },
+          },
+        });
+      }
+      pipeline.push({
+        $facet: {
+          data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+        },
+      });
+
+      const result = await this.adModel
+        .aggregate(pipeline)
+        .collation({ locale: 'en', strength: 2 });
+      data = result?.[0]?.data ?? [];
+      total = result?.[0]?.total?.[0]?.count ?? 0;
+    }
+
+    // Map to DTOs
+    const dtoData = data.map((ad: any) => {
+      const dto = this.mapToResponseDto(ad);
+      dto.year =
+        ad.vehicleDetails?.[0]?.year ??
+        ad.commercialVehicleDetails?.[0]?.year ??
+        null;
+      // Add distance if available
+      if (ad.distance != null) {
+        dto.distance = ad.distance;
+      }
+      return dto;
+    });
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNext: page * limit < total,
+      hasPrev: page > 1,
+    };
+
+    // Cache list
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
+  }
+
+  /** ---------- GET USER ADS ---------- */
+  async getUserAds(
+    userId: string,
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      soldOut?: boolean;
+      showUnapproved?: boolean;
+    } = {},
+  ): Promise<PaginatedDetailedAdResponseDto> {
+    if (!this.isValidId(userId)) {
+      throw new BadRequestException(`Invalid user ID: ${userId}`);
+    }
+
+    // Build deterministic cache key
+    const safeFilters = this.normalize({ ...filters, userId });
+    const cacheKey = this.key({ scope: 'getUserAds', ...safeFilters });
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    let {
+      page = 1,
+      limit = 20,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      soldOut,
+    } = filters;
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // ------- Pipeline -------
+    const pipeline: any[] = [];
+
+    // Match user's ads only
+    const matchStage: any = {
+      postedBy: new Types.ObjectId(userId),
+      isDeleted: { $ne: true },
+    };
+
+    // Filter by approval status if showUnapproved is false (default)
+    if (!filters.showUnapproved) {
+      matchStage.isApproved = true;
+    }
+
+    // // Add soldOut filter - default to false (exclude sold-out ads) unless explicitly requested
+    // if (soldOut !== undefined) {
+    //   matchStage.soldOut = soldOut;
+    // } else {
+    //   matchStage.soldOut = false; // Default: exclude sold-out ads
+    // }
+
+    pipeline.push({ $match: matchStage });
+
+    // User lookup
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
+
+    // Note: Manufacturer, model, fuel type, and transmission lookups removed
+    // These will be fetched individually using VehicleInventoryService in the mapping function
+
+    // ---- Robust subdoc lookups (join by both 'ad' and 'adId' then merge) ----
+    // Property
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'propertyDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          propertyDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$propertyDetails' }, 0] },
+              then: '$propertyDetails',
+              else: '$propertyDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Vehicle
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'vehicleDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          vehicleDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$vehicleDetails' }, 0] },
+              then: '$vehicleDetails',
+              else: '$vehicleDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Commercial Vehicle
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'adId',
+          as: 'commercialVehicleDetailsAlt',
+        },
+      },
+      {
+        $addFields: {
+          commercialVehicleDetails: {
+            $cond: {
+              if: { $gt: [{ $size: '$commercialVehicleDetails' }, 0] },
+              then: '$commercialVehicleDetails',
+              else: '$commercialVehicleDetailsAlt',
+            },
+          },
+        },
+      },
+      {
+        $unwind: {
+          path: '$commercialVehicleDetails',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    // ----- Basic Search functionality -----
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      pipeline.push({
+        $match: {
+          $or: [
+            // Search in ad description
+            { description: { $regex: searchTerm, $options: 'i' } },
+            // Search in location
+            { location: { $regex: searchTerm, $options: 'i' } },
+            // Search in price (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$price' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in vehicle details
+            { 'vehicleDetails.color': { $regex: searchTerm, $options: 'i' } },
+            {
+              'commercialVehicleDetails.color': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in year (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$vehicleDetails.year' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.year' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in mileage (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$vehicleDetails.mileage' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.mileage' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in additional features
+            {
+              'vehicleDetails.additionalFeatures': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.additionalFeatures': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in property details
+            {
+              'propertyDetails.propertyType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in commercial vehicle details
+            {
+              'commercialVehicleDetails.commercialVehicleType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'commercialVehicleDetails.bodyType': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            // Search in payload capacity (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $toString: '$commercialVehicleDetails.payloadCapacity',
+                  },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in axle count (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $toString: '$commercialVehicleDetails.axleCount' },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+            // Search in seating capacity (convert to string for partial matching)
+            {
+              $expr: {
+                $regexMatch: {
+                  input: {
+                    $toString: '$commercialVehicleDetails.seatingCapacity',
+                  },
+                  regex: searchTerm,
+                  options: 'i',
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // ----- Sorting -----
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+    // Note: Manufacturer, model, fuel type, and transmission names will be added
+    // in the mapping function using VehicleInventoryService (v2 approach)
+
+    // ----- Pagination -----
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const result = await this.adModel
+      .aggregate(pipeline)
+      .collation({ locale: 'en', strength: 2 });
+    const data = result?.[0]?.data ?? [];
+    const total = result?.[0]?.total?.[0]?.count ?? 0;
+
+    // Map ads to DTOs with inventory details (v2 approach)
+    const dtoData = await Promise.all(
+      data.map(async (ad: any) => {
+        const dto = await this.mapToResponseDtoWithInventory(ad);
+        dto.year =
+          ad.vehicleDetails?.[0]?.year ??
+          ad.commercialVehicleDetails?.[0]?.year ??
+          null;
+        return dto;
+      }),
+    );
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNext: page * limit < total,
+      hasPrev: page > 1,
+    };
+
+    // Cache user ads list
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
+  }
+
+  /** ---------- CHECK IF AD EXISTS ---------- */
+  async exists(id: string): Promise<boolean> {
+    if (!this.isValidId(id)) {
+      return false;
+    }
+    const count = await this.adModel.countDocuments({
+      _id: new Types.ObjectId(id),
+      isDeleted: { $ne: true },
+    });
+    return count > 0;
+  }
+
+  /** ---------- FIND ONE ---------- */
+  async findOne(id: string): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+    const pipeline = [
+      { $match: { _id: new Types.ObjectId(id), isDeleted: { $ne: true } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      // Add approvedBy user lookup
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'approvedBy',
+          foreignField: '_id',
+          as: 'approvedByUser',
+          pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+      },
+      {
+        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+      },
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+    ];
+
+    const results = await this.adModel.aggregate(pipeline);
+    if (results.length === 0) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    const ad = results[0];
+    const dto = this.mapToResponseDto(ad);
+    dto.year =
+      ad.vehicleDetails?.[0]?.year ??
+      ad.commercialVehicleDetails?.[0]?.year ??
+      null;
+
+    return dto;
+  }
+
+  /** ---------- FIND BY IDS (with cache) ---------- */
+  async findByIds(ids: string[]): Promise<AdResponseDto[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const validIds = ids.filter((x) => this.isValidId(x));
+    if (validIds.length === 0) return [];
+
+    const cacheKeys = validIds.map(
+      (id) => `${AdsService.CACHE_PREFIX}getById:${id}:anonymous`,
+    );
+    const cachedResults = await Promise.all(
+      cacheKeys.map((key) =>
+        this.redisService.cacheGet<DetailedAdResponseDto>(key),
+      ),
+    );
+
+    const uncachedIds = validIds.filter((_, i) => !cachedResults[i]);
+    const cachedAds = cachedResults.filter(Boolean) as DetailedAdResponseDto[];
+
+    if (uncachedIds.length === 0) {
+      return cachedAds.map((ad) => this.mapToResponseDto(ad));
+    }
+
+    const objectIds = uncachedIds.map((x) => new Types.ObjectId(x));
+    const uncachedAds = await this.adModel
+      .find({ _id: { $in: objectIds }, isDeleted: { $ne: true } })
+      .populate('postedBy', 'name email phone')
+      .exec();
+
+    const adsToCache = uncachedAds.map((ad) => ({
+      key: `${AdsService.CACHE_PREFIX}getById:${ad._id}:anonymous`,
+      data: this.mapToResponseDto(ad),
+      ttl: AdsService.TTL.BY_ID,
+    }));
+    await Promise.all(
+      adsToCache.map(({ key, data, ttl }) =>
+        this.redisService.cacheSet(key, data, ttl),
+      ),
+    );
+
+    return [
+      ...cachedAds.map((ad) => this.mapToResponseDto(ad)),
+      ...uncachedAds.map((ad) => this.mapToResponseDto(ad)),
+    ];
+  }
+
+  /** ---------- GET BY ID (detailed + cache) ---------- */
+  async getAdById(id: string, userId?: string): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+    const cacheKey = `${AdsService.CACHE_PREFIX}getById:${id}:${userId || 'anonymous'}`;
+    const cached =
+      await this.redisService.cacheGet<DetailedAdResponseDto>(cacheKey);
+    if (cached) return cached;
+
+    // Enhanced pipeline with comprehensive lookups
+    const pipeline = [
+      { $match: { _id: new Types.ObjectId(id), isDeleted: { $ne: true } } },
+
+      // Enhanced user information with more details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                name: 1,
+                email: 1,
+                phoneNumber: 1,
+                profilePic: 1,
+                type: 1,
+                createdAt: 1,
+                isDeleted: 1,
+              },
+            },
+          ],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+
+      // Property details with enhanced lookup
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+
+      // Vehicle details with enhanced lookup
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+
+      // Commercial vehicle details with enhanced lookup
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+
+      // Add view count (increment on each request)
+      {
+        $addFields: {
+          viewCount: { $ifNull: ['$viewCount', 0] },
+        },
+      },
+    ];
+
+    const results = await this.adModel.aggregate(pipeline);
+    if (results.length === 0) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    const ad = results[0];
+
+    // Increment view count
+    await this.adModel.updateOne(
+      { _id: new Types.ObjectId(id) },
+      { $inc: { viewCount: 1 } },
+    );
+
+    const detailed = this.mapToDetailedResponseDto(ad);
+
+    // Populate vehicle inventory details with sub-relations
+    if (
+      ad.category === AdCategory.PRIVATE_VEHICLE ||
+      ad.category === AdCategory.TWO_WHEELER ||
+      ad.category === AdCategory.COMMERCIAL_VEHICLE
+    ) {
+      await this.populateVehicleInventoryDetails(detailed);
+    }
+
+    // Get favorites count
+    const favoritesCount = await this.favoriteModel.countDocuments({
+      itemId: new Types.ObjectId(id),
+    });
+    detailed.favoritesCount = favoritesCount;
+
+    // Check if current user has favorited this ad
+    if (userId) {
+      const userFavorite = await this.favoriteModel.findOne({
+        userId: new Types.ObjectId(userId),
+        itemId: new Types.ObjectId(id),
+      });
+      detailed.isFavorited = !!userFavorite;
+    }
+
+    // Get chat relations
+    await this.populateChatRelations(detailed, userId);
+
+    // Get ratings and reviews (if rating system exists for ads)
+    const ratings = await this.getAdRatings(id);
+    if (ratings) {
+      detailed.averageRating = ratings.averageRating;
+      detailed.ratingsCount = ratings.ratingsCount;
+      detailed.reviews = ratings.reviews;
+    }
+
+    // Add view count to response
+    detailed.viewCount = (ad.viewCount || 0) + 1;
+
+    await this.redisService.cacheSet(cacheKey, detailed, AdsService.TTL.BY_ID);
+    return detailed;
+  }
+
+  /** ---------- CREATE (unified) ---------- */
+  async createAd(
+    createDto: CreateAdDto,
+    userId: string,
+  ): Promise<DetailedAdResponseDto> {
+    // Auto-detect commercial vehicle intent
+    if (createDto.data?.modelId) {
+      const commercialDefaults =
+        await this.commercialVehicleDetectionService.detectCommercialVehicleDefaults(
+          createDto.data.modelId,
+        );
+      if (commercialDefaults.isCommercialVehicle && !createDto.category) {
+        createDto.category = AdCategory.COMMERCIAL_VEHICLE;
+      }
+      if (commercialDefaults.isCommercialVehicle) {
+        createDto.data = {
+          ...createDto.data,
+          commercialVehicleType:
+            createDto.data.commercialVehicleType ??
+            commercialDefaults.commercialVehicleType,
+          bodyType: createDto.data.bodyType ?? commercialDefaults.bodyType,
+          payloadCapacity:
+            createDto.data.payloadCapacity ??
+            commercialDefaults.payloadCapacity,
+          payloadUnit:
+            createDto.data.payloadUnit ?? commercialDefaults.payloadUnit,
+          axleCount: createDto.data.axleCount ?? commercialDefaults.axleCount,
+          seatingCapacity:
+            createDto.data.seatingCapacity ??
+            commercialDefaults.seatingCapacity,
+        };
+      }
+    }
+
+    // Auto-generate location and hierarchy from coordinates if not provided
+    let locationHierarchy: {
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+    } = {};
+
+    if (
+      !createDto.data.location &&
+      createDto.data.latitude &&
+      createDto.data.longitude
+    ) {
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        createDto.data.location = geocodingResult.location;
+        // Extract location hierarchy from geocoding
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        // Get district from location hierarchy service
+        try {
+          const locationFilter =
+            this.locationHierarchyService.getLocationFilter(
+              createDto.data.latitude,
+              createDto.data.longitude,
+            );
+          locationHierarchy.district = locationFilter.district;
+        } catch (error) {
+          // Silently fail if location hierarchy service fails
+        }
+      } catch (error) {
+        // If geocoding fails, use coordinates as fallback
+        createDto.data.location = `${createDto.data.latitude.toFixed(4)}, ${createDto.data.longitude.toFixed(4)}`;
+      }
+    } else if (createDto.data.latitude && createDto.data.longitude) {
+      // Location provided but still extract hierarchy for filtering
+      try {
+        const geocodingResult = await this.geocodingService.reverseGeocode(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        locationHierarchy.city = geocodingResult.city;
+        locationHierarchy.state = geocodingResult.state;
+        locationHierarchy.country = geocodingResult.country;
+
+        const locationFilter = this.locationHierarchyService.getLocationFilter(
+          createDto.data.latitude,
+          createDto.data.longitude,
+        );
+        locationHierarchy.district = locationFilter.district;
+      } catch (error) {
+        // Silently fail - hierarchy is optional
+      }
+    }
+
+    this.validateRequiredFields(createDto);
+
+    // Pass location hierarchy to create functions
+    (createDto.data as any).city = locationHierarchy.city;
+    (createDto.data as any).district = locationHierarchy.district;
+    (createDto.data as any).state = locationHierarchy.state;
+    (createDto.data as any).country = locationHierarchy.country;
+
+    let result: AdResponseDto;
+    switch (createDto.category) {
+      case AdCategory.PROPERTY:
+        result = await this.createPropertyAdFromUnified(createDto.data, userId);
+        break;
+      case AdCategory.PRIVATE_VEHICLE:
+        result = await this.createVehicleAdFromUnified(createDto.data, userId);
+        break;
+      case AdCategory.COMMERCIAL_VEHICLE:
+        result = await this.createCommercialVehicleAdFromUnified(
+          createDto.data,
+          userId,
+        );
+        break;
+      case AdCategory.TWO_WHEELER:
+        result = await this.createTwoWheelerAdFromUnified(
+          createDto.data,
+          userId,
+        );
+        break;
+      default:
+        throw new BadRequestException(
+          `Invalid ad category: ${createDto.category}`,
+        );
+    }
+
+    await this.invalidateAdCache(undefined, userId);
+    return result;
+  }
+
+  private validateRequiredFields(createDto: CreateAdDto): void {
+    const { category, data } = createDto;
+
+    if (!data?.description || data.price == null) {
+      throw new BadRequestException(
+        'Description and price are required for all ad types',
+      );
+    }
+
+    // Location is required - either provided directly or generated from coordinates
+    if (!data.location && (!data.latitude || !data.longitude)) {
+      throw new BadRequestException(
+        'Either location or both latitude and longitude are required',
+      );
+    }
+
+    switch (category) {
+      case AdCategory.PROPERTY:
+        if (!data.propertyType) {
+          throw new BadRequestException('propertyType is required');
+        }
+
+        if (!data.price) {
+          throw new BadRequestException('price is required');
+        }
+
+        if (!data.location) {
+          throw new BadRequestException('location is required');
+        }
+
+        if (data.areaSqft == null) {
+          throw new BadRequestException('areaSqft is required');
+        }
+        if (!data.description) {
+          throw new BadRequestException('description is required');
+        }
+        if (
+          data.propertyType === PropertyTypeEnum.APARTMENT ||
+          data.propertyType === PropertyTypeEnum.HOUSE ||
+          data.propertyType === PropertyTypeEnum.VILLA
+        ) {
+          if (data.bedrooms == null) {
+            throw new BadRequestException(
+              'bedrooms is required for Apartment, House, Villa',
+            );
+          }
+          if (data.bathrooms == null) {
+            throw new BadRequestException(
+              'bathrooms is required for Apartment, House, Villa',
+            );
+          }
+        }
+
+        const nonResidentialTypes = [
+          'plot',
+          'commercial',
+          'office',
+          'shop',
+          'warehouse',
+        ];
+        if (nonResidentialTypes.includes(data.propertyType)) {
+          if (data.bedrooms != null)
+            throw new BadRequestException(
+              'bedrooms should not exist for Plot, Commercial, Office, Shop, Warehouse',
+            );
+          if (data.bathrooms != null)
+            throw new BadRequestException(
+              'bathrooms should not exist for Plot, Commercial, Office, Shop, Warehouse',
+            );
+        }
+        break;
+
+      case AdCategory.PRIVATE_VEHICLE:
+      case AdCategory.TWO_WHEELER:
+        if (
+          !data.vehicleType ||
+          !data.manufacturerId ||
+          !data.modelId ||
+          data.year == null ||
+          data.mileage == null ||
+          !data.transmissionTypeId ||
+          !data.fuelTypeId ||
+          !data.color
+        ) {
+          throw new BadRequestException(
+            'Vehicle ads require: vehicleType, manufacturerId, modelId, year, mileage, transmissionTypeId, fuelTypeId, and color',
+          );
+        }
+        break;
+
+      case AdCategory.COMMERCIAL_VEHICLE:
+        {
+          const required = [
+            'commercialVehicleType',
+            'manufacturerId',
+            'modelId',
+            'year',
+            'Mileage', // keep consistent if your DTO uses mileage (lowercase)
+            'transmissionTypeId',
+            'fuelTypeId',
+            'color',
+          ];
+          const missing = [
+            'commercialVehicleType',
+            'manufacturerId',
+            'modelId',
+            'year',
+            'mileage',
+            'transmissionTypeId',
+            'fuelTypeId',
+            'color',
+          ].filter((k) => !data[k]);
+
+          if (missing.length > 0) {
+            throw new BadRequestException(
+              `Commercial vehicle ads require: ${missing.join(', ')}`,
+            );
+          }
+
+          if (
+            !data.commercialVehicleType &&
+            !data.bodyType &&
+            !data.payloadCapacity
+          ) {
+            throw new BadRequestException(
+              'Commercial vehicle ads require commercial vehicle specific fields. Provide commercialVehicleType, bodyType, and payloadCapacity or ensure the model has metadata.',
+            );
+          }
+        }
+        break;
+    }
+  }
+
+  private async createPropertyAdFromUnified(
+    data: any,
+    userId: string,
+  ): Promise<DetailedAdResponseDto> {
+    const title =
+      `${data.propertyType} ${data.areaSqft}Sqft ${data.location} `.trim();
+    const finalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
+        : undefined;
+
+    const ad = new this.adModel({
+      title: finalTitle,
+      description: data.description,
+      price: data.price,
+      images: data.images ?? [],
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
+      link: data.link,
+      postedBy: new Types.ObjectId(userId),
+      category: AdCategory.PROPERTY,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
+    });
+    const savedAd = await ad.save();
+
+    const propertyAd = new this.propertyAdModel({
+      ad: savedAd._id as any,
+      propertyType: data.propertyType,
+      listingType: data.listingType,
+      bedrooms: data.bedrooms,
+      bathrooms: data.bathrooms,
+      areaSqft: data.areaSqft,
+      floor: data.floor,
+      isFurnished: data.isFurnished,
+      hasParking: data.hasParking,
+      hasGarden: data.hasGarden,
+      amenities: data.amenities ?? [],
+    });
+    await propertyAd.save();
+
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
+    return this.findOne((savedAd._id as any).toString());
+  }
+
+  private async createVehicleAdFromUnified(
+    data: any,
+    userId: string,
+  ): Promise<DetailedAdResponseDto> {
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model
+      ? (model as any).displayName || (model as any).name
+      : 'Vehicle';
+    const year = data.year ?? '';
+    const title = `${modelName} ${year}`.trim();
+    const finalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
+        : undefined;
+
+    const ad = new this.adModel({
+      title: finalTitle,
+      description: data.description,
+      price: data.price,
+      images: data.images ?? [],
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
+      link: data.link,
+      postedBy: new Types.ObjectId(userId),
+      category: AdCategory.PRIVATE_VEHICLE,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
+    });
+    const savedAd = await ad.save();
+
+    const vehicleAd = new this.vehicleAdModel({
+      ad: savedAd._id as Types.ObjectId,
+      vehicleType: data.vehicleType,
+      manufacturerId: new Types.ObjectId(data.manufacturerId),
+      modelId: new Types.ObjectId(data.modelId),
+      variantId: data.variantId
+        ? new Types.ObjectId(data.variantId)
+        : undefined,
+      year: data.year,
+      mileage: data.mileage,
+      transmissionTypeId: new Types.ObjectId(data.transmissionTypeId),
+      fuelTypeId: new Types.ObjectId(data.fuelTypeId),
+      color: data.color,
+      isFirstOwner: data.isFirstOwner ?? false,
+      hasInsurance: data.hasInsurance ?? false,
+      hasRcBook: data.hasRcBook ?? false,
+      additionalFeatures: data.additionalFeatures ?? [],
+    });
+    await vehicleAd.save();
+
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
+    return this.findOne((savedAd._id as Types.ObjectId).toString());
+  }
+
+  private async createCommercialVehicleAdFromUnified(
+    data: any,
+    userId: string,
+  ): Promise<DetailedAdResponseDto> {
+    await this.validateVehicleInventoryReferences(data);
+
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model
+      ? (model as any).displayName || (model as any).name
+      : 'Vehicle';
+    const year = data.year ?? '';
+    const title = `${modelName} ${year}`.trim();
+    const FinalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
+        : undefined;
+
+    const session = await this.adModel.startSession();
+    session.startTransaction();
+    try {
+      const ad = new this.adModel({
+        title: FinalTitle,
+        description: data.description,
+        price: data.price,
+        images: data.images ?? [],
+        location: data.location,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        geoLocation,
+        city: data.city,
+        district: data.district,
+        state: data.state,
+        country: data.country,
+        link: data.link,
+        postedBy: new Types.ObjectId(userId),
+        category: AdCategory.COMMERCIAL_VEHICLE,
+        soldOut: false, // Always set soldOut to false by default
+        isApproved: false, // Always set isApproved to false by default
+        status: AdStatus.PENDING,
+      });
+      const savedAd = await ad.save({ session });
+
+      const commercialVehicleAd = new this.commercialVehicleAdModel({
+        ad: savedAd._id as Types.ObjectId,
+        commercialVehicleType: data.commercialVehicleType,
+        bodyType: data.bodyType,
+        manufacturerId: new Types.ObjectId(data.manufacturerId),
+        modelId: new Types.ObjectId(data.modelId),
+        variantId: data.variantId
+          ? new Types.ObjectId(data.variantId)
+          : undefined,
+        year: data.year,
+        mileage: data.mileage,
+        payloadCapacity: data.payloadCapacity,
+        payloadUnit: data.payloadUnit,
+        axleCount: data.axleCount,
+        transmissionTypeId: new Types.ObjectId(data.transmissionTypeId),
+        fuelTypeId: new Types.ObjectId(data.fuelTypeId),
+        color: data.color,
+        hasInsurance: data.hasInsurance ?? false,
+        hasFitness: data.hasFitness ?? false,
+        hasPermit: data.hasPermit ?? false,
+        additionalFeatures: data.additionalFeatures ?? [],
+        seatingCapacity: data.seatingCapacity,
+      });
+      await commercialVehicleAd.save({ session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      this.syncSearchDoc((savedAd as any)._id, 'v1 create');
+    return this.findOne((savedAd._id as Types.ObjectId).toString());
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      // eslint-disable-next-line no-console
+      console.error('❌ Error creating commercial vehicle ad:', e);
+      throw e;
+    }
+  }
+
+  private async createTwoWheelerAdFromUnified(
+    data: any,
+    userId: string,
+  ): Promise<DetailedAdResponseDto> {
+    const model = await this.vehicleInventoryService.findVehicleModelById(
+      data.modelId,
+    );
+    const modelName = model
+      ? (model as any).displayName || (model as any).name
+      : 'Vehicle';
+    const year = data.year ?? '';
+    const title = `${modelName} ${year}`.trim();
+    const FinalTitle =
+      data.title && data.title.trim() !== '' ? data.title : title;
+
+    // Prepare geoLocation if coordinates are provided
+    const geoLocation =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? {
+          type: 'Point' as const,
+          coordinates: [data.longitude, data.latitude], // [longitude, latitude]
+        }
+        : undefined;
+
+    const ad = new this.adModel({
+      title: FinalTitle,
+      description: data.description,
+      price: data.price,
+      images: data.images ?? [],
+      location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geoLocation,
+      city: data.city,
+      district: data.district,
+      state: data.state,
+      country: data.country,
+      link: data.link,
+      postedBy: new Types.ObjectId(userId),
+      category: AdCategory.TWO_WHEELER,
+      soldOut: false, // Always set soldOut to false by default
+      isApproved: false, // Always set isApproved to false by default
+      status: AdStatus.PENDING,
+    });
+    const savedAd = await ad.save();
+
+    const vehicleAd = new this.vehicleAdModel({
+      ad: savedAd._id as any,
+      vehicleType: data.vehicleType,
+      manufacturerId: new Types.ObjectId(data.manufacturerId),
+      modelId: new Types.ObjectId(data.modelId),
+      variantId: data.variantId
+        ? new Types.ObjectId(data.variantId)
+        : undefined,
+      year: data.year,
+      mileage: data.mileage,
+      transmissionTypeId: new Types.ObjectId(data.transmissionTypeId),
+      fuelTypeId: new Types.ObjectId(data.fuelTypeId),
+      color: data.color,
+      isFirstOwner: data.isFirstOwner ?? false,
+      hasInsurance: data.hasInsurance ?? false,
+      hasRcBook: data.hasRcBook ?? false,
+      additionalFeatures: data.additionalFeatures ?? [],
+    });
+    await vehicleAd.save();
+
+    this.syncSearchDoc((savedAd as any)._id, 'v1 create');
+    return this.findOne((savedAd._id as any).toString());
+  }
+
+  /** ---------- UPDATE / DELETE ---------- */
+  async update(
+    id: string,
+    updateDto: any,
+    userId: string,
+    userType?: string,
+  ): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+    // Allow if owner or Super Admin
+    const ad = await this.adModel.findById(id);
+    if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+    const isOwner = (ad.postedBy as any)?.toString?.() === userId;
+    const isSuperAdmin = userType === 'SA';
+    if (!isOwner && !isSuperAdmin) {
+      throw new NotFoundException(
+        `Advertisement with ID ${id} not found or you don't have permission to update it`,
+      );
+    }
+
+    // 1) Update top-level ad fields (only allowed ones)
+    const adUpdate: any = {};
+
+    // Handle both old format (direct properties) and new format (nested in data)
+    const updateData = updateDto.data || updateDto;
+
+    // If data is empty object, treat it as no updates
+    if (updateDto.data && Object.keys(updateDto.data).length === 0) {
+      console.log('Empty data object provided, no updates to apply');
+    }
+
+    if (typeof updateData.title === 'string') adUpdate.title = updateData.title;
+    if (typeof updateData.description === 'string')
+      adUpdate.description = updateData.description;
+    if (typeof updateData.price === 'number') adUpdate.price = updateData.price;
+    if (Array.isArray(updateData.images)) adUpdate.images = updateData.images;
+    if (typeof updateData.location === 'string')
+      adUpdate.location = updateData.location;
+    if (typeof updateData.link === 'string') adUpdate.link = updateData.link;
+    if (typeof updateData.isActive === 'boolean')
+      adUpdate.isActive = updateData.isActive;
+    // Record the outgoing price before it's overwritten, so the detail page
+    // can show "₹15,000 lower than 3 days ago".
+    if (
+      typeof adUpdate.price === 'number' &&
+      typeof ad.price === 'number' &&
+      adUpdate.price !== ad.price
+    ) {
+      adUpdate.priceHistory = appendPriceHistory(ad.priceHistory, ad.price);
+    }
+    if (Object.keys(adUpdate).length) {
+      Object.assign(ad, adUpdate);
+      await ad.save();
+    }
+
+    switch (ad.category) {
+      case AdCategory.PROPERTY:
+        await this.updatePropertyAd(id, updateData);
+        break;
+      case AdCategory.PRIVATE_VEHICLE:
+      case AdCategory.TWO_WHEELER:
+        await this.updateVehicleAdValidated(id, updateData, ad);
+        break;
+      case AdCategory.COMMERCIAL_VEHICLE:
+        await this.updateCommercialVehicleAdValidated(id, updateData, ad);
+        break;
+    }
+
+    await this.invalidateAdCache(id, userId);
+    this.syncSearchDoc(id, 'v1 update');
+    return this.findOne(id);
+  }
+
+  async delete(id: string, userId: string, userType?: string): Promise<void> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+    // Find the ad - exclude already deleted ads
+    const ad = await this.adModel.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    // Admins can delete any ad; regular users can only delete their own
+    const isAdmin = userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN;
+    if (!isAdmin && ad.postedBy.toString() !== userId) {
+      throw new NotFoundException(
+        `You don't have permission to delete this advertisement. Only the owner, admin, or super admin can delete it.`,
+      );
+    }
+
+    // Soft delete: mark as deleted instead of hard delete
+    await this.adModel.findByIdAndUpdate(id, {
+      isDeleted: true,
+      isActive: false,
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await this.invalidateAdCache(id, userId);
+  }
+
+  /** ---------- APPROVAL WORKFLOW ---------- */
+  async updateAdApproval(
+    id: string,
+    isApproved: boolean,
+    approvedBy: string,
+  ): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+
+    const ad = await this.adModel.findById(id);
+    if (!ad) {
+      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+    }
+
+    // Update the ad with approval information
+    const updateData: any = {
+      isApproved,
+      updatedAt: new Date(),
+    };
+
+    if (isApproved) {
+      updateData.approvedBy = new Types.ObjectId(approvedBy);
+      updateData.status = AdStatus.APPROVED;
+    } else {
+      updateData.approvedBy = null;
+      updateData.status = AdStatus.REJECTED;
+    }
+
+    await this.adModel.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (isApproved === false) {
+      await this.favoriteModel.deleteMany({
+        itemId: new Types.ObjectId(id),
+      });
+    }
+
+    // Invalidate cache to ensure fresh data
+    await this.invalidateAdCache(id, approvedBy);
+    // Approval is when an ad becomes searchable: make sure its search document
+    // exists even if the create-time build was missed (older ads, admin tools).
+    this.syncSearchDoc(id, 'v1 approval');
+
+    return this.findOne(id);
+  }
+
+  /** ---------- ADMIN ONLY - ALL ADS (INCLUDING UNAPPROVED) ---------- */
+  async getAllAdsForAdmin(
+    filters: FilterAdDto,
+  ): Promise<PaginatedDetailedAdResponseDto> {
+    // Build deterministic cache key
+    const normalize = (obj: any): any => {
+      if (obj == null) return obj;
+      if (Array.isArray(obj)) return obj.map(normalize);
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)]);
+        return Object.fromEntries(entries);
+      }
+      return obj;
+    };
+
+    const safeFilters = this.normalize(filters);
+    const cacheKey = this.key({ scope: 'getAllAdsForAdmin', ...safeFilters });
+
+    // Try cache first
+    const cached =
+      await this.redisService.cacheGet<PaginatedDetailedAdResponseDto>(
+        cacheKey,
+      );
+    if (cached) return cached;
+
+    let {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      search,
+      latitude,
+      longitude,
+    } = filters;
+    const { field: sortField, dir: sortDirection } = this.coerceSort(
+      sortBy,
+      sortOrder,
+    );
+    page = this.clamp(Number(page) || 1, 1, 1e9);
+    limit = this.clamp(Number(limit) || 20, 1, 100);
+
+    // ------- Pipeline -------
+    const pipeline: any[] = [];
+
+    // Enhanced search: will be applied after lookups to include manufacturer, model, variant names
+    // Store search term for later use
+    const searchTerm = search && `${search}`.trim() ? `${search}`.trim() : null;
+
+    // Base visibility: show all ads (including unapproved) except soft-deleted
+    pipeline.push({ $match: { isDeleted: { $ne: true } } });
+
+    // Optional filter by owner (used to pre-filter the admin ads view by user)
+    if (filters.postedBy && this.isValidId(filters.postedBy)) {
+      pipeline.push({
+        $match: { postedBy: new Types.ObjectId(filters.postedBy) },
+      });
+    }
+
+    // Optional category filter
+    if (filters.category) {
+      pipeline.push({ $match: { category: filters.category } });
+    }
+
+    // Hierarchical location-based filtering
+    if (latitude !== undefined && longitude !== undefined) {
+      // Get location hierarchy pipeline stages
+      const locationPipeline =
+        this.locationHierarchyService.getLocationAggregationPipeline(
+          latitude,
+          longitude,
+        );
+
+      // Add location filtering stages to pipeline
+      pipeline.push(...locationPipeline);
+
+      // Add location scoring for prioritization
+      pipeline.push(
+        this.locationHierarchyService.getLocationScoringStage(
+          latitude,
+          longitude,
+        ),
+      );
+    }
+
+    // user
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'postedBy',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [
+            { $project: { name: 1, email: 1, countryCode: 1, phoneNumber: 1 } },
+          ],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    );
+
+    // Add approvedBy user lookup for admin view
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'approvedBy',
+          foreignField: '_id',
+          as: 'approvedByUser',
+          pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+      },
+      {
+        $unwind: { path: '$approvedByUser', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Add vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'vehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'vehicleDetails',
+        },
+      },
+      {
+        $unwind: { path: '$vehicleDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Add commercial vehicle details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'commercialvehicleads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'commercialVehicleDetails',
+        },
+      },
+      {
+        $unwind: {
+          path: '$commercialVehicleDetails',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    // Add property details lookup (unwind to get single object)
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'propertyads',
+          localField: '_id',
+          foreignField: 'ad',
+          as: 'propertyDetails',
+        },
+      },
+      {
+        $unwind: { path: '$propertyDetails', preserveNullAndEmptyArrays: true },
+      },
+    );
+
+    // Apply search filter if provided
+    if (searchTerm) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { location: { $regex: searchTerm, $options: 'i' } },
+            { 'user.name': { $regex: searchTerm, $options: 'i' } },
+            { 'user.email': { $regex: searchTerm, $options: 'i' } },
+          ],
+        },
+      });
+    }
+
+    // Sort
+    if (latitude !== undefined && longitude !== undefined) {
+      // Prioritize by location score first, then by requested sort field
+      pipeline.push({
+        $sort: {
+          locationScore: -1, // Higher location score first (district > state > country)
+          [sortField]: sortDirection,
+        },
+      });
+    } else {
+      // Regular sorting when no location filtering
+      pipeline.push({ $sort: { [sortField]: sortDirection } });
+    }
+
+    // Facet for pagination
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const [result] = await this.adModel.aggregate(pipeline);
+    const data = result.data || [];
+    const total = result.total[0]?.count || 0;
+
+    // OPTIMIZATION: Batch fetch all inventory items to avoid N+1 queries
+    const manufacturerIds = new Set<string>();
+    const modelIds = new Set<string>();
+    const variantIds = new Set<string>();
+    const fuelTypeIds = new Set<string>();
+    const transmissionTypeIds = new Set<string>();
+
+    // Collect all unique IDs from all ads
+    data.forEach((ad: any) => {
+      if (ad.vehicleDetails && typeof ad.vehicleDetails === 'object') {
+        if (ad.vehicleDetails.manufacturerId)
+          manufacturerIds.add(ad.vehicleDetails.manufacturerId.toString());
+        if (ad.vehicleDetails.modelId)
+          modelIds.add(ad.vehicleDetails.modelId.toString());
+        if (ad.vehicleDetails.variantId)
+          variantIds.add(ad.vehicleDetails.variantId.toString());
+        if (ad.vehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.vehicleDetails.fuelTypeId.toString());
+        if (ad.vehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.vehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+      if (
+        ad.commercialVehicleDetails &&
+        typeof ad.commercialVehicleDetails === 'object'
+      ) {
+        if (ad.commercialVehicleDetails.manufacturerId)
+          manufacturerIds.add(
+            ad.commercialVehicleDetails.manufacturerId.toString(),
+          );
+        if (ad.commercialVehicleDetails.modelId)
+          modelIds.add(ad.commercialVehicleDetails.modelId.toString());
+        if (ad.commercialVehicleDetails.variantId)
+          variantIds.add(ad.commercialVehicleDetails.variantId.toString());
+        if (ad.commercialVehicleDetails.fuelTypeId)
+          fuelTypeIds.add(ad.commercialVehicleDetails.fuelTypeId.toString());
+        if (ad.commercialVehicleDetails.transmissionTypeId)
+          transmissionTypeIds.add(
+            ad.commercialVehicleDetails.transmissionTypeId.toString(),
+          );
+      }
+    });
+
+    // Bulk fetch all inventory items in parallel
+    const [
+      manufacturerResults,
+      modelResults,
+      variantResults,
+      fuelTypeResults,
+      transmissionTypeResults,
+    ] = await Promise.all([
+      manufacturerIds.size > 0
+        ? this.vehicleInventoryService
+          .findManufacturersByIds(Array.from(manufacturerIds))
+          .catch(() => [])
+        : Promise.resolve([]),
+      modelIds.size > 0
+        ? this.vehicleInventoryService
+          .findVehicleModelsByIds(Array.from(modelIds))
+          .catch(() => [])
+        : Promise.resolve([]),
+      variantIds.size > 0
+        ? this.vehicleInventoryService
+          .findVehicleVariantsByIds(Array.from(variantIds))
+          .catch(() => [])
+        : Promise.resolve([]),
+      fuelTypeIds.size > 0
+        ? this.vehicleInventoryService
+          .findFuelTypesByIds(Array.from(fuelTypeIds))
+          .catch(() => [])
+        : Promise.resolve([]),
+      transmissionTypeIds.size > 0
+        ? this.vehicleInventoryService
+          .findTransmissionTypesByIds(Array.from(transmissionTypeIds))
+          .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    // Convert to maps for O(1) lookup
+    const manufacturers: Record<string, any> = {};
+    manufacturerResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) manufacturers[id] = item;
+    });
+
+    const models: Record<string, any> = {};
+    modelResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) models[id] = item;
+    });
+
+    const variants: Record<string, any> = {};
+    variantResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) variants[id] = item;
+    });
+
+    const fuelTypes: Record<string, any> = {};
+    fuelTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) fuelTypes[id] = item;
+    });
+
+    const transmissionTypes: Record<string, any> = {};
+    transmissionTypeResults.forEach((item: any) => {
+      const id = item._id?.toString() || item.id?.toString();
+      if (id) transmissionTypes[id] = item;
+    });
+
+    // Map to response DTOs using pre-fetched inventory data
+    const dtoData = data.map((ad: any) => {
+      const dto = this.mapToResponseDtoWithInventoryBatched(
+        ad,
+        manufacturers,
+        models,
+        variants,
+        fuelTypes,
+        transmissionTypes,
+      );
+      dto.year =
+        ad.vehicleDetails?.year ?? ad.commercialVehicleDetails?.year ?? null;
+      return dto;
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    const response: PaginatedDetailedAdResponseDto = {
+      data: dtoData,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    // Cache the result
+    await this.redisService.cacheSet(cacheKey, response, AdsService.TTL.LIST);
+    return response;
+  }
+
+  /** ---------- REDIS / CACHING UTILS ---------- */
+  private async invalidateAdCache(
+    adId?: string,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      // The v2 read stack (ads-v2) keeps its own Redis namespace with tag-based
+      // invalidation. Writes still go through v1, so v1 has to clear v2's
+      // entries too — otherwise an edited, sold or deleted ad keeps showing in
+      // the v2 feed until the 5 minute TTL expires. This matters much more
+      // since P1-2 made the geo (default) list shape cacheable.
+      await this.adsV2Cache.invalidateLists();
+      if (adId) {
+        await this.adsV2Cache.invalidateById(adId);
+      }
+
+      // Invalidate general ad listings
+      const findAllKeys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}findAll*`,
+      );
+      if (findAllKeys.length > 0) {
+        await Promise.all(
+          findAllKeys.map((k) => this.redisService.cacheDel(k)),
+        );
+      }
+
+      // Invalidate user-specific ad listings
+      const getUserAdsKeys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}getUserAds*`,
+      );
+      if (getUserAdsKeys.length > 0) {
+        await Promise.all(
+          getUserAdsKeys.map((k) => this.redisService.cacheDel(k)),
+        );
+      }
+
+      // Invalidate admin all ads cache
+      const adminAllAdsKeys = await this.redisService.keys(
+        `${AdsService.CACHE_PREFIX}getAllAdsForAdmin*`,
+      );
+      if (adminAllAdsKeys.length > 0) {
+        await Promise.all(
+          adminAllAdsKeys.map((k) => this.redisService.cacheDel(k)),
+        );
+      }
+
+      // Invalidate specific ad details if adId provided
+      if (adId) {
+        const idKeys = await this.redisService.keys(
+          `${AdsService.CACHE_PREFIX}getById:${adId}:*`,
+        );
+        if (idKeys?.length) {
+          await Promise.all(idKeys.map((k) => this.redisService.cacheDel(k)));
+        }
+      }
+
+      // Invalidate user-specific caches if userId provided
+      if (userId) {
+        const userKeys = await this.redisService.keys(
+          `${AdsService.CACHE_PREFIX}*userId*${userId}*`,
+        );
+        if (userKeys.length > 0) {
+          await Promise.all(userKeys.map((k) => this.redisService.cacheDel(k)));
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error invalidating ad cache:', err);
+    }
+  }
+
+  async warmUpCache(): Promise<void> {
+    try {
+      const popularQueries: FilterAdDto[] = [
+        { page: 1, limit: 20, sortBy: 'createdAt', sortOrder: 'DESC' },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.PRIVATE_VEHICLE,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.PROPERTY,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.COMMERCIAL_VEHICLE,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        },
+        {
+          page: 1,
+          limit: 20,
+          category: AdCategory.TWO_WHEELER,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        },
+      ];
+      await Promise.all(popularQueries.map((q) => this.findAll(q)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('❌ Error warming up ads cache:', error);
+    }
+  }
+
+  /** ---------- CHAT RELATIONS ENRICHMENT ---------- */
+  private async populateChatRelations(
+    detailedAd: DetailedAdResponseDto,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      // Get chat rooms related to this ad
+      const chatRooms = await this.chatRoomModel
+        .find({ adId: new Types.ObjectId(detailedAd.id) })
+        .populate('initiatorId', 'name email profilePic')
+        .populate('adPosterId', 'name email profilePic')
+        .sort({ lastMessageAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get last message for each chat room
+      const chatRoomsWithMessages = await Promise.all(
+        chatRooms.map(async (room: any) => {
+          const lastMessage = await this.messageModel
+            .findOne({ roomId: room._id })
+            .sort({ createdAt: -1 })
+            .populate('senderId', 'name')
+            .lean();
+
+          return {
+            id: room._id.toString(),
+            participants: [
+              {
+                id: (room.initiatorId as any)?._id?.toString() || '',
+                name: (room.initiatorId as any)?.name || 'Unknown',
+                email: (room.initiatorId as any)?.email || '',
+              },
+              {
+                id: (room.adPosterId as any)?._id?.toString() || '',
+                name: (room.adPosterId as any)?.name || 'Unknown',
+                email: (room.adPosterId as any)?.email || '',
+              },
+            ],
+            lastMessage: lastMessage
+              ? {
+                content: lastMessage.content || '',
+                createdAt: (lastMessage as any).createdAt instanceof Date
+                  ? (lastMessage as any).createdAt
+                  : new Date((lastMessage as any).createdAt || Date.now()),
+                sender: (lastMessage as any).senderId?.name || 'Unknown',
+              }
+              : undefined,
+            createdAt: (room as any).createdAt instanceof Date
+              ? (room as any).createdAt
+              : new Date((room as any).createdAt || Date.now()),
+          };
+        }),
+      );
+
+      detailedAd.chats = chatRoomsWithMessages;
+      detailedAd.chatsCount = chatRooms.length;
+
+      // Check if current user has an active chat with this ad
+      if (userId) {
+        const userChatRoom = await this.chatRoomModel.findOne({
+          adId: new Types.ObjectId(detailedAd.id),
+          $or: [
+            { initiatorId: new Types.ObjectId(userId) },
+            { adPosterId: new Types.ObjectId(userId) },
+          ],
+        });
+        detailedAd.hasUserChat = !!userChatRoom;
+      }
+    } catch (error) {
+      console.error('Error populating chat relations:', error);
+      // Don't throw error, just set empty values
+      detailedAd.chats = [];
+      detailedAd.chatsCount = 0;
+    }
+  }
+
+  /** ---------- HELPER: Remove null values from objects ---------- */
+  private removeNullValues(obj: any, visited = new WeakSet<any>()): any {
+    if (obj === null || obj === undefined) return undefined;
+
+    // Handle Mongoose Documents - convert to plain object
+    if (typeof obj.toObject === 'function') {
+      obj = obj.toObject({ virtuals: true, versionKey: false });
+    }
+
+    if (Array.isArray(obj)) {
+      return obj
+        .map((item) => this.removeNullValues(item, visited))
+        .filter((item) => item !== undefined);
+    }
+
+    // Convert ObjectId-like objects with buffer to string or remove them
+    if (obj && typeof obj === 'object') {
+      if (obj.buffer && obj.buffer instanceof Buffer) {
+        return undefined;
+      }
+      if (obj._id && obj._id.buffer && obj._id.buffer instanceof Buffer) {
+        // It's a BSON ObjectId structure leaked as a plain object
+        return undefined;
+      }
+    }
+
+    // Handle Mongoose ObjectID or similar objects that should be strings
+    if (obj && typeof obj === 'object' && obj.toString && Types.ObjectId.isValid(obj.toString())) {
+      // if it's the _id field value itself (checking if it is strictly an ObjectId type might be better but checking string validity is safe)
+      if (obj._bsontype === 'ObjectID') {
+        return obj.toString();
+      }
+    }
+
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    // Detect circular references
+    if (visited.has(obj)) return undefined;
+    visited.add(obj);
+
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip internal properties, version key, and raw buffer/binary IDs if they appear as keys
+      if (key.startsWith('$') || key === '__v' || (key.startsWith('_') && key !== '_id')) {
+        continue;
+      }
+
+      // Specifically fix the _id containing buffer issue
+      if (key === '_id' && value && typeof value === 'object' && (value as any).buffer) {
+        if ((value as any).toString) cleaned[key] = (value as any).toString();
+        continue;
+      }
+
+      if (key === '_id' && value && typeof value === 'object' && (value as any)._bsontype === 'ObjectID') {
+        cleaned[key] = value.toString();
+        continue;
+      }
+
+      if (value !== null && value !== undefined) {
+        const cleanedValue = this.removeNullValues(value, visited);
+        if (cleanedValue !== undefined) {
+          // If it's an empty object, don't include it (mimics original behavior)
+          if (typeof cleanedValue === 'object' &&
+            !Array.isArray(cleanedValue) &&
+            !(cleanedValue instanceof Date) &&
+            Object.keys(cleanedValue).length === 0) {
+            continue;
+          }
+          cleaned[key] = cleanedValue;
+        }
+      }
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+
+  /** ---------- HELPER: Convert ObjectId fields to strings ---------- */
+  private normalizeObjectIds(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.normalizeObjectIds(item));
+    }
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+
+    const normalized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Convert _id fields to strings
+      if (key === '_id') {
+        if (value === null || value === undefined) {
+          normalized[key] = value;
+        } else if (value && typeof value === 'object' && 'buffer' in value) {
+          // Handle ObjectId buffer format from .lean() - most common case
+          try {
+            const buffer = (value as any).buffer;
+            if (Buffer.isBuffer(buffer)) {
+              const objectId = new Types.ObjectId(buffer);
+              normalized[key] = objectId.toString();
+            } else if (typeof buffer === 'object' && buffer !== null) {
+              // Handle nested buffer object (like { buffer: { 0: 104, 1: 181, ... } })
+              const bufferArray = Object.values(
+                buffer as Record<number, number>,
+              )
+                .map((v) => Number(v))
+                .filter((v) => !isNaN(v));
+              if (bufferArray.length === 12) {
+                // ObjectId is 12 bytes
+                const objectId = new Types.ObjectId(Buffer.from(bufferArray));
+                normalized[key] = objectId.toString();
+              } else {
+                normalized[key] = String(value);
+              }
+            } else {
+              normalized[key] = String(value);
+            }
+          } catch {
+            normalized[key] = String(value);
+          }
+        } else if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
+          // Already a string ObjectId
+          normalized[key] = value;
+        } else if (typeof value === 'string') {
+          // Already a string (not ObjectId format)
+          normalized[key] = value;
+        } else if (
+          (typeof value === 'string' || typeof value === 'number') &&
+          Types.ObjectId.isValid(value)
+        ) {
+          // Valid ObjectId format (string or number)
+          try {
+            const objectId = new Types.ObjectId(value);
+            normalized[key] = objectId.toString();
+          } catch {
+            normalized[key] = String(value);
+          }
+        } else if (typeof (value as any).toString === 'function') {
+          // Try toString method
+          const str = (value as any).toString();
+          // Only use toString result if it's not "[object Object]"
+          normalized[key] = str === '[object Object]' ? String(value) : str;
+        } else {
+          normalized[key] = String(value);
+        }
+      } else if (
+        key === 'id' &&
+        value &&
+        typeof value === 'object' &&
+        '_id' in value
+      ) {
+        // Handle nested id fields that might be objects
+        normalized[key] =
+          (value as any)._id?.toString() || (value as any).toString();
+      } else if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        !(value instanceof Date)
+      ) {
+        // Recursively normalize nested objects
+        normalized[key] = this.normalizeObjectIds(value);
+      } else if (Array.isArray(value)) {
+        normalized[key] = value.map((item) => this.normalizeObjectIds(item));
+      } else {
+        normalized[key] = value;
+      }
+    }
+    return normalized;
+  }
+
+  /** ---------- VEHICLE INVENTORY ENRICHMENT ---------- */
+  private async populateVehicleInventoryDetails(
+    detailedAd: DetailedAdResponseDto,
+  ): Promise<void> {
+    try {
+      const vehicleDetails =
+        detailedAd.vehicleDetails || detailedAd.commercialVehicleDetails;
+      if (!vehicleDetails) return;
+
+      const inv: any = {};
+
+      if (vehicleDetails.manufacturerId) {
+        try {
+          const m = await this.vehicleInventoryService.findManufacturerById(
+            vehicleDetails.manufacturerId,
+          );
+          inv.manufacturer = {
+            id: (m as any)._id?.toString?.() ?? '',
+            name: (m as any).name,
+            country: (m as any).originCountry,
+          };
+        } catch { }
+      }
+
+      if (vehicleDetails.modelId) {
+        try {
+          const model = await this.vehicleInventoryService.findVehicleModelById(
+            vehicleDetails.modelId,
+          );
+          inv.model = {
+            id: (model as any)._id?.toString?.() ?? '',
+            name: (model as any).name,
+            manufacturerId: (model as any).manufacturer?.toString?.(),
+          };
+        } catch { }
+      }
+
+      if (vehicleDetails.variantId) {
+        try {
+          const v = await this.vehicleInventoryService.findVehicleVariantById(
+            vehicleDetails.variantId,
+          );
+          const vehicleModel = (v as any).vehicleModel;
+          const variantData: any = {
+            id: (v as any)._id?.toString?.() ?? '',
+            name: (v as any).name,
+            price: (v as any).price,
+          };
+
+          // Only include vehicleModel if it's not null
+          if (vehicleModel) {
+            variantData.vehicleModel = this.removeNullValues({
+              _id: vehicleModel._id?.toString?.() || vehicleModel._id,
+              name: vehicleModel.name,
+              displayName: vehicleModel.displayName,
+            });
+            variantData.modelId =
+              vehicleModel._id?.toString?.() || vehicleModel._id;
+          }
+
+          // Only add variant if it has valid data
+          const cleanedVariant = this.removeNullValues(variantData);
+          if (cleanedVariant) {
+            inv.variant = cleanedVariant;
+          }
+        } catch { }
+      }
+
+      if (vehicleDetails.transmissionTypeId) {
+        try {
+          const t = await this.vehicleInventoryService.findTransmissionTypeById(
+            vehicleDetails.transmissionTypeId,
+          );
+          inv.transmissionType = {
+            id: (t as any)._id?.toString?.() ?? '',
+            name: (t as any).name,
+            description: (t as any).description,
+          };
+        } catch { }
+      }
+
+      if (vehicleDetails.fuelTypeId) {
+        try {
+          const f = await this.vehicleInventoryService.findFuelTypeById(
+            vehicleDetails.fuelTypeId,
+          );
+          inv.fuelType = {
+            id: (f as any)._id?.toString?.() ?? '',
+            name: (f as any).name,
+            description: (f as any).description,
+          };
+        } catch { }
+      }
+
+      if (Object.keys(inv).length > 0) {
+        if (detailedAd.vehicleDetails) {
+          (detailedAd.vehicleDetails as any).inventory = inv;
+        } else if (detailedAd.commercialVehicleDetails) {
+          (detailedAd.commercialVehicleDetails as any).inventory = inv;
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error populating vehicle inventory details:', error);
+    }
+  }
+
+  /** ---------- DTO MAPPERS ---------- */
+  private mapToResponseDto(ad: any): DetailedAdResponseDto {
+    return {
+      id: (ad._id as any).toString(),
+      title: ad.title,
+      description: ad.description,
+      price: ad.price,
+      images: ad.images,
+      location: ad.location,
+      link: ad.link || '',
+      category: ad.category,
+      isActive: ad.isActive,
+      soldOut: ad.soldOut || false,
+      isApproved: ad.isApproved || false,
+      status: ad.status || AdStatus.PENDING,
+      approvedBy: ad.approvedBy ? (ad.approvedBy as any).toString() : undefined,
+      postedAt: ad.createdAt, // expose createdAt as postedAt
+      updatedAt: ad.updatedAt,
+      postedBy: ad.postedBy,
+      user: ad.user
+        ? {
+          id: (ad.user._id as any)?.toString?.(),
+          name: ad.user.name,
+          email: ad.user.email,
+          countryCode: ad.user.countryCode,
+          phoneNumber: ad.user.phoneNumber,
+        }
+        : undefined,
+      approvedByUser: ad.approvedByUser
+        ? {
+          id: (ad.approvedByUser._id as any)?.toString?.(),
+          name: ad.approvedByUser.name,
+          email: ad.approvedByUser.email,
+        }
+        : undefined,
+      vehicleDetails: ad.vehicleDetails || [],
+      commercialVehicleDetails: ad.commercialVehicleDetails || [],
+      propertyDetails: ad.propertyDetails || [],
+    };
+  }
+
+  /**
+   * Map ad to response DTO with inventory details (v2 approach)
+   */
+  private async mapToResponseDtoWithInventory(
+    ad: any,
+  ): Promise<DetailedAdResponseDto> {
+    const base = this.mapToResponseDto(ad);
+
+    // Vehicle details processing with inventory information
+
+    // Process vehicle details with inventory information
+    const vehicleDetails = ad.vehicleDetails;
+    let processedVehicleDetails = vehicleDetails;
+
+    if (vehicleDetails && Object.keys(vehicleDetails).length > 0) {
+      // Fetch vehicle inventory details individually with error handling
+      const [manufacturer, model, variant, fuelType, transmissionType] =
+        await Promise.all([
+          vehicleDetails.manufacturerId
+            ? this.vehicleInventoryService
+              .findManufacturerById(vehicleDetails.manufacturerId)
+              .catch(() => ({
+                _id: vehicleDetails.manufacturerId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          vehicleDetails.modelId
+            ? this.vehicleInventoryService
+              .findVehicleModelById(vehicleDetails.modelId)
+              .catch(() => ({
+                _id: vehicleDetails.modelId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          vehicleDetails.variantId
+            ? this.vehicleInventoryService
+              .findVehicleVariantById(vehicleDetails.variantId)
+              .catch(() => ({
+                _id: vehicleDetails.variantId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          vehicleDetails.fuelTypeId
+            ? this.vehicleInventoryService
+              .findFuelTypeById(vehicleDetails.fuelTypeId)
+              .catch(() => ({
+                _id: vehicleDetails.fuelTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          vehicleDetails.transmissionTypeId
+            ? this.vehicleInventoryService
+              .findTransmissionTypeById(vehicleDetails.transmissionTypeId)
+              .catch(() => ({
+                _id: vehicleDetails.transmissionTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+        ]);
+
+      // Clean variant - remove vehicleModel field if null, or remove entire variant if no valid data
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          // Remove vehicleModel field if null, but keep variant if it has other fields
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedVehicleDetails = {
+        ...vehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.removeNullValues(manufacturer),
+        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(transmissionType && {
+          transmissionType: this.removeNullValues(transmissionType),
+        }),
+      };
+    }
+
+    // Process commercial vehicle details with inventory information
+    const commercialVehicleDetails = ad.commercialVehicleDetails;
+    let processedCommercialVehicleDetails = commercialVehicleDetails;
+
+    if (
+      commercialVehicleDetails &&
+      Object.keys(commercialVehicleDetails).length > 0
+    ) {
+      // Fetch commercial vehicle inventory details individually with error handling
+      const [manufacturer, model, variant, fuelType, transmissionType] =
+        await Promise.all([
+          commercialVehicleDetails.manufacturerId
+            ? this.vehicleInventoryService
+              .findManufacturerById(commercialVehicleDetails.manufacturerId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.manufacturerId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.modelId
+            ? this.vehicleInventoryService
+              .findVehicleModelById(commercialVehicleDetails.modelId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.modelId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.variantId
+            ? this.vehicleInventoryService
+              .findVehicleVariantById(commercialVehicleDetails.variantId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.variantId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.fuelTypeId
+            ? this.vehicleInventoryService
+              .findFuelTypeById(commercialVehicleDetails.fuelTypeId)
+              .catch(() => ({
+                _id: commercialVehicleDetails.fuelTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+          commercialVehicleDetails.transmissionTypeId
+            ? this.vehicleInventoryService
+              .findTransmissionTypeById(
+                commercialVehicleDetails.transmissionTypeId,
+              )
+              .catch(() => ({
+                _id: commercialVehicleDetails.transmissionTypeId,
+                name: 'Not Found',
+                displayName: 'Not Found',
+              }))
+            : Promise.resolve(undefined),
+        ]);
+
+      // Clean variant - remove vehicleModel field if null, or remove entire variant if no valid data
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          // Remove vehicleModel field if null, but keep variant if it has other fields
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedCommercialVehicleDetails = {
+        ...commercialVehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.removeNullValues(manufacturer),
+        }),
+        ...(model && { model: this.removeNullValues(model) }),
+        ...(cleanedVariant && { variant: cleanedVariant }),
+        ...(fuelType && { fuelType: this.removeNullValues(fuelType) }),
+        ...(transmissionType && {
+          transmissionType: this.removeNullValues(transmissionType),
+        }),
+      };
+    }
+
+    return {
+      ...base,
+      vehicleDetails: processedVehicleDetails || undefined,
+      commercialVehicleDetails: processedCommercialVehicleDetails || undefined,
+    };
+  }
+
+  /**
+   * Optimized version that uses pre-fetched inventory data (batched)
+   * This avoids N+1 queries by using data fetched in bulk
+   */
+  private mapToResponseDtoWithInventoryBatched(
+    ad: any,
+    manufacturers: Record<string, any>,
+    models: Record<string, any>,
+    variants: Record<string, any>,
+    fuelTypes: Record<string, any>,
+    transmissionTypes: Record<string, any>,
+  ): DetailedAdResponseDto {
+    const base = this.mapToResponseDto(ad);
+
+    // Process vehicle details with pre-fetched inventory
+    const vehicleDetails = ad.vehicleDetails;
+    let processedVehicleDetails = vehicleDetails;
+
+    if (vehicleDetails && Object.keys(vehicleDetails).length > 0) {
+      const manufacturer = vehicleDetails.manufacturerId
+        ? manufacturers[vehicleDetails.manufacturerId.toString()]
+        : undefined;
+      const model = vehicleDetails.modelId
+        ? models[vehicleDetails.modelId.toString()]
+        : undefined;
+      const variant = vehicleDetails.variantId
+        ? variants[vehicleDetails.variantId.toString()]
+        : undefined;
+      const fuelType = vehicleDetails.fuelTypeId
+        ? fuelTypes[vehicleDetails.fuelTypeId.toString()]
+        : undefined;
+      const transmissionType = vehicleDetails.transmissionTypeId
+        ? transmissionTypes[vehicleDetails.transmissionTypeId.toString()]
+        : undefined;
+
+      // Clean variant
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedVehicleDetails = {
+        ...vehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.normalizeObjectIds(
+            this.removeNullValues(manufacturer),
+          ),
+        }),
+        ...(model && {
+          model: this.normalizeObjectIds(this.removeNullValues(model)),
+        }),
+        ...(cleanedVariant && {
+          variant: this.normalizeObjectIds(cleanedVariant),
+        }),
+        ...(fuelType && {
+          fuelType: this.normalizeObjectIds(this.removeNullValues(fuelType)),
+        }),
+        ...(transmissionType && {
+          transmissionType: this.normalizeObjectIds(
+            this.removeNullValues(transmissionType),
+          ),
+        }),
+      };
+    }
+
+    // Process commercial vehicle details with pre-fetched inventory
+    const commercialVehicleDetails = ad.commercialVehicleDetails;
+    let processedCommercialVehicleDetails = commercialVehicleDetails;
+
+    if (
+      commercialVehicleDetails &&
+      Object.keys(commercialVehicleDetails).length > 0
+    ) {
+      const manufacturer = commercialVehicleDetails.manufacturerId
+        ? manufacturers[commercialVehicleDetails.manufacturerId.toString()]
+        : undefined;
+      const model = commercialVehicleDetails.modelId
+        ? models[commercialVehicleDetails.modelId.toString()]
+        : undefined;
+      const variant = commercialVehicleDetails.variantId
+        ? variants[commercialVehicleDetails.variantId.toString()]
+        : undefined;
+      const fuelType = commercialVehicleDetails.fuelTypeId
+        ? fuelTypes[commercialVehicleDetails.fuelTypeId.toString()]
+        : undefined;
+      const transmissionType = commercialVehicleDetails.transmissionTypeId
+        ? transmissionTypes[
+        commercialVehicleDetails.transmissionTypeId.toString()
+        ]
+        : undefined;
+
+      // Clean variant
+      let cleanedVariant = variant;
+      if (variant) {
+        if (
+          (variant as any).vehicleModel === null ||
+          (variant as any).vehicleModel === undefined
+        ) {
+          const { vehicleModel, ...rest } = variant as any;
+          cleanedVariant =
+            Object.keys(rest).length > 0
+              ? this.removeNullValues(rest)
+              : undefined;
+        } else {
+          cleanedVariant = this.removeNullValues(variant);
+        }
+      }
+
+      processedCommercialVehicleDetails = {
+        ...commercialVehicleDetails,
+        ...(manufacturer && {
+          manufacturer: this.normalizeObjectIds(
+            this.removeNullValues(manufacturer),
+          ),
+        }),
+        ...(model && {
+          model: this.normalizeObjectIds(this.removeNullValues(model)),
+        }),
+        ...(cleanedVariant && {
+          variant: this.normalizeObjectIds(cleanedVariant),
+        }),
+        ...(fuelType && {
+          fuelType: this.normalizeObjectIds(this.removeNullValues(fuelType)),
+        }),
+        ...(transmissionType && {
+          transmissionType: this.normalizeObjectIds(
+            this.removeNullValues(transmissionType),
+          ),
+        }),
+      };
+    }
+
+    return {
+      ...base,
+      vehicleDetails: processedVehicleDetails || undefined,
+      commercialVehicleDetails: processedCommercialVehicleDetails || undefined,
+    };
+  }
+
+  /**
+   * Update soldOut status for an advertisement
+   * This method is intentionally lightweight to support a public PATCH endpoint
+   */
+  async updateSoldOut(
+    id: string,
+    soldOut: boolean,
+    requesterId?: string,
+    requesterType?: string,
+  ): Promise<DetailedAdResponseDto> {
+    if (!this.isValidId(id)) {
+      throw new BadRequestException(`Invalid ad ID: ${id}`);
+    }
+
+    // Ensure ad exists first
+    const ad = await this.adModel.findById(id).lean();
+    if (!ad) {
+      throw new NotFoundException('Advertisement not found');
+    }
+
+    // Authorization: Admin/Super Admin full access; others must own the ad
+    const isPrivileged =
+      requesterType === 'admin' || requesterType === 'super_admin';
+    const isOwner =
+      requesterId && ad.postedBy?.toString?.() === requesterId.toString();
+    if (!isPrivileged && !isOwner) {
+      throw new ForbiddenException(
+        'You are not allowed to update sold-out status for this advertisement',
+      );
+    }
+
+    const updated = await this.adModel.findByIdAndUpdate(
+      id,
+      { $set: { soldOut, updatedAt: new Date() } },
+      { new: true },
+    );
+
+    // Sold-out flips visibility in every list query, so the caches must go —
+    // this path previously invalidated nothing at all.
+    await this.invalidateAdCache(id, requesterId);
+
+    // Reuse aggregation-based fetch to return enriched data consistently
+    return await this.findOne(id);
+  }
+
+  private mapToDetailedResponseDto(ad: any): DetailedAdResponseDto {
+    const base = this.mapToResponseDto(ad);
+
+    const detailed: DetailedAdResponseDto = {
+      ...base,
+      postedBy: (ad.postedBy as any)?.toString?.() ?? base.postedBy,
+    };
+
+    if (ad.propertyDetails?.[0]) {
+      const p = ad.propertyDetails[0];
+      detailed.propertyDetails = {
+        propertyType: p.propertyType,
+        bedrooms: p.bedrooms,
+        bathrooms: p.bathrooms,
+        areaSqft: p.areaSqft,
+        floor: p.floor,
+        isFurnished: p.isFurnished,
+        hasParking: p.hasParking,
+        hasGarden: p.hasGarden,
+        amenities: p.amenities,
+      } as any;
+    }
+
+    if (ad.vehicleDetails?.[0]) {
+      const v = ad.vehicleDetails[0];
+      detailed.vehicleDetails = {
+        vehicleType: v.vehicleType,
+        manufacturerId: v.manufacturerId,
+        modelId: v.modelId,
+        variantId: v.variantId,
+        year: v.year,
+        mileage: v.mileage,
+        transmissionTypeId: v.transmissionTypeId,
+        fuelTypeId: v.fuelTypeId,
+        color: v.color,
+        isFirstOwner: v.isFirstOwner,
+        hasInsurance: v.hasInsurance,
+        hasRcBook: v.hasRcBook,
+        additionalFeatures: v.additionalFeatures,
+      } as any;
+    }
+
+    if (ad.commercialVehicleDetails?.[0]) {
+      const c = ad.commercialVehicleDetails[0];
+      detailed.commercialVehicleDetails = {
+        vehicleType: c.vehicleType,
+        commercialVehicleType: c.commercialVehicleType,
+        bodyType: c.bodyType,
+        manufacturerId: c.manufacturerId,
+        modelId: c.modelId,
+        variantId: c.variantId,
+        year: c.year,
+        mileage: c.mileage,
+        payloadCapacity: c.payloadCapacity,
+        payloadUnit: c.payloadUnit,
+        axleCount: c.axleCount,
+        transmissionTypeId: c.transmissionTypeId,
+        fuelTypeId: c.fuelTypeId,
+        color: c.color,
+        hasInsurance: c.hasInsurance,
+        hasFitness: c.hasFitness,
+        hasPermit: c.hasPermit,
+        additionalFeatures: c.additionalFeatures,
+        seatingCapacity: c.seatingCapacity,
+      } as any;
+    }
+
+    return detailed;
+  }
+
+  /** ---------- SUBDOC UPDATES ---------- */
+  private async updatePropertyAd(id: string, updateDto: any): Promise<void> {
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.propertyAdModel.findOne({ ad: adObjectId });
+    if (doc) {
+      const allowed: any = {};
+      if (updateDto.propertyType) allowed.propertyType = updateDto.propertyType;
+      if (updateDto.listingType) allowed.listingType = updateDto.listingType;
+      if (typeof updateDto.bedrooms === 'number')
+        allowed.bedrooms = updateDto.bedrooms;
+      if (typeof updateDto.bathrooms === 'number')
+        allowed.bathrooms = updateDto.bathrooms;
+      if (typeof updateDto.areaSqft === 'number')
+        allowed.areaSqft = updateDto.areaSqft;
+      if (typeof updateDto.floor === 'number') allowed.floor = updateDto.floor;
+      if (typeof updateDto.isFurnished === 'boolean')
+        allowed.isFurnished = updateDto.isFurnished;
+      if (typeof updateDto.hasParking === 'boolean')
+        allowed.hasParking = updateDto.hasParking;
+      if (typeof updateDto.hasGarden === 'boolean')
+        allowed.hasGarden = updateDto.hasGarden;
+      if (Array.isArray(updateDto.amenities))
+        allowed.amenities = updateDto.amenities;
+      Object.assign(doc, allowed);
+      await doc.save();
+    }
+  }
+
+  private async updateVehicleAdValidated(
+    id: string,
+    updateDto: any,
+    ad: AdDocument,
+  ): Promise<void> {
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.vehicleAdModel.findOne({ ad: adObjectId });
+    if (!doc) return;
+
+    const update: any = {};
+    if (updateDto.vehicleType) update.vehicleType = updateDto.vehicleType;
+    if (updateDto.manufacturerId) {
+      await this.vehicleInventoryService.findManufacturerById(
+        updateDto.manufacturerId,
+      );
+      update.manufacturerId = new Types.ObjectId(updateDto.manufacturerId);
+    }
+    if (updateDto.modelId) {
+      await this.vehicleInventoryService.findVehicleModelById(
+        updateDto.modelId,
+      );
+      update.modelId = new Types.ObjectId(updateDto.modelId);
+    }
+    if (updateDto.variantId)
+      update.variantId = new Types.ObjectId(updateDto.variantId);
+    if (typeof updateDto.year === 'number') update.year = updateDto.year;
+    if (typeof updateDto.mileage === 'number')
+      update.mileage = updateDto.mileage;
+    if (updateDto.transmissionTypeId) {
+      await this.vehicleInventoryService.findTransmissionTypeById(
+        updateDto.transmissionTypeId,
+      );
+      update.transmissionTypeId = new Types.ObjectId(
+        updateDto.transmissionTypeId,
+      );
+    }
+    if (updateDto.fuelTypeId) {
+      await this.vehicleInventoryService.findFuelTypeById(updateDto.fuelTypeId);
+      update.fuelTypeId = new Types.ObjectId(updateDto.fuelTypeId);
+    }
+    if (typeof updateDto.color === 'string') update.color = updateDto.color;
+    if (typeof updateDto.isFirstOwner === 'boolean')
+      update.isFirstOwner = updateDto.isFirstOwner;
+    if (typeof updateDto.hasInsurance === 'boolean')
+      update.hasInsurance = updateDto.hasInsurance;
+    if (typeof updateDto.hasRcBook === 'boolean')
+      update.hasRcBook = updateDto.hasRcBook;
+    if (Array.isArray(updateDto.additionalFeatures))
+      update.additionalFeatures = updateDto.additionalFeatures;
+
+    Object.assign(doc, update);
+    await doc.save();
+
+    // Auto-update title disabled - title is only updated when user explicitly provides it
+    // // Update ad title if model/year changed
+    // if (updateDto.modelId || updateDto.year) {
+    //   const modelId = updateDto.modelId
+    //     ? updateDto.modelId
+    //     : (doc.modelId as any)?.toString?.();
+    //   if (modelId) {
+    //     const model =
+    //       await this.vehicleInventoryService.findVehicleModelById(modelId);
+    //     const modelName =
+    //       (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+    //     const year = updateDto.year ?? doc.year ?? '';
+    //     const title = `${modelName} ${year}`.trim();
+    //     await this.adModel.updateOne({ _id: ad._id }, { title });
+    //   }
+    // }
+  }
+
+  private async updateCommercialVehicleAdValidated(
+    id: string,
+    updateDto: any,
+    ad: AdDocument,
+  ): Promise<void> {
+    const adObjectId = new Types.ObjectId(id);
+    const doc = await this.commercialVehicleAdModel.findOne({ ad: adObjectId });
+    if (!doc) return;
+
+    const update: any = {};
+    if (updateDto.commercialVehicleType)
+      update.commercialVehicleType = updateDto.commercialVehicleType;
+    if (updateDto.bodyType) update.bodyType = updateDto.bodyType;
+    if (updateDto.manufacturerId) {
+      await this.vehicleInventoryService.findManufacturerById(
+        updateDto.manufacturerId,
+      );
+      update.manufacturerId = new Types.ObjectId(updateDto.manufacturerId);
+    }
+    if (updateDto.modelId) {
+      await this.vehicleInventoryService.findVehicleModelById(
+        updateDto.modelId,
+      );
+      update.modelId = new Types.ObjectId(updateDto.modelId);
+    }
+    if (updateDto.variantId)
+      update.variantId = new Types.ObjectId(updateDto.variantId);
+    if (typeof updateDto.year === 'number') update.year = updateDto.year;
+    if (typeof updateDto.mileage === 'number')
+      update.mileage = updateDto.mileage;
+    if (typeof updateDto.payloadCapacity === 'number')
+      update.payloadCapacity = updateDto.payloadCapacity;
+    if (typeof updateDto.payloadUnit === 'string')
+      update.payloadUnit = updateDto.payloadUnit;
+    if (typeof updateDto.axleCount === 'number')
+      update.axleCount = updateDto.axleCount;
+    if (updateDto.transmissionTypeId) {
+      await this.vehicleInventoryService.findTransmissionTypeById(
+        updateDto.transmissionTypeId,
+      );
+      update.transmissionTypeId = new Types.ObjectId(
+        updateDto.transmissionTypeId,
+      );
+    }
+    if (updateDto.fuelTypeId) {
+      await this.vehicleInventoryService.findFuelTypeById(updateDto.fuelTypeId);
+      update.fuelTypeId = new Types.ObjectId(updateDto.fuelTypeId);
+    }
+    if (typeof updateDto.color === 'string') update.color = updateDto.color;
+    if (typeof updateDto.hasInsurance === 'boolean')
+      update.hasInsurance = updateDto.hasInsurance;
+    if (typeof updateDto.hasFitness === 'boolean')
+      update.hasFitness = updateDto.hasFitness;
+    if (typeof updateDto.hasPermit === 'boolean')
+      update.hasPermit = updateDto.hasPermit;
+    if (Array.isArray(updateDto.additionalFeatures))
+      update.additionalFeatures = updateDto.additionalFeatures;
+    if (typeof updateDto.seatingCapacity === 'number')
+      update.seatingCapacity = updateDto.seatingCapacity;
+
+    Object.assign(doc, update);
+    await doc.save();
+
+    // Auto-update title disabled - title is only updated when user explicitly provides it
+    // // Update ad title if model/year changed
+    // if (updateDto.modelId || updateDto.year) {
+    //   const modelId = updateDto.modelId
+    //     ? updateDto.modelId
+    //     : (doc.modelId as any)?.toString?.();
+    //   if (modelId) {
+    //     const model =
+    //       await this.vehicleInventoryService.findVehicleModelById(modelId);
+    //     const modelName =
+    //       (model as any)?.displayName || (model as any)?.name || 'Vehicle';
+    //     const year = updateDto.year ?? doc.year ?? '';
+    //     const title = `${modelName} ${year}`.trim();
+    //     await this.adModel.updateOne({ _id: ad._id }, { title });
+    //   }
+    // }
+  }
+
+  /** ---------- RATINGS AND REVIEWS ---------- */
+  private async getAdRatings(adId: string): Promise<{
+    averageRating: number;
+    ratingsCount: number;
+    reviews: Array<{
+      id: string;
+      rating: number;
+      review: string;
+      user: {
+        id: string;
+        name: string;
+      };
+      createdAt: Date;
+    }>;
+  } | null> {
+    try {
+      // Note: This is a placeholder implementation since the rating system
+      // currently only supports products, not ads. You would need to extend
+      // the rating system to support ads or create a separate ad rating system.
+
+      // For now, return null to indicate no ratings available
+      return null;
+    } catch (error) {
+      console.error('Error fetching ad ratings:', error);
+      return null;
+    }
+  }
+
+  /** ---------- INVENTORY VALIDATION ---------- */
+  private async validateVehicleInventoryReferences(
+    createDto: any,
+  ): Promise<void> {
+    try {
+      const {
+        manufacturerId,
+        modelId,
+        variantId,
+        transmissionTypeId,
+        fuelTypeId,
+      } = createDto || {};
+
+      if (!manufacturerId || !modelId || !transmissionTypeId || !fuelTypeId) {
+        throw new BadRequestException(
+          'Missing required vehicle inventory references',
+        );
+      }
+
+      await this.vehicleInventoryService.findManufacturerById(manufacturerId);
+      await this.vehicleInventoryService.findVehicleModelById(modelId);
+
+      if (variantId) {
+        await this.vehicleInventoryService.findVehicleVariantById(variantId);
+      }
+
+      await this.vehicleInventoryService.findTransmissionTypeById(
+        transmissionTypeId,
+      );
+      await this.vehicleInventoryService.findFuelTypeById(fuelTypeId);
+    } catch (error: any) {
+      const msg = error?.message ?? 'Unknown error';
+      throw new BadRequestException(
+        `Invalid vehicle inventory reference: ${msg}`,
+      );
+    }
+  }
+}

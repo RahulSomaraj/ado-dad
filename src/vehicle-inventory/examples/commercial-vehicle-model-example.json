@@ -1,0 +1,70 @@
+{
+  "description": "Example of creating a commercial vehicle model with automatic field detection",
+  "examples": {
+    "tata_407_truck": {
+      "name": "tata-407",
+      "displayName": "Tata 407",
+      "manufacturer": "507f1f77bcf86cd799439011",
+      "vehicleType": "Truck",
+      "description": "Heavy duty commercial truck for logistics and transportation",
+      "launchYear": 1986,
+      "segment": "Commercial",
+      "bodyType": "Truck",
+      "images": [
+        "https://example.com/tata407-exterior.jpg",
+        "https://example.com/tata407-cargo.jpg"
+      ],
+      "brochureUrl": "https://example.com/tata407-brochure.pdf",
+      "isCommercialVehicle": true,
+      "commercialVehicleType": "truck",
+      "commercialBodyType": "flatbed",
+      "defaultPayloadCapacity": 4000,
+      "defaultPayloadUnit": "kg",
+      "defaultAxleCount": 2,
+      "defaultSeatingCapacity": 3
+    },
+    "ashok_leyland_bus": {
+      "name": "ashok-leyland-bus",
+      "displayName": "Ashok Leyland Bus",
+      "manufacturer": "507f1f77bcf86cd799439012",
+      "vehicleType": "Truck",
+      "description": "Passenger bus for commercial transportation",
+      "launchYear": 1995,
+      "segment": "Commercial",
+      "bodyType": "Bus",
+      "images": [
+        "https://example.com/bus-exterior.jpg",
+        "https://example.com/bus-interior.jpg"
+      ],
+      "isCommercialVehicle": true,
+      "commercialVehicleType": "bus",
+      "commercialBodyType": "passenger",
+      "defaultPayloadCapacity": 2000,
+      "defaultPayloadUnit": "kg",
+      "defaultAxleCount": 2,
+      "defaultSeatingCapacity": 45
+    },
+    "eicher_truck": {
+      "name": "eicher-truck",
+      "displayName": "Eicher Truck",
+      "manufacturer": "507f1f77bcf86cd799439013",
+      "vehicleType": "Truck",
+      "description": "Medium duty commercial truck",
+      "launchYear": 2000,
+      "segment": "Commercial",
+      "bodyType": "Truck",
+      "isCommercialVehicle": true,
+      "commercialVehicleType": "truck",
+      "commercialBodyType": "container",
+      "defaultPayloadCapacity": 6000,
+      "defaultPayloadUnit": "kg",
+      "defaultAxleCount": 2,
+      "defaultSeatingCapacity": 2
+    }
+  },
+  "usage": {
+    "create_model": "POST /vehicle-inventory/models",
+    "create_ad": "POST /ads",
+    "auto_detection": "When creating an ad with a commercial vehicle modelId, the system will automatically detect and populate commercial vehicle fields"
+  }
+}

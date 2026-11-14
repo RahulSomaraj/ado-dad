@@ -1,73 +1,640 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import { Throttle } from '../common/guards/auth-throttle.guard';
+import { safeFilename } from '../common/security/path-safety.util';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  Query,
+  UseFilters,
+  UseGuards,
+  Request,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+  ForbiddenException,
+  Patch,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { EmailService } from '../utils/email.service';
-import { ApiTags, ApiQuery, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/create-user.dto';  // Import CreateUserDto
-import { UpdateUserDto } from './dto/update-user.dto';  // Import UpdateUserDto
+import {
+  ApiTags,
+  ApiQuery,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+} from '@nestjs/swagger';
+import { CreateUserDto, CreateUserWithFileDto } from './dto/create-user.dto'; // Import both DTOs
+import { UpdateUserDto } from './dto/update-user.dto'; // Import UpdateUserDto
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { GetUsersDto } from './dto/get-user.dto';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from './enums/user.types';
+import { RolesGuard } from '../roles/roles.guard';
+import { S3Service } from '../shared/s3.service';
+import { LoginResponse } from './dto/login-response.dto';
 
-@ApiTags('users')
+@ApiTags('Users')
 @Controller('users')
+@UseFilters(new HttpExceptionFilter('Users'))
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
+    private readonly s3Service: S3Service,
   ) {}
-
-  @Get()
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of users per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search query to filter users' })
-  @ApiResponse({ status: 200, description: 'List of users' })
-  async getAllUsers(@Query() query): Promise<any> {
-    return this.usersService.getAllUsers(query.page, query.limit, query);
-  }
-
-  @Get(':id')
-  @ApiResponse({ status: 200, description: 'User found' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserById(@Param('id') id: string) {
-    return this.usersService.getUserById(id);
-  }
 
   @Post()
   @ApiBody({
-    description: 'Create a new user',
-    type: CreateUserDto,  // Use CreateUserDto for creating user
+    description: 'Create a new user with profile picture URL',
+    type: CreateUserDto, // Use CreateUserDto for creating user with URL
   })
   @ApiResponse({ status: 201, description: 'User created' })
   async createUser(@Body() userData: CreateUserDto) {
+    // SECURITY: never allow privileged account types via public self-signup.
+    const allowedSelfSignup = [UserType.USER, UserType.SHOWROOM];
+    if (!userData.type) {
+      (userData as any).type = UserType.USER;
+    } else if (!allowedSelfSignup.includes(userData.type as UserType)) {
+      throw new ForbiddenException(
+        'You are not allowed to self-register with this account type',
+      );
+    }
     return this.usersService.createUser(userData);
   }
 
+  @Post('with-profile-picture')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create a new user with profile picture file upload',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'John Doe' },
+        phoneNumber: { type: 'string', example: '+123456789' },
+        email: { type: 'string', example: 'john@example.com' },
+        password: { type: 'string', example: 'password123' },
+        type: { type: 'string', enum: ['SA', 'AD', 'NU', 'SR'], example: 'NU' },
+        profilePic: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile picture file (JPG, PNG, WebP supported)',
+        },
+      },
+      required: ['name', 'phoneNumber', 'email', 'password', 'type'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'User created with profile picture',
+  })
+  @UseInterceptors(FileInterceptor('profilePic'))
+  async createUserWithProfilePicture(
+    @Body() userData: CreateUserWithFileDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          // Validate MIME types explicitly
+          // Validate by MIME type
+          new FileTypeValidator({ fileType: /^image\//i }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    profilePic?: Express.Multer.File,
+  ) {
+    // Upload profile picture if provided
+    let profilePicUrl: string | undefined;
+    if (profilePic) {
+      try {
+        profilePicUrl = await this.s3Service.uploadFile(profilePic);
+      } catch (error) {
+        console.error(
+          'S3 upload failed, falling back to local storage:',
+          (error as any)?.message,
+        );
+        // Fallback to local storage
+        const uploadsDir = require('path').join(
+          __dirname,
+          '..',
+          '..',
+          'public',
+          'uploads',
+        );
+        const fs = require('fs');
+        const { v4: uuidv4 } = require('uuid');
+
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+
+        const uniqueFileName = `${uuidv4()}-${safeFilename(profilePic.originalname)}`;
+        const filePath = require('path').join(uploadsDir, uniqueFileName);
+        fs.writeFileSync(filePath, profilePic.buffer);
+        profilePicUrl = `/uploads/${uniqueFileName}`;
+      }
+    }
+
+    // SECURITY: never allow privileged account types via public self-signup.
+    const allowedSelfSignup = [UserType.USER, UserType.SHOWROOM];
+    if (!userData.type) {
+      (userData as any).type = UserType.USER;
+    } else if (!allowedSelfSignup.includes(userData.type as UserType)) {
+      throw new ForbiddenException(
+        'You are not allowed to self-register with this account type',
+      );
+    }
+
+    // Create user with profile picture URL
+    const createUserDto: CreateUserDto = {
+      ...userData,
+      profilePic: profilePicUrl,
+    };
+
+    return this.usersService.createUser(createUserDto);
+  }
+
+  // ===== PUBLIC ENDPOINTS (No Authentication Required) =====
+
+  @Get('public')
+  @ApiOperation({
+    summary: 'Get all users (Public API)',
+    description: `
+      Retrieve a paginated list of all users without authentication requirements.
+      
+      **Features:**
+      - No authentication required
+      - Returns limited, non-PII fields only (name, email, type, createdAt)
+      - Phone numbers and profile pictures are excluded for privacy
+      - Pagination support with configurable page size
+      - Filtering by user type, search terms, and other criteria
+      - Sorting by various fields
+      
+      **Query Parameters:**
+      - page: Page number (default: 1)
+      - limit: Items per page (default: 10, max: 100)
+      - search: Search term for name or email
+      - type: Filter by user type (valid values: SA, AD, NU, SR)
+      - sort: Sort field and direction
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all users retrieved successfully',
+    schema: {
+      example: {
+        users: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            name: 'John Doe',
+            email: 'john@example.com',
+            type: 'NU',
+            createdAt: '2024-01-15T10:30:00.000Z',
+          },
+        ],
+        totalPages: 5,
+        currentPage: 1,
+        totalUsers: 50,
+        hasNext: true,
+        hasPrev: false,
+      },
+    },
+  })
+  async getAllUsersPublic(@Query() query: GetUsersDto): Promise<any> {
+    return this.usersService.getAllUsersPublic(query);
+  }
+
+  @Get('public/:id')
+  @ApiOperation({
+    summary: 'Get user by ID (Public API)',
+    description: `
+      Retrieve a specific user by their ID without authentication requirements.
+      
+      **Features:**
+      - No authentication required
+      - Returns limited, non-PII fields only (name, email, type, createdAt)
+      - Phone numbers and profile pictures are excluded for privacy
+      - Works for any user type
+      
+      **Parameters:**
+      - id: User ID (MongoDB ObjectId)
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User found successfully',
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'John Doe',
+        email: 'john@example.com',
+        type: 'NU',
+        createdAt: '2024-01-15T10:30:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getUserByIdPublic(@Param('id') id: string) {
+    return this.usersService.getUserByIdPublic(id);
+  }
+
+  // ===== AUTHENTICATED ENDPOINTS (Authentication Required) =====
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Get()
+  async getAllUsers(@Query() query: GetUsersDto, @Request() req): Promise<any> {
+    const { user } = req;
+    return this.usersService.getAllUsers(query, user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @Get('count')
+  @ApiOperation({ summary: 'Get user counts (total normal users + breakdown by type)' })
+  @ApiResponse({ status: 200, description: 'User counts' })
+  async getUserCount() {
+    return this.usersService.getUserCount();
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Get(':id')
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getUserById(@Param('id') id: string, @Request() req) {
+    const { user } = req;
+    return this.usersService.getUserById(id, user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
   @Put(':id')
   @ApiBody({
     description: 'Update user details',
-    type: UpdateUserDto,  // Use UpdateUserDto for updating user
+    type: UpdateUserDto, // Use UpdateUserDto for updating user
   })
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async updateUser(@Param('id') id: string, @Body() updateData: UpdateUserDto) {
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateData: UpdateUserDto,
+    @Request() req,
+  ) {
+    const actor = req.user;
+    if (!actor) {
+      throw new ForbiddenException();
+    }
+    const isAdmin =
+      actor.type === UserType.SUPER_ADMIN || actor.type === UserType.ADMIN;
+    if (!isAdmin && actor.id !== id && actor._id !== id) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+    // SECURITY: only admins may change a user's role/type.
+    if (!isAdmin) {
+      delete (updateData as any).type;
+    }
     return this.usersService.updateUser(id, updateData);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @Patch(':id/password')
+  @ApiBody({
+    description: 'Change password',
+    schema: {
+      type: 'object',
+      properties: {
+        currentPassword: { type: 'string' },
+        newPassword: { type: 'string' },
+      },
+      required: ['currentPassword', 'newPassword'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Password changed' })
+  async changePassword(
+    @Param('id') id: string,
+    @Body() body: { currentPassword: string; newPassword: string },
+    @Request() req,
+  ) {
+    const actor = req.user;
+    const isAdmin =
+      actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
+    if (!isAdmin && actor?.id !== id && actor?._id !== id) {
+      throw new ForbiddenException('You can only change your own password');
+    }
+    return this.usersService.changePassword(
+      id,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER)
   @Delete(':id')
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deleteUser(@Param('id') id: string) {
+  async deleteUser(@Param('id') id: string, @Request() req) {
+    const actor = req.user;
+    const isAdmin =
+      actor?.type === UserType.SUPER_ADMIN || actor?.type === UserType.ADMIN;
+    if (!isAdmin && actor?.id !== id && actor?._id !== id) {
+      throw new ForbiddenException('You can delete only your own account');
+    }
     return this.usersService.deleteUser(id);
   }
 
-  @Post('send-otp')
-  @ApiResponse({ status: 200, description: 'OTP sent' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async sendOTP(@Body('email') email: string) {
-    return this.usersService.sendOTP(email);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Post('delete-my-data')
+  @ApiOperation({
+    summary: 'Delete my data - Soft delete all ads',
+    description: `
+      Soft delete all ads belonging to the authenticated user. 
+      This will mark all ads as deleted (isDeleted: true) so they are not visible anywhere.
+      
+      **Features:**
+      - Authentication required
+      - Only deletes ads belonging to the authenticated user
+      - Performs soft delete (ads are marked as deleted, not permanently removed)
+      - Sets isActive to false and isDeleted to true
+      - Returns count of deleted ads
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All ads soft deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'All your ads have been soft deleted successfully',
+        },
+        deletedAdsCount: {
+          type: 'number',
+          example: 5,
+          description: 'Number of ads that were soft deleted',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  async deleteMyData(@Request() req) {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      throw new ForbiddenException('User not authenticated');
+    }
+    return this.usersService.deleteMyData(userId);
   }
 
+  @Throttle({ limit: 3, ttl: 300, keyFields: ['identifier', 'email'], name: 'send-otp' })
+  @Post('send-otp')
+  @ApiBody({
+    description: 'Email or phone number to receive OTP',
+    schema: {
+      type: 'object',
+      properties: {
+        identifier: {
+          type: 'string',
+          example: 'user@example.com or 9447414535',
+          description: 'Email address or phone number',
+        },
+      },
+      required: ['identifier'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'OTP sent' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async sendOTP(@Body('identifier') identifier: string) {
+    return this.usersService.sendOTP(identifier);
+  }
+
+  @Throttle({ limit: 5, ttl: 300, keyFields: ['identifier'], name: 'verify-otp' })
   @Post('verify-otp')
+  @ApiBody({
+    description: 'Verify OTP for email or phone number',
+    schema: {
+      type: 'object',
+      properties: {
+        identifier: {
+          type: 'string',
+          example: 'user@example.com or 9447414535',
+          description: 'Email address or phone number',
+        },
+        otp: {
+          type: 'string',
+          example: '123456',
+          description: '6-digit OTP',
+        },
+      },
+      required: ['identifier', 'otp'],
+    },
+  })
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid OTP or OTP expired' })
-  async verifyOTP(@Body() body: { email: string; otp: string }) {
-    return this.usersService.verifyOTP(body.email, body.otp);
+  async verifyOTP(
+    @Body() body: { identifier: string; otp: string },
+  ): Promise<LoginResponse> {
+    return this.usersService.verifyOTP(body.identifier, body.otp);
+  }
+
+  @Throttle({ limit: 3, ttl: 900, keyFields: ['email'], name: 'forgot-password' })
+  @Post('forgot-password')
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Send a password reset email to the user if the email exists in the system.',
+  })
+  @ApiBody({
+    description: 'Email address for password reset',
+    schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'user@example.com',
+          description: 'User email address',
+        },
+      },
+      required: ['email'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset email sent (if email exists)',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'If the email exists, a password reset link has been sent.',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid email format',
+  })
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.usersService.forgotPassword(body.email);
+  }
+
+  @Throttle({ limit: 10, ttl: 900, name: 'reset-password' })
+  @Post('reset-password')
+  @ApiOperation({
+    summary: 'Reset password using token',
+    description:
+      'Reset user password using the token received from forgot password email.',
+  })
+  @ApiBody({
+    description: 'Password reset data',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          example: '507f1f77bcf86cd799439011',
+          description: 'User ID from reset link',
+        },
+        token: {
+          type: 'string',
+          example: 'a1b2c3d4e5f6...',
+          description: 'Reset token from email link',
+        },
+        newPassword: {
+          type: 'string',
+          example: 'NewSecurePassword123!',
+          description: 'New password',
+        },
+      },
+      required: ['userId', 'token', 'newPassword'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example:
+            'Password reset successfully. You can now login with your new password.',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid token or user ID',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Token expired or invalid',
+  })
+  async resetPassword(
+    @Body() body: { userId: string; token: string; newPassword: string },
+  ) {
+    return this.usersService.resetPassword(
+      body.userId,
+      body.token,
+      body.newPassword,
+    );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN, UserType.USER, UserType.SHOWROOM)
+  @Post('profile-picture')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update user profile picture',
+    schema: {
+      type: 'object',
+      properties: {
+        profilePic: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile picture file (JPG, PNG, WebP supported)',
+        },
+      },
+      required: ['profilePic'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Profile picture updated' })
+  @UseInterceptors(FileInterceptor('profilePic'))
+  async updateProfilePicture(
+    @Request() req: any,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: /^image\//i }),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    profilePic: Express.Multer.File,
+  ) {
+    // Upload profile picture
+    let profilePicUrl: string;
+    try {
+      profilePicUrl = await this.s3Service.uploadFile(profilePic);
+    } catch (error) {
+      console.error(
+        'S3 upload failed, falling back to local storage:',
+        (error as any)?.message,
+      );
+      // Fallback to local storage
+      const uploadsDir = require('path').join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        'uploads',
+      );
+      const fs = require('fs');
+      const { v4: uuidv4 } = require('uuid');
+
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const uniqueFileName = `${uuidv4()}-${profilePic.originalname}`;
+      const filePath = require('path').join(uploadsDir, uniqueFileName);
+      fs.writeFileSync(filePath, profilePic.buffer);
+      profilePicUrl = `/uploads/${uniqueFileName}`;
+    }
+
+    // Update user profile picture
+    return this.usersService.updateUser(req.user.id, {
+      profilePic: profilePicUrl,
+    });
   }
 }

@@ -1,0 +1,106 @@
+{
+  "secrets": [
+    {
+      "name": "AWS_ACCESS_KEY_ID",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-aws-access-key-id"
+    },
+    {
+      "name": "AWS_SECRET_ACCESS_KEY",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-aws-secret-access-key"
+    },
+    {
+      "name": "AWS_REGION",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-aws-region"
+    },
+    {
+      "name": "AWS_S3_BUCKET_NAME",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-aws-s3-bucket-name"
+    },
+    {
+      "name": "MONGO_URI",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-uri"
+    },
+    {
+      "name": "MONGO_USER",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-user"
+    },
+    {
+      "name": "MONGO_PASSWORD",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-password"
+    },
+    {
+      "name": "MONGO_HOST",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-host"
+    },
+    {
+      "name": "MONGO_PORT",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-port"
+    },
+    {
+      "name": "MONGO_DATABASE",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-mongo-database"
+    },
+    {
+      "name": "REDIS_URL",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-redis-url"
+    },
+    {
+      "name": "JWT_SECRET",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-jwt-secret"
+    },
+    {
+      "name": "TOKEN_KEY",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-token-key"
+    },
+    {
+      "name": "SALT_ROUNDS",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-salt-rounds"
+    },
+    {
+      "name": "ACCESS_TOKEN_EXPIRY",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-access-token-expiry"
+    },
+    {
+      "name": "REFRESH_TOKEN_EXPIRY",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-refresh-token-expiry"
+    },
+    {
+      "name": "API_KEY_MAPS",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-api-key-maps"
+    },
+    {
+      "name": "API_SECRET_MAPS",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-api-secret-maps"
+    },
+    {
+      "name": "GOOGLE_MAPS_API_KEY",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-google-maps-api-key"
+    },
+    {
+      "name": "FIREBASE_SA_JSON",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-firebase-sa-json"
+    },
+    {
+      "name": "RESET_LINK",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-reset-link"
+    },
+    {
+      "name": "SES_FROM_EMAIL",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-ses-from-email"
+    },
+    {
+      "name": "FRONTEND_URL",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-frontend-url"
+    }
+  ],
+  "environment": [
+    {
+      "name": "NODE_ENV",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-node-env"
+    },
+    {
+      "name": "BACKEND_PORT",
+      "valueFrom": "arn:aws:ssm:ap-south-1:329599647381:parameter/ado-dad-prod-backend-port"
+    }
+  ]
+}

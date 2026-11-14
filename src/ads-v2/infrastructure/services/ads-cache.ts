@@ -1,0 +1,77 @@
+import { Injectable } from '@nestjs/common';
+import { RedisService } from '../../../shared/redis.service';
+
+@Injectable()
+export class AdsCache {
+  // r2: key version bumped when the cached list shape changed (P0-1 removed
+  // seller email/phone/countryCode) so stale PII-carrying entries are never
+  // served after deploy; orphaned old keys expire via TTL.
+  private static readonly PREFIX = 'ads:v2:r2:';
+  private static readonly TAG_LIST = 'ads:v2:tag:list';
+  private static readonly TAG_BY_ID = (id: string) => `ads:v2:tag:byId:${id}`;
+
+  constructor(private readonly redis: RedisService) {}
+
+  makeKey(parts: Record<string, unknown>): string {
+    const norm = Object.entries(parts)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+      .join('&');
+    return `${AdsCache.PREFIX}${norm}`;
+  }
+
+  async setList(key: string, value: any, ttlSec: number): Promise<void> {
+    await this.redis.cacheSet(key, value, ttlSec);
+    await this.redis.sAdd(AdsCache.TAG_LIST, key);
+  }
+
+  /**
+   * P1-5: the key format used by setById, exposed so callers can read the same
+   * entry back through get() instead of re-deriving the string.
+   */
+  byIdKey(id: string, userId: string | 'anonymous'): string {
+    return `${AdsCache.PREFIX}getById:${id}:${userId}`;
+  }
+
+  async setById(
+    id: string,
+    userId: string | 'anonymous',
+    value: any,
+    ttlSec: number,
+  ): Promise<void> {
+    const key = this.byIdKey(id, userId);
+    await this.redis.cacheSet(key, value, ttlSec);
+    await this.redis.sAdd(AdsCache.TAG_BY_ID(id), key);
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    return this.redis.cacheGet<T>(key);
+  }
+
+  /** Delete one exact cache key (e.g. a makeKey() entry). */
+  async del(key: string): Promise<void> {
+    await this.redis.cacheDel(key);
+  }
+
+  async invalidateLists(): Promise<void> {
+    const keys = await this.redis.sMembers(AdsCache.TAG_LIST);
+    if (keys?.length) {
+      await Promise.all(keys.map((k) => this.redis.cacheDel(k)));
+    }
+    await this.redis.del(AdsCache.TAG_LIST);
+  }
+
+  async invalidateById(id: string): Promise<void> {
+    const tag = AdsCache.TAG_BY_ID(id);
+    const keys = await this.redis.sMembers(tag);
+    if (keys?.length) {
+      await Promise.all(keys.map((k) => this.redis.cacheDel(k)));
+    }
+    await this.redis.del(tag);
+  }
+
+  async indexListKey(key: string): Promise<void> {
+    await this.redis.sAdd(AdsCache.TAG_LIST, key);
+  }
+}

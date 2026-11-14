@@ -8,9 +8,9 @@ import { ProductSchema } from '../product/schemas/product.schema'; // Make sure 
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'Cart', schema: CartSchema }]),  // Register Cart model
-    MongooseModule.forFeature([{ name: 'Product', schema: ProductSchema }]),  // Register Product model
-    ProductModule,  // Ensure ProductModule is imported for dependency injection
+    MongooseModule.forFeature([{ name: 'Cart', schema: CartSchema }]), // Register Cart model
+    MongooseModule.forFeature([{ name: 'Product', schema: ProductSchema }]), // Register Product model
+    ProductModule, // Ensure ProductModule is imported for dependency injection
   ],
   controllers: [CartController],
   providers: [CartService],

@@ -1,28 +1,73 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  Query,
+  UseFilters,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { BannerService } from './banner.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Banner } from './schemas/schema.banner';
+import { HttpExceptionFilter } from '../shared/exception-service';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../roles/roles.guard';
+import { Roles } from '../roles/roles.decorator';
+import { UserType } from '../users/enums/user.types';
 
 @ApiTags('Banners')
 @Controller('banners')
+@UseFilters(new HttpExceptionFilter('Banners'))
 export class BannerController {
   constructor(private readonly bannerService: BannerService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new banner' })
   @ApiResponse({ status: 201, description: 'Banner created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
-  async create(@Body() createBannerDto: CreateBannerDto): Promise<Banner> {
-    return this.bannerService.create(createBannerDto);
+  async create(
+    @Body() createBannerDto: CreateBannerDto,
+    @Request() req,
+  ): Promise<Banner> {
+    const { user } = req;
+    return this.bannerService.create(createBannerDto, user);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Retrieve all banners' })
+  @ApiOperation({ summary: 'Retrieve all banners with pagination' })
   @ApiQuery({ name: 'title', required: false, description: 'Filter by title' })
-  async findAll(@Query('title') title?: string): Promise<Banner[]> {
-    return this.bannerService.findAll(title);
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  async findAll(
+    @Query('title') title?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ): Promise<{ banners: Banner[]; totalPages: number; currentPage: number }> {
+    return this.bannerService.findAll(title, page, limit);
   }
 
   @Get(':id')
@@ -34,19 +79,31 @@ export class BannerController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a banner' })
   @ApiResponse({ status: 200, description: 'Banner updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
   @ApiResponse({ status: 404, description: 'Banner not found' })
-  async update(@Param('id') id: string, @Body() updateBannerDto: UpdateBannerDto): Promise<Banner> {
-    return this.bannerService.update(id, updateBannerDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateBannerDto: UpdateBannerDto,
+    @Request() req,
+  ): Promise<Banner> {
+    const { user } = req;
+    return this.bannerService.update(id, updateBannerDto, user);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN, UserType.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a banner' })
   @ApiResponse({ status: 200, description: 'Banner deleted successfully' })
   @ApiResponse({ status: 404, description: 'Banner not found' })
-  async remove(@Param('id') id: string): Promise<void> {
-    return this.bannerService.remove(id);
+  async remove(@Param('id') id: string, @Request() req): Promise<void> {
+    const { user } = req;
+    return this.bannerService.remove(id, user);
   }
 }

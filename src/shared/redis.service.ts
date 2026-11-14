@@ -1,0 +1,584 @@
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient, RedisClientType } from 'redis';
+
+@Injectable()
+export class RedisService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
+  private redisClient: RedisClientType;
+  private readonly keyPrefix: string;
+  private isConnected: boolean = false;
+  private connectionAttempts: number = 0;
+  private maxRetries: number = 3;
+  private hasLoggedConnectionFailure: boolean = false;
+
+  constructor(private readonly configService: ConfigService) {
+    this.keyPrefix =
+      this.configService.get('REDIS_CONFIG.keyPrefix') || 'adodad:';
+  }
+
+  async onModuleInit() {
+    await this.connect();
+  }
+
+  async onModuleDestroy() {
+    await this.disconnect();
+  }
+
+  private async connect() {
+    // If already connected, don't connect again
+    if (this.redisClient?.isReady) {
+      return;
+    }
+    await this._connect();
+  }
+
+  private async _connect() {
+    try {
+      const redisConfig = this.configService.get('REDIS_CONFIG');
+      const isTestEnvironment =
+        process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID;
+      const isProductionEnvironment = process.env.NODE_ENV === 'production';
+
+      if (isProductionEnvironment && !redisConfig?.password) {
+        this.logRedisUnavailable(
+          '⚠️  REDIS_PASSWORD is missing in production. Redis caching is disabled.',
+        );
+        this.isConnected = false;
+        return;
+      }
+
+      this.redisClient = createClient({
+        socket: {
+          host: redisConfig.host,
+          port: redisConfig.port,
+          connectTimeout: redisConfig.connectTimeout,
+          reconnectStrategy: (retries) => {
+            if (retries >= this.maxRetries) {
+              this.logRedisUnavailable(
+                '⚠️  Redis connection failed after maximum retries. Application will run without caching.',
+              );
+              return false; // Stop retrying
+            }
+            return Math.min(retries * 100, 3000); // Exponential backoff, max 3 seconds
+          },
+        },
+        password: redisConfig.password || undefined,
+        database: redisConfig.db,
+      });
+
+      this.redisClient.on('error', (err) => {
+        // Only log the first error to avoid spam
+        if (!this.isConnected && this.connectionAttempts === 0) {
+          this.logRedisUnavailable(
+            '⚠️  Redis connection failed. Application will run without caching.',
+          );
+        }
+        this.isConnected = false;
+        this.connectionAttempts++;
+      });
+
+      this.redisClient.on('connect', () => {
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Connected');
+        }
+        this.isConnected = true;
+        this.hasLoggedConnectionFailure = false;
+        this.connectionAttempts = 0; // Reset attempts on successful connection
+      });
+
+      this.redisClient.on('ready', () => {
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Ready');
+        }
+        this.isConnected = true;
+      });
+
+      this.redisClient.on('end', () => {
+        if (!isTestEnvironment) {
+          this.logger.log('Redis Client Disconnected');
+        }
+        this.isConnected = false;
+      });
+
+      await this.redisClient.connect();
+      if (!isTestEnvironment) {
+        this.logger.log(
+          `Connected to Redis at ${redisConfig.host}:${redisConfig.port}`,
+        );
+      }
+    } catch (error) {
+      this.logRedisUnavailable(
+        '⚠️  Redis connection failed. Application will run without caching.',
+      );
+      this.isConnected = false;
+      // Do not crash app if Redis is down; continue in degraded mode.
+    }
+  }
+
+  private logRedisUnavailable(message: string): void {
+    if (this.hasLoggedConnectionFailure) {
+      return;
+    }
+    this.logger.warn(message);
+    this.logger.warn(
+      '   To enable Redis caching, ensure Redis is running on localhost:6379',
+    );
+    this.hasLoggedConnectionFailure = true;
+  }
+
+  private async disconnect() {
+    if (this.redisClient && this.isConnected) {
+      try {
+        // Add timeout to prevent hanging
+        await Promise.race([
+          this.redisClient.quit(),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Redis disconnect timeout')),
+              3000,
+            ),
+          ),
+        ]);
+        this.logger.log('Redis client disconnected');
+      } catch (error) {
+        this.logger.warn('Error disconnecting Redis client:', error);
+        // Force disconnect if quit() fails
+        try {
+          if (this.redisClient) {
+            this.redisClient.removeAllListeners();
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      this.isConnected = false;
+    }
+  }
+
+  private getKey(key: string): string {
+    return `${this.keyPrefix}${key}`;
+  }
+
+  private isClientReady(): boolean {
+    return !!this.redisClient && this.isConnected && this.redisClient.isReady;
+  }
+
+  // Basic Redis Operations
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.debug(
+        `Redis not connected, skipping set operation for key: ${key}`,
+      );
+      return;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      if (ttl) {
+        await this.redisClient.setEx(fullKey, ttl, value);
+      } else {
+        await this.redisClient.set(fullKey, value);
+      }
+    } catch (error) {
+      this.logger.error(`Error setting key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atomic SET key value NX EX ttl.
+   * Returns true when the key was created, false when it already existed, and
+   * null when Redis is unavailable (callers decide whether to fail open).
+   */
+  async setNx(
+    key: string,
+    value: string,
+    ttlSec: number,
+  ): Promise<boolean | null> {
+    if (!this.isClientReady()) {
+      return null;
+    }
+    try {
+      const result = await this.redisClient.set(this.getKey(key), value, {
+        NX: true,
+        EX: ttlSec,
+      });
+      return result === 'OK';
+    } catch (error) {
+      this.logger.error(`Error in setNx for key ${key}:`, error);
+      return null;
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.debug(`Redis not connected, returning null for key: ${key}`);
+      return null;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.get(fullKey);
+    } catch (error) {
+      this.logger.error(`Error getting key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async del(key: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(`Redis not connected, skipping delete for key: ${key}`);
+      return 0;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.del(fullKey);
+    } catch (error) {
+      this.logger.error(`Error deleting key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key);
+      const result = await this.redisClient.exists(fullKey);
+      return result === 1;
+    } catch (error) {
+      this.logger.error(`Error checking existence of key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async expire(key: string, ttl: number): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.expire(fullKey, ttl);
+    } catch (error) {
+      this.logger.error(`Error setting expiry for key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  // JSON Operations
+  async setJson(key: string, value: any, ttl?: number): Promise<void> {
+    try {
+      const fullKey = this.getKey(key);
+      const jsonValue = JSON.stringify(value);
+      if (ttl) {
+        await this.redisClient.setEx(fullKey, ttl, jsonValue);
+      } else {
+        await this.redisClient.set(fullKey, jsonValue);
+      }
+    } catch (error) {
+      this.logger.error(`Error setting JSON key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async getJson<T>(key: string): Promise<T | null> {
+    try {
+      const fullKey = this.getKey(key);
+      const value = await this.redisClient.get(fullKey);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      this.logger.error(`Error getting JSON key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  // Hash Operations
+  async hSet(key: string, field: string, value: string): Promise<number> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.hSet(fullKey, field, value);
+    } catch (error) {
+      this.logger.error(
+        `Error setting hash field ${field} for key ${key}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async hGet(key: string, field: string): Promise<string | null> {
+    try {
+      const fullKey = this.getKey(key);
+      const fieldStr = field || '';
+      const result = await this.redisClient.hGet(fullKey, fieldStr);
+      return result ?? null;
+    } catch (error) {
+      this.logger.error(
+        `Error getting hash field ${field} for key ${key}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async hGetAll(key: string): Promise<Record<string, string>> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.hGetAll(fullKey);
+    } catch (error) {
+      this.logger.error(`Error getting all hash fields for key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async hDel(key: string, field: string): Promise<number> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.hDel(fullKey, field);
+    } catch (error) {
+      this.logger.error(
+        `Error deleting hash field ${field} for key ${key}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  // List Operations
+  async lPush(key: string, value: string): Promise<number> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.lPush(fullKey, value);
+    } catch (error) {
+      this.logger.error(`Error pushing to list ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async rPush(key: string, value: string): Promise<number> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.rPush(fullKey, value);
+    } catch (error) {
+      this.logger.error(`Error pushing to list ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async lPop(key: string): Promise<string | null> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.lPop(fullKey);
+    } catch (error) {
+      this.logger.error(`Error popping from list ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async rPop(key: string): Promise<string | null> {
+    if (!this.isConnected || !this.redisClient) {
+      return null;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.rPop(fullKey);
+    } catch (error) {
+      this.logger.error(`Error popping from list ${key}:`, error);
+      throw error;
+    }
+  }
+
+  //brPop removed
+
+  async lRange(key: string, start: number, stop: number): Promise<string[]> {
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.lRange(fullKey, start, stop);
+    } catch (error) {
+      this.logger.error(`Error getting range from list ${key}:`, error);
+      throw error;
+    }
+  }
+
+  // Set Operations
+  async sAdd(key: string, member: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, skipping set add for key: ${key}`,
+      );
+      return 0;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.sAdd(fullKey, member);
+    } catch (error) {
+      this.logger.error(`Error adding member to set ${key}:`, error);
+      return 0;
+    }
+  }
+
+  async sRem(key: string, member: string): Promise<number> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, skipping set remove for key: ${key}`,
+      );
+      return 0;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.sRem(fullKey, member);
+    } catch (error) {
+      this.logger.error(`Error removing member from set ${key}:`, error);
+      return 0;
+    }
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, returning empty members for key: ${key}`,
+      );
+      return [];
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.sMembers(fullKey);
+    } catch (error) {
+      this.logger.error(`Error getting members from set ${key}:`, error);
+      return [];
+    }
+  }
+
+  async sIsMember(key: string, member: string): Promise<boolean> {
+    if (!this.isClientReady()) {
+      this.logger.debug(
+        `Redis not connected, returning false membership for key: ${key}`,
+      );
+      return false;
+    }
+    try {
+      const fullKey = this.getKey(key);
+      return await this.redisClient.sIsMember(fullKey, member);
+    } catch (error) {
+      this.logger.error(`Error checking membership in set ${key}:`, error);
+      return false;
+    }
+  }
+
+  // Cache Operations
+  async cacheGet<T>(key: string): Promise<T | null> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.debug(
+        `Redis not connected, returning null for cache key: ${key}`,
+      );
+      return null;
+    }
+    try {
+      return await this.getJson<T>(key);
+    } catch (error) {
+      this.logger.error(`Error getting cache key ${key}:`, error);
+      return null;
+    }
+  }
+
+  async cacheSet<T>(key: string, value: T, ttl: number = 3600): Promise<void> {
+    if (!this.isConnected || !this.redisClient) {
+      this.logger.debug(
+        `Redis not connected, skipping cache set for key: ${key}`,
+      );
+      return;
+    }
+    try {
+      await this.setJson(key, value, ttl);
+    } catch (error) {
+      this.logger.error(`Error setting cache key ${key}:`, error);
+    }
+  }
+
+  async cacheDel(key: string): Promise<void> {
+    try {
+      await this.del(key);
+    } catch (error) {
+      this.logger.error(`Error deleting cache key ${key}:`, error);
+    }
+  }
+
+  // Session Operations
+  async setSession(
+    sessionId: string,
+    data: any,
+    ttl: number = 86400,
+  ): Promise<void> {
+    try {
+      await this.setJson(`session:${sessionId}`, data, ttl);
+    } catch (error) {
+      this.logger.error(`Error setting session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  async getSession<T>(sessionId: string): Promise<T | null> {
+    try {
+      return await this.getJson<T>(`session:${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Error getting session ${sessionId}:`, error);
+      return null;
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      await this.del(`session:${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Error deleting session ${sessionId}:`, error);
+    }
+  }
+
+  // Rate Limiting
+  async incrementRateLimit(key: string, ttl: number = 60): Promise<number> {
+    try {
+      const fullKey = this.getKey(`rate_limit:${key}`);
+      const current = await this.redisClient.incr(fullKey);
+
+      if (current === 1) {
+        await this.redisClient.expire(fullKey, ttl);
+      }
+
+      return current;
+    } catch (error) {
+      this.logger.error(`Error incrementing rate limit for ${key}:`, error);
+      throw error;
+    }
+  }
+
+  // Health Check
+  async ping(): Promise<string> {
+    try {
+      return await this.redisClient.ping();
+    } catch (error) {
+      this.logger.error('Redis ping failed:', error);
+      throw error;
+    }
+  }
+
+  // Get keys by pattern
+  async keys(pattern: string): Promise<string[]> {
+    try {
+      const fullPattern = this.getKey(pattern);
+      return await this.redisClient.keys(fullPattern);
+    } catch (error) {
+      this.logger.error(`Error getting keys with pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
+  // Flush Database (use with caution)
+  async flushDb(): Promise<void> {
+    try {
+      await this.redisClient.flushDb();
+      this.logger.warn('Redis database flushed');
+    } catch (error) {
+      this.logger.error('Error flushing Redis database:', error);
+      throw error;
+    }
+  }
+}

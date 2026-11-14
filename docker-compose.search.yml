@@ -1,0 +1,34 @@
+# Local MongoDB WITH Atlas Search, for running the search adapter contract
+# tests and trying the Atlas adapter without a cluster.
+#
+#   docker compose -f docker-compose.search.yml up -d
+#   export MONGO_TEST_URI="mongodb://localhost:27018/adodad_search_test?directConnection=true"
+#   npm run search:test:contract        # both adapters against this instance
+#
+# `mongodb/mongodb-atlas-local` bundles mongod + mongot, so `$search`,
+# `$searchMeta` and `createSearchIndex` work exactly as on Atlas. Plain
+# `mongo` images cannot run the Atlas adapter; the Mongo adapter works on both.
+services:
+  mongo-atlas-local:
+    image: mongodb/mongodb-atlas-local:8.0
+    container_name: adodad_mongo_atlas_local
+    ports:
+      - '27018:27017'
+    environment:
+      MONGODB_INITDB_DATABASE: adodad_search_test
+    volumes:
+      - adodad_atlas_local_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis-search-test:
+    image: redis:7-alpine
+    container_name: adodad_redis_search_test
+    ports:
+      - '26379:6379'
+
+volumes:
+  adodad_atlas_local_data:

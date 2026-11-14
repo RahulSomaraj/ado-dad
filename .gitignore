@@ -2,11 +2,21 @@
 /dist
 /node_modules
 /build
-package-lock.json
 node_modules/
 .env
 .env.example
-package-lock.json
+.env.prod
+.env.uat
+env.prod.for.docker
+
+# Test reports and generated files
+/reports
+reports/
+test/performance-report.html
+test/*.html
+test/*.json
+test/*.xml
+test/*.txt
 
 # Logs
 logs
@@ -116,6 +126,11 @@ web_modules/
 .env.production.local
 .env.local
 
+# Firebase service account credentials (contains secrets)
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+*.firebase.json
+
 # temp directory
 .temp
 .tmp
@@ -177,3 +192,16 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+nul
+
+# Database backups and migration artefacts — NEVER commit these.
+# They contain production data (ads, and the users collection incl. email,
+# phoneNumber and password hashes).
+backups/
+.migration-backups/
+*.jsonl
+*.jsonl.gz
+Claude outputs/
+
+# generated test artifacts
+test-results/

@@ -1,0 +1,77 @@
+import { getJwtSecret } from '../../common/jwt-secret.util';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { PassportStrategy } from '@nestjs/passport';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
+
+import { User } from '../../users/schemas/user.schema';
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    private configService: ConfigService,
+  ) {
+    const secret = getJwtSecret();
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: secret,
+      // P0-6: assert the claims we actually mint. Verified safe first —
+      // UsersService.generateAccessToken() (users.service.ts:1180-1186) signs
+      // both of these, and access tokens live 1 h, which bounds the blast
+      // radius if an older token is still in flight. This matches the
+      // verifyOptions already declared on the app-level JwtModule
+      // (app.module.ts:104-107), which this strategy was silently ignoring.
+      //
+      // Access/refresh separation: tokens now carry a `typ` claim
+      // (users.service.ts generateAccessToken/generateRefreshToken) and
+      // validate() below rejects typ:'refresh'. Legacy tokens without typ
+      // are accepted during migration; once all refresh tokens from before
+      // the typ rollout have expired (REFRESH_TOKEN_EXPIRY, default 60d),
+      // tighten validate() to REQUIRE typ === 'access'.
+      issuer: 'ado-dad-api',
+      audience: 'ado-dad-users',
+    });
+  }
+
+  async validate(payload: any) {
+    // Reject refresh tokens presented as access tokens. Legacy tokens
+    // without a typ claim pass during migration (see constructor note).
+    if (payload.typ && payload.typ !== 'access') {
+      throw new HttpException(
+        { status: HttpStatus.UNAUTHORIZED, error: 'Invalid token type' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    // Try to find user by ID (handle both string and ObjectId)
+    let user;
+    try {
+      user = await this.userModel.findById(payload.id).exec();
+    } catch (error) {
+      // If findById fails, try to find by _id field
+      user = await this.userModel.findOne({ _id: payload.id }).exec();
+    }
+
+    if (!user) {
+      throw new HttpException(
+        {
+          status: HttpStatus.UNAUTHORIZED,
+          error: 'User not found',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Return user with id property for compatibility
+    const userWithType = {
+      ...user.toObject(),
+      id: (user as any)._id.toString(),
+      type: (user as any).type,
+    };
+
+    return userWithType;
+  }
+}

@@ -1,0 +1,351 @@
+{
+  "description": "Minimal data examples for creating advertisements across all categories",
+  "required_base_fields": ["description", "price", "location"],
+  "api_endpoint": "POST /ads",
+  "authentication": "Bearer token required",
+  "content_type": "application/json",
+  "examples": {
+    "property_minimal": {
+      "category": "property",
+      "data": {
+        "description": "1BHK apartment for sale in prime location",
+        "price": 500000,
+        "location": "Mumbai, Maharashtra",
+        "propertyType": "apartment",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "areaSqft": 500
+      },
+      "required_fields": [
+        "description",
+        "price",
+        "location",
+        "propertyType",
+        "bedrooms",
+        "bathrooms",
+        "areaSqft"
+      ],
+      "optional_fields": [
+        "images",
+        "floor",
+        "isFurnished",
+        "hasParking",
+        "hasGarden",
+        "amenities"
+      ]
+    },
+    "property_complete": {
+      "category": "property",
+      "data": {
+        "description": "Luxury 3BHK villa with modern amenities and excellent connectivity",
+        "price": 25000000,
+        "location": "Bangalore, Karnataka",
+        "images": [
+          "https://example.com/villa1.jpg",
+          "https://example.com/villa2.jpg",
+          "https://example.com/villa3.jpg"
+        ],
+        "propertyType": "villa",
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "areaSqft": 2500,
+        "floor": 2,
+        "isFurnished": true,
+        "hasParking": true,
+        "hasGarden": true,
+        "amenities": [
+          "Gym",
+          "Swimming Pool",
+          "Garden",
+          "Security",
+          "Lift",
+          "24/7 Water Supply"
+        ]
+      }
+    },
+    "private_vehicle_minimal": {
+      "category": "private_vehicle",
+      "data": {
+        "description": "Maruti Swift 2018 for sale in good condition",
+        "price": 450000,
+        "location": "Gurgaon, Haryana",
+        "vehicleType": "four_wheeler",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "year": 2018,
+        "mileage": 45000,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "Silver"
+      },
+      "required_fields": [
+        "description",
+        "price",
+        "location",
+        "vehicleType",
+        "manufacturerId",
+        "modelId",
+        "year",
+        "mileage",
+        "transmissionTypeId",
+        "fuelTypeId",
+        "color"
+      ],
+      "optional_fields": [
+        "images",
+        "variantId",
+        "isFirstOwner",
+        "hasInsurance",
+        "hasRcBook",
+        "additionalFeatures"
+      ]
+    },
+    "private_vehicle_complete": {
+      "category": "private_vehicle",
+      "data": {
+        "description": "Honda City 2020 - Single Owner, Excellent Condition, Full Service History",
+        "price": 850000,
+        "location": "Dwarka, Delhi, NCR",
+        "images": [
+          "https://example.com/car1.jpg",
+          "https://example.com/car2.jpg",
+          "https://example.com/car3.jpg"
+        ],
+        "vehicleType": "four_wheeler",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "variantId": "507f1f77bcf86cd799439013",
+        "year": 2020,
+        "mileage": 25000,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "White",
+        "isFirstOwner": true,
+        "hasInsurance": true,
+        "hasRcBook": true,
+        "additionalFeatures": [
+          "Sunroof",
+          "Leather Seats",
+          "Navigation System",
+          "Reverse Camera",
+          "Bluetooth Connectivity"
+        ]
+      }
+    },
+    "two_wheeler_minimal": {
+      "category": "two_wheeler",
+      "data": {
+        "description": "Honda Activa 6G for sale in excellent condition",
+        "price": 65000,
+        "location": "Koramangala, Bangalore, Karnataka",
+        "vehicleType": "two_wheeler",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "year": 2021,
+        "mileage": 12000,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "Red"
+      },
+      "required_fields": [
+        "description",
+        "price",
+        "location",
+        "vehicleType",
+        "manufacturerId",
+        "modelId",
+        "year",
+        "mileage",
+        "transmissionTypeId",
+        "fuelTypeId",
+        "color"
+      ],
+      "optional_fields": [
+        "images",
+        "variantId",
+        "isFirstOwner",
+        "hasInsurance",
+        "hasRcBook",
+        "additionalFeatures"
+      ]
+    },
+    "two_wheeler_complete": {
+      "category": "two_wheeler",
+      "data": {
+        "description": "Bajaj Pulsar 150 - Single Owner, Low Mileage, Perfect for Daily Commute",
+        "price": 85000,
+        "location": "Dwarka, Delhi",
+        "images": [
+          "https://example.com/bike1.jpg",
+          "https://example.com/bike2.jpg"
+        ],
+        "vehicleType": "two_wheeler",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "variantId": "507f1f77bcf86cd799439013",
+        "year": 2019,
+        "mileage": 25000,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "Black",
+        "isFirstOwner": true,
+        "hasInsurance": true,
+        "hasRcBook": true,
+        "additionalFeatures": [
+          "Digital Console",
+          "LED Headlight",
+          "Mobile Charging Port",
+          "Combi Brake System"
+        ]
+      }
+    },
+    "commercial_vehicle_minimal": {
+      "category": "commercial_vehicle",
+      "data": {
+        "description": "Tata 407 truck for sale in good condition",
+        "price": 850000,
+        "location": "Mumbai, Maharashtra",
+        "vehicleType": "four_wheeler",
+        "commercialVehicleType": "truck",
+        "bodyType": "flatbed",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "year": 2018,
+        "mileage": 125000,
+        "payloadCapacity": 4000,
+        "payloadUnit": "kg",
+        "axleCount": 2,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "White"
+      },
+      "required_fields": [
+        "description",
+        "price",
+        "location",
+        "vehicleType",
+        "commercialVehicleType",
+        "bodyType",
+        "manufacturerId",
+        "modelId",
+        "year",
+        "mileage",
+        "payloadCapacity",
+        "payloadUnit",
+        "axleCount",
+        "transmissionTypeId",
+        "fuelTypeId",
+        "color"
+      ],
+      "optional_fields": [
+        "images",
+        "variantId",
+        "hasInsurance",
+        "hasFitness",
+        "hasPermit",
+        "additionalFeatures",
+        "seatingCapacity"
+      ]
+    },
+    "commercial_vehicle_complete": {
+      "category": "commercial_vehicle",
+      "data": {
+        "description": "Mahindra Bolero Pickup - Perfect for Business, Low Maintenance",
+        "price": 450000,
+        "location": "Chennai, Tamil Nadu",
+        "images": [
+          "https://example.com/truck1.jpg",
+          "https://example.com/truck2.jpg"
+        ],
+        "vehicleType": "four_wheeler",
+        "commercialVehicleType": "truck",
+        "bodyType": "pickup",
+        "manufacturerId": "507f1f77bcf86cd799439011",
+        "modelId": "507f1f77bcf86cd799439012",
+        "variantId": "507f1f77bcf86cd799439013",
+        "year": 2020,
+        "mileage": 35000,
+        "payloadCapacity": 1000,
+        "payloadUnit": "kg",
+        "axleCount": 2,
+        "transmissionTypeId": "507f1f77bcf86cd799439014",
+        "fuelTypeId": "507f1f77bcf86cd799439015",
+        "color": "White",
+        "hasInsurance": true,
+        "hasFitness": true,
+        "hasPermit": true,
+        "additionalFeatures": [
+          "Power Steering",
+          "AC Cabin",
+          "Music System",
+          "Digital Console"
+        ],
+        "seatingCapacity": 3
+      }
+    }
+  },
+  "validation_rules": {
+    "base_fields": {
+      "description": "Required string, cannot be empty",
+      "price": "Required number, must be >= 0",
+      "location": "Required string, cannot be empty"
+    },
+    "property_fields": {
+      "propertyType": "Required enum: apartment, villa, house, plot, commercial",
+      "bedrooms": "Required number, must be >= 0",
+      "bathrooms": "Required number, must be >= 0",
+      "areaSqft": "Required number, must be > 0"
+    },
+    "vehicle_fields": {
+      "vehicleType": "Required enum: four_wheeler, two_wheeler",
+      "manufacturerId": "Required string, must be valid MongoDB ObjectId",
+      "modelId": "Required string, must be valid MongoDB ObjectId",
+      "year": "Required number, must be >= 1900",
+      "mileage": "Required number, must be >= 0",
+      "transmissionTypeId": "Required string, must be valid MongoDB ObjectId",
+      "fuelTypeId": "Required string, must be valid MongoDB ObjectId",
+      "color": "Required string, cannot be empty"
+    },
+    "commercial_vehicle_fields": {
+      "commercialVehicleType": "Required enum: truck, bus, van, tractor, trailer, forklift",
+      "bodyType": "Required enum: flatbed, container, refrigerated, tanker, dump, pickup, box, passenger",
+      "payloadCapacity": "Required number, must be > 0",
+      "payloadUnit": "Required string (e.g., kg, tons)",
+      "axleCount": "Required number, must be >= 1 and <= 10"
+    }
+  },
+  "test_scenarios": {
+    "success_cases": [
+      "Create ad with minimal required fields",
+      "Create ad with all optional fields",
+      "Create ad with different property types",
+      "Create ad with different vehicle types",
+      "Create ad with different commercial vehicle types"
+    ],
+    "failure_cases": [
+      "Missing required fields",
+      "Invalid category",
+      "Invalid enum values",
+      "Negative price",
+      "Empty description",
+      "Invalid ObjectId references",
+      "Invalid year (before 1900)",
+      "Negative mileage",
+      "Invalid payload capacity",
+      "Invalid axle count"
+    ],
+    "edge_cases": [
+      "Very high prices",
+      "Very low prices",
+      "Long descriptions",
+      "Special characters in location",
+      "Empty arrays for optional fields",
+      "Maximum values for numeric fields"
+    ]
+  },
+  "prerequisites": {
+    "authentication": "User must be registered and logged in",
+    "vehicle_inventory": "For vehicle ads, manufacturer, model, fuel type, and transmission type must exist in vehicle inventory",
+    "user_permissions": "Any authenticated user can create ads"
+  }
+}

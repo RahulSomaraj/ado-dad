@@ -1,0 +1,571 @@
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Get,
+  UseGuards,
+  Req,
+  BadRequestException,
+  Param,
+  Query,
+  UseFilters,
+  Patch,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiCreatedResponse,
+  ApiBadRequestResponse,
+  ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
+import { CreateAdV2Dto } from './dto/create-ad-v2.dto';
+import { ListAdsV2Dto } from './dto/list-ads-v2.dto';
+import { CreateAdUc } from './application/use-cases/create-ad.uc';
+import { ListAdsUc } from './application/use-cases/list-ads.uc';
+import { GetAdByIdUc } from './application/use-cases/get-ad-by-id.uc';
+import { ProfileStatsUc } from './application/use-cases/profile-stats.uc';
+import { SellerStatsUc } from './application/use-cases/seller-stats.uc';
+import { JwtAuthGuard } from '../auth/guard/jwt-auth-guard';
+import { RolesGuard } from '../auth/guard/roles.guards';
+import { Roles } from '../auth/guard/roles.decorator';
+import { UserType } from '../users/enums/user.types';
+import { DetailedAdResponseDto } from '../ads/dto/common/ad-response.dto';
+import { GetAdByIdSwagger } from './dto/get-ad-by-id.dto';
+import { Throttle } from '../common/guards/auth-throttle.guard';
+import { OptionalJwtAuthGuard } from '../auth/guard/optional-jwt-auth-guard';
+import { SuspensionGuard } from '../moderation/guards/suspension.guard';
+import { UserThrottleGuard } from '../common/guards/user-throttle.guard';
+import { SellApiExceptionFilter } from '../common/filters/sell-api-exception.filter';
+import { GetAdForEditUc } from './application/use-cases/get-ad-for-edit.uc';
+import { UpdateAdUc } from './application/use-cases/update-ad.uc';
+import { UpdateAdV2Dto } from './dto/update-ad-v2.dto';
+import { SearchEventDto } from './dto/search-event.dto';
+import { SearchEventsService } from '../search/events/search-events.service';
+
+@ApiTags('Ads v2')
+@Controller('v2/ads')
+export class AdsV2Controller {
+  constructor(
+    private readonly createAdUc: CreateAdUc,
+    private readonly listAdsUc: ListAdsUc,
+    private readonly getAdByIdUc: GetAdByIdUc,
+    private readonly profileStatsUc: ProfileStatsUc,
+    private readonly sellerStatsUc: SellerStatsUc,
+    private readonly getAdForEditUc: GetAdForEditUc,
+    private readonly updateAdUc: UpdateAdUc,
+    private readonly searchEvents: SearchEventsService,
+  ) {}
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  // CREATE-06: sell-flow error envelope (422 VALIDATION_FAILED fields, 409
+  // IDEMPOTENCY_*, 403 ACCOUNT_SUSPENDED, 429 RATE_LIMITED, 5xx traceId).
+  @UseFilters(SellApiExceptionFilter)
+  // 20 creates/hour per user (counted after auth by UserThrottleGuard).
+  @Throttle({ name: 'adsCreate', limit: 20, ttl: 3600, by: 'user' })
+  @UseGuards(JwtAuthGuard, RolesGuard, UserThrottleGuard, SuspensionGuard)
+  @Roles(UserType.USER, UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Create a new advertisement (v2)',
+    description: `
+      Create an advertisement with enhanced validation, idempotency support, and better error handling.
+      
+      **Features:**
+      - Strong DTO validation (compile-time + runtime)
+      - Inventory integrity checks for vehicle references
+      - Commercial vehicle auto-detection
+      - Idempotency support via Idempotency-Key header
+      - Transactional writes (Ad + subdocument)
+      - Cache invalidation
+      - Async event processing for enrichments
+      
+      **Idempotency:**
+      - Provide Idempotency-Key header to make retries safe
+      - Same key with same data returns cached result
+      - Prevents duplicate creates on network retries
+      
+      **Validation:**
+      - Category-specific field validation
+      - Inventory reference validation
+      - Price and numeric field validation
+      - Image count limits (max 20)
+    `,
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'UUID to make retries safe (recommended)',
+    example: '1f3b8f48-1d7a-4c63-a8a2-7e5d9f5a3d6e',
+  })
+  @ApiBody({
+    description: 'Advertisement creation data with examples for each category',
+    type: CreateAdV2Dto,
+    examples: {
+      property: {
+        summary: 'Property Advertisement',
+        description: 'Example for creating a property advertisement',
+        value: {
+          category: 'property',
+          data: {
+            description:
+              'എറണാകുളം ജില്ല arayankaav ടൗണിനു സമീപം പ്രീമിയം പ്ലോട്ടുകൾ വില്പനക്ക് 9747757547',
+            price: 100000,
+            location: 'arayankaav',
+            link: 'https://example.com/property-details/arayankaav-plot',
+            images: [
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/0104fc6e-f6cd-44a3-b95b-83f742255912-image_1757679411039.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3f432878-2cda-44c9-b203-18932a2cc648-image_1757679412305.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/8fc3df77-4d2e-45b8-b8b8-f9714f35015f-image_1757679413180.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/654bcc2e-e319-40b9-bbc5-c7770ad648f3-image_1757679414099.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/f82c62e2-ada1-42ce-ae0f-99ee1c32799c-image_1757679414998.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/1b215bcf-8c59-49a9-80e5-e29628cbef5a-image_1757679415930.jpeg',
+            ],
+          },
+          property: {
+            propertyType: 'plot',
+            bedrooms: 0,
+            bathrooms: 0,
+            areaSqft: 100,
+            floor: 0,
+            isFurnished: true,
+            hasParking: true,
+            hasGarden: true,
+            amenities: [],
+          },
+        },
+      },
+      private_vehicle: {
+        summary: 'Private Vehicle Advertisement',
+        description: 'Example for creating a private vehicle advertisement',
+        value: {
+          category: 'private_vehicle',
+          data: {
+            description: 'Sporty Porsche Macan Turbo with turbo performance.',
+            price: 120000090,
+            location: 'Pune, Maharashtra',
+            link: 'https://example.com/vehicle-details/porsche-macan-turbo',
+            images: [
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3fa63fc6-d4a8-437a-89f1-c86dc3e55c62-image_1756892894323.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/4aa322a1-134c-4a58-87b7-ef53ad2d2783-image_1756892894685.jpeg',
+            ],
+          },
+          vehicle: {
+            vehicleType: 'four_wheeler',
+            manufacturerId: '507f1f77bcf86cd799439031',
+            modelId: '507f1f77bcf86cd799439041',
+            year: 2020,
+            mileage: 20000,
+            transmissionTypeId: '507f1f77bcf86cd799439031',
+            fuelTypeId: '507f1f77bcf86cd799439041',
+            color: 'Carrara White',
+            isFirstOwner: true,
+            hasInsurance: true,
+            hasRcBook: true,
+            additionalFeatures: [
+              'Premium Audio System',
+              'Panoramic Sunroof',
+              'Heated Seats',
+              '360° Camera',
+              'Air Suspension',
+            ],
+          },
+        },
+      },
+      commercial_vehicle: {
+        summary: 'Commercial Vehicle Advertisement',
+        description: 'Example for creating a commercial vehicle advertisement',
+        value: {
+          category: 'commercial_vehicle',
+          data: {
+            description:
+              'Heavy duty truck for commercial use with valid permits',
+            price: 1500000,
+            location: 'Pune, Maharashtra',
+            link: 'https://example.com/commercial-vehicle-details/heavy-duty-truck',
+            images: [
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/3fa63fc6-d4a8-437a-89f1-c86dc3e55c62-image_1756892894323.jpeg',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/4aa322a1-134c-4a58-87b7-ef53ad2d2783-image_1756892894685.jpeg',
+            ],
+          },
+          commercial: {
+            vehicleType: 'four_wheeler',
+            manufacturerId: '507f1f77bcf86cd799439011',
+            modelId: '507f1f77bcf86cd799439012',
+            variantId: '507f1f77bcf86cd799439013',
+            year: 2019,
+            mileage: 80000,
+            transmissionTypeId: '507f1f77bcf86cd799439014',
+            fuelTypeId: '507f1f77bcf86cd799439015',
+            color: 'Blue',
+            isFirstOwner: false,
+            hasInsurance: true,
+            hasRcBook: true,
+            additionalFeatures: [
+              'GPS Tracking',
+              'Air Brakes',
+              'Fleet Management',
+            ],
+            commercialVehicleType: 'truck',
+            bodyType: 'flatbed',
+            payloadCapacity: 5000,
+            payloadUnit: 'kg',
+            axleCount: 2,
+            hasFitness: true,
+            hasPermit: true,
+            seatingCapacity: 2,
+          },
+        },
+      },
+      two_wheeler: {
+        summary: 'Two Wheeler Advertisement',
+        description: 'Example for creating a two-wheeler advertisement',
+        value: {
+          category: 'two_wheeler',
+          data: {
+            description: 'Bike near chittar for sale, good condition',
+            price: 45000,
+            location: 'Chittar,Pathanmathitta',
+            link: 'https://example.com/two-wheeler-details/chittar-bike',
+            images: [
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/6137d10f-798b-41c0-9f89-2f2a09be7aa3-image_1757739698227.png',
+              'https://ado-dad.s3.ap-south-1.amazonaws.com/uploads/1d3be360-f296-4882-b490-449ed58a7dc7-image_1757739701656.png',
+            ],
+          },
+          vehicle: {
+            vehicleType: 'two_wheeler',
+            manufacturerId: '68b5376e019b16f4fd2c1b1e',
+            modelId: '68b54bac2e106cc77e5e7098',
+            variantId: '68b54c96ac287cf92222d5fa',
+            year: 2015,
+            mileage: 20,
+            transmissionTypeId: '68b53a421f3fb49e93b9ef59',
+            fuelTypeId: '68b53a26933e8b3908eb5448',
+            color: 'Black',
+            isFirstOwner: true,
+            hasInsurance: true,
+            hasRcBook: true,
+            additionalFeatures: [],
+          },
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    description: 'Advertisement created successfully',
+    type: DetailedAdResponseDto,
+    schema: {
+      example: {
+        id: '507f1f77bcf86cd799439011',
+        title: 'Honda City 2020 (White)',
+        description: 'Honda City 2020 Model - Single Owner',
+        price: 850000,
+        images: ['https://example.com/vehicle1.jpg'],
+        location: 'Delhi, NCR',
+        category: 'private_vehicle',
+        isActive: true,
+        status: 'active',
+        postedAt: '2024-01-15T10:30:00.000Z',
+        updatedAt: '2024-01-15T10:30:00.000Z',
+        postedBy: '507f1f77bcf86cd799439021',
+        user: {
+          id: '507f1f77bcf86cd799439021',
+          name: 'John Doe',
+          email: 'john@example.com',
+          phone: '+91-9876543210',
+          profilePic: 'https://example.com/profile.jpg',
+        },
+        vehicleDetails: {
+          vehicleType: 'four_wheeler',
+          manufacturerId: '507f1f77bcf86cd799439031',
+          modelId: '507f1f77bcf86cd799439041',
+          variantId: '507f1f77bcf86cd799439051',
+          year: 2020,
+          mileage: 25000,
+          transmissionTypeId: '507f1f77bcf86cd799439061',
+          fuelTypeId: '507f1f77bcf86cd799439071',
+          color: 'White',
+          isFirstOwner: true,
+          hasInsurance: true,
+          hasRcBook: true,
+          additionalFeatures: ['Sunroof', 'Leather Seats'],
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad request - validation error or missing required fields',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: [
+          'Description, price, and location are required for all ad types',
+          'Vehicle data is required for vehicle advertisements',
+          'Invalid manufacturer ID: 507f1f77bcf86cd799439999',
+        ],
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - authentication required',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - insufficient permissions',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+        error: 'Forbidden',
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  async create(
+    @Body() dto: CreateAdV2Dto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() req: any,
+  ): Promise<DetailedAdResponseDto> {
+    if (!req.user?.id) {
+      throw new BadRequestException('User ID not found in request');
+    }
+
+    const userId = String(req.user.id);
+    const userType = req.user.userType || req.user.role || 'USER';
+
+    // Errors are logged (without the body) by SellApiExceptionFilter.
+    const result = await this.createAdUc.exec({
+      dto,
+      userId,
+      userType,
+      idempotencyKey,
+    });
+
+    return result as DetailedAdResponseDto;
+  }
+
+  @Post('list')
+  @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read. Each call costs a geo aggregation,
+  // so it is throttled per client IP. Fails open if Redis is unavailable.
+  @Throttle({ name: 'adsList', limit: 60, ttl: 60 })
+  // P0-6: optional auth through the shared passport pipeline — verifies the
+  // signature, expiry and that the user still exists, and downgrades
+  // suspended/banned accounts to anonymous. Anonymous callers still get 200.
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
+  async list(@Body() dto: ListAdsV2Dto, @Req() req: any) {
+    try {
+      const userId: string | undefined = req.user?.id;
+      // Search context: an anonymous session id for event logging, and the
+      // debug switch (never honoured in production).
+      const sessionId = this.headerString(req, 'x-session-id');
+      const debug =
+        process.env.NODE_ENV !== 'production' && this.headerString(req, 'x-search-debug') === '1';
+
+      const result = await this.listAdsUc.exec(dto, userId || undefined, { sessionId, debug });
+      return result;
+    } catch (error) {
+      console.error('Error listing v2 advertisements:', error);
+      throw error;
+    }
+  }
+
+  @Post('search/events')
+  @HttpCode(HttpStatus.ACCEPTED)
+  // Click/contact feedback on search results (audit §C.11). Public, throttled,
+  // anonymous: it carries an event id and an ad id, nothing about the person.
+  @Throttle({ name: 'searchEvents', limit: 120, ttl: 60 })
+  @ApiOperation({
+    summary: 'Report a click, contact or favourite on a search result',
+    description:
+      'Send `query.eventId` from the list response, the ad id, its 0-based position and the action. ' +
+      'Used to tune ranking and suggestions; fire-and-forget from the app.',
+  })
+  async searchEvent(@Body() dto: SearchEventDto) {
+    const recorded = await this.searchEvents.recordClick(dto);
+    return { recorded };
+  }
+
+  private headerString(req: any, name: string): string | undefined {
+    const v = req?.headers?.[name];
+    const s = Array.isArray(v) ? v[0] : v;
+    return typeof s === 'string' && s.trim() ? s.trim() : undefined;
+  }
+
+  @Get('me/stats')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async myStats(@Req() req: any) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return { ads: 0, wishlist: 0, chats: 0 };
+    }
+    return this.profileStatsUc.exec(userId);
+  }
+
+  @Get('sellers/:id/stats')
+  @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read.
+  @Throttle({ name: 'sellerStats', limit: 60, ttl: 60 })
+  @ApiOperation({
+    summary: 'Trust signals for a seller (ad count, member-since, reply time)',
+    description:
+      'Returns public trust signals for a seller. No authentication required. Response is cached for 5 minutes per seller.',
+  })
+  @ApiParam({ name: 'id', description: 'Seller (user) ObjectId' })
+  @ApiResponse({
+    status: 200,
+    description: 'Seller stats returned successfully',
+    schema: {
+      example: {
+        adCount: 12,
+        memberSince: '2023-01-15T00:00:00.000Z',
+        isVerified: true,
+        avgReplyMinutes: 5,
+        rating: null,
+        ratingCount: 0,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Seller not found',
+    schema: {
+      example: { statusCode: 404, message: 'Seller not found', error: 'Not Found' },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  async sellerStats(@Param('id') id: string) {
+    if (!id || typeof id !== 'string' || id.trim().length === 0) {
+      throw new BadRequestException('Seller id is required');
+    }
+    return this.sellerStatsUc.exec(id.trim());
+  }
+
+  @Get(':id/edit')
+  @HttpCode(HttpStatus.OK)
+  @UseFilters(SellApiExceptionFilter)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ad in POST /v2/ads body shape, for pre-filling the edit form',
+    description:
+      'Owner or super admin only; anything else is 404 NOT_FOUND. Returns { id, status, category, data: { title, description, price, location, latitude, longitude, media: [{url}], videoUrl }, and one of vehicle | commercial | property (with manufacturerName, modelName, variantName for vehicles) }.',
+  })
+  async getForEdit(@Param('id') id: string, @Req() req: any) {
+    return this.getAdForEditUc.exec({
+      adId: String(id ?? '').trim(),
+      userId: String(req.user.id),
+      userType: req.user.type,
+    });
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @UseFilters(SellApiExceptionFilter)
+  @Throttle({ name: 'adsUpdate', limit: 60, ttl: 3600, by: 'user' })
+  @UseGuards(JwtAuthGuard, UserThrottleGuard, SuspensionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Edit an ad (full replace of editable fields)',
+    description:
+      'Same body as POST /v2/ads, with data.media [{mediaId}|{url}], data.videoMediaId | data.videoUrl | data.removeVideo. Category cannot change. Status/approval are not changed. Idempotency-Key is accepted and ignored.',
+  })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdV2Dto,
+    @Req() req: any,
+  ): Promise<DetailedAdResponseDto> {
+    const result = await this.updateAdUc.exec({
+      adId: String(id ?? '').trim(),
+      dto,
+      userId: String(req.user.id),
+      userType: req.user.type,
+    });
+    return result as DetailedAdResponseDto;
+  }
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  // P0-2: public, unauthenticated read.
+  @Throttle({ name: 'adsDetail', limit: 120, ttl: 60 })
+  // P0-6: see POST /v2/ads/list above.
+  @UseGuards(OptionalJwtAuthGuard)
+  @GetAdByIdSwagger()
+  async getById(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Query('lat') latRaw?: string,
+    @Query('lng') lngRaw?: string,
+  ): Promise<DetailedAdResponseDto> {
+    // Validate ID parameter
+    if (!id || typeof id !== 'string' || id.trim().length === 0) {
+      throw new BadRequestException('Advertisement ID is required');
+    }
+
+    // Trim whitespace from ID
+    const adId = id.trim();
+
+    // Optional authentication: populated by OptionalJwtAuthGuard, null when the
+    // caller is anonymous (or suspended/banned).
+    const userId: string | undefined = req.user?.id;
+    const userType: string | undefined = req.user?.type;
+
+    // Optional viewer position → `distance` in the response. Ignored unless
+    // both are valid coordinates; never an error, the page works without it.
+    const lat = latRaw != null && latRaw !== '' ? Number(latRaw) : NaN;
+    const lng = lngRaw != null && lngRaw !== '' ? Number(lngRaw) : NaN;
+    const hasPosition =
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lng) <= 180;
+
+    // Call the use case to get advertisement by ID
+    // userId will be undefined if no valid token is provided
+    return await this.getAdByIdUc.exec({
+      adId: adId,
+      userId: userId || undefined,
+      userType,
+      lat: hasPosition ? lat : undefined,
+      lng: hasPosition ? lng : undefined,
+    });
+  }
+}
