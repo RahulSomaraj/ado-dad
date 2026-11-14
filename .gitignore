@@ -2,14 +2,12 @@
 /dist
 /node_modules
 /build
-package-lock.json
 node_modules/
 .env
 .env.example
 .env.prod
 .env.uat
 env.prod.for.docker
-package-lock.json
 
 # Test reports and generated files
 /reports

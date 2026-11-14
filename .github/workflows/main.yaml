@@ -41,7 +41,7 @@ jobs:
             git pull origin develop
 
             # Install dependencies
-            npm install --legacy-peer-deps 
+            npm ci
 
             # Build Node 
             npm run build
