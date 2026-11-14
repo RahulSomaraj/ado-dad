@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getModelToken } from '@nestjs/mongoose';
+import { User } from '../../users/schemas/user.schema';
 import { AdsController } from './ads.controller';
 import { AdsService } from '../services/ads.service';
 import { S3Service } from '../../shared/s3.service';
@@ -63,6 +65,10 @@ describe('AdsController', () => {
         {
           provide: VehicleInventoryService,
           useValue: mockVehicleInventoryService,
+        },
+        {
+          provide: getModelToken(User.name),
+          useValue: {},
         },
       ],
     }).compile();

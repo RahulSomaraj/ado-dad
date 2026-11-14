@@ -6,24 +6,24 @@ import * as request from 'supertest';
 import { Types } from 'mongoose';
 
 // App modules
-import { AppModule } from '../app.module';
-import { AdsV2Module } from './ads.v2.module';
+import { AppModule } from '../../app.module';
+import { AdsV2Module } from '../ads.v2.module';
 
 // Schemas
-import { User, UserSchema } from '../users/schemas/user.schema';
-import { Ad, AdSchema } from '../ads/schemas/ad.schema';
+import { User, UserSchema } from '../../users/schemas/user.schema';
+import { Ad, AdSchema } from '../../ads/schemas/ad.schema';
 import {
   PropertyAd,
   PropertyAdSchema,
-} from '../ads/schemas/property-ad.schema';
-import { VehicleAd, VehicleAdSchema } from '../ads/schemas/vehicle-ad.schema';
+} from '../../ads/schemas/property-ad.schema';
+import { VehicleAd, VehicleAdSchema } from '../../ads/schemas/vehicle-ad.schema';
 import {
   CommercialVehicleAd,
   CommercialVehicleAdSchema,
-} from '../ads/schemas/commercial-vehicle-ad.schema';
+} from '../../ads/schemas/commercial-vehicle-ad.schema';
 
 // DTOs
-import { CreateAdV2Dto, AdCategoryV2 } from './dto/create-ad-v2.dto';
+import { CreateAdV2Dto, AdCategoryV2 } from '../dto/create-ad-v2.dto';
 
 describe('Ads V2 - Create Advertisement (e2e)', () => {
   let app: INestApplication;

@@ -6,7 +6,7 @@ const createCartModelMock = () => {
   const cartDoc: any = {
     items: [],
     save: jest.fn().mockResolvedValue(undefined),
-    populate: jest.fn().mockResolvedValue(undefined),
+    populate: jest.fn(function (this: any) { return Promise.resolve(this); }),
   };
 
   const CartModel: any = jest.fn().mockImplementation(data => {

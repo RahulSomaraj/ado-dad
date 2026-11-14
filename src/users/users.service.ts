@@ -24,7 +24,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { LoginResponse } from './dto/login-response.dto';
 import { UserType } from './enums/user.types';
 import { RedisService } from '../shared/redis.service';
-import { AdDocument } from 'src/ads/schemas/ad.schema';
+import { AdDocument } from '../ads/schemas/ad.schema';
 
 interface PaginatedUsersResponse {
   users: Partial<User>[];

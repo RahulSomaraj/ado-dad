@@ -17,7 +17,7 @@ import { UpdateManufacturerDto } from './dto/update-manufacturer.dto';
 import { FilterManufacturerDto } from './dto/filter-manufacturer.dto';
 import { PaginatedManufacturerResponseDto } from './dto/manufacturer-response.dto';
 import { RedisService } from '../shared/redis.service';
-import { parseFile } from 'src/utils/file-parser.util';
+import { parseFile } from '../utils/file-parser.util';
 
 @Injectable()
 export class ManufacturersService {
@@ -106,6 +106,9 @@ export class ManufacturersService {
       originCountry: 1,
       createdAt: 1,
       updatedAt: 1,
+      // Virtual sort for the app's brand picker: expands to
+      // { isPopular: -1, popularityRank: 1, name: 1 } (direction ignored).
+      popularity: 1,
     };
     const field = sortBy && allowed[sortBy] ? sortBy : 'name';
     const dir: 1 | -1 = sortOrder === 'DESC' ? -1 : 1;
@@ -325,7 +328,10 @@ export class ManufacturersService {
       filters.sortBy,
       filters.sortOrder,
     );
-    const sort: { [key: string]: SortOrder } = { [sortBy]: sortDir };
+    const sort: { [key: string]: SortOrder } =
+      sortBy === 'popularity'
+        ? { isPopular: -1, popularityRank: 1, name: 1 }
+        : { [sortBy]: sortDir };
 
     // Pagination - return everything if limit/page not provided OR if page=1&limit=100
     const isGetAllRequest =

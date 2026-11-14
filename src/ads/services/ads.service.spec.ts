@@ -15,6 +15,7 @@ import { LocationHierarchyService } from '../../common/services/location-hierarc
 import { Favorite } from '../../favorites/schemas/schema.favorite';
 import { ChatRoom } from '../../chat/schemas/chat-room.schema';
 import { ChatMessage } from '../../chat/schemas/chat-message.schema';
+import { AdsCache } from '../../ads-v2/infrastructure/services/ads-cache';
 import { Types } from 'mongoose';
 
 describe('AdsService', () => {
@@ -144,6 +145,10 @@ describe('AdsService', () => {
         {
           provide: LocationHierarchyService,
           useValue: mockLocationHierarchyService,
+        },
+        {
+          provide: AdsCache,
+          useValue: { invalidateLists: jest.fn(), invalidateById: jest.fn() },
         },
       ],
     }).compile();

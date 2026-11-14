@@ -91,7 +91,7 @@ describe('Phone Validation Utility', () => {
     it('should parse full Indian phone number', () => {
       const parsed = parsePhoneNumber('+919876543210');
       expect(parsed).not.toBeNull();
-      expect(parsed?.countryCode).toBe('IN');
+      expect(parsed?.countryCode).toBe('+91');
       expect(parsed?.phoneNumber).toBe('9876543210');
     });
 
@@ -106,14 +106,14 @@ describe('Phone Validation Utility', () => {
     it('should parse phone number without + prefix', () => {
       const parsed = parsePhoneNumber('919876543210');
       expect(parsed).not.toBeNull();
-      expect(parsed?.countryCode).toBe('IN');
+      expect(parsed?.countryCode).toBe('+91');
       expect(parsed?.phoneNumber).toBe('9876543210');
     });
 
     it('should parse 10-digit number as India by default', () => {
       const parsed = parsePhoneNumber('9876543210');
       expect(parsed).not.toBeNull();
-      expect(parsed?.countryCode).toBe('IN');
+      expect(parsed?.countryCode).toBe('+91');
       expect(parsed?.phoneNumber).toBe('9876543210');
     });
 

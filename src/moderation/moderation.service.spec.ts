@@ -183,7 +183,7 @@ describe('ModerationService', () => {
     strikeModel.countDocuments.mockReturnValueOnce(q(1));
     userModel.findById.mockReturnValue(q({ _id: 'u1' }));
 
-    await service.removeStrike('s1', 'admin1');
+    await service.removeStrike('s1', '507f1f77bcf86cd799439011');
 
     expect(strikeDoc.isActive).toBe(false);
     expect(strikeDoc.save).toHaveBeenCalled();

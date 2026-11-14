@@ -11,7 +11,7 @@ import {
   AuthTokens,
   AuthTokensSchema,
 } from '../auth/schemas/schema.refresh-token';
-import { AdSchema } from 'src/ads/schemas/ad.schema';
+import { AdSchema } from '../ads/schemas/ad.schema';
 
 @Module({
   imports: [

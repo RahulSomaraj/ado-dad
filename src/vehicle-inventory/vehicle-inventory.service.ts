@@ -35,7 +35,7 @@ import { RedisService } from '../shared/redis.service';
 import { ManufacturersService } from './manufacturers.service';
 import { PaginatedVehicleModelResponseDto } from './dto/vehicle-model-response.dto';
 import { PaginatedVehicleVariantResponseDto } from './dto/vehicle-variant-response.dto';
-import { parseFile } from 'src/utils/file-parser.util';
+import { parseFile } from '../utils/file-parser.util';
 import {
   Manufacturer,
   ManufacturerDocument,
