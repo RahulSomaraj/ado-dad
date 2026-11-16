@@ -29,7 +29,8 @@ export class FilterManufacturerDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Sort by field',
+    description:
+      "Sort by field. 'popularity' sorts isPopular first, then popularityRank asc, then name (sortOrder ignored).",
     enum: [
       'name',
       'displayName',
@@ -38,6 +39,7 @@ export class FilterManufacturerDto {
       'headquarters',
       'createdAt',
       'updatedAt',
+      'popularity',
     ],
     example: 'name',
   })
@@ -50,6 +52,7 @@ export class FilterManufacturerDto {
     'headquarters',
     'createdAt',
     'updatedAt',
+    'popularity',
   ])
   sortBy?: string;
 

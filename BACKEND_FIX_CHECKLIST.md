@@ -271,6 +271,7 @@ against Mongo/Redis.**
 | **C3** | Seller `email`/`phoneNumber` out of list rows | **Frontend audits and confirms**, then backend ships. Shipping blind breaks call/chat buttons |
 | **C4** | `commercialVehicleTypes` server filter | **Backend fixes and confirms**, then frontend removes the workaround |
 | **C5** | Retire v1 `/ads` writes | **Frontend migrates first**, backend deletes after |
+| **C6** | Popular brands: manufacturer responses gain `isPopular` + `popularityRank` (additive) and `GET /vehicle-inventory/manufacturers` gains `sortBy=popularity` | **Backend ships first** — additive only; Flutter `VehicleManufacturer.fromJson` reads named keys and ignores extras (verified 14 Nov 2026). App then sends `sortBy=popularity` for the sell-flow Popular grid; admin default `name ASC` untouched |
 
 ---
 

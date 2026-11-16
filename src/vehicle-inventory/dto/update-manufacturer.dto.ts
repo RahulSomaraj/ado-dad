@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsArray,
   IsIn,
+  Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -89,6 +90,25 @@ export class UpdateManufacturerDto {
   @IsOptional()
   @IsBoolean()
   isPremium?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the manufacturer appears in the app\'s "Popular" brands section.',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPopular?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Order among popular manufacturers (lower = first). Ignored unless isPopular is true.',
+    example: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  popularityRank?: number;
 
   @ApiPropertyOptional({
     description:

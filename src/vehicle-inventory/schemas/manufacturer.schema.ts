@@ -37,6 +37,14 @@ export class Manufacturer {
   @Prop({ default: false })
   isPremium: boolean;
 
+  /** Shown in the app's "Popular" brands grid (admin-curated). */
+  @Prop({ default: false })
+  isPopular: boolean;
+
+  /** Order among popular brands — lower comes first. Ignored unless isPopular. */
+  @Prop({ default: 999 })
+  popularityRank: number;
+
   @Prop({
     required: false,
     enum: [
@@ -74,6 +82,15 @@ ManufacturerSchema.index({
   description: 'text',
   originCountry: 'text',
   headquarters: 'text',
+});
+
+// Popularity ordering for the app's brand picker (sortBy=popularity):
+// { isPopular: -1, popularityRank: 1, name: 1 } over active, undeleted rows
+ManufacturerSchema.index({
+  isDeleted: 1,
+  isActive: 1,
+  isPopular: -1,
+  popularityRank: 1,
 });
 
 // Index for efficient case-insensitive sorting by name (default sort)

@@ -161,7 +161,11 @@ export class ListAdsV2Dto {
   @IsOptional()
   @IsString()
   @IsIn(['createdAt', 'updatedAt', 'price', 'title', 'relevance', 'newest', 'year', 'distance'])
-  sortBy?: string = 'createdAt';
+  // No class default on purpose: `undefined` must mean "no preference" so the
+  // geo feed keeps $geoNear's nearest-first order (list-ads.uc.ts
+  // sortExplicitlyRequested) and searches keep scored order (search-planner).
+  // The non-geo feed still falls back to createdAt DESC in the use case.
+  sortBy?: string;
 
   @ApiPropertyOptional({
     description: 'Sort order',

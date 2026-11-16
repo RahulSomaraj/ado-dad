@@ -70,6 +70,20 @@ export class ManufacturerResponseDto {
 
   @ApiProperty({
     description:
+      'Whether the manufacturer appears in the app\'s "Popular" brands section',
+    example: false,
+  })
+  isPopular: boolean;
+
+  @ApiProperty({
+    description:
+      'Order among popular manufacturers (lower = first); meaningful only when isPopular is true',
+    example: 999,
+  })
+  popularityRank: number;
+
+  @ApiProperty({
+    description:
       'Vehicle category for this manufacturer (e.g., passenger_car, two_wheeler, commercial_vehicle)',
     example: 'passenger_car',
   })
